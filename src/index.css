@@ -1,0 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", serif;
+  
+  --color-brand-cream: #FDFCFB;
+  --color-brand-rose: #C97C7B;
+  --color-brand-rose-light: #FDF8F8;
+  --color-brand-dark: #1A1A1A;
+  --color-brand-gray: #717171;
+  --color-brand-gold: #B8924D;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-cream text-brand-dark font-sans antialiased selection:bg-brand-rose/20;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+
+  .display-hero {
+    @apply text-[40px] md:text-[48px] font-medium leading-tight;
+  }
+
+  .heading-section {
+    @apply text-[24px] md:text-[28px] font-medium leading-snug;
+  }
+
+  .body-text {
+    @apply text-[16px] leading-relaxed;
+  }
+
+  .label-text {
+    @apply text-[12px] md:text-[13px] uppercase tracking-wider font-semibold;
+  }
+}
+
+.premium-shadow {
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.05);
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.editorial-underline {
+  @apply relative inline-block;
+}
+
+.editorial-underline::after {
+  content: '';
+  @apply absolute bottom-0.5 left-0 w-full h-px bg-current opacity-20;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-dark/5 rounded-full hover:bg-brand-dark/10 transition-colors;
+}

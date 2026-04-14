@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Fields: uid, name, specialty, bio, location, whatsapp, slug, avatar, createdAt
+    //
+    // Collection: services
+    // Fields: professionalId, name, description, duration, price, category, active
+    //
+    // Collection: appointments
+    // Fields: professionalId, serviceId, serviceName, clientName, clientPhone, date, time, status, createdAt
+    //
+    // Collection: availability
+    // Fields: professionalId, dayOfWeek, startTime, endTime, active
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner(data) {
+      return isAuthenticated() && request.auth.uid == data.professionalId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // Validators
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'slug']) &&
+             data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.slug is string && data.slug.size() > 2 && data.slug.size() < 50;
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['professionalId', 'name', 'duration', 'price']) &&
+             data.professionalId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.duration is number && data.duration > 0 &&
+             data.price is number && data.price >= 0;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['professionalId', 'serviceId', 'clientName', 'date', 'time']) &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.date is string && data.time is string;
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if true; // Public profiles are readable
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /services/{serviceId} {
+      allow read: if true; // Services are public
+      allow create: if isAuthenticated() && isValidService(request.resource.data);
+      allow update: if isDocOwner(resource.data) && isValidService(request.resource.data);
+      allow delete: if isDocOwner(resource.data);
+    }
+
+    match /appointments/{appointmentId} {
+      allow read: if isAuthenticated() && (request.auth.uid == resource.data.professionalId);
+      allow create: if isValidAppointment(request.resource.data); // Anyone can book
+      allow update: if isAuthenticated() && (request.auth.uid == resource.data.professionalId);
+      allow delete: if isAuthenticated() && (request.auth.uid == resource.data.professionalId);
+    }
+
+    match /availability/{availabilityId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.professionalId == request.auth.uid;
+      allow update: if isDocOwner(resource.data) && request.resource.data.professionalId == request.auth.uid;
+      allow delete: if isDocOwner(resource.data);
+    }
+  }
+}

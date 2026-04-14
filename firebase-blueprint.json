@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Dados da profissional autônoma",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "specialty": { "type": "string" },
+        "bio": { "type": "string" },
+        "location": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "slug": { "type": "string" },
+        "avatar": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "slug"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Serviços oferecidos pela profissional",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "duration": { "type": "number" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["professionalId", "name", "duration", "price"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Agendamentos realizados pelas clientes",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientPhone": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "serviceId", "clientName", "date", "time"]
+    },
+    "Availability": {
+      "title": "Availability",
+      "description": "Configuração de horários da profissional",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "dayOfWeek": { "type": "number" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["professionalId", "dayOfWeek", "startTime", "endTime"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Perfil da profissional"
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Lista de serviços"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Lista de agendamentos"
+    },
+    "/availability/{availabilityId}": {
+      "schema": "Availability",
+      "description": "Configuração de horários"
+    }
+  }
+}

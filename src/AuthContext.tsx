@@ -1,0 +1,93 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth, db, OperationType, handleFirestoreError } from './firebase';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+
+interface AuthContextType {
+  user: User | null;
+  profile: any | null;
+  loading: boolean;
+  isAuthReady: boolean;
+}
+
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  profile: null,
+  loading: true,
+  isAuthReady: false,
+});
+
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  useEffect(() => {
+    let unsubscribeProfile: (() => void) | null = null;
+
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        console.warn('[AuthContext] Safety timeout reached. Forcing loading to false.');
+        setLoading(false);
+        setIsAuthReady(true);
+      }
+    }, 5000);
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      console.log('[AuthContext] Auth state changed:', currentUser?.uid || 'null');
+      setUser(currentUser);
+      
+      if (unsubscribeProfile) {
+        console.log('[AuthContext] Unsubscribing from previous profile...');
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
+      if (currentUser) {
+        console.log('[AuthContext] Starting profile snapshot for:', currentUser.uid);
+        const docRef = doc(db, 'users', currentUser.uid);
+        
+        // Use onSnapshot for real-time updates
+        unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
+          console.log('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());
+          if (docSnap.exists()) {
+            setProfile(docSnap.data());
+          } else {
+            console.log('[AuthContext] Profile document does not exist yet.');
+            setProfile(null);
+          }
+          setLoading(false);
+          setIsAuthReady(true);
+          clearTimeout(safetyTimeout);
+        }, (error) => {
+          console.error("[AuthContext] Error listening to profile:", error);
+          setLoading(false);
+          setIsAuthReady(true);
+          clearTimeout(safetyTimeout);
+        });
+      } else {
+        console.log('[AuthContext] No user, setting loading to false.');
+        setProfile(null);
+        setLoading(false);
+        setIsAuthReady(true);
+        clearTimeout(safetyTimeout);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+      clearTimeout(safetyTimeout);
+    };
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, profile, loading, isAuthReady }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
