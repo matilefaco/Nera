@@ -7,17 +7,55 @@ import {
   MapPin, Phone, Calendar as CalendarIcon, Clock, 
   CheckCircle2, ChevronRight, ArrowLeft, Sparkles,
   ShieldCheck, Instagram, Heart, Info, MessageCircle,
-  ExternalLink, ArrowDown
+  ExternalLink, ArrowDown, Star, Share2, Copy,
+  Check, Award, Users, Zap, HelpCircle, Home, Plus, X
 } from 'lucide-react';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, cn } from '../lib/utils';
 import { toast } from 'sonner';
+import Logo from '../components/Logo';
+
+// --- Sub-components for the Premium Slug Page ---
+
+const SectionHeading = ({ label, title, subtitle, centered = true }: any) => (
+  <div className={cn("mb-16", centered ? "text-center" : "text-left")}>
+    <span className="label-text mb-4 block">{label}</span>
+    <h2 className="heading-section text-brand-ink mb-4">{title}</h2>
+    {subtitle && <p className="body-text text-brand-stone max-w-lg mx-auto italic">{subtitle}</p>}
+  </div>
+);
+
+const PremiumButton = ({ children, onClick, variant = 'primary', className, disabled, loading }: any) => {
+  const baseStyles = "relative overflow-hidden px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] transition-all duration-500 flex items-center justify-center gap-3";
+  const variants: any = {
+    primary: "bg-brand-ink text-brand-white hover:bg-brand-espresso premium-shadow",
+    secondary: "bg-brand-white text-brand-ink border border-brand-mist hover:border-brand-ink",
+    terracotta: "bg-brand-terracotta text-brand-white hover:bg-brand-sienna premium-shadow",
+  };
+
+  return (
+    <button 
+      onClick={onClick} 
+      disabled={disabled || loading}
+      className={cn(baseStyles, variants[variant], className, (disabled || loading) && "opacity-50 cursor-not-allowed")}
+    >
+      {loading ? (
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+          <Sparkles size={18} />
+        </motion.div>
+      ) : children}
+    </button>
+  );
+};
 
 export default function PublicProfile() {
   const { slug } = useParams();
   const [profile, setProfile] = useState<any>(null);
   const [services, setServices] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const servicesRef = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
   
   // Booking Flow State
   const [step, setStep] = useState(1);
@@ -31,22 +69,103 @@ export default function PublicProfile() {
   const [bookingLoading, setBookingLoading] = useState(false);
 
   useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 100);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
       if (!slug) {
         setLoading(false);
         return;
       }
+
+      // Fallback for Demo/Example
+      if (slug === 'helena-prado') {
+        const demoProfile = {
+          uid: 'demo-uid',
+          name: 'Helena Prado',
+          specialty: 'Design de Sobrancelhas e Brow Lamination',
+          city: 'Fortaleza',
+          bio: 'Atendimento em domicílio com experiência premium, foco em naturalidade e acabamento elegante.',
+          avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop',
+          avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop',
+          instagram: 'helenaprado.beauty',
+          whatsapp: '5585999999999',
+          serviceMode: 'home',
+          serviceAreas: [
+            { name: 'Aldeota', fee: 15 },
+            { name: 'Meireles', fee: 15 },
+            { name: 'Cocó', fee: 20 },
+            { name: 'Dionísio Torres', fee: 20 }
+          ],
+          portfolio: [
+            { url: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=1200&auto=format&fit=crop', category: 'Design Perfeito' },
+            { url: 'https://images.unsplash.com/photo-1620331311520-246422fd82f9?q=80&w=1200&auto=format&fit=crop', category: 'Brow Lamination' },
+            { url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=1200&auto=format&fit=crop', category: 'Close Técnico' },
+            { url: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?q=80&w=1200&auto=format&fit=crop', category: 'Processo' },
+            { url: 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?q=80&w=1200&auto=format&fit=crop', category: 'Resultado Final' },
+            { url: 'https://images.unsplash.com/photo-1600948836101-f9ffda59d250?q=80&w=1200&auto=format&fit=crop', category: 'Macro dos Fios' }
+          ]
+        };
+        const demoServices = [
+          { id: 's1', name: 'Design de Sobrancelhas', duration: 50, price: 80, description: 'Mapeamento facial completo e design personalizado.' },
+          { id: 's2', name: 'Brow Lamination', duration: 80, price: 140, description: 'Alinhamento dos fios para um olhar mais marcante e volumoso.' },
+          { id: 's3', name: 'Henna + Design', duration: 70, price: 95, description: 'Preenchimento natural com henna de alta durabilidade.' }
+        ];
+        const demoReviews = [
+          { id: 'r1', firstName: 'Mariana', neighborhood: 'Aldeota', rating: 5, comment: 'A Helena é impecável. O atendimento em domicílio é super prático e ela traz um clima de spa para casa.', serviceName: 'Design Premium', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString() },
+          { id: 'r2', firstName: 'Beatriz', neighborhood: 'Meireles', rating: 5, comment: 'Melhor brow lamination que já fiz! Super natural e duradouro. Recomendo de olhos fechados.', serviceName: 'Brow Lamination', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString() },
+          { id: 'r3', firstName: 'Carla', neighborhood: 'Cocó', rating: 5, comment: 'Profissional extremamente pontual e organizada. O material é todo esterilizado, me senti muito segura.', serviceName: 'Design + Henna', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString() }
+        ];
+        const demoStats = {
+          averageRating: 4.9,
+          totalReviews: 84,
+          totalCompletedBookings: 320,
+          topTags: ['Pontualidade', 'Delicadeza', 'Organização', 'Resultado natural']
+        };
+        setProfile(demoProfile);
+        setServices(demoServices);
+        setReviews(demoReviews);
+        setStats(demoStats);
+        setLoading(false);
+        return;
+      }
+
       try {
         const q = query(collection(db, 'users'), where('slug', '==', slug));
         const snapshot = await getDocs(q);
         
         if (!snapshot.empty) {
           const userData = snapshot.docs[0].data();
-          setProfile({ ...userData, uid: snapshot.docs[0].id });
+          const professionalId = snapshot.docs[0].id;
+          setProfile({ ...userData, uid: professionalId });
           
-          const servicesQ = query(collection(db, 'services'), where('professionalId', '==', userData.uid || snapshot.docs[0].id), where('active', '==', true));
+          // Fetch Services
+          const servicesQ = query(collection(db, 'services'), 
+            where('professionalId', '==', professionalId), 
+            where('active', '==', true)
+          );
           const servicesSnapshot = await getDocs(servicesQ);
           setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+          // Fetch Stats
+          const statsDoc = await getDocs(query(collection(db, 'review_stats'), where('professionalId', '==', professionalId)));
+          if (!statsDoc.empty) {
+            setStats(statsDoc.docs[0].data());
+          }
+
+          // Fetch Reviews
+          const reviewsQ = query(
+            collection(db, 'reviews'), 
+            where('professionalId', '==', professionalId),
+            where('publicApproved', '==', true),
+            where('publicDisplayMode', 'in', ['named', 'anonymous'])
+          );
+          const reviewsSnapshot = await getDocs(reviewsQ);
+          setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
         } else {
           setProfile(null);
         }
@@ -64,12 +183,6 @@ export default function PublicProfile() {
   const calculateTotalPrice = () => {
     if (!selectedService) return 0;
     const basePrice = Number(selectedService.price) || 0;
-    
-    if (profile?.serviceMode === 'studio') return basePrice;
-    
-    // Both 'included' and 'extra' add the area fee to the base service price.
-    // The difference is purely visual in how it's presented to the client.
-    // In the new model, we always sum them but show only the final value.
     return basePrice + (selectedArea?.fee || 0);
   };
 
@@ -83,7 +196,7 @@ export default function PublicProfile() {
         serviceId: selectedService.id,
         serviceName: selectedService.name,
         price: selectedService.price,
-        travelFee: profile.pricingStrategy === 'extra' ? (selectedArea?.fee || 0) : 0,
+        travelFee: selectedArea?.fee || 0,
         totalPrice: totalPrice,
         neighborhood: selectedArea?.name || '',
         address: clientAddress,
@@ -95,6 +208,7 @@ export default function PublicProfile() {
         createdAt: new Date().toISOString()
       });
       setStep(5); // Success
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error("Booking error:", error);
       toast.error('Erro ao agendar horário');
@@ -104,420 +218,759 @@ export default function PublicProfile() {
   };
 
   const scrollToServices = () => {
-    servicesRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const addToCalendar = () => {
-    if (!selectedService || !profile) return;
-    const [year, month, day] = selectedDate.split('-');
-    const [hour, minute] = selectedTime.split(':');
-    const start = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
-    const end = new Date(start.getTime() + (Number(selectedService.duration || 60) * 60000));
-    
-    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(selectedService.name + ' com ' + profile.name)}&dates=${start.toISOString().replace(/-|:|\.\d\d\d/g, "")}/${end.toISOString().replace(/-|:|\.\d\d\d/g, "")}&details=${encodeURIComponent('Agendamento via Marca Aí')}&location=${encodeURIComponent(profile.address || profile.city || '')}`;
-    window.open(url, '_blank');
+    servicesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-cream">
-      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="text-brand-rose">
-        <Sparkles size={32} />
+    <div className="min-h-screen flex items-center justify-center bg-brand-parchment">
+      <motion.div 
+        animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }} 
+        transition={{ repeat: Infinity, duration: 2 }} 
+        className="text-brand-terracotta"
+      >
+        <Logo variant="light" className="w-24 opacity-20" />
       </motion.div>
     </div>
   );
   
   if (!profile) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-brand-cream p-6 text-center">
-      <div className="w-20 h-20 bg-brand-rose/10 text-brand-rose rounded-full flex items-center justify-center mb-6">
-        <Info size={40} />
+    <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-10 border border-brand-mist shadow-sm"
+      >
+        <Info size={40} strokeWidth={1.5} />
+      </motion.div>
+      <h1 className="text-4xl font-serif font-normal text-brand-ink mb-6">Página não encontrada</h1>
+      <p className="body-text text-brand-stone mb-12 max-w-sm mx-auto leading-relaxed">
+        O link que você acessou pode estar incorreto ou o perfil da profissional ainda não foi publicado.
+      </p>
+      
+      <div className="flex flex-col sm:flex-row items-center gap-4">
+        <Link 
+          to="/" 
+          className="w-full sm:w-auto bg-brand-ink text-brand-white px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all premium-shadow"
+        >
+          Voltar para o início
+        </Link>
+        <Link 
+          to="/p/helena-prado" 
+          className="w-full sm:w-auto bg-brand-white text-brand-ink border border-brand-mist px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all"
+        >
+          Ver perfil de exemplo
+        </Link>
       </div>
-      <h1 className="text-2xl font-serif font-bold text-brand-dark mb-2">Profissional não encontrada</h1>
-      <p className="text-brand-gray mb-8">O link que você acessou pode estar incorreto ou o perfil foi removido.</p>
-      <Link to="/" className="bg-brand-dark text-white px-8 py-4 rounded-full font-bold text-xs uppercase tracking-widest">
-        Voltar para o início
-      </Link>
     </div>
   );
 
   const isHomeService = profile.serviceMode === 'home' || profile.serviceMode === 'hybrid';
 
   return (
-    <div className="min-h-screen bg-brand-cream flex flex-col">
-      {/* Header / Hero */}
-      <header className="bg-white pt-24 pb-20 px-6 text-center relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-full opacity-[0.02] pointer-events-none">
-          <div className="absolute top-10 left-10 w-64 h-64 border border-brand-dark rounded-full" />
-          <div className="absolute bottom-10 right-10 w-96 h-96 border border-brand-dark rounded-full" />
+    <div className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10">
+      
+      {/* Sticky Header for Mobile Conversion */}
+      <AnimatePresence>
+        {scrolled && step === 1 && (
+          <motion.div 
+            initial={{ y: -100 }} 
+            animate={{ y: 0 }} 
+            exit={{ y: -100 }}
+            className="fixed top-0 left-0 w-full bg-brand-white/80 backdrop-blur-md border-b border-brand-mist z-[100] px-6 py-4 flex items-center justify-between md:hidden"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full overflow-hidden border border-brand-mist">
+                <img src={profile.avatar || profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              </div>
+              <span className="font-serif text-brand-ink text-sm">{profile.name.split(' ')[0]}</span>
+            </div>
+            <button 
+              onClick={scrollToServices}
+              className="bg-brand-ink text-brand-white px-6 py-3 rounded-full text-[9px] font-medium uppercase tracking-widest"
+            >
+              Agendar
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 1. HERO PREMIUM */}
+      <header className="relative min-h-[90vh] flex flex-col items-center justify-center pt-32 pb-24 px-6 text-center overflow-hidden">
+        {/* Background Elements */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-brand-linen/40 rounded-full blur-[100px]" />
+          <div className="absolute bottom-[-10%] left-[-5%] w-[400px] h-[400px] bg-brand-blush/30 rounded-full blur-[80px]" />
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative z-10 max-w-2xl mx-auto"
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="relative z-10 max-w-3xl mx-auto"
         >
-          <div className="w-32 h-32 bg-brand-rose-light rounded-full mx-auto mb-8 flex items-center justify-center text-brand-rose border border-brand-dark/5 shadow-2xl overflow-hidden">
-            {profile.avatar ? (
-              <img src={profile.avatar} alt={profile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-            ) : (
-              <span className="text-5xl font-serif font-bold">{profile.name?.[0] || '?'}</span>
-            )}
-          </div>
-
-          <div className="flex flex-col items-center gap-4 mb-8">
-            <h1 className="display-hero text-brand-dark">{profile.name}</h1>
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-brand-rose-light rounded-full border border-brand-rose/10">
-              <ShieldCheck size={16} className="text-brand-rose" />
-              <span className="label-text text-brand-rose">Profissional verificada • 100% confirmações recentes</span>
+          {/* Avatar with refined border */}
+          <div className="relative w-40 h-40 md:w-48 md:h-48 mx-auto mb-12">
+            <div className="absolute inset-0 bg-brand-terracotta/10 rounded-full animate-pulse" />
+            <div className="relative w-full h-full rounded-full overflow-hidden border-[6px] border-brand-white shadow-2xl">
+              {(profile.avatar || profile.avatarUrl) ? (
+                <img src={profile.avatar || profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-full h-full bg-brand-linen flex items-center justify-center text-brand-terracotta text-6xl font-serif">
+                  {profile.name?.[0]}
+                </div>
+              )}
+            </div>
+            <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-brand-white rounded-full flex items-center justify-center shadow-lg border border-brand-mist">
+              <ShieldCheck size={24} className="text-brand-terracotta" />
             </div>
           </div>
-          
-          <p className="label-text text-brand-gray tracking-[0.3em] mb-6">{profile.specialty || 'Especialista'}</p>
-          
-          <p className="text-brand-gray text-lg md:text-xl mb-10 leading-relaxed font-light italic px-4">
-            "{profile.bio || 'Bem-vinda ao meu espaço de beleza e cuidado. Agende seu horário e sinta-se única.'}"
-          </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 mb-12 text-[10px] font-bold uppercase tracking-widest text-brand-gray">
+          <span className="label-text mb-6 block text-brand-terracotta">Profissional Verificada</span>
+          <h1 className="display-hero text-brand-ink mb-6">{profile.name}</h1>
+          
+          <div className="flex flex-col items-center gap-4 mb-10">
+            <p className="text-[12px] md:text-[14px] font-medium text-brand-stone uppercase tracking-[0.4em]">{profile.specialty || 'Especialista em Beleza'}</p>
+            <div className="h-px w-12 bg-brand-mist" />
+            <p className="body-text text-brand-stone max-w-md italic text-lg">
+              "{profile.bio || 'Transformando olhares e elevando a autoestima com atendimento personalizado e exclusivo.'}"
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-8 mb-16 text-[11px] font-medium uppercase tracking-widest text-brand-stone">
             <div className="flex items-center gap-2">
-              <MapPin size={14} className="text-brand-dark/20" />
-              <span>{isHomeService ? `Atende em domicílio em ${profile.city}` : profile.city}</span>
+              <MapPin size={16} className="text-brand-terracotta" />
+              <span className="editorial-underline">{profile.city}</span>
             </div>
-            {profile.instagram && (
-              <a href={`https://instagram.com/${profile.instagram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-rose transition-colors">
-                <Instagram size={14} className="text-brand-dark/20" />
-                <span className="editorial-underline">@{profile.instagram.replace('@', '')}</span>
-              </a>
-            )}
-            {profile.whatsapp && (
-              <a href={`https://wa.me/${profile.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:text-brand-rose transition-colors">
-                <MessageCircle size={14} className="text-brand-dark/20" />
-                <span className="editorial-underline">WhatsApp</span>
-              </a>
-            )}
+            <div className="flex items-center gap-2">
+              <Zap size={16} className="text-brand-terracotta" />
+              <span>Confirmação Instantânea</span>
+            </div>
           </div>
 
-          <div className="flex flex-col items-center gap-4">
-            <button 
-              onClick={scrollToServices}
-              className="w-full sm:w-auto bg-brand-dark text-white px-8 sm:px-16 py-6 sm:py-7 rounded-full text-xs font-bold uppercase tracking-widest hover:bg-brand-dark/90 transition-all premium-shadow flex flex-col items-center gap-1"
-            >
-              <span>Garantir meu horário</span>
-              <span className="text-[9px] opacity-40 font-normal tracking-normal normal-case">Leva menos de 30 segundos</span>
-            </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+            <PremiumButton onClick={scrollToServices} className="w-full sm:w-auto min-w-[280px]">
+              Reservar Experiência <ChevronRight size={18} />
+            </PremiumButton>
+            {profile.instagram && (
+              <a 
+                href={`https://instagram.com/${profile.instagram.replace('@', '')}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 text-[11px] font-medium uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors group"
+              >
+                <Instagram size={18} className="group-hover:text-brand-terracotta transition-colors" />
+                <span>Ver Portfólio</span>
+              </a>
+            )}
           </div>
+        </motion.div>
+
+        <motion.div 
+          animate={{ y: [0, 10, 0] }} 
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 text-brand-mist"
+        >
+          <ArrowDown size={24} />
         </motion.div>
       </header>
 
-      {/* Gallery Section */}
-      {profile.portfolio && profile.portfolio.length > 0 && (
-        <section className="bg-white py-24 px-6 border-t border-brand-dark/5">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="heading-section mb-4">M e u  t r a b a l h o</h2>
-              <p className="text-brand-gray text-sm font-light">Resultados reais e personalizados.</p>
-            </div>
-            
-            <div className="space-y-16">
-              {Object.entries(
-                profile.portfolio.reduce((acc: any, item: any) => {
-                  const cat = item.category || 'Geral';
-                  if (!acc[cat]) acc[cat] = [];
-                  acc[cat].push(item);
-                  return acc;
-                }, {})
-              ).map(([category, items]: [string, any]) => (
-                <div key={category} className="space-y-6">
-                  <h3 className="text-[10px] font-bold text-brand-dark uppercase tracking-[0.3em] ml-2">{category}</h3>
-                  <div className="flex gap-6 overflow-x-auto pb-8 snap-x no-scrollbar -mx-2 px-2">
-                    {items.map((item: any, i: number) => (
-                      <div key={i} className="min-w-[280px] md:min-w-[320px] aspect-[4/5] bg-brand-cream rounded-[2.5rem] overflow-hidden border border-brand-dark/5 snap-start shadow-sm hover:shadow-xl transition-all duration-500 group">
-                        <img 
-                          src={item.url} 
-                          alt={`${category} ${i}`} 
-                          className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700 group-hover:scale-105"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+      {/* 2. STATUS CARD / TRUST BAR */}
+      <section className="px-6 -mt-12 relative z-20">
+        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+          {[
+            { label: 'Atendimentos', value: `${stats?.totalCompletedBookings || profile.totalBookings || '320'}+`, icon: Users },
+            { label: 'Avaliação', value: `${stats?.averageRating || '4.9'}/5`, icon: Star },
+            { label: 'Experiência', value: '5 anos', icon: Award },
+            { label: 'Resposta', value: '< 1h', icon: Clock },
+          ].map((stat, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1 }}
+              className="bg-brand-white/80 backdrop-blur-md border border-brand-mist p-6 md:p-8 rounded-[32px] text-center premium-shadow"
+            >
+              <div className="w-10 h-10 bg-brand-linen rounded-2xl flex items-center justify-center text-brand-terracotta mx-auto mb-4">
+                <stat.icon size={20} />
+              </div>
+              <div className="text-2xl font-serif text-brand-ink mb-1">{stat.value}</div>
+              <div className="text-[9px] uppercase tracking-widest text-brand-stone font-medium">{stat.label}</div>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* 2.5 INSIGHTS AGGREGATED (Layer 3) */}
+      {stats && (
+        <section className="pt-24 px-6">
+          <div className="max-w-5xl mx-auto flex flex-wrap justify-center gap-6">
+            {stats.topTags?.map((tag: string, i: number) => (
+              <div key={i} className="flex items-center gap-3 px-6 py-3 bg-brand-white border border-brand-mist rounded-full shadow-sm">
+                <div className="w-2 h-2 rounded-full bg-brand-terracotta" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">{tag}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-3 px-6 py-3 bg-brand-linen border border-brand-mist rounded-full shadow-sm">
+              <Heart size={14} className="text-brand-terracotta" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">98% Recomendariam</span>
             </div>
           </div>
         </section>
       )}
 
-      <main ref={servicesRef} className="flex-1 max-w-2xl mx-auto w-full px-6 py-24">
-        <AnimatePresence mode="wait">
-          {step === 1 && (
-            <motion.div key="step1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-              <div className="text-center mb-16">
-                <h2 className="heading-section mb-4">Escolha o Serviço</h2>
-                <p className="text-brand-gray text-sm font-light">Selecione o procedimento que deseja realizar.</p>
-              </div>
+      {/* 3. EDITORIAL ABOUT SECTION */}
+      <section className="py-32 px-6 overflow-hidden">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+          <motion.div 
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            className="relative"
+          >
+            <div className="aspect-[4/5] rounded-[40px] overflow-hidden border border-brand-mist premium-shadow">
+              <img 
+                src={(profile.portfolio?.[0]?.url || profile.portfolio?.[0]) || (profile.avatar || profile.avatarUrl)} 
+                alt="About" 
+                className="w-full h-full object-cover grayscale-[20%] hover:grayscale-0 transition-all duration-1000"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+            <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-brand-linen rounded-[32px] p-8 hidden md:flex flex-col justify-end border border-brand-mist premium-shadow">
+              <Sparkles size={32} className="text-brand-terracotta mb-4" />
+              <p className="text-xs font-serif italic text-brand-ink">"Beleza é sobre como você se sente por dentro."</p>
+            </div>
+          </motion.div>
 
-              <div className="space-y-6">
-                {services.length > 0 ? (
-                  services.map(service => (
-                    <motion.button 
-                      key={service.id}
-                      whileHover={{ y: -4 }}
-                      onClick={() => { setSelectedService(service); setStep(2); }}
-                      className="w-full bg-white p-10 rounded-[3rem] border border-brand-dark/5 text-left flex items-center justify-between hover:border-brand-rose/30 transition-all premium-shadow group"
-                    >
-                      <div className="flex-1 pr-10">
-                        <h4 className="font-serif italic text-2xl mb-2 group-hover:text-brand-rose transition-colors">{service.name}</h4>
-                        <p className="text-brand-gray text-sm mb-6 font-light leading-relaxed max-w-md">{service.description || 'Atendimento personalizado com foco no seu bem-estar.'}</p>
-                        <div className="flex items-center gap-8 text-[10px] text-brand-gray font-bold uppercase tracking-[0.2em]">
-                          <span className="flex items-center gap-2"><Clock size={14} className="opacity-40" /> {service.duration} min</span>
-                          <span className="text-brand-dark font-serif italic lowercase tracking-normal text-lg">a partir de {formatCurrency(service.price)}</span>
-                        </div>
-                      </div>
-                      <div className="w-14 h-14 rounded-full bg-brand-cream flex items-center justify-center text-brand-dark/10 group-hover:bg-brand-dark group-hover:text-white transition-all shrink-0">
-                        <ChevronRight size={28} />
-                      </div>
-                    </motion.button>
-                  ))
-                ) : (
-                  <div className="text-center py-24 bg-white/50 rounded-[3rem] border-2 border-dashed border-brand-dark/5">
-                    <Sparkles size={32} className="text-brand-dark/10 mx-auto mb-4" />
-                    <p className="text-brand-gray font-serif italic text-lg">Nenhum serviço disponível no momento.</p>
+          <motion.div 
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="label-text mb-6 block">A Essência</span>
+            <h2 className="heading-section text-brand-ink mb-8">A arte de desenhar olhares com naturalidade.</h2>
+            <div className="space-y-6 body-text text-brand-stone text-lg">
+              <p>
+                Acredito que as sobrancelhas são a moldura do rosto. Meu trabalho é focado em realçar sua expressão através de um design personalizado, respeitando sua anatomia e buscando sempre a harmonia perfeita.
+              </p>
+              <p>
+                Especialista em {profile.specialty || 'Design e Brow Lamination'}, utilizo técnicas avançadas e materiais de alta qualidade para entregar um resultado sofisticado, duradouro e, acima de tudo, natural.
+              </p>
+              <div className="pt-6 flex flex-wrap gap-4">
+                {['Atendimento Exclusivo', 'Produtos Premium', 'Biossegurança', 'Pontualidade'].map((tag, i) => (
+                  <div key={i} className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest text-brand-stone">
+                    <Check size={12} className="text-brand-terracotta" /> {tag}
                   </div>
-                )}
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 4. SERVICES SECTION */}
+      <section ref={servicesRef} className="py-32 px-6 bg-brand-white border-y border-brand-mist">
+        <div className="max-w-5xl mx-auto">
+          <SectionHeading 
+            label="Menu de Serviços" 
+            title="Escolha sua Experiência" 
+            subtitle="Procedimentos pensados para valorizar sua beleza de forma única e sofisticada."
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {services.length > 0 ? (
+              services.map((service, i) => (
+                <motion.div 
+                  key={service.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="group relative bg-brand-parchment/50 border border-brand-mist p-10 rounded-[40px] hover:bg-brand-white hover:border-brand-terracotta/20 transition-all duration-500 premium-shadow"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-6 mb-8">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <h3 className="text-2xl font-serif text-brand-ink group-hover:text-brand-terracotta transition-colors leading-tight">
+                          {service.name}
+                        </h3>
+                        {i === 0 && (
+                          <span className="px-3 py-1 bg-brand-terracotta/10 text-brand-terracotta text-[8px] font-bold uppercase tracking-widest rounded-full shrink-0">
+                            Mais Desejado
+                          </span>
+                        )}
+                      </div>
+                      <p className="body-text text-brand-stone text-sm leading-relaxed max-w-md">
+                        {service.description || 'Um atendimento completo focado em resultados impecáveis e naturais.'}
+                      </p>
+                    </div>
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2">
+                      <div className="text-2xl font-serif text-brand-terracotta whitespace-nowrap">
+                        {formatCurrency(service.price)}
+                      </div>
+                      <div className="text-[9px] uppercase tracking-widest text-brand-stone font-medium flex items-center gap-1.5 bg-brand-linen/50 px-3 py-1.5 rounded-full sm:bg-transparent sm:p-0">
+                        <Clock size={10} className="text-brand-terracotta" /> {service.duration} min
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <PremiumButton 
+                    variant="secondary" 
+                    className="w-full group-hover:bg-brand-ink group-hover:text-brand-white"
+                    onClick={() => { setSelectedService(service); setStep(2); }}
+                  >
+                    Selecionar Data
+                  </PremiumButton>
+                </motion.div>
+              ))
+            ) : (
+              <div className="col-span-full py-24 text-center border-2 border-dashed border-brand-mist rounded-[40px]">
+                <Sparkles size={32} className="text-brand-mist mx-auto mb-4" />
+                <p className="text-brand-stone font-serif italic text-lg">Consulte a disponibilidade via WhatsApp.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 5. REGIONS / LOGISTICS */}
+      {isHomeService && (
+        <section className="py-32 px-6 bg-brand-parchment">
+          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+            >
+              <span className="label-text mb-6 block">Logística & Conforto</span>
+              <h2 className="heading-section text-brand-ink mb-8">O luxo de ser atendida no conforto do seu lar.</h2>
+              <p className="body-text text-brand-stone text-lg mb-10">
+                Levo toda a estrutura necessária para proporcionar uma experiência de salão premium dentro da sua casa. Organização, higiene e pontualidade são meus pilares.
+              </p>
+              
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink mb-6">Regiões Atendidas em {profile.city}</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {profile.serviceAreas?.map((area: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-brand-white border border-brand-mist rounded-2xl">
+                      <span className="text-sm font-medium text-brand-ink">{area.name}</span>
+                      <span className="text-[10px] text-brand-stone italic">+{formatCurrency(area.fee)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
-          )}
 
-          {step === 2 && (
-            <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <button onClick={() => setStep(1)} className="flex items-center gap-2 text-brand-gray text-[10px] font-bold uppercase tracking-widest mb-12 hover:text-brand-dark transition-colors">
-                <ArrowLeft size={14} /> Voltar aos serviços
-              </button>
-              
-              <div className="text-center mb-16">
-                <h2 className="heading-section mb-4">Escolha a data</h2>
-                <p className="text-brand-gray text-sm font-light">Selecione o melhor dia para você.</p>
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="bg-brand-white p-12 rounded-[40px] border border-brand-mist premium-shadow relative"
+            >
+              <div className="absolute -top-6 -left-6 w-16 h-16 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center shadow-xl">
+                <Home size={32} />
               </div>
+              <h3 className="text-2xl font-serif text-brand-ink mb-8">Como funciona?</h3>
+              <ul className="space-y-6">
+                {[
+                  { title: 'Agendamento', desc: 'Escolha seu serviço e horário aqui na página.' },
+                  { title: 'Confirmação', desc: 'Receba os detalhes e orientações via WhatsApp.' },
+                  { title: 'Atendimento', desc: 'Chego no horário com todo o material necessário.' },
+                  { title: 'Finalização', desc: 'Pagamento facilitado após sua total satisfação.' },
+                ].map((item, i) => (
+                  <li key={i} className="flex gap-4">
+                    <div className="w-6 h-6 rounded-full bg-brand-linen text-brand-terracotta flex items-center justify-center text-[10px] font-bold shrink-0">{i + 1}</div>
+                    <div>
+                      <div className="text-sm font-medium text-brand-ink mb-1">{item.title}</div>
+                      <div className="text-xs text-brand-stone font-light">{item.desc}</div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          </div>
+        </section>
+      )}
 
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-3 mb-16">
-                {[0, 1, 2, 3, 4, 5, 6].map(offset => {
-                  const date = new Date();
-                  date.setDate(date.getDate() + offset);
-                  const isSelected = selectedDate === date.toISOString().split('T')[0];
-                  return (
-                    <button 
-                      key={offset}
-                      onClick={() => setSelectedDate(date.toISOString().split('T')[0])}
-                      className={`h-24 rounded-2xl flex flex-col items-center justify-center transition-all ${isSelected ? 'bg-brand-dark text-white premium-shadow scale-105' : 'bg-white border border-brand-dark/5 hover:border-brand-dark/20'}`}
-                    >
-                      <span className="text-[10px] font-bold uppercase opacity-40 mb-2">
-                        {date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
-                      </span>
-                      <span className="text-2xl font-serif font-bold">{date.getDate()}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              
-              {selectedDate && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                  <div className="text-center mb-10">
-                    <h3 className="text-xl font-serif font-medium mb-2">Horários disponíveis</h3>
-                    <p className="text-brand-gray text-xs font-bold uppercase tracking-widest">{new Date(selectedDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}</p>
-                  </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
-                    {['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'].map(time => (
-                      <button 
-                        key={time}
-                        onClick={() => { setSelectedTime(time); setStep(3); }}
-                        className="py-5 bg-white rounded-2xl border border-brand-dark/5 font-bold hover:border-brand-dark/20 hover:bg-brand-cream transition-all text-lg"
-                      >
-                        {time}
-                      </button>
+      {/* 6. EDITORIAL PORTFOLIO GRID */}
+      {profile.portfolio && profile.portfolio.length > 0 && (
+        <section className="py-32 px-6 bg-brand-white overflow-hidden">
+          <div className="max-w-6xl mx-auto">
+            <SectionHeading 
+              label="O Olhar em Detalhes" 
+              title="Resultados com Precisão" 
+              subtitle="Naturalidade, definição e acabamento elegante em cada design."
+            />
+
+            <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-8">
+              {profile.portfolio.map((item: any, i: number) => {
+                const imageUrl = typeof item === 'string' ? item : item.url;
+                const category = typeof item === 'string' ? '' : item.category;
+                
+                return (
+                  <motion.div 
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    className="relative group rounded-[32px] overflow-hidden border border-brand-mist premium-shadow break-inside-avoid"
+                  >
+                    <img 
+                      src={imageUrl} 
+                      alt={category || `Trabalho de ${profile.name}`} 
+                      className="w-full object-cover transition-all duration-1000 group-hover:scale-105"
+                      referrerPolicy="no-referrer"
+                    />
+                    {category && (
+                      <div className="absolute inset-0 bg-brand-ink/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
+                        <span className="text-brand-white text-[10px] font-medium uppercase tracking-widest">{category}</span>
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* 7. PROVA SOCIAL / TESTIMONIALS (Layer 2) */}
+      <section className="py-32 px-6 bg-brand-linen/30">
+        <div className="max-w-5xl mx-auto">
+          <SectionHeading label="Experiências" title="O que elas dizem" subtitle="Avaliações reais de clientes que já vivenciaram a experiência Nera." />
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {reviews.length > 0 ? (
+              reviews.slice(0, 6).map((review, i) => (
+                <motion.div 
+                  key={review.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-brand-white p-10 rounded-[40px] border border-brand-mist premium-shadow relative"
+                >
+                  <div className="flex gap-1 mb-6 text-brand-terracotta">
+                    {[...Array(5)].map((_, j) => (
+                      <Star 
+                        key={j} 
+                        size={14} 
+                        fill={j < review.rating ? "currentColor" : "none"} 
+                        className={j < review.rating ? "" : "text-brand-mist"}
+                      />
                     ))}
                   </div>
+                  <p className="body-text text-brand-ink italic mb-8">"{review.comment || 'Atendimento impecável e muito profissional.'}"</p>
+                  <div className="flex items-center justify-between pt-6 border-t border-brand-mist">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-serif text-brand-ink">
+                        {review.publicDisplayMode === 'anonymous' ? 'Cliente Nera' : review.firstName}
+                      </span>
+                      {review.neighborhood && (
+                        <span className="text-[9px] text-brand-stone uppercase tracking-widest">{review.neighborhood}</span>
+                      )}
+                    </div>
+                    <span className="text-[9px] uppercase tracking-widest text-brand-stone text-right">{review.serviceName}</span>
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="col-span-full py-24 text-center">
+                <p className="text-brand-stone font-serif italic text-lg">Ainda não há avaliações públicas.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 8. DISPONIBILIDADE / CTA FINAL */}
+      <section className="py-32 px-6 bg-brand-ink text-brand-white relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">
+           <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] border border-brand-white rounded-full" />
+        </div>
+
+        <div className="max-w-4xl mx-auto text-center relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-brand-terracotta mb-8 block">Agenda Aberta</span>
+            <h2 className="text-[42px] md:text-[56px] font-serif font-normal mb-10 leading-tight">Pronta para sua transformação?</h2>
+            <p className="text-brand-blush/60 text-lg md:text-xl mb-12 max-w-xl mx-auto font-light">
+              Poucos horários disponíveis para esta semana. Garanta sua vaga e desfrute de um atendimento exclusivo.
+            </p>
+            
+            <div className="flex flex-col items-center gap-8">
+              <PremiumButton 
+                variant="terracotta" 
+                className="min-w-[300px] py-7 text-sm"
+                onClick={scrollToServices}
+              >
+                Agendar Agora
+              </PremiumButton>
+              
+              <div className="flex items-center gap-8 text-[10px] font-medium uppercase tracking-[0.2em] text-brand-blush/40">
+                <div className="flex items-center gap-2"><CheckCircle2 size={14} /> 100% Seguro</div>
+                <div className="flex items-center gap-2"><MessageCircle size={14} /> Suporte via WhatsApp</div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* 9. FAQ SECTION */}
+      <section className="py-32 px-6 bg-brand-white">
+        <div className="max-w-3xl mx-auto">
+          <SectionHeading label="Dúvidas" title="Perguntas Frequentes" />
+          
+          <div className="space-y-4">
+            {[
+              { q: 'Como funciona o atendimento em domicílio?', a: 'Levo toda a estrutura (maca, iluminação, materiais) até você. Só preciso de um espaço pequeno e iluminado.' },
+              { q: 'Quais as formas de pagamento?', a: 'Aceito PIX, Cartão de Crédito e Débito no momento do atendimento.' },
+              { q: 'Posso remarcar meu horário?', a: 'Sim, com até 24h de antecedência sem custo adicional.' },
+              { q: 'Quanto tempo dura o procedimento?', a: 'Varia entre 50 min a 1h30 dependendo do serviço escolhido.' },
+            ].map((item, i) => (
+              <details key={i} className="group bg-brand-parchment rounded-[24px] border border-brand-mist overflow-hidden transition-all">
+                <summary className="flex items-center justify-between p-8 cursor-pointer list-none">
+                  <span className="text-sm font-medium text-brand-ink">{item.q}</span>
+                  <Plus size={18} className="text-brand-terracotta group-open:rotate-45 transition-transform" />
+                </summary>
+                <div className="px-8 pb-8 text-sm text-brand-stone font-light leading-relaxed">
+                  {item.a}
+                </div>
+              </details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 10. REFINED FOOTER */}
+      <footer className="py-20 px-6 bg-brand-white border-t border-brand-mist text-center">
+        <div className="max-w-5xl mx-auto flex flex-col items-center gap-12">
+          <Logo variant="light" className="w-20 opacity-30 grayscale" />
+          
+          <div className="flex flex-wrap justify-center gap-10 text-[10px] font-medium uppercase tracking-widest text-brand-stone">
+            <Link to="/" className="hover:text-brand-ink transition-colors">Início</Link>
+            <Link to="/register" className="hover:text-brand-ink transition-colors">Seja uma Profissional</Link>
+            <a href="#" className="hover:text-brand-ink transition-colors">Termos</a>
+            <a href="#" className="hover:text-brand-ink transition-colors">Privacidade</a>
+          </div>
+
+          <div className="flex gap-6">
+            {profile.instagram && (
+              <a href={`https://instagram.com/${profile.instagram.replace('@', '')}`} target="_blank" className="w-10 h-10 rounded-full border border-brand-mist flex items-center justify-center text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta transition-all">
+                <Instagram size={18} />
+              </a>
+            )}
+            <a href={`https://wa.me/${profile.whatsapp}`} target="_blank" className="w-10 h-10 rounded-full border border-brand-mist flex items-center justify-center text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta transition-all">
+              <MessageCircle size={18} />
+            </a>
+          </div>
+
+          <p className="text-[9px] text-brand-stone/40 uppercase tracking-widest">
+            © {new Date().getFullYear()} {profile.name} • Powered by Nera
+          </p>
+        </div>
+      </footer>
+
+      {/* --- BOOKING MODAL OVERLAY --- */}
+      <AnimatePresence>
+        {step > 1 && step < 5 && (
+          <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-0 md:p-6">
+            <motion.div 
+              initial={{ y: "100%" }} 
+              animate={{ y: 0 }} 
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar"
+            >
+              <button 
+                onClick={() => setStep(1)} 
+                className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors"
+              >
+                <X size={24} />
+              </button>
+
+              {/* Progress Indicator */}
+              <div className="flex gap-2 mb-12">
+                {[2, 3, 4].map((s) => (
+                  <div key={s} className={cn("h-1 flex-1 rounded-full transition-all duration-500", step >= s ? "bg-brand-terracotta" : "bg-brand-mist")} />
+                ))}
+              </div>
+
+              {/* Step 2: Date & Time */}
+              {step === 2 && (
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                  <h3 className="text-2xl font-serif text-brand-ink mb-2">Quando deseja ser atendida?</h3>
+                  <p className="text-xs text-brand-stone font-light mb-10">Selecione o melhor dia e horário para você.</p>
+                  
+                  <div className="flex gap-3 overflow-x-auto pb-6 no-scrollbar mb-10">
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(offset => {
+                      const date = new Date();
+                      date.setDate(date.getDate() + offset);
+                      const dateStr = date.toISOString().split('T')[0];
+                      const isSelected = selectedDate === dateStr;
+                      return (
+                        <button 
+                          key={offset}
+                          onClick={() => setSelectedDate(dateStr)}
+                          className={cn(
+                            "min-w-[70px] h-24 rounded-2xl flex flex-col items-center justify-center transition-all shrink-0",
+                            isSelected ? "bg-brand-ink text-brand-white premium-shadow" : "bg-brand-parchment border border-brand-mist"
+                          )}
+                        >
+                          <span className="text-[9px] font-medium uppercase opacity-40 mb-2">
+                            {date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
+                          </span>
+                          <span className="text-xl font-serif">{date.getDate()}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {selectedDate && (
+                    <div className="grid grid-cols-3 gap-3">
+                      {['09:00', '10:30', '13:00', '14:30', '16:00', '17:30'].map(time => (
+                        <button 
+                          key={time}
+                          onClick={() => { setSelectedTime(time); setStep(3); }}
+                          className="py-4 bg-brand-parchment rounded-xl border border-brand-mist text-sm font-medium hover:border-brand-ink transition-all"
+                        >
+                          {time}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Step 3: Location */}
+              {step === 3 && (
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                  <h3 className="text-2xl font-serif text-brand-ink mb-2">Local do Atendimento</h3>
+                  <p className="text-xs text-brand-stone font-light mb-10">Onde a mágica vai acontecer?</p>
+                  
+                  {isHomeService ? (
+                    <div className="space-y-3">
+                      {profile.serviceAreas?.map((area: any) => (
+                        <button 
+                          key={area.name}
+                          onClick={() => { setSelectedArea(area); setStep(4); }}
+                          className="w-full p-6 bg-brand-parchment border border-brand-mist rounded-2xl text-left flex justify-between items-center hover:border-brand-ink transition-all"
+                        >
+                          <div>
+                            <span className="font-medium block">{area.name}</span>
+                            <span className="text-[10px] text-brand-stone italic">Taxa de deslocamento: {formatCurrency(area.fee)}</span>
+                          </div>
+                          <ChevronRight size={18} className="text-brand-mist" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-brand-parchment p-8 rounded-2xl border border-brand-mist text-center">
+                      <MapPin size={24} className="text-brand-terracotta mx-auto mb-4" />
+                      <p className="text-sm text-brand-ink font-medium mb-2">Atendimento no Estúdio</p>
+                      <p className="text-xs text-brand-stone font-light mb-8">
+                        {profile.serviceMode === 'home' 
+                          ? `Atendimento em domicílio em ${profile.city}` 
+                          : profile.studioAddress 
+                            ? `${profile.studioAddress.street}, ${profile.studioAddress.number}${profile.studioAddress.complement ? ` - ${profile.studioAddress.complement}` : ''}, ${profile.studioAddress.neighborhood}, ${profile.studioAddress.city}`
+                            : profile.address || profile.city}
+                      </p>
+                      <PremiumButton onClick={() => setStep(4)} className="w-full">Confirmar Local</PremiumButton>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+
+              {/* Step 4: Confirmation */}
+              {step === 4 && (
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                  <h3 className="text-2xl font-serif text-brand-ink mb-2">Quase lá...</h3>
+                  <p className="text-xs text-brand-stone font-light mb-10">Confirme seus dados para finalizar o agendamento.</p>
+                  
+                  <div className="space-y-4 mb-10">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Seu Nome</label>
+                      <input 
+                        type="text" 
+                        value={clientName}
+                        onChange={(e) => setClientName(e.target.value)}
+                        placeholder="Nome completo"
+                        className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">WhatsApp</label>
+                      <input 
+                        type="tel" 
+                        value={clientPhone}
+                        onChange={(e) => setClientPhone(e.target.value)}
+                        placeholder="(00) 00000-0000"
+                        className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="bg-brand-linen/50 p-8 rounded-3xl border border-brand-mist mb-10">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-xs text-brand-stone">Serviço</span>
+                      <span className="text-xs font-medium">{selectedService.name}</span>
+                    </div>
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-xs text-brand-stone">Data e Hora</span>
+                      <span className="text-xs font-medium">{new Date(selectedDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {selectedTime}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-4 border-t border-brand-mist">
+                      <span className="text-sm font-serif italic">Total</span>
+                      <span className="text-xl font-serif text-brand-terracotta">{formatCurrency(calculateTotalPrice())}</span>
+                    </div>
+                  </div>
+
+                  <PremiumButton 
+                    onClick={handleBooking} 
+                    loading={bookingLoading}
+                    disabled={!clientName || !clientPhone}
+                    className="w-full py-6"
+                  >
+                    Finalizar Agendamento
+                  </PremiumButton>
                 </motion.div>
               )}
             </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <button onClick={() => setStep(2)} className="flex items-center gap-2 text-brand-gray text-[10px] font-bold uppercase tracking-widest mb-12 hover:text-brand-dark transition-colors">
-                <ArrowLeft size={14} /> Voltar para a data
-              </button>
-              
-              {isHomeService ? (
-                <>
-                  <div className="text-center mb-16">
-                    <h2 className="heading-section mb-4">Selecione sua região</h2>
-                    <p className="text-brand-gray text-sm font-light italic">Os valores já incluem o deslocamento.</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 gap-4">
-                    {profile.serviceAreas?.map((area: any) => (
-                      <button 
-                        key={area.name}
-                        onClick={() => { setSelectedArea(area); setStep(4); }}
-                        className="bg-white p-8 rounded-[2rem] border border-brand-dark/5 text-left hover:border-brand-rose/30 transition-all premium-shadow flex justify-between items-center group"
-                      >
-                        <div>
-                          <span className="text-lg font-bold block mb-1 group-hover:text-brand-rose transition-colors">{area.name}</span>
-                          <span className="text-[10px] text-brand-gray font-bold uppercase tracking-widest">
-                            Valor final: {formatCurrency(Number(selectedService?.price || 0) + (area.fee || 0))}
-                          </span>
-                        </div>
-                        <ChevronRight size={20} className="text-brand-dark/10 group-hover:text-brand-rose transition-colors" />
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-20 bg-white rounded-[3rem] border border-brand-dark/5 premium-shadow">
-                  <MapPin size={32} className="text-brand-rose mx-auto mb-4" />
-                  <h3 className="text-xl font-serif font-bold mb-2">Local do Atendimento</h3>
-                  <p className="text-brand-gray font-light mb-8 px-8">{profile.address || profile.city}</p>
-                  <button onClick={() => setStep(4)} className="bg-brand-dark text-white px-12 py-5 rounded-full font-bold text-xs uppercase tracking-widest">Confirmar Local</button>
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {step === 4 && (
-            <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <button onClick={() => setStep(3)} className="flex items-center gap-2 text-brand-gray text-[10px] font-bold uppercase tracking-widest mb-12 hover:text-brand-dark transition-colors">
-                <ArrowLeft size={14} /> Voltar
-              </button>
-              
-              <div className="text-center mb-16">
-                <h2 className="heading-section mb-4">Seus dados</h2>
-                <p className="text-brand-gray text-sm font-light">Preencha para confirmarmos sua reserva.</p>
-              </div>
-              
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 gap-8">
-                  <div className="space-y-2">
-                    <label className="label-text text-brand-dark ml-1">Nome Completo</label>
-                    <input 
-                      type="text" 
-                      value={clientName}
-                      onChange={(e) => setClientName(e.target.value)}
-                      placeholder="Como podemos te chamar?"
-                      className="w-full px-8 py-5 bg-white border border-brand-dark/5 rounded-3xl focus:ring-1 focus:ring-brand-dark outline-none transition-all text-lg font-light"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="label-text text-brand-dark ml-1">WhatsApp</label>
-                    <input 
-                      type="tel" 
-                      value={clientPhone}
-                      onChange={(e) => setClientPhone(e.target.value)}
-                      placeholder="(00) 00000-0000"
-                      className="w-full px-8 py-5 bg-white border border-brand-dark/5 rounded-3xl focus:ring-1 focus:ring-brand-dark outline-none transition-all text-lg font-light"
-                    />
-                  </div>
-                  {isHomeService && (
-                    <div className="space-y-2">
-                      <label className="label-text text-brand-dark ml-1">Complemento (Opcional)</label>
-                      <input 
-                        type="text" 
-                        value={clientAddress}
-                        onChange={(e) => setClientAddress(e.target.value)}
-                        placeholder="Apto, bloco, referência"
-                        className="w-full px-8 py-5 bg-white border border-brand-dark/5 rounded-3xl focus:ring-1 focus:ring-brand-dark outline-none transition-all text-lg font-light"
-                      />
-                    </div>
-                  )}
-                </div>
-                
-                <div className="bg-white p-10 rounded-[3rem] border border-brand-dark/5 premium-shadow mt-16">
-                  <h4 className="label-text text-brand-dark mb-10 tracking-[0.3em] text-center">Resumo da Reserva</h4>
-                  <div className="space-y-6 mb-12">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-brand-gray font-light">Serviço</span>
-                      <span className="font-bold">{selectedService.name}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-brand-gray font-light">Data e Hora</span>
-                      <span className="font-bold">{new Date(selectedDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {selectedTime}</span>
-                    </div>
-                    {isHomeService && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-brand-gray font-light">Localização</span>
-                        <span className="font-bold">{selectedArea.name}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-sm pt-6 border-t border-brand-dark/5">
-                      <span className="text-brand-gray font-light">Valor</span>
-                      <span className="text-2xl font-serif font-bold text-brand-rose">{formatCurrency(calculateTotalPrice())}</span>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    onClick={handleBooking}
-                    disabled={!clientName || !clientPhone || bookingLoading}
-                    className="w-full bg-brand-dark text-white py-6 rounded-full font-bold text-xs uppercase tracking-widest premium-shadow hover:bg-brand-dark/90 transition-all disabled:opacity-30 flex items-center justify-center gap-3"
-                  >
-                    {bookingLoading ? 'Processando...' : 'Confirmar Agendamento'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 5 && (
-            <motion.div key="step5" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-16 sm:py-24 px-6 sm:px-10 bg-white rounded-[3rem] sm:rounded-[4rem] border border-brand-dark/5 premium-shadow">
-              <div className="w-20 h-20 sm:w-24 h-24 bg-brand-cream text-brand-rose rounded-full flex items-center justify-center mx-auto mb-8 sm:mb-10">
-                <CheckCircle2 size={40} />
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-serif font-medium mb-4 sm:mb-6">Reserva Confirmada</h2>
-              <p className="text-brand-gray mb-10 sm:mb-12 leading-relaxed max-w-sm mx-auto font-light text-sm sm:text-base">
-                Tudo certo! Seu horário foi reservado com sucesso. Você receberá uma confirmação em breve.
-              </p>
-              
-              <div className="flex flex-col gap-4">
-                <button 
-                  onClick={addToCalendar}
-                  className="w-full bg-brand-dark text-white py-6 rounded-full text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-brand-dark/90 transition-all"
-                >
-                  <CalendarIcon size={18} /> Adicionar ao Calendário
-                </button>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="w-full text-brand-gray text-[10px] font-bold uppercase tracking-widest py-4 hover:text-brand-dark transition-all"
-                >
-                  Voltar ao início
-                </button>
-              </div>
-
-              <div className="mt-20 pt-16 border-t border-brand-dark/5">
-                <p className="text-[10px] font-bold text-brand-gray uppercase tracking-widest mb-6">Também é profissional?</p>
-                <Link to="/register" className="inline-flex items-center gap-3 text-brand-dark font-serif italic font-bold text-2xl hover:text-brand-rose transition-colors">
-                  Crie sua agenda premium <ChevronRight size={20} />
-                </Link>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-
-      {/* Growth Footer */}
-      <footer className="py-20 px-6 text-center border-t border-brand-dark/5 bg-white">
-        <div className="flex flex-col items-center gap-6">
-          <div className="flex items-center gap-3 opacity-20 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-default">
-            <div className="w-8 h-8 bg-brand-dark rounded-full flex items-center justify-center text-white">
-              <CalendarIcon size={16} />
-            </div>
-            <span className="text-xl font-serif font-bold">Marca Aí</span>
           </div>
-          <p className="text-[10px] font-bold text-brand-gray uppercase tracking-[0.25em]">
-            O padrão de excelência para profissionais autônomas
-          </p>
-          <Link to="/" className="text-[10px] text-brand-rose font-bold uppercase tracking-widest hover:underline">
-            Crie sua conta gratuita
-          </Link>
-        </div>
-      </footer>
+        )}
+      </AnimatePresence>
+
+      {/* Step 5: Success Overlay (Full Screen) */}
+      <AnimatePresence>
+        {step === 5 && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center justify-center p-8 text-center"
+          >
+            <motion.div 
+              initial={{ scale: 0.5, opacity: 0 }} 
+              animate={{ scale: 1, opacity: 1 }} 
+              transition={{ type: "spring", damping: 15 }}
+              className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-10"
+            >
+              <Check size={48} />
+            </motion.div>
+            <h2 className="text-4xl font-serif text-brand-ink mb-6">Reserva Realizada</h2>
+            <p className="body-text text-brand-stone mb-12 max-w-xs mx-auto">
+              Tudo pronto! Sua reserva com {profile.name} foi confirmada. Você receberá um lembrete em breve.
+            </p>
+            <PremiumButton onClick={() => setStep(1)} className="min-w-[250px]">
+              Voltar à Vitrine
+            </PremiumButton>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

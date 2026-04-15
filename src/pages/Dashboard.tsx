@@ -2,16 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, auth } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore';
 import { 
-  Calendar, Clock, Users, ExternalLink, Copy, Check, LogOut, 
-  Settings, List, TrendingUp, MessageCircle, CheckCircle2, 
-  Share2, ChevronRight, Plus, MapPin
+  Calendar, Clock, Users, LogOut, 
+  Settings, List, MessageCircle, CheckCircle2, 
+  Share2, Plus, MapPin, Check, TrendingUp,
+  ChevronRight, Sparkles
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrency } from '../lib/utils';
 import MobileNav from '../components/MobileNav';
+import Logo from '../components/Logo';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -65,173 +67,248 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-cream pb-24 md:pb-0 md:flex">
-      {/* Desktop Sidebar (Hidden on Mobile) */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-brand-rose/10 p-6 flex-col">
-        <div className="flex items-center gap-2 mb-12">
-          <div className="w-8 h-8 bg-brand-rose rounded-lg flex items-center justify-center text-white">
-            <Calendar size={18} />
-          </div>
-          <span className="text-xl font-serif italic font-bold">Marca Aí</span>
+    <div className="min-h-screen bg-brand-parchment pb-24 md:pb-0 md:flex">
+      {/* Desktop Sidebar */}
+      <aside className="hidden md:flex w-72 bg-brand-white border-r border-brand-mist p-8 flex-col sticky top-0 h-screen">
+        <div className="mb-12">
+          <Logo />
         </div>
-        <nav className="flex-1 space-y-2">
-          <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 bg-brand-rose-light text-brand-rose rounded-xl font-bold text-sm">
-            <Calendar size={18} /> Dashboard
+        <nav className="flex-1 space-y-1">
+          <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all">
+            <TrendingUp size={18} className="text-brand-terracotta" /> Dashboard
           </Link>
-          <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 text-brand-gray hover:bg-brand-cream rounded-xl font-bold text-sm transition-all">
-            <Calendar size={18} /> Agenda
+          <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
+            <Calendar size={18} className="group-hover:text-brand-terracotta transition-colors" /> Agenda
           </Link>
-          <Link to="/clients" className="flex items-center gap-3 px-4 py-3 text-brand-gray hover:bg-brand-cream rounded-xl font-bold text-sm transition-all">
-            <Users size={18} /> Clientes
+          <Link to="/clients" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
+            <Users size={18} className="group-hover:text-brand-terracotta transition-colors" /> Clientes
           </Link>
-          <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-gray hover:bg-brand-cream rounded-xl font-bold text-sm transition-all">
-            <List size={18} /> Serviços
+          <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
+            <List size={18} className="group-hover:text-brand-terracotta transition-colors" /> Serviços
           </Link>
-          <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-gray hover:bg-brand-cream rounded-xl font-bold text-sm transition-all">
-            <Settings size={18} /> Perfil
+          <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
+            <Settings size={18} className="group-hover:text-brand-terracotta transition-colors" /> Perfil
           </Link>
         </nav>
+        
+        <div className="mt-auto pt-8 border-t border-brand-mist">
+          <button 
+            onClick={() => auth.signOut()}
+            className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:text-brand-terracotta transition-all text-[11px] font-medium uppercase tracking-widest w-full"
+          >
+            <LogOut size={18} /> Sair
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 md:p-12 max-w-2xl mx-auto w-full">
-        <header className="mb-12">
-          <h1 className="text-4xl font-serif font-medium text-brand-dark mb-3">
-            Olá, {profile?.name?.split(' ')[0]}
-          </h1>
-          <p className="text-brand-gray text-sm font-light leading-relaxed">
-            Hoje você tem <span className="text-brand-dark font-bold">{appointments.length} atendimentos</span> e <span className="text-brand-dark font-bold">{formatCurrency(dailyRevenue)}</span> confirmados para receber.
-          </p>
+      <main className="flex-1 p-6 md:p-16 max-w-5xl mx-auto w-full">
+        <header className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div>
+            <span className="text-[10px] font-medium text-brand-terracotta uppercase tracking-[0.3em] mb-4 block">Bem-vinda de volta</span>
+            <h1 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-ink leading-tight">
+              Olá, {profile?.name?.split(' ')[0]}
+            </h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => {
+                const url = `${window.location.origin}/p/${profile?.slug}`;
+                navigator.clipboard.writeText(url);
+                toast.success('Link da vitrine copiado!');
+              }}
+              className="flex items-center gap-3 px-6 py-4 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm group"
+            >
+              <Share2 size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+              Sua Vitrine
+            </button>
+            <Link 
+              to="/agenda"
+              className="flex items-center gap-3 px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg"
+            >
+              <Plus size={14} />
+              Novo Agendamento
+            </Link>
+          </div>
         </header>
 
-        {/* Quick Actions Grid */}
-        <section className="grid grid-cols-2 gap-4 mb-12">
-          <button className="bg-white p-6 rounded-[2rem] border border-brand-dark/5 premium-shadow flex flex-col items-center gap-3 group hover:border-brand-rose/30 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-brand-rose-light text-brand-rose flex items-center justify-center group-hover:scale-110 transition-transform">
-              <MessageCircle size={24} />
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-dark">Lembretes</span>
-          </button>
-          <Link to="/agenda" className="bg-white p-6 rounded-[2rem] border border-brand-dark/5 premium-shadow flex flex-col items-center gap-3 group hover:border-brand-rose/30 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-brand-cream text-brand-dark flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Calendar size={24} />
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-dark">Ver Agenda</span>
-          </Link>
-          <button className="bg-white p-6 rounded-[2rem] border border-brand-dark/5 premium-shadow flex flex-col items-center gap-3 group hover:border-brand-rose/30 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-brand-cream text-brand-dark flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Clock size={24} />
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-dark">Bloquear</span>
-          </button>
-          <button className="bg-white p-6 rounded-[2rem] border border-brand-dark/5 premium-shadow flex flex-col items-center gap-3 group hover:border-brand-rose/30 transition-all">
-            <div className="w-12 h-12 rounded-2xl bg-brand-cream text-brand-dark flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Plus size={24} />
-            </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-dark">Reagendar</span>
-          </button>
-        </section>
-
-        {/* Dopamine Earnings Card */}
-        <motion.div 
-          initial={{ scale: 0.95, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-brand-dark p-10 rounded-[3rem] text-white mb-12 relative overflow-hidden premium-shadow"
-        >
-          <div className="absolute top-0 right-0 w-64 h-64 bg-brand-rose/10 rounded-full -mr-32 -mt-32 blur-3xl" />
-          <div className="relative z-10">
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em] mb-4">Ganhos do Dia</p>
-            <div className="flex items-baseline gap-3">
-              <span className="text-5xl font-serif font-bold">{formatCurrency(dailyRevenue)}</span>
-              {pendingCount > 0 && (
-                <span className="text-xs text-brand-rose font-bold uppercase tracking-widest">+{pendingCount} pendentes</span>
-              )}
-            </div>
-            {travelRevenue > 0 && (
-              <div className="mt-6 pt-6 border-t border-white/5">
-                <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest">
-                  Incluindo {formatCurrency(travelRevenue)} em atendimento na região
-                </p>
+        {/* Stats Grid */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          {/* Earnings Card */}
+          <motion.div 
+            initial={{ scale: 0.98, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="md:col-span-2 bg-brand-ink p-10 md:p-12 rounded-[40px] text-brand-white relative overflow-hidden shadow-2xl group"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-terracotta/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-brand-terracotta/20 transition-all duration-700" />
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-8">
+                <p className="text-[10px] font-medium text-brand-mist uppercase tracking-[0.3em]">Receita Estimada (Hoje)</p>
+                <TrendingUp size={16} className="text-brand-terracotta" />
               </div>
-            )}
-          </div>
-        </motion.div>
+              <div className="flex items-baseline gap-4 mb-8">
+                <span className="text-5xl md:text-7xl font-serif font-normal">{formatCurrency(dailyRevenue)}</span>
+                {pendingCount > 0 && (
+                  <span className="text-[10px] text-brand-terracotta font-medium uppercase tracking-widest px-4 py-1.5 bg-brand-terracotta/10 rounded-full border border-brand-terracotta/20">
+                    {pendingCount} Pendentes
+                  </span>
+                )}
+              </div>
+              <div className="pt-8 border-t border-brand-white/10 flex flex-wrap gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta" />
+                  <p className="text-[10px] text-brand-mist font-light uppercase tracking-widest">
+                    {appointments.length} Atendimentos confirmados
+                  </p>
+                </div>
+                {travelRevenue > 0 && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-sienna" />
+                    <p className="text-[10px] text-brand-mist font-light uppercase tracking-widest">
+                      {formatCurrency(travelRevenue)} em taxas de deslocamento
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
 
-        {/* Today's List */}
-        <section>
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-xs font-bold text-brand-dark uppercase tracking-[0.2em]">Sua Agenda de Hoje</h2>
-            <Link to="/agenda" className="text-[10px] font-bold text-brand-rose uppercase tracking-widest editorial-underline">Ver Completa</Link>
-          </div>
-
-          <div className="space-y-4">
-            {appointments.length > 0 ? (
-              appointments.map((appointment) => (
-                <motion.div 
-                  key={appointment.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white p-5 rounded-[2rem] border border-brand-dark/5 flex items-center justify-between hover:border-brand-rose/20 transition-all premium-shadow group"
-                >
-                  <div className="flex items-center gap-5">
-                    <div className={`w-14 h-14 rounded-2xl flex flex-col items-center justify-center transition-colors ${appointment.status === 'confirmed' ? 'bg-green-50 text-green-600' : 'bg-brand-cream text-brand-dark group-hover:bg-brand-rose-light group-hover:text-brand-rose'}`}>
-                      <span className="text-sm font-bold">{appointment.time}</span>
+          {/* Quick Stats Card */}
+          <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm flex flex-col justify-between">
+            <div>
+              <p className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-8">Próximo Cliente</p>
+              {appointments.find(a => a.status === 'pending') ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-brand-linen flex items-center justify-center text-brand-ink font-serif text-lg">
+                      {appointments.find(a => a.status === 'pending')?.time}
                     </div>
                     <div>
-                      <h4 className="font-bold text-lg text-brand-dark leading-tight mb-1">{appointment.clientName}</h4>
-                      <div className="flex items-center gap-3">
-                        <p className="text-[10px] text-brand-gray font-bold uppercase tracking-widest">{appointment.serviceName}</p>
-                        {appointment.neighborhood && (
-                          <div className="flex items-center gap-1 text-[9px] font-bold text-brand-rose uppercase tracking-widest">
-                            <MapPin size={10} /> {appointment.neighborhood}
-                          </div>
-                        )}
-                      </div>
+                      <p className="font-medium text-brand-ink">{appointments.find(a => a.status === 'pending')?.clientName}</p>
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">{appointments.find(a => a.status === 'pending')?.serviceName}</p>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    {appointment.status === 'pending' ? (
-                      <>
-                        <button 
-                          onClick={() => sendWhatsAppReminder(appointment)}
-                          title="Lembrar via WhatsApp"
-                          className="p-3 hover:bg-green-50 rounded-xl text-green-600 transition-all"
-                        >
-                          <MessageCircle size={20} />
-                        </button>
-                        <button 
-                          onClick={() => handleComplete(appointment.id)}
-                          title="Marcar como Concluído"
-                          className="p-3 hover:bg-brand-rose-light rounded-xl text-brand-rose transition-all"
-                        >
-                          <CheckCircle2 size={20} />
-                        </button>
-                      </>
-                    ) : (
-                      <div className="w-10 h-10 bg-green-50 text-green-500 rounded-xl flex items-center justify-center">
-                        <Check size={20} />
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              ))
-            ) : (
-              <div className="bg-white/50 border-2 border-dashed border-brand-dark/5 rounded-[2.5rem] p-16 text-center">
-                <p className="text-brand-gray font-serif italic text-lg">Nenhum atendimento para hoje.</p>
-              </div>
-            )}
+                </div>
+              ) : (
+                <p className="text-brand-stone italic font-serif text-lg">Nenhum pendente</p>
+              )}
+            </div>
+            <Link to="/agenda" className="mt-8 flex items-center justify-between text-[10px] font-medium uppercase tracking-widest text-brand-terracotta group">
+              Ver agenda completa
+              <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </Link>
           </div>
         </section>
 
-        {/* Quick Actions Footer (Mobile only) */}
-        <div className="mt-12 grid grid-cols-2 gap-4 md:hidden">
-          <button className="bg-white p-4 rounded-2xl border border-brand-rose/10 font-bold text-xs flex items-center justify-center gap-2">
-            <Plus size={16} /> Novo Agendamento
-          </button>
-          <button className="bg-white p-4 rounded-2xl border border-brand-rose/10 font-bold text-xs flex items-center justify-center gap-2">
-            <Share2 size={16} /> Link da Agenda
-          </button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Today's List */}
+          <section className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-10">
+              <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Atendimentos de Hoje</h2>
+              <div className="h-px flex-1 bg-brand-mist mx-6" />
+            </div>
+
+            <div className="space-y-4">
+              {appointments.length > 0 ? (
+                appointments.map((appointment) => (
+                  <motion.div 
+                    key={appointment.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-brand-white p-8 rounded-[32px] border border-brand-mist flex items-center justify-between hover:border-brand-stone transition-all shadow-sm group"
+                  >
+                    <div className="flex items-center gap-8">
+                      <div className={`w-20 h-20 rounded-[24px] flex flex-col items-center justify-center transition-colors ${appointment.status === 'confirmed' ? 'bg-green-50 text-green-600' : 'bg-brand-parchment text-brand-ink group-hover:bg-brand-linen'}`}>
+                        <span className="text-xl font-serif font-normal">{appointment.time}</span>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-xl text-brand-ink mb-2">{appointment.clientName}</h4>
+                        <div className="flex flex-wrap items-center gap-6">
+                          <div className="flex items-center gap-2 text-[10px] text-brand-stone font-medium uppercase tracking-widest">
+                            <Clock size={14} className="text-brand-terracotta" />
+                            {appointment.serviceName}
+                          </div>
+                          {appointment.neighborhood && (
+                            <div className="flex items-center gap-2 text-[10px] font-medium text-brand-stone uppercase tracking-widest">
+                              <MapPin size={14} className="text-brand-terracotta" />
+                              {appointment.neighborhood}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      {appointment.status === 'pending' ? (
+                        <>
+                          <button 
+                            onClick={() => sendWhatsAppReminder(appointment)}
+                            className="w-12 h-12 flex items-center justify-center bg-brand-linen text-brand-ink rounded-full hover:bg-green-50 hover:text-green-600 transition-all"
+                            title="Enviar lembrete"
+                          >
+                            <MessageCircle size={20} />
+                          </button>
+                          <button 
+                            onClick={() => handleComplete(appointment.id)}
+                            className="w-12 h-12 flex items-center justify-center bg-brand-ink text-brand-white rounded-full hover:bg-brand-espresso transition-all shadow-md"
+                            title="Concluir atendimento"
+                          >
+                            <Check size={20} />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="w-12 h-12 bg-green-50 text-green-500 rounded-full flex items-center justify-center">
+                          <CheckCircle2 size={24} />
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="bg-brand-white/50 border border-dashed border-brand-mist rounded-[40px] p-24 text-center">
+                  <Sparkles size={32} className="text-brand-mist mx-auto mb-6" />
+                  <p className="text-brand-stone font-serif italic text-xl font-light">Nenhum atendimento agendado para hoje.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Quick Actions Sidebar */}
+          <section className="space-y-8">
+            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
+              <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-10">Ações Rápidas</h3>
+              <div className="grid grid-cols-1 gap-4">
+                <button className="flex items-center gap-4 p-5 bg-brand-parchment rounded-2xl hover:bg-brand-linen transition-all group">
+                  <div className="w-10 h-10 rounded-xl bg-brand-white flex items-center justify-center text-brand-terracotta shadow-sm group-hover:scale-110 transition-transform">
+                    <MessageCircle size={18} />
+                  </div>
+                  <span className="text-[11px] font-medium uppercase tracking-widest text-brand-ink">Lembretes em Massa</span>
+                </button>
+                <button className="flex items-center gap-4 p-5 bg-brand-parchment rounded-2xl hover:bg-brand-linen transition-all group">
+                  <div className="w-10 h-10 rounded-xl bg-brand-white flex items-center justify-center text-brand-terracotta shadow-sm group-hover:scale-110 transition-transform">
+                    <Clock size={18} />
+                  </div>
+                  <span className="text-[11px] font-medium uppercase tracking-widest text-brand-ink">Bloquear Horário</span>
+                </button>
+                <button className="flex items-center gap-4 p-5 bg-brand-parchment rounded-2xl hover:bg-brand-linen transition-all group">
+                  <div className="w-10 h-10 rounded-xl bg-brand-white flex items-center justify-center text-brand-terracotta shadow-sm group-hover:scale-110 transition-transform">
+                    <TrendingUp size={18} />
+                  </div>
+                  <span className="text-[11px] font-medium uppercase tracking-widest text-brand-ink">Relatório Mensal</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-brand-terracotta p-10 rounded-[40px] text-brand-white relative overflow-hidden">
+              <div className="relative z-10">
+                <h4 className="text-xl font-serif font-normal mb-4">Dica do dia</h4>
+                <p className="text-brand-white/70 text-sm font-light leading-relaxed">
+                  "Sua vitrine é sua marca pessoal. Mantenha seu portfólio sempre atualizado para atrair clientes premium."
+                </p>
+              </div>
+              <Sparkles size={64} className="absolute -bottom-4 -right-4 text-brand-white/10 rotate-12" />
+            </div>
+          </section>
         </div>
       </main>
 

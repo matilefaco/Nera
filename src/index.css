@@ -1,21 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Outfit:wght@200;300;400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", serif;
   
-  --color-brand-cream: #FDFCFB;
-  --color-brand-rose: #C97C7B;
-  --color-brand-rose-light: #FDF8F8;
-  --color-brand-dark: #1A1A1A;
-  --color-brand-gray: #717171;
-  --color-brand-gold: #B8924D;
+  --color-brand-ink: #18120E;
+  --color-brand-espresso: #2E1F14;
+  --color-brand-terracotta: #A85C3A;
+  --color-brand-sienna: #C47250;
+  --color-brand-blush: #EDD9CC;
+  --color-brand-parchment: #F9F5F0;
+  --color-brand-linen: #F2EBE3;
+  --color-brand-stone: #8A7060;
+  --color-brand-mist: #E5DDD6;
+  --color-brand-white: #FDFAF7;
 }
 
 @layer base {
   body {
-    @apply bg-brand-cream text-brand-dark font-sans antialiased selection:bg-brand-rose/20;
+    @apply bg-brand-parchment text-brand-ink font-sans antialiased selection:bg-brand-terracotta/20;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -23,24 +27,28 @@
   }
 
   .display-hero {
-    @apply text-[40px] md:text-[48px] font-medium leading-tight;
+    @apply text-[48px] md:text-[64px] font-normal leading-[1.1] tracking-tight;
   }
 
   .heading-section {
-    @apply text-[24px] md:text-[28px] font-medium leading-snug;
+    @apply text-[32px] md:text-[42px] font-normal leading-tight;
   }
 
   .body-text {
-    @apply text-[16px] leading-relaxed;
+    @apply text-[16px] leading-relaxed font-light;
   }
 
   .label-text {
-    @apply text-[12px] md:text-[13px] uppercase tracking-wider font-semibold;
+    @apply text-[10px] md:text-[11px] uppercase tracking-[0.2em] font-medium text-brand-stone;
   }
 }
 
 .premium-shadow {
-  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 40px 80px -20px rgba(24, 18, 14, 0.08);
+}
+
+.card-refined {
+  @apply bg-brand-white border border-brand-mist rounded-[24px] p-8 transition-all duration-300;
 }
 
 .text-balance {
@@ -75,5 +83,5 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-brand-dark/5 rounded-full hover:bg-brand-dark/10 transition-colors;
+  @apply bg-brand-ink/5 rounded-full hover:bg-brand-ink/10 transition-colors;
 }

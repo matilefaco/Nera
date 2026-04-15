@@ -13,6 +13,18 @@
         "whatsapp": { "type": "string" },
         "slug": { "type": "string" },
         "avatar": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "studioAddress": {
+          "type": "object",
+          "properties": {
+            "street": { "type": "string" },
+            "number": { "type": "string" },
+            "complement": { "type": "string" },
+            "neighborhood": { "type": "string" },
+            "city": { "type": "string" },
+            "reference": { "type": "string" }
+          }
+        },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["uid", "name", "slug"]
@@ -61,6 +73,53 @@
         "active": { "type": "boolean" }
       },
       "required": ["professionalId", "dayOfWeek", "startTime", "endTime"]
+    },
+    "ReviewRequest": {
+      "title": "Review Request",
+      "description": "Solicitação de avaliação vinculada a um agendamento",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string" },
+        "professionalId": { "type": "string" },
+        "clientDisplayName": { "type": "string" },
+        "clientNeighborhood": { "type": "string" },
+        "token": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "submitted", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bookingId", "professionalId", "token", "status"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Avaliação real de uma cliente",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string" },
+        "professionalId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "rating": { "type": "number" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "comment": { "type": "string" },
+        "publicDisplayMode": { "type": "string", "enum": ["named", "anonymous", "private"] },
+        "firstName": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bookingId", "professionalId", "rating", "publicDisplayMode"]
+    },
+    "ReviewStats": {
+      "title": "Review Stats",
+      "description": "Estatísticas agregadas de avaliações",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "averageRating": { "type": "number" },
+        "totalReviews": { "type": "number" },
+        "totalCompletedBookings": { "type": "number" },
+        "topTags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["professionalId"]
     }
   },
   "firestore": {
@@ -79,6 +138,18 @@
     "/availability/{availabilityId}": {
       "schema": "Availability",
       "description": "Configuração de horários"
+    },
+    "/review_requests/{requestId}": {
+      "schema": "ReviewRequest",
+      "description": "Solicitações de avaliação"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Avaliações recebidas"
+    },
+    "/review_stats/{statsId}": {
+      "schema": "ReviewStats",
+      "description": "Estatísticas de avaliações"
     }
   }
 }

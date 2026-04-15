@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { db, auth } from '../firebase';
+import { db, auth, storage, handleFirestoreError, OperationType } from '../firebase';
 import { doc, updateDoc, collection, addDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
   User, MapPin, Home, Building2, Briefcase, 
   Clock, DollarSign, Instagram, MessageCircle, 
@@ -11,7 +12,9 @@ import {
   Camera, Plus, X, Globe, Copy, Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import imageCompression from 'browser-image-compression';
 import { generateSlug, formatCurrency } from '../lib/utils';
+import Logo from '../components/Logo';
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
 
@@ -20,16 +23,25 @@ export default function OnboardingPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
 
   // Step 1: Identity
   const [name, setName] = useState('');
   const [specialty, setSpecialty] = useState('');
   const [city, setCity] = useState('');
+  const [neighborhood, setNeighborhood] = useState('');
   const [avatar, setAvatar] = useState('');
   const [serviceMode, setServiceMode] = useState<ServiceMode>('studio');
 
   // Step 2: Service Mode Details
-  const [address, setAddress] = useState('');
+  const [studioAddress, setStudioAddress] = useState({
+    street: '',
+    number: '',
+    complement: '',
+    neighborhood: '',
+    city: '',
+    reference: ''
+  });
   const [serviceAreas, setServiceAreas] = useState<{name: string, fee: number}[]>([]);
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
@@ -55,44 +67,79 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (profile) {
-      if (profile.name) setName(profile.name);
-      if (profile.specialty) setSpecialty(profile.specialty);
-      if (profile.city) setCity(profile.city);
-      if (profile.avatar) setAvatar(profile.avatar);
-      if (profile.serviceMode) setServiceMode(profile.serviceMode);
-      if (profile.address) setAddress(profile.address);
-      if (profile.serviceAreas) setServiceAreas(profile.serviceAreas);
-      if (profile.pricingStrategy) setPricingStrategy(profile.pricingStrategy);
-      if (profile.workingDays) setWorkingDays(profile.workingDays);
-      if (profile.startTime) setStartTime(profile.startTime);
-      if (profile.endTime) setEndTime(profile.endTime);
-      if (profile.slug) {
-        setSlug(profile.slug);
-      } else if (profile.name) {
-        setSlug(generateSlug(profile.name));
-      }
-      if (profile.whatsapp) setWhatsapp(profile.whatsapp);
-      if (profile.instagram) setInstagram(profile.instagram);
-      if (profile.bio) setBio(profile.bio);
-      if (profile.servicesDraft) setServices(profile.servicesDraft);
-      if (profile.onboardingStep) setStep(profile.onboardingStep);
+      const locallyCompletedKey = `onboarding_completed_${user?.uid}`;
+      const locallyCompleted = sessionStorage.getItem(locallyCompletedKey) === 'true';
       
-      if (profile.onboardingCompleted) {
-        navigate('/dashboard');
+      console.log('[Onboarding] Profile snapshot received:', {
+        step: profile.onboardingStep,
+        completed: profile.onboardingCompleted,
+        locallyCompleted,
+        isFinalizing,
+        currentStep: step
+      });
+
+      // 1. If onboarding is already completed (server or local), and we are not on the success step,
+      // let the App.tsx guard handle the redirect to dashboard.
+      if ((profile.onboardingCompleted || locallyCompleted) && !isFinalizing && step !== 7) {
+        console.log('[Onboarding] Onboarding completed (server or local), allowing App.tsx guard to redirect...');
+        return;
+      }
+
+      // 2. Sync local state with profile, but ONLY if we are not in the middle of a process
+      // AND not already completed locally
+      if (!loading && !isFinalizing && !locallyCompleted) {
+        if (profile.name) setName(profile.name);
+        if (profile.specialty) setSpecialty(profile.specialty);
+        if (profile.city) setCity(profile.city);
+        if (profile.neighborhood) setNeighborhood(profile.neighborhood);
+        if (profile.studioAddress) {
+          setStudioAddress(profile.studioAddress);
+        } else if (profile.address) {
+          // Migration: if old address exists, put it in street for now
+          setStudioAddress(prev => ({ ...prev, street: profile.address }));
+        }
+        if (profile.avatar) setAvatar(profile.avatar);
+        if (profile.serviceAreas) setServiceAreas(profile.serviceAreas);
+        if (profile.pricingStrategy) setPricingStrategy(profile.pricingStrategy);
+        if (profile.workingDays) setWorkingDays(profile.workingDays);
+        if (profile.startTime) setStartTime(profile.startTime);
+        if (profile.endTime) setEndTime(profile.endTime);
+        if (profile.slug) {
+          setSlug(profile.slug);
+        } else if (profile.name) {
+          setSlug(generateSlug(profile.name));
+        }
+        if (profile.whatsapp) setWhatsapp(profile.whatsapp);
+        if (profile.instagram) setInstagram(profile.instagram);
+        if (profile.bio) setBio(profile.bio);
+        if (profile.servicesDraft) setServices(profile.servicesDraft);
+        
+        if (profile.onboardingStep !== undefined) {
+          console.log('[Onboarding] Syncing step from profile:', profile.onboardingStep);
+          setStep(profile.onboardingStep);
+        }
       }
     }
-  }, [profile, navigate]);
+  }, [profile, isFinalizing, loading, user?.uid, step]);
 
   const saveProgress = async (nextStepNum: number) => {
-    if (!user) return;
+    const locallyCompletedKey = `onboarding_completed_${user?.uid}`;
+    const locallyCompleted = sessionStorage.getItem(locallyCompletedKey) === 'true';
+
+    if (!user || isFinalizing || profile?.onboardingCompleted || locallyCompleted) {
+      console.log('[Onboarding] Skipping saveProgress: already completed or finalizing');
+      return;
+    }
+    console.log(`[Onboarding] Saving progress to step ${nextStepNum}...`);
     try {
       await updateDoc(doc(db, 'users', user.uid), {
         name,
         specialty,
         city,
+        neighborhood,
+        studioAddress,
         avatar,
         serviceMode,
-        address,
         serviceAreas,
         pricingStrategy,
         portfolio,
@@ -107,23 +154,53 @@ export default function OnboardingPage() {
         onboardingStep: nextStepNum,
         updatedAt: new Date().toISOString()
       });
+      console.log(`[Onboarding] Progress saved successfully.`);
     } catch (error) {
-      console.error('Error saving progress:', error);
+      console.error('[Onboarding] Error saving progress:', error);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadImage = async (file: File, path: string): Promise<string> => {
+    console.log(`[OnboardingSave] Uploading image to ${path}...`);
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    console.log(`[OnboardingSave] Upload successful: ${url}`);
+    return url;
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 1024 * 1024) {
-        toast.error('A imagem deve ter menos de 1MB');
-        return;
+    if (file && user) {
+      setUploadingImage(true);
+      try {
+        console.log(`[Avatar] Processing image: ${file.name}`);
+        const options = {
+          maxSizeMB: 0.1, // Increased slightly for better quality
+          maxWidthOrHeight: 800,
+          useWebWorker: true
+        };
+        const compressedFile = await imageCompression(file, options);
+        console.log(`[Avatar] Compressed size: ${(compressedFile.size / 1024).toFixed(2)} KB`);
+        
+        const downloadUrl = await uploadImage(compressedFile, `avatars/${user.uid}/${Date.now()}_${file.name}`);
+        
+        // Update local state
+        setAvatar(downloadUrl);
+        
+        // PERSISTENCE: Save immediately to Firestore to avoid loss
+        await updateDoc(doc(db, 'users', user.uid), {
+          avatar: downloadUrl,
+          updatedAt: new Date().toISOString()
+        });
+        
+        toast.success('Foto de perfil salva com sucesso!');
+      } catch (error: any) {
+        console.error('[Avatar] Error processing avatar:', error);
+        toast.error(`Erro ao salvar foto de perfil: ${error.message || 'Erro no servidor'}`);
+      } finally {
+        setUploadingImage(false);
       }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatar(reader.result as string);
-      };
-      reader.readAsDataURL(file);
     }
   };
 
@@ -136,51 +213,141 @@ export default function OnboardingPage() {
   const prevStep = () => setStep(s => s - 1);
 
   const handleFinish = async () => {
-    if (!user) return;
+    const locallyCompletedKey = `onboarding_completed_${user?.uid}`;
+    const locallyCompleted = sessionStorage.getItem(locallyCompletedKey) === 'true';
+
+    if (!user || isFinalizing || profile?.onboardingCompleted || locallyCompleted) {
+      console.log('[Onboarding] handleFinish blocked:', { 
+        isFinalizing, 
+        profileCompleted: profile?.onboardingCompleted,
+        locallyCompleted 
+      });
+      if (profile?.onboardingCompleted || locallyCompleted) navigate('/dashboard');
+      return;
+    }
+    
     setLoading(true);
+    setIsFinalizing(true);
+    console.log('[Onboarding] >>> STARTING FINALIZATION <<<');
+    
+    // Fail-safe: Mark as locally completed IMMEDIATELY to prevent any bounce during the process
+    sessionStorage.setItem(locallyCompletedKey, 'true');
+
     try {
-      // 1. Update User Profile
-      await updateDoc(doc(db, 'users', user.uid), {
-        name,
-        specialty,
-        city,
+      // 1. Sanitize Data
+      console.log('[Onboarding] Validating and sanitizing payload');
+      const sanitizedName = name.trim();
+      const sanitizedSpecialty = specialty.trim();
+      const sanitizedBio = bio.trim();
+      const sanitizedCity = city.trim();
+      const sanitizedSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      
+      const sanitizedAreas = serviceAreas
+        .filter(area => area.name && area.name.trim())
+        .map(area => ({
+          name: area.name.trim(),
+          fee: Number(area.fee) || 0
+        }));
+
+      // 2. Add Services
+      const activeServices = services.filter(s => s.name && s.price);
+      console.log(`[Onboarding] Step 1: Saving ${activeServices.length} services...`);
+      
+      try {
+        const servicePromises = activeServices.map(service => {
+          return addDoc(collection(db, 'services'), {
+            professionalId: user.uid,
+            name: service.name.trim(),
+            duration: Number(service.duration) || 60,
+            price: Number(service.price) || 0,
+            description: (service.description || '').trim(),
+            active: true,
+            createdAt: new Date().toISOString()
+          });
+        });
+        await Promise.all(servicePromises);
+        console.log('[Onboarding] Step 1: Services saved OK');
+      } catch (svcErr) {
+        console.warn('[Onboarding] Step 1 Warning: Error saving services, but continuing...', svcErr);
+      }
+
+      // 3. Prepare Final Data (WITHOUT PORTFOLIO FIRST to ensure it fits)
+      const finalData = {
+        name: sanitizedName,
+        specialty: sanitizedSpecialty,
+        city: sanitizedCity,
+        neighborhood: neighborhood.trim(),
         avatar,
         serviceMode,
-        address: serviceMode !== 'home' ? address : '',
-        serviceAreas: serviceMode !== 'studio' ? serviceAreas : [],
+        studioAddress: {
+          street: (studioAddress.street || '').trim(),
+          number: (studioAddress.number || '').trim(),
+          complement: (studioAddress.complement || '').trim(),
+          neighborhood: (studioAddress.neighborhood || '').trim(),
+          city: (studioAddress.city || sanitizedCity).trim(),
+          reference: (studioAddress.reference || '').trim()
+        },
+        serviceAreas: sanitizedAreas,
         pricingStrategy: serviceMode !== 'studio' ? pricingStrategy : 'none',
         workingDays,
         startTime,
         endTime,
-        slug,
-        whatsapp,
-        instagram,
-        bio,
-        portfolio,
+        slug: sanitizedSlug,
+        whatsapp: whatsapp.trim().replace(/\D/g, ''),
+        instagram: instagram.trim(),
+        bio: sanitizedBio,
         onboardingCompleted: true,
+        onboardingStep: 7,
         updatedAt: new Date().toISOString()
-      });
+      };
 
-      // 2. Add Services
-      for (const service of services) {
-        if (service.name && service.price) {
-          await addDoc(collection(db, 'services'), {
-            professionalId: user.uid,
-            name: service.name,
-            duration: Number(service.duration),
-            price: Number(service.price),
-            description: service.description,
-            active: true,
-            createdAt: new Date().toISOString()
+      console.log('[Onboarding] Step 2: Saving final profile data (base)...');
+      try {
+        await updateDoc(doc(db, 'users', user.uid), finalData);
+        console.log('[Onboarding] Step 2: Base profile saved OK');
+      } catch (err) {
+        console.error('[Onboarding] Step 2 Failed:', err);
+        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
+      }
+
+      // 4. Try to save portfolio separately
+      if (portfolio && portfolio.length > 0) {
+        console.log(`[Onboarding] Step 3: Attempting to save ${portfolio.length} portfolio images...`);
+        try {
+          // Ensure no base64 is being saved
+          const hasBase64 = portfolio.some(p => p.url.startsWith('data:'));
+          if (hasBase64) {
+            console.warn('[Onboarding] Detected base64 images in portfolio. These should have been uploaded to Storage.');
+          }
+
+          await updateDoc(doc(db, 'users', user.uid), {
+            portfolio: portfolio
           });
+          console.log('[Onboarding] Step 3: Portfolio saved OK');
+        } catch (portErr: any) {
+          console.error('[Onboarding] Step 3 Error: Error saving portfolio (likely size limit):', portErr);
+          toast.error('Algumas fotos do portfólio não puderam ser salvas devido ao tamanho, mas sua vitrine foi criada!');
         }
       }
 
-      toast.success('Onboarding concluído com sucesso!');
-      nextStep(); // Go to step 6 (Finalization)
-    } catch (error) {
-      console.error('Error finishing onboarding:', error);
-      toast.error('Erro ao salvar suas configurações.');
+      toast.success('Onboarding concluído!');
+      setStep(7);
+      console.log('[Onboarding] >>> FINALIZATION SUCCESSFUL <<<');
+    } catch (error: any) {
+      console.error('[Onboarding] !!! FINALIZATION CRITICAL ERROR !!!', error);
+      
+      const errorMsg = error?.message || String(error);
+      const errorCode = error?.code || 'unknown';
+      console.log('[Onboarding] Technical error details:', { errorCode, errorMsg });
+      
+      if (errorMsg.includes('too large') || errorCode === 'resource-exhausted') {
+        toast.error('Erro: Dados muito grandes. Tente remover algumas fotos ou serviços.');
+      } else {
+        toast.error(`Erro ao finalizar: ${errorCode} - ${errorMsg.substring(0, 100)}`);
+      }
+      
+      setIsFinalizing(false);
+      sessionStorage.removeItem(locallyCompletedKey); // Allow retry if it failed
     } finally {
       setLoading(false);
     }
@@ -241,23 +408,42 @@ export default function OnboardingPage() {
     toast.success(`${newAreaName.trim()} adicionado com sucesso!`);
   };
 
-  const handlePortfolioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
+    if (files && files.length > 0 && user) {
       setUploadingImage(true);
       const file = files[0];
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('Cada imagem deve ter menos de 2MB');
-        setUploadingImage(false);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPortfolio([...portfolio, { url: reader.result as string, category: specialty || 'Geral' }]);
-        setUploadingImage(false);
+      
+      try {
+        console.log(`[Portfolio] Processing image: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
+        
+        const options = {
+          maxSizeMB: 0.2, 
+          maxWidthOrHeight: 1200,
+          useWebWorker: true
+        };
+
+        const compressedFile = await imageCompression(file, options);
+        console.log(`[Portfolio] Compressed size: ${(compressedFile.size / 1024).toFixed(2)} KB`);
+
+        const downloadUrl = await uploadImage(compressedFile, `portfolio/${user.uid}/${Date.now()}_${file.name}`);
+        
+        const newPortfolio = [...portfolio, { url: downloadUrl, category: specialty || 'Geral' }];
+        setPortfolio(newPortfolio);
+
+        // PERSISTENCE: Save immediately to Firestore
+        await updateDoc(doc(db, 'users', user.uid), {
+          portfolio: newPortfolio,
+          updatedAt: new Date().toISOString()
+        });
+
         toast.success('Imagem adicionada ao seu portfólio!');
-      };
-      reader.readAsDataURL(file);
+      } catch (error: any) {
+        console.error('[Portfolio] Error:', error);
+        toast.error(`Erro ao processar imagem: ${error.message || 'Erro desconhecido'}`);
+      } finally {
+        setUploadingImage(false);
+      }
     }
   };
 
@@ -274,112 +460,121 @@ export default function OnboardingPage() {
   const progress = (step / 6) * 100;
 
   return (
-    <div className="min-h-screen bg-brand-cream/30 flex flex-col">
+    <div className="min-h-screen bg-brand-parchment flex flex-col">
       {/* Progress Bar */}
-      <div className="fixed top-0 left-0 w-full h-1.5 bg-brand-rose/10 z-50">
+      <div className="fixed top-0 left-0 w-full h-1 bg-brand-mist z-50">
         <motion.div 
-          className="h-full bg-brand-rose"
+          className="h-full bg-brand-ink"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
           transition={{ duration: 0.5 }}
         />
       </div>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full">
+      <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full py-20">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div 
               key="step1"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="w-full space-y-8"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
             >
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-brand-rose text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-rose/20">
-                  <User size={32} />
-                </div>
-                <h1 className="text-3xl font-serif font-bold text-brand-dark">Como as clientes devem te conhecer?</h1>
-                <p className="text-brand-gray">Sua identidade é o primeiro passo para criar confiança.</p>
+              <div className="text-center space-y-4">
+                <Logo className="mx-auto mb-8 scale-110" />
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Como as clientes devem te conhecer?</h1>
+                <p className="text-brand-stone font-light">Sua identidade é o primeiro passo para criar confiança.</p>
               </div>
 
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-brand-rose/10 space-y-6">
-                <div className="flex flex-col items-center mb-8">
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
+                <div className="flex flex-col items-center">
                   <div className="relative group">
-                    <div className="w-28 h-28 bg-brand-cream rounded-full flex items-center justify-center text-brand-rose border-4 border-white shadow-lg overflow-hidden relative">
+                    <div className="w-32 h-32 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden relative">
                       {avatar ? (
                         <img src={avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
-                        <User size={40} className="opacity-20" />
+                        <User size={48} className="opacity-20" />
                       )}
                     </div>
-                    <label className="absolute bottom-0 right-0 w-10 h-10 bg-brand-rose text-white rounded-full flex items-center justify-center border-4 border-white shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                    <label className="absolute bottom-0 right-0 w-10 h-10 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-4 border-brand-white shadow-lg cursor-pointer hover:scale-110 transition-transform">
                       <Camera size={18} />
                       <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
                     </label>
                   </div>
-                  <p className="mt-4 text-[10px] font-bold text-brand-gray uppercase tracking-widest">Sua melhor foto profissional</p>
+                  <p className="mt-4 text-[10px] font-medium text-brand-stone uppercase tracking-widest">Sua melhor foto profissional</p>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Nome que aparece na agenda</label>
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Nome que aparece na agenda</label>
                     <input 
                       type="text" 
                       value={name} 
                       onChange={(e) => setName(e.target.value)} 
                       placeholder="Ex: Bruna Designer" 
-                      className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Sua Especialidade Principal</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Especialidade Principal</label>
                     <input 
                       type="text" 
                       value={specialty} 
                       onChange={(e) => setSpecialty(e.target.value)} 
                       placeholder="Ex: Nail Designer" 
-                      className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Cidade Base</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Cidade Base</label>
                     <div className="relative">
-                      <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-gray" size={20} />
+                      <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
                       <input 
                         type="text" 
                         value={city} 
                         onChange={(e) => setCity(e.target.value)} 
                         placeholder="Ex: Fortaleza, CE" 
-                        className="w-full pl-14 pr-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                        className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Onde você atende?</label>
+                <div className="space-y-4">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro Base</label>
+                  <input 
+                    type="text" 
+                    value={neighborhood} 
+                    onChange={(e) => setNeighborhood(e.target.value)} 
+                    placeholder="Ex: Aldeota" 
+                    className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-[24px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Onde você atende?</label>
                   <div className="grid grid-cols-3 gap-3">
                     <button 
                       onClick={() => setServiceMode('studio')}
-                      className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${serviceMode === 'studio' ? 'border-brand-rose bg-brand-rose-light/20 text-brand-rose' : 'border-brand-cream bg-brand-cream text-brand-gray'}`}
+                      className={`p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2 ${serviceMode === 'studio' ? 'border-brand-ink bg-brand-linen text-brand-ink' : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'}`}
                     >
                       <Building2 size={24} />
-                      <span className="text-[10px] font-bold uppercase">Estúdio</span>
+                      <span className="text-[10px] font-medium uppercase">Estúdio</span>
                     </button>
                     <button 
                       onClick={() => setServiceMode('home')}
-                      className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${serviceMode === 'home' ? 'border-brand-rose bg-brand-rose-light/20 text-brand-rose' : 'border-brand-cream bg-brand-cream text-brand-gray'}`}
+                      className={`p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2 ${serviceMode === 'home' ? 'border-brand-ink bg-brand-linen text-brand-ink' : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'}`}
                     >
                       <Home size={24} />
-                      <span className="text-[10px] font-bold uppercase">Domicílio</span>
+                      <span className="text-[10px] font-medium uppercase">Domicílio</span>
                     </button>
                     <button 
                       onClick={() => setServiceMode('hybrid')}
-                      className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all ${serviceMode === 'hybrid' ? 'border-brand-rose bg-brand-rose-light/20 text-brand-rose' : 'border-brand-cream bg-brand-cream text-brand-gray'}`}
+                      className={`p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2 ${serviceMode === 'hybrid' ? 'border-brand-ink bg-brand-linen text-brand-ink' : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'}`}
                     >
                       <Briefcase size={24} />
-                      <span className="text-[10px] font-bold uppercase">Híbrido</span>
+                      <span className="text-[10px] font-medium uppercase">Híbrido</span>
                     </button>
                   </div>
                 </div>
@@ -387,10 +582,10 @@ export default function OnboardingPage() {
 
               <button 
                 onClick={nextStep}
-                disabled={!name || !specialty || !city}
-                className="w-full bg-brand-dark text-white py-6 rounded-full font-bold text-sm uppercase tracking-widest premium-shadow flex items-center justify-center gap-3 disabled:opacity-50"
+                disabled={!name || !specialty || !city || !neighborhood || uploadingImage}
+                className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
               >
-                Continuar <ArrowRight size={20} />
+                {uploadingImage ? 'Processando...' : 'Continuar'} <ArrowRight size={18} />
               </button>
             </motion.div>
           )}
@@ -398,99 +593,157 @@ export default function OnboardingPage() {
           {step === 2 && (
             <motion.div 
               key="step2"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="w-full space-y-8"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
             >
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-brand-rose text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-rose/20">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   {serviceMode === 'home' ? <Home size={32} /> : <Building2 size={32} />}
                 </div>
-                <h1 className="text-3xl font-serif font-bold text-brand-dark">Onde você atende?</h1>
-                <p className="text-brand-gray">Configure sua logística de atendimento.</p>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Onde você atende?</h1>
+                <p className="text-brand-stone font-light">Configure sua logística de atendimento.</p>
               </div>
 
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-brand-rose/10 space-y-8">
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
                 {(serviceMode === 'studio' || serviceMode === 'hybrid') && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 text-brand-dark">
-                      <Building2 size={20} className="text-brand-rose" />
-                      <h3 className="font-bold">Endereço do seu Estúdio</h3>
+                  <div className="space-y-8">
+                    <div className="flex items-center gap-3 text-brand-ink">
+                      <Building2 size={20} className="text-brand-terracotta" />
+                      <h3 className="font-medium text-lg">Endereço do seu Estúdio</h3>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Endereço Completo</label>
-                      <textarea 
-                        value={address} 
-                        onChange={(e) => setAddress(e.target.value)} 
-                        placeholder="Rua, número, complemento, bairro..." 
-                        className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all h-24 resize-none"
-                      />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Rua</label>
+                        <input 
+                          type="text"
+                          value={studioAddress.street} 
+                          onChange={(e) => setStudioAddress({...studioAddress, street: e.target.value})} 
+                          placeholder="Ex: Rua Silva Jatahy" 
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Número</label>
+                        <input 
+                          type="text"
+                          value={studioAddress.number} 
+                          onChange={(e) => setStudioAddress({...studioAddress, number: e.target.value})} 
+                          placeholder="Ex: 123" 
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Complemento</label>
+                        <input 
+                          type="text"
+                          value={studioAddress.complement} 
+                          onChange={(e) => setStudioAddress({...studioAddress, complement: e.target.value})} 
+                          placeholder="Ex: Sala 402" 
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro</label>
+                        <input 
+                          type="text"
+                          value={studioAddress.neighborhood} 
+                          onChange={(e) => setStudioAddress({...studioAddress, neighborhood: e.target.value})} 
+                          placeholder="Ex: Meireles" 
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Cidade</label>
+                        <input 
+                          type="text"
+                          value={studioAddress.city || city} 
+                          onChange={(e) => setStudioAddress({...studioAddress, city: e.target.value})} 
+                          placeholder="Ex: Fortaleza" 
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Ponto de Referência</label>
+                        <input 
+                          type="text"
+                          value={studioAddress.reference} 
+                          onChange={(e) => setStudioAddress({...studioAddress, reference: e.target.value})} 
+                          placeholder="Ex: Próximo ao Shopping Del Paseo" 
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {(serviceMode === 'home' || serviceMode === 'hybrid') && (
-                  <div className="space-y-6 pt-6 border-t border-brand-rose/10">
-                    <div className="flex items-center gap-3 text-brand-dark">
-                      <Home size={20} className="text-brand-rose" />
-                      <h3 className="font-bold">Atendimento em Domicílio</h3>
+                  <div className="space-y-8 pt-8 border-t border-brand-mist">
+                    <div className="flex items-center gap-3 text-brand-ink">
+                      <Home size={20} className="text-brand-terracotta" />
+                      <h3 className="font-medium text-lg">Atendimento em Domicílio</h3>
                     </div>
                     
                     <div className="space-y-4">
-                      <p className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Você cobra o mesmo valor em todos os bairros?</p>
+                      <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Você cobra o mesmo valor em todos os bairros?</p>
                       <div className="grid grid-cols-1 gap-3">
                         <button 
                           onClick={() => setPricingStrategy('none')}
-                          className={`p-4 rounded-2xl border-2 text-left transition-all ${pricingStrategy === 'none' ? 'border-brand-rose bg-brand-rose-light/10' : 'border-brand-cream bg-brand-cream'}`}
+                          className={`p-5 rounded-[24px] border text-left transition-all ${pricingStrategy === 'none' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
                         >
-                          <p className="text-xs font-bold text-brand-dark mb-1">Sim, é o mesmo valor</p>
-                          <p className="text-[10px] text-brand-gray leading-tight">O valor do serviço será o mesmo em todas as regiões atendidas.</p>
+                          <p className="text-xs font-medium text-brand-ink mb-1">Sim, é o mesmo valor</p>
+                          <p className="text-[10px] text-brand-stone font-light leading-tight">O valor do serviço será o mesmo em todas as regiões atendidas.</p>
                         </button>
                         <button 
                           onClick={() => setPricingStrategy('extra')}
-                          className={`p-4 rounded-2xl border-2 text-left transition-all ${pricingStrategy === 'extra' ? 'border-brand-rose bg-brand-rose-light/10' : 'border-brand-cream bg-brand-cream'}`}
+                          className={`p-5 rounded-[24px] border text-left transition-all ${pricingStrategy === 'extra' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
                         >
-                          <p className="text-xs font-bold text-brand-dark mb-1">Não, varia por região</p>
-                          <p className="text-[10px] text-brand-gray leading-tight">Você pode ajustar valores conforme a região para cobrir deslocamentos maiores.</p>
+                          <p className="text-xs font-medium text-brand-ink mb-1">Não, varia por região</p>
+                          <p className="text-[10px] text-brand-stone font-light leading-tight">Você pode ajustar valores conforme a região para cobrir deslocamentos maiores.</p>
                         </button>
                       </div>
                     </div>
 
                     {pricingStrategy === 'extra' && (
-                      <div className="space-y-4 pt-4 bg-brand-rose-light/5 p-6 rounded-3xl border border-brand-rose/10">
+                      <div className="space-y-6 pt-6 bg-brand-parchment p-8 rounded-[32px] border border-brand-mist">
                         <div className="flex items-center gap-2 mb-2">
-                          <Sparkles size={16} className="text-brand-rose" />
-                          <h4 className="text-xs font-bold text-brand-dark uppercase tracking-widest">Ajuste de valores por região</h4>
+                          <Sparkles size={16} className="text-brand-terracotta" />
+                          <h4 className="text-[10px] font-medium text-brand-ink uppercase tracking-widest">Ajuste de valores por região</h4>
                         </div>
-                        <p className="text-[10px] text-brand-gray leading-tight mb-4">Adicione um valor adicional para bairros que exigem um deslocamento maior.</p>
                         
                         <div className="flex flex-col md:flex-row items-end gap-3">
-                          <div className="flex-1 space-y-1.5 w-full">
-                            <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Bairro / Região</label>
+                          <div className="flex-1 space-y-2 w-full">
+                            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro / Região</label>
                             <input 
                               type="text" 
                               value={newAreaName} 
                               onChange={(e) => setNewAreaName(e.target.value)} 
                               onKeyDown={(e) => e.key === 'Enter' && addArea()}
                               placeholder="Ex: Aldeota" 
-                              className="w-full px-5 py-3 bg-white rounded-xl outline-none text-sm focus:ring-2 focus:ring-brand-rose/20 transition-all border border-brand-rose/10" 
+                              className="w-full px-5 py-3 bg-brand-white border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
                             />
                           </div>
-                          <div className="w-full md:w-32 space-y-1.5">
-                            <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Valor Adicional</label>
+                          <div className="w-full md:w-32 space-y-2">
+                            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Valor Adicional</label>
                             <input 
                               type="number" 
                               value={newAreaFee} 
                               onChange={(e) => setNewAreaFee(e.target.value)} 
                               onKeyDown={(e) => e.key === 'Enter' && addArea()}
                               placeholder="0,00" 
-                              className="w-full px-5 py-3 bg-white rounded-xl outline-none text-sm focus:ring-2 focus:ring-brand-rose/20 transition-all border border-brand-rose/10" 
+                              className="w-full px-5 py-3 bg-brand-white border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
                             />
                           </div>
                           <button 
                             onClick={addArea} 
-                            className="bg-brand-dark text-white px-8 h-[46px] rounded-xl font-bold text-xs whitespace-nowrap hover:bg-brand-dark/90 active:scale-95 transition-all shadow-lg shadow-brand-dark/10"
+                            className="bg-brand-ink text-brand-white px-8 h-[46px] rounded-xl text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
                           >
                             Adicionar
                           </button>
@@ -500,21 +753,21 @@ export default function OnboardingPage() {
 
                     {pricingStrategy === 'none' && (
                       <div className="space-y-4 pt-4">
-                        <p className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Quais bairros você atende?</p>
+                        <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Quais bairros você atende?</p>
                         <div className="flex flex-col md:flex-row items-end gap-3">
-                          <div className="flex-1 space-y-1.5 w-full">
+                          <div className="flex-1 space-y-2 w-full">
                             <input 
                               type="text" 
                               value={newAreaName} 
                               onChange={(e) => setNewAreaName(e.target.value)} 
                               onKeyDown={(e) => e.key === 'Enter' && addArea()}
                               placeholder="Ex: Aldeota" 
-                              className="w-full px-5 py-3 bg-brand-cream rounded-xl outline-none text-sm focus:ring-2 focus:ring-brand-rose/20 transition-all" 
+                              className="w-full px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
                             />
                           </div>
                           <button 
                             onClick={addArea} 
-                            className="bg-brand-dark text-white px-8 h-[46px] rounded-xl font-bold text-xs whitespace-nowrap hover:bg-brand-dark/90 active:scale-95 transition-all shadow-lg shadow-brand-dark/10"
+                            className="bg-brand-ink text-brand-white px-8 h-[46px] rounded-xl text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
                           >
                             Adicionar
                           </button>
@@ -524,16 +777,16 @@ export default function OnboardingPage() {
 
                     <div className="space-y-2">
                       {serviceAreas.map((area, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-brand-cream/50 p-3 rounded-xl border border-brand-rose/5">
-                          <span className="text-sm font-bold">{area.name}</span>
-                          <div className="flex items-center gap-3">
+                        <div key={idx} className="flex items-center justify-between bg-brand-parchment p-4 rounded-2xl border border-brand-mist">
+                          <span className="text-sm font-medium text-brand-ink">{area.name}</span>
+                          <div className="flex items-center gap-4">
                             {pricingStrategy === 'extra' && area.fee > 0 && (
-                              <span className="text-xs font-bold text-brand-rose">
+                              <span className="text-xs font-medium text-brand-terracotta">
                                 + {formatCurrency(area.fee)}
                               </span>
                             )}
-                            <button onClick={() => removeArea(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-lg transition-all">
-                              <X size={14} />
+                            <button onClick={() => removeArea(idx)} className="text-brand-stone hover:text-brand-terracotta transition-all">
+                              <X size={16} />
                             </button>
                           </div>
                         </div>
@@ -544,15 +797,18 @@ export default function OnboardingPage() {
               </div>
 
               <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-white rounded-full text-brand-gray border border-brand-dark/5 premium-shadow">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
                   <ArrowLeft size={24} />
                 </button>
                 <button 
                   onClick={nextStep}
-                  disabled={(serviceMode !== 'home' && !address) || (serviceMode !== 'studio' && serviceAreas.length === 0)}
-                  className="flex-1 bg-brand-dark text-white py-6 rounded-full font-bold text-sm uppercase tracking-widest premium-shadow flex items-center justify-center gap-3 disabled:opacity-50"
+                  disabled={
+                    (serviceMode !== 'home' && (!studioAddress.street || !studioAddress.number || !studioAddress.neighborhood)) || 
+                    (serviceMode !== 'studio' && serviceAreas.length === 0)
+                  }
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  Continuar <ArrowRight size={20} />
+                  Continuar <ArrowRight size={18} />
                 </button>
               </div>
             </motion.div>
@@ -561,73 +817,73 @@ export default function OnboardingPage() {
           {step === 3 && (
             <motion.div 
               key="step3"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="w-full space-y-8"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
             >
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-brand-rose text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-rose/20">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   <Sparkles size={32} />
                 </div>
-                <h1 className="text-3xl font-serif font-bold text-brand-dark">Seus Serviços</h1>
-                <p className="text-brand-gray">O que suas clientes vão agendar?</p>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seus Serviços</h1>
+                <p className="text-brand-stone font-light">O que suas clientes vão agendar?</p>
               </div>
 
               <div className="space-y-6">
                 {services.map((service, idx) => (
-                  <div key={idx} className="bg-white p-8 rounded-[2.5rem] shadow-xl border border-brand-rose/10 relative">
+                  <div key={idx} className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl relative">
                     {services.length > 1 && (
-                      <button onClick={() => removeService(idx)} className="absolute top-6 right-6 text-brand-gray hover:text-red-500 transition-colors">
+                      <button onClick={() => removeService(idx)} className="absolute top-8 right-8 text-brand-stone hover:text-brand-terracotta transition-colors">
                         <X size={20} />
                       </button>
                     )}
-                    <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Nome do Serviço</label>
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Nome do Serviço</label>
                         <input 
                           type="text" 
                           value={service.name} 
                           onChange={(e) => updateService(idx, 'name', e.target.value)} 
                           placeholder="Ex: Design de Sobrancelhas" 
-                          className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Duração (min)</label>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Duração (min)</label>
                           <div className="relative">
-                            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-gray" size={18} />
+                            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                             <input 
                               type="number" 
                               value={service.duration} 
                               onChange={(e) => updateService(idx, 'duration', e.target.value)} 
-                              className="w-full pl-12 pr-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                              className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                             />
                           </div>
                         </div>
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Preço (R$)</label>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Preço (R$)</label>
                           <div className="relative">
-                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-gray" size={18} />
+                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                             <input 
                               type="number" 
                               value={service.price} 
                               onChange={(e) => updateService(idx, 'price', e.target.value)} 
                               placeholder="0,00"
-                              className="w-full pl-12 pr-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                              className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                             />
                           </div>
                         </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Descrição Curta (Opcional)</label>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Descrição Curta (Opcional)</label>
                         <input 
                           type="text" 
                           value={service.description} 
                           onChange={(e) => updateService(idx, 'description', e.target.value)} 
                           placeholder="Ex: Inclui mapeamento e finalização" 
-                          className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                         />
                       </div>
                     </div>
@@ -636,22 +892,22 @@ export default function OnboardingPage() {
 
                 <button 
                   onClick={addService}
-                  className="w-full py-6 border-2 border-dashed border-brand-rose/20 rounded-[2.5rem] text-brand-rose font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-rose-light/10 transition-all"
+                  className="w-full py-6 border border-dashed border-brand-terracotta/30 rounded-[40px] text-brand-terracotta font-medium text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-linen transition-all"
                 >
                   <Plus size={18} /> Adicionar outro serviço
                 </button>
               </div>
 
               <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-white rounded-full text-brand-gray border border-brand-dark/5 premium-shadow">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
                   <ArrowLeft size={24} />
                 </button>
                 <button 
                   onClick={nextStep}
                   disabled={services.some(s => !s.name || !s.price)}
-                  className="flex-1 bg-brand-dark text-white py-6 rounded-full font-bold text-sm uppercase tracking-widest premium-shadow flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  Continuar <ArrowRight size={20} />
+                  Continuar <ArrowRight size={18} />
                 </button>
               </div>
             </motion.div>
@@ -660,28 +916,28 @@ export default function OnboardingPage() {
           {step === 4 && (
             <motion.div 
               key="step4"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="w-full space-y-8"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
             >
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-brand-rose text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-rose/20">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   <Clock size={32} />
                 </div>
-                <h1 className="text-3xl font-serif font-bold text-brand-dark">Seus Horários</h1>
-                <p className="text-brand-gray">Não se preocupe: você poderá personalizar sua agenda com mais flexibilidade depois.</p>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seus Horários</h1>
+                <p className="text-brand-stone font-light">Não se preocupe: você poderá personalizar sua agenda com mais flexibilidade depois.</p>
               </div>
 
-              <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-brand-rose/10 space-y-8">
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
                 <div className="space-y-4">
-                  <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Dias de Trabalho</label>
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
                   <div className="flex justify-between">
                     {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
                       <button 
                         key={idx}
                         onClick={() => toggleDay(idx)}
-                        className={`w-10 h-10 rounded-full font-bold text-xs transition-all ${workingDays.includes(idx) ? 'bg-brand-rose text-white shadow-lg shadow-brand-rose/20' : 'bg-brand-cream text-brand-gray'}`}
+                        className={`w-10 h-10 rounded-full font-medium text-xs transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone'}`}
                       >
                         {day}
                       </button>
@@ -689,23 +945,23 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-brand-rose/10">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Início do Dia</label>
+                <div className="grid grid-cols-2 gap-6 pt-8 border-t border-brand-mist">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início do Dia</label>
                     <input 
                       type="time" 
                       value={startTime} 
                       onChange={(e) => setStartTime(e.target.value)} 
-                      className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all font-bold"
+                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Fim do Dia</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Fim do Dia</label>
                     <input 
                       type="time" 
                       value={endTime} 
                       onChange={(e) => setEndTime(e.target.value)} 
-                      className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all font-bold"
+                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
                     />
                   </div>
                 </div>
@@ -718,24 +974,24 @@ export default function OnboardingPage() {
                       setEndTime('18:00');
                       toast.info('Horário padrão aplicado!');
                     }}
-                    className="w-full py-5 bg-brand-rose-light/30 text-brand-rose rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-rose-light/40 transition-all border border-brand-rose/10"
+                    className="w-full py-5 bg-brand-linen text-brand-ink rounded-[20px] text-[10px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist"
                   >
                     Usar horário padrão (Seg a Sex, 9h às 18h)
                   </button>
-                  <p className="text-[10px] text-brand-gray text-center italic">Esse é só o seu horário inicial. Você poderá ajustar dias, pausas e exceções depois.</p>
+                  <p className="text-[10px] text-brand-stone text-center italic font-light">Esse é só o seu horário inicial. Você poderá ajustar dias, pausas e exceções depois.</p>
                 </div>
               </div>
 
               <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-white rounded-full text-brand-gray border border-brand-dark/5 premium-shadow">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
                   <ArrowLeft size={24} />
                 </button>
                 <button 
                   onClick={nextStep}
                   disabled={workingDays.length === 0}
-                  className="flex-1 bg-brand-dark text-white py-6 rounded-full font-bold text-sm uppercase tracking-widest premium-shadow flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  Continuar <ArrowRight size={20} />
+                  Continuar <ArrowRight size={18} />
                 </button>
               </div>
             </motion.div>
@@ -744,99 +1000,99 @@ export default function OnboardingPage() {
           {step === 5 && (
             <motion.div 
               key="step5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="w-full space-y-8"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
             >
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-brand-rose text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-rose/20">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   <Globe size={32} />
                 </div>
-                <h1 className="text-3xl font-serif font-bold text-brand-dark">Sua Vitrine Digital</h1>
-                <p className="text-brand-gray">Como as clientes vão te encontrar?</p>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Sua Vitrine Digital</h1>
+                <p className="text-brand-stone font-light">Como as clientes vão te encontrar?</p>
               </div>
 
-              <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-brand-rose/10 space-y-6">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Seu Link Exclusivo</label>
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seu Link Exclusivo</label>
                   <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-gray font-bold text-sm">marca.ai/p/</span>
+                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-mist font-medium text-sm">nera.app/p/</span>
                     <input 
                       type="text" 
                       value={slug} 
                       onChange={(e) => setSlug(e.target.value)} 
-                      className="w-full pl-28 pr-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all font-bold text-brand-rose"
+                      className="w-full pl-28 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-terracotta"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">WhatsApp</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">WhatsApp</label>
                     <div className="relative">
-                      <MessageCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-gray" size={18} />
+                      <MessageCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                       <input 
                         type="tel" 
                         value={whatsapp} 
                         onChange={(e) => setWhatsapp(e.target.value)} 
                         placeholder="(00) 00000-0000"
-                        className="w-full pl-12 pr-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                        className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                       />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Instagram</label>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram</label>
                     <div className="relative">
-                      <Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-gray" size={18} />
+                      <Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                       <input 
                         type="text" 
                         value={instagram} 
                         onChange={(e) => setInstagram(e.target.value)} 
                         placeholder="@seuusuario"
-                        className="w-full pl-12 pr-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all"
+                        className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Bio Curta (O que te torna única?)</label>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bio Curta (O que te torna única?)</label>
                   <textarea 
                     value={bio} 
                     onChange={(e) => setBio(e.target.value)} 
                     placeholder="Ex: Especialista em beleza natural com mais de 5 anos de experiência."
-                    className="w-full px-6 py-4 bg-brand-cream rounded-2xl outline-none focus:ring-2 focus:ring-brand-rose/20 transition-all h-24 resize-none"
+                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-24 resize-none font-light"
                   />
                 </div>
               </div>
 
               {/* Mini Preview */}
-              <div className="bg-brand-dark p-6 rounded-[2.5rem] text-white flex items-center gap-6">
-                <div className="w-16 h-16 bg-brand-cream rounded-full overflow-hidden shrink-0">
+              <div className="bg-brand-ink p-8 rounded-[40px] text-brand-white flex items-center gap-6 shadow-xl">
+                <div className="w-16 h-16 bg-brand-linen rounded-full overflow-hidden shrink-0 border border-brand-mist/20">
                   {avatar && <img src={avatar} className="w-full h-full object-cover" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-serif italic font-bold truncate">{name || 'Seu Nome'}</h4>
-                  <p className="text-[10px] text-white/40 uppercase tracking-widest truncate">{specialty || 'Sua Especialidade'}</p>
-                  <div className="flex gap-2 mt-2">
-                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center"><Instagram size={12} /></div>
-                    <div className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center"><MessageCircle size={12} /></div>
+                  <h4 className="font-serif italic text-lg truncate">{name || 'Seu Nome'}</h4>
+                  <p className="text-[10px] text-brand-mist uppercase tracking-widest truncate">{specialty || 'Sua Especialidade'}</p>
+                  <div className="flex gap-2 mt-3">
+                    <div className="w-7 h-7 rounded-full bg-brand-white/10 flex items-center justify-center"><Instagram size={14} /></div>
+                    <div className="w-7 h-7 rounded-full bg-brand-white/10 flex items-center justify-center"><MessageCircle size={14} /></div>
                   </div>
                 </div>
-                <div className="bg-brand-rose px-4 py-2 rounded-full text-[8px] font-bold uppercase tracking-widest">Preview</div>
+                <div className="bg-brand-terracotta px-4 py-2 rounded-full text-[8px] font-medium uppercase tracking-widest">Preview</div>
               </div>
 
               <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-white rounded-full text-brand-gray border border-brand-dark/5 premium-shadow">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
                   <ArrowLeft size={24} />
                 </button>
                 <button 
                   onClick={nextStep}
                   disabled={loading || !slug || !whatsapp}
-                  className="flex-1 bg-brand-dark text-white py-6 rounded-full font-bold text-sm uppercase tracking-widest premium-shadow flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  Continuar <ArrowRight size={20} />
+                  Continuar <ArrowRight size={18} />
                 </button>
               </div>
             </motion.div>
@@ -845,37 +1101,37 @@ export default function OnboardingPage() {
           {step === 6 && (
             <motion.div 
               key="step6"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="w-full space-y-8"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
             >
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 bg-brand-rose text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-rose/20">
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   <Camera size={32} />
                 </div>
-                <h1 className="text-3xl font-serif font-bold text-brand-dark">Seu Portfólio</h1>
-                <p className="text-brand-gray">Mostre o seu melhor trabalho para encantar as clientes.</p>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seu Portfólio</h1>
+                <p className="text-brand-stone font-light">Mostre o seu melhor trabalho para encantar as clientes.</p>
               </div>
 
-              <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-brand-rose/10 space-y-6">
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {portfolio.map((item, idx) => (
-                    <div key={idx} className="aspect-square bg-brand-cream rounded-2xl overflow-hidden relative group">
+                    <div key={idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
                       <img src={item.url} className="w-full h-full object-cover" />
                       <button 
                         onClick={() => removePortfolioImage(idx)}
-                        className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute top-2 right-2 w-8 h-8 bg-brand-ink/80 text-brand-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X size={16} />
                       </button>
-                      <div className="absolute bottom-0 left-0 w-full p-2 bg-black/20 backdrop-blur-sm">
-                        <p className="text-[8px] text-white font-bold uppercase truncate">{item.category}</p>
+                      <div className="absolute bottom-0 left-0 w-full p-2 bg-brand-ink/40 backdrop-blur-sm">
+                        <p className="text-[8px] text-brand-white font-medium uppercase truncate tracking-widest">{item.category}</p>
                       </div>
                     </div>
                   ))}
                   
-                  <label className="aspect-square border-2 border-dashed border-brand-rose/20 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-rose-light/10 transition-all text-brand-rose">
+                  <label className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta">
                     {uploadingImage ? (
                       <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
                         <Sparkles size={24} />
@@ -883,26 +1139,26 @@ export default function OnboardingPage() {
                     ) : (
                       <>
                         <Plus size={24} />
-                        <span className="text-[10px] font-bold uppercase">Adicionar</span>
+                        <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
                       </>
                     )}
                     <input type="file" accept="image/*" className="hidden" onChange={handlePortfolioUpload} disabled={uploadingImage} />
                   </label>
                 </div>
                 
-                <p className="text-[10px] text-brand-gray text-center italic">Dica: Fotos bem iluminadas e de alta qualidade convertem até 3x mais!</p>
+                <p className="text-[10px] text-brand-stone text-center italic font-light">Dica: Fotos bem iluminadas e de alta qualidade convertem até 3x mais!</p>
               </div>
 
               <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-white rounded-full text-brand-gray border border-brand-dark/5 premium-shadow">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
                   <ArrowLeft size={24} />
                 </button>
                 <button 
                   onClick={handleFinish}
                   disabled={loading}
-                  className="flex-1 bg-brand-dark text-white py-6 rounded-full font-bold text-sm uppercase tracking-widest premium-shadow flex items-center justify-center gap-3 disabled:opacity-50"
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  {loading ? 'Finalizando...' : 'Concluir Agenda'} <CheckCircle2 size={20} />
+                  {loading ? 'Finalizando...' : 'Concluir Vitrine'} <CheckCircle2 size={18} />
                 </button>
               </div>
             </motion.div>
@@ -910,8 +1166,8 @@ export default function OnboardingPage() {
 
           {step === 7 && (
             <motion.div 
-              key="step6"
-              initial={{ opacity: 0, scale: 0.9 }}
+              key="step7"
+              initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="w-full space-y-12 text-center"
             >
@@ -920,67 +1176,67 @@ export default function OnboardingPage() {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', damping: 12, delay: 0.2 }}
-                  className="w-32 h-32 bg-green-500 text-white rounded-[2.5rem] flex items-center justify-center mx-auto shadow-2xl shadow-green-500/20"
+                  className="w-32 h-32 bg-brand-terracotta text-brand-white rounded-[40px] flex items-center justify-center mx-auto shadow-2xl shadow-brand-terracotta/20"
                 >
                   <CheckCircle2 size={64} />
                 </motion.div>
-                <div className="absolute -top-4 -right-4 w-12 h-12 bg-brand-rose text-white rounded-2xl flex items-center justify-center shadow-lg rotate-12 animate-bounce">
+                <div className="absolute -top-4 -right-4 w-12 h-12 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center shadow-lg rotate-12 animate-bounce">
                   <Sparkles size={24} />
                 </div>
               </div>
 
               <div className="space-y-4">
-                <h1 className="text-5xl font-serif font-bold text-brand-dark">Sua agenda está pronta!</h1>
-                <p className="text-brand-gray text-lg max-w-sm mx-auto">
+                <h1 className="text-5xl font-serif font-normal text-brand-ink">Sua vitrine está pronta!</h1>
+                <p className="text-brand-stone text-lg max-w-sm mx-auto font-light">
                   Agora você tem um sistema profissional para receber agendamentos e valorizar seu tempo.
                 </p>
               </div>
 
-              <div className="bg-white p-8 rounded-[3rem] shadow-xl border border-brand-rose/10 space-y-6">
-                <div className="p-6 bg-brand-cream rounded-2xl border border-brand-rose/10">
-                  <p className="text-[10px] font-bold text-brand-gray uppercase tracking-widest mb-2">Seu link da bio</p>
-                  <p className="text-xl font-bold text-brand-rose break-all">marca.ai/p/{slug}</p>
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
+                <div className="p-8 bg-brand-parchment rounded-[32px] border border-brand-mist">
+                  <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-2">Seu link da bio</p>
+                  <p className="text-2xl font-serif italic text-brand-terracotta break-all">nera.app/p/{slug}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <button 
                     onClick={() => {
-                      navigator.clipboard.writeText(`https://marca.ai/p/${slug}`);
+                      navigator.clipboard.writeText(`https://nera.app/p/${slug}`);
                       toast.success('Link copiado!');
                     }}
-                    className="flex flex-col items-center gap-3 p-6 bg-brand-cream rounded-2xl hover:bg-brand-rose-light/20 transition-all group"
+                    className="flex flex-col items-center gap-4 p-8 bg-brand-parchment rounded-[32px] border border-brand-mist hover:bg-brand-linen transition-all group"
                   >
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-brand-dark group-hover:scale-110 transition-transform">
+                    <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center text-brand-ink border border-brand-mist group-hover:scale-110 transition-transform">
                       <Copy size={24} />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Copiar Link</span>
+                    <span className="text-[10px] font-medium uppercase tracking-widest">Copiar Link</span>
                   </button>
                   <button 
                     onClick={() => {
-                      const text = `Olá! Agora você pode agendar seus horários comigo diretamente pelo meu link: https://marca.ai/p/${slug} ✨`;
+                      const text = `Olá! Agora você pode agendar seus horários comigo diretamente pelo meu link: https://nera.app/p/${slug} ✨`;
                       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                     }}
-                    className="flex flex-col items-center gap-3 p-6 bg-brand-cream rounded-2xl hover:bg-brand-rose-light/20 transition-all group"
+                    className="flex flex-col items-center gap-4 p-8 bg-brand-parchment rounded-[32px] border border-brand-mist hover:bg-brand-linen transition-all group"
                   >
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-brand-dark group-hover:scale-110 transition-transform">
+                    <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center text-brand-ink border border-brand-mist group-hover:scale-110 transition-transform">
                       <Share2 size={24} />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Divulgar</span>
+                    <span className="text-[10px] font-medium uppercase tracking-widest">Divulgar</span>
                   </button>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-6">
                 <button 
                   onClick={() => navigate('/dashboard')}
-                  className="w-full bg-brand-dark text-white py-7 rounded-full font-bold text-sm uppercase tracking-widest premium-shadow flex items-center justify-center gap-3"
+                  className="w-full bg-brand-ink text-brand-white py-7 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 shadow-xl"
                 >
                   Ir para meu Dashboard <ArrowRight size={20} />
                 </button>
                 <Link 
                   to={`/p/${slug}`} 
                   target="_blank"
-                  className="text-sm font-bold text-brand-rose uppercase tracking-widest editorial-underline"
+                  className="text-[11px] font-medium text-brand-terracotta uppercase tracking-widest hover:text-brand-sienna transition-colors"
                 >
                   Ver minha página pública
                 </Link>
@@ -989,6 +1245,17 @@ export default function OnboardingPage() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Debug Overlay - Only visible during development/debugging if showDebugHUD is true */}
+      {process.env.NODE_ENV === 'development' && (window as any).showDebugHUD && (
+        <div className="fixed bottom-4 right-4 bg-brand-ink/90 text-brand-white p-4 rounded-2xl text-[8px] font-mono z-[100] border border-brand-mist/20 pointer-events-none opacity-50">
+          <p>STEP: {step}</p>
+          <p>FINALIZING: {isFinalizing ? 'YES' : 'NO'}</p>
+          <p>LOADING: {loading ? 'YES' : 'NO'}</p>
+          <p>PROFILE_COMPLETED: {profile?.onboardingCompleted ? 'YES' : 'NO'}</p>
+          <p>LOCAL_COMPLETED: {sessionStorage.getItem(`onboarding_completed_${user?.uid}`) === 'true' ? 'YES' : 'NO'}</p>
+        </div>
+      )}
     </div>
   );
 }

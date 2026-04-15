@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { Calendar, User, Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
+import { User, Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
 import { generateSlug } from '../lib/utils';
+import Logo from '../components/Logo';
 
 export default function RegisterPage() {
   const { user: currentUser } = useAuth();
@@ -22,19 +23,15 @@ export default function RegisterPage() {
     console.log('>>> [DEBUG] [Register] Início do cadastro com Google');
     try {
       if (auth.currentUser) {
-        console.log('>>> [DEBUG] [Register] Usuário já logado, encerrando sessão...');
         await signOut(auth);
       }
 
       const provider = new GoogleAuthProvider();
-      console.log('>>> [DEBUG] [Register] Abrindo popup Google...');
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      console.log('>>> [DEBUG] [Register] Google Auth sucesso. UID:', user.uid);
       
       const slug = generateSlug(user.displayName || 'profissional');
       
-      console.log('>>> [DEBUG] [Register] Criando/Atualizando perfil no Firestore...');
       try {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
@@ -49,31 +46,22 @@ export default function RegisterPage() {
           onboardingCompleted: false,
           createdAt: new Date().toISOString()
         }, { merge: true });
-        console.log('>>> [DEBUG] [Register] Perfil Firestore atualizado');
       } catch (firestoreError) {
-        console.error('>>> [DEBUG] [Register] Erro Firestore Google:', firestoreError);
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      toast.success('Bem-vinda ao Marca Aí!');
-      console.log('>>> [DEBUG] [Register] Redirecionando para /onboarding...');
-      
-      setTimeout(() => {
-        navigate('/onboarding');
-      }, 500);
+      toast.success('Bem-vinda à nera!');
+      setTimeout(() => navigate('/onboarding'), 500);
 
     } catch (error: any) {
       console.error('>>> [DEBUG] [Register] Erro no cadastro Google:', error);
       if (error.code === 'auth/popup-blocked') {
         toast.error('O popup foi bloqueado pelo navegador.');
-      } else if (error.message?.includes('security cookie') || error.code === 'auth/internal-error') {
-        toast.error('Erro de segurança. Tente abrir em uma nova aba.');
       } else {
-        toast.error('Erro ao cadastrar com Google: ' + (error.message || 'Erro desconhecido'));
+        toast.error('Erro ao cadastrar com Google');
       }
     } finally {
       setLoading(false);
-      console.log('>>> [DEBUG] [Register] Fluxo Google encerrado. loading=false');
     }
   };
 
@@ -85,34 +73,23 @@ export default function RegisterPage() {
     console.log('>>> [DEBUG] [Register] Início do processo de cadastro manual');
     
     try {
-      // 1. Limpeza de sessão (se houver)
       if (auth.currentUser) {
-        console.log('>>> [DEBUG] [Register] Usuário já autenticado detectado. Tentando deslogar...');
         await signOut(auth);
-        console.log('>>> [DEBUG] [Register] Logout concluído com sucesso');
       }
 
-      // 2. Criação da conta no Firebase Auth
-      console.log('>>> [DEBUG] [Register] Chamando createUserWithEmailAndPassword...');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      console.log('>>> [DEBUG] [Register] Conta criada no Firebase Auth. UID:', user.uid);
       
-      // 3. Atualização do Perfil no Auth (Nome)
-      console.log('>>> [DEBUG] [Register] Atualizando displayName no Auth...');
       try {
         await updateProfile(user, { displayName: name });
-        console.log('>>> [DEBUG] [Register] displayName atualizado com sucesso');
       } catch (updateError) {
-        console.warn('>>> [DEBUG] [Register] Erro ao atualizar displayName (não-crítico):', updateError);
+        console.warn('>>> [DEBUG] [Register] Erro ao atualizar displayName:', updateError);
       }
       
       const slug = generateSlug(name);
       
-      // 4. Criação do Perfil no Firestore
-      console.log('>>> [DEBUG] [Register] Criando documento no Firestore (users)...');
       try {
-        const userDoc = {
+        await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           name,
           email,
@@ -124,84 +101,66 @@ export default function RegisterPage() {
           avatar: '',
           onboardingCompleted: false,
           createdAt: new Date().toISOString()
-        };
-        
-        console.log('>>> [DEBUG] [Register] Dados do documento:', userDoc);
-        await setDoc(doc(db, 'users', user.uid), userDoc);
-        console.log('>>> [DEBUG] [Register] Documento no Firestore criado com sucesso');
+        });
       } catch (firestoreError) {
-        console.error('>>> [DEBUG] [Register] Erro ao gravar no Firestore:', firestoreError);
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      // 5. Finalização e Redirecionamento
       toast.success('Conta criada com sucesso!');
-      console.log('>>> [DEBUG] [Register] Redirecionando para /onboarding...');
-      
-      // Pequeno delay para garantir que o estado do Auth se propague
-      setTimeout(() => {
-        navigate('/onboarding');
-        console.log('>>> [DEBUG] [Register] navigate() chamado');
-      }, 500);
+      setTimeout(() => navigate('/onboarding'), 500);
 
     } catch (error: any) {
-      console.error('>>> [DEBUG] [Register] ERRO CRÍTICO NO FLUXO:', error);
-      
-      let errorMessage = 'Erro desconhecido';
+      console.error('>>> [DEBUG] [Register] ERRO NO CADASTRO:', error);
+      let errorMessage = 'Erro ao criar conta';
       if (error.code === 'auth/email-already-in-use') errorMessage = 'Este e-mail já está em uso.';
-      else if (error.code === 'auth/invalid-email') errorMessage = 'E-mail inválido.';
       else if (error.code === 'auth/weak-password') errorMessage = 'A senha é muito fraca.';
-      else errorMessage = error.message || String(error);
-
-      toast.error('Erro ao criar conta: ' + errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
-      console.log('>>> [DEBUG] [Register] Fluxo encerrado. loading=false');
     }
   };
 
   const handleLogoutAndStay = async () => {
     await signOut(auth);
-    toast.info('Sessão encerrada. Você pode criar uma nova conta agora.');
+    toast.info('Sessão encerrada.');
   };
 
   return (
-    <div className="min-h-screen bg-brand-cream/30 flex flex-col items-center justify-center p-6 relative overflow-hidden">
-      {/* Decorative Blur */}
-      <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-brand-rose/10 rounded-full blur-[100px] -z-10" />
-      <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-brand-rose/5 rounded-full blur-[100px] -z-10" />
+    <div className="min-h-screen bg-brand-parchment flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Decorative Elements */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none">
+        <div className="absolute top-1/4 right-1/4 w-96 h-96 border border-brand-ink rounded-full" />
+        <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] border border-brand-ink rounded-full" />
+      </div>
 
-      <Link to="/" className="flex items-center gap-2.5 mb-12 group">
-        <div className="w-12 h-12 bg-brand-rose rounded-[18px] flex items-center justify-center text-white shadow-xl shadow-brand-rose/20 group-hover:scale-110 transition-transform">
-          <Calendar size={28} />
-        </div>
-        <span className="text-3xl font-serif italic font-bold tracking-tight text-brand-dark">Marca Aí</span>
+      <Link to="/" className="mb-12">
+        <Logo className="scale-110" />
       </Link>
 
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-white p-10 rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(231,143,142,0.15)] border border-brand-rose/10 relative"
+        className="w-full max-w-md bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-2xl relative"
       >
         {currentUser && !loading && (
-          <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur-sm rounded-[3rem] flex flex-col items-center justify-center p-10 text-center">
-            <div className="w-20 h-20 bg-brand-rose-light text-brand-rose rounded-3xl flex items-center justify-center mb-6">
-              <LogOut size={40} />
+          <div className="absolute inset-0 z-50 bg-brand-white/95 backdrop-blur-sm rounded-[40px] flex flex-col items-center justify-center p-10 text-center">
+            <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-6">
+              <LogOut size={32} />
             </div>
-            <h3 className="text-2xl font-serif font-bold text-brand-dark mb-4">Você já está conectada</h3>
-            <p className="text-brand-gray text-sm mb-8 leading-relaxed">
-              Para criar uma nova conta boutique, você precisa sair da conta atual ({currentUser.displayName || currentUser.email}).
+            <h3 className="text-2xl font-serif font-normal text-brand-ink mb-4">Você já está conectada</h3>
+            <p className="text-brand-stone text-sm mb-8 leading-relaxed font-light">
+              Para criar uma nova vitrine premium, você precisa sair da conta atual ({currentUser.displayName || currentUser.email}).
             </p>
-            <div className="flex flex-col w-full gap-4">
+            <div className="flex flex-col w-full gap-3">
               <button 
                 onClick={handleLogoutAndStay}
-                className="w-full bg-brand-dark text-white py-5 rounded-2xl font-bold text-xs uppercase tracking-widest premium-shadow"
+                className="w-full bg-brand-ink text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all"
               >
                 Sair e criar nova conta
               </button>
               <Link 
                 to="/dashboard"
-                className="w-full bg-brand-cream text-brand-dark py-5 rounded-2xl font-bold text-xs uppercase tracking-widest"
+                className="w-full bg-brand-linen text-brand-ink py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all text-center"
               >
                 Ir para meu Dashboard
               </Link>
@@ -209,54 +168,52 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <div className="absolute -top-4 -left-4 w-12 h-12 bg-brand-dark text-white rounded-2xl flex items-center justify-center shadow-lg -rotate-12">
-          <Sparkles size={24} />
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Sua nova era</h2>
+          <p className="text-brand-stone text-sm font-light">Crie sua vitrine premium em menos de 2 minutos.</p>
         </div>
 
-        <h2 className="text-3xl font-serif italic font-bold mb-2 text-brand-dark">Comece seu Estúdio</h2>
-        <p className="text-brand-gray text-sm mb-10 font-medium">Crie sua agenda boutique em menos de 2 minutos.</p>
-
         <form onSubmit={handleRegister} className="space-y-5 mb-10">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Seu Nome</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seu Nome</label>
             <div className="relative">
-              <User className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-gray" size={20} />
+              <User className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
               <input 
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Como quer ser chamada?"
-                className="w-full pl-14 pr-6 py-4 bg-brand-cream border-none rounded-2xl focus:ring-2 focus:ring-brand-rose/20 outline-none transition-all text-brand-dark"
+                className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] focus:ring-1 focus:ring-brand-ink outline-none transition-all text-brand-ink font-light"
                 required
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Seu MELHOR E-mail</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seu E-mail</label>
             <div className="relative">
-              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-gray" size={20} />
+              <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
               <input 
                 type="email" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="exemplo@estudio.com"
-                className="w-full pl-14 pr-6 py-4 bg-brand-cream border-none rounded-2xl focus:ring-2 focus:ring-brand-rose/20 outline-none transition-all text-brand-dark"
+                className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] focus:ring-1 focus:ring-brand-ink outline-none transition-all text-brand-ink font-light"
                 required
               />
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-brand-gray uppercase tracking-widest ml-1">Crie uma Senha</label>
+          <div className="space-y-2">
+            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Crie uma Senha</label>
             <div className="relative">
-              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-gray" size={20} />
+              <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
               <input 
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="No mínimo 6 caracteres"
-                className="w-full pl-14 pr-6 py-4 bg-brand-cream border-none rounded-2xl focus:ring-2 focus:ring-brand-rose/20 outline-none transition-all text-brand-dark"
+                className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] focus:ring-1 focus:ring-brand-ink outline-none transition-all text-brand-ink font-light"
                 required
                 minLength={6}
               />
@@ -266,31 +223,31 @@ export default function RegisterPage() {
           <button 
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-rose text-white py-5 rounded-2xl font-bold text-lg hover:bg-brand-rose/90 transition-all flex items-center justify-center gap-3 premium-shadow disabled:opacity-50 mt-4"
+            className="w-full bg-brand-terracotta text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
           >
-            {loading ? 'Criando...' : 'Criar Minha Agenda'} <ArrowRight size={22} />
+            {loading ? 'Criando...' : 'Criar Minha Vitrine'} <ArrowRight size={18} />
           </button>
         </form>
 
         <div className="relative mb-10">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-brand-rose/10"></div>
+            <div className="w-full border-t border-brand-mist"></div>
           </div>
           <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
-            <span className="bg-white px-4 text-brand-gray font-bold">Ou continue com</span>
+            <span className="bg-brand-white px-4 text-brand-mist font-medium">Ou continue com</span>
           </div>
         </div>
 
         <button 
           onClick={handleGoogleRegister}
-          className="w-full bg-white border border-brand-rose/20 text-brand-dark py-4 rounded-2xl font-bold hover:bg-brand-cream transition-all flex items-center justify-center gap-4 shadow-sm"
+          className="w-full bg-brand-white border border-brand-mist text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-4"
         >
-          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
           Google Account
         </button>
 
-        <p className="text-center mt-10 text-sm text-brand-gray font-medium">
-          Já tem uma conta? <Link to="/login" className="text-brand-rose font-bold hover:underline">Fazer login</Link>
+        <p className="text-center mt-10 text-sm text-brand-stone font-light">
+          Já tem uma conta? <Link to="/login" className="text-brand-terracotta font-medium hover:underline">Fazer login</Link>
         </p>
       </motion.div>
     </div>
