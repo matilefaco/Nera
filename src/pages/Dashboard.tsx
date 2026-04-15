@@ -45,7 +45,7 @@ export default function Dashboard() {
         .reduce((acc: number, curr: any) => acc + (curr.travelFee || 0), 0);
       setDailyRevenue(todayRev);
       setTravelRevenue(travelRev);
-      setPendingCount(docs.filter((a: any) => a.status === 'pending').length);
+      setPendingCount(docs.filter((a: any) => a.status === 'pending_confirmation').length);
     });
 
     return () => unsubscribe();
@@ -53,7 +53,7 @@ export default function Dashboard() {
 
   const handleComplete = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'appointments', id), { status: 'confirmed' });
+      await updateDoc(doc(db, 'appointments', id), { status: 'completed' });
       toast.success('Atendimento concluído!');
     } catch (error) {
       toast.error('Erro ao atualizar status');
@@ -62,7 +62,7 @@ export default function Dashboard() {
 
   const sendWhatsAppReminder = (appointment: any) => {
     const message = `Olá ${appointment.clientName}! Confirmado nosso horário hoje às ${appointment.time} para ${appointment.serviceName}? Aguardo você! ✨`;
-    const url = `https://wa.me/${appointment.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
+    const url = `https://wa.me/${appointment.clientWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 
@@ -177,20 +177,20 @@ export default function Dashboard() {
           <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm flex flex-col justify-between">
             <div>
               <p className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-8">Próximo Cliente</p>
-              {appointments.find(a => a.status === 'pending') ? (
+              {appointments.find(a => a.status === 'pending_confirmation') ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-brand-linen flex items-center justify-center text-brand-ink font-serif text-lg">
-                      {appointments.find(a => a.status === 'pending')?.time}
+                      {appointments.find(a => a.status === 'pending_confirmation')?.time}
                     </div>
                     <div>
-                      <p className="font-medium text-brand-ink">{appointments.find(a => a.status === 'pending')?.clientName}</p>
-                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">{appointments.find(a => a.status === 'pending')?.serviceName}</p>
+                      <p className="font-medium text-brand-ink">{appointments.find(a => a.status === 'pending_confirmation')?.clientName}</p>
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">{appointments.find(a => a.status === 'pending_confirmation')?.serviceName}</p>
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="text-brand-stone italic font-serif text-lg">Nenhum pendente</p>
+                <p className="text-brand-stone italic font-serif text-lg">Nenhuma solicitação pendente</p>
               )}
             </div>
             <Link to="/agenda" className="mt-8 flex items-center justify-between text-[10px] font-medium uppercase tracking-widest text-brand-terracotta group">
@@ -239,7 +239,14 @@ export default function Dashboard() {
                     </div>
                     
                     <div className="flex items-center gap-3">
-                      {appointment.status === 'pending' ? (
+                      {appointment.status === 'pending_confirmation' ? (
+                        <Link 
+                          to={`/booking-request/${appointment.id}/respond`}
+                          className="px-6 py-3 bg-brand-terracotta text-brand-white rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-md"
+                        >
+                          Responder
+                        </Link>
+                      ) : appointment.status === 'confirmed' ? (
                         <>
                           <button 
                             onClick={() => sendWhatsAppReminder(appointment)}

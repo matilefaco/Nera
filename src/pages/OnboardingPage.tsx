@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { db, auth, storage, handleFirestoreError, OperationType } from '../firebase';
-import { doc, updateDoc, collection, addDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, auth, storage, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem } from '../firebase';
+import { doc, updateDoc, collection, addDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
   User, MapPin, Home, Building2, Briefcase, 
   Clock, DollarSign, Instagram, MessageCircle, 
@@ -13,10 +13,33 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { generateSlug, formatCurrency } from '../lib/utils';
+import { generateSlug, formatCurrency, cn } from '../lib/utils';
 import Logo from '../components/Logo';
+import { ProfessionalIdentity } from '../types';
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
+
+const IDENTITY_STYLES = [
+  'Delicada e detalhista',
+  'Rápida e eficiente',
+  'Técnica e precisa',
+  'Premium e sofisticada',
+  'Natural e leve'
+];
+
+const IDENTITY_DIFFERENTIALS = [
+  'Pontualidade',
+  'Biossegurança',
+  'Produtos premium',
+  'Atendimento exclusivo',
+  'Técnica avançada'
+];
+
+const EXPERIENCE_OPTIONS = [
+  { label: '1-2 anos', value: '1-2' },
+  { label: '3-5 anos', value: '3-5' },
+  { label: '5+ anos', value: '5+' }
+];
 
 export default function OnboardingPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -24,6 +47,10 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const portfolioInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
 
   // Step 1: Identity
   const [name, setName] = useState('');
@@ -46,7 +73,7 @@ export default function OnboardingPage() {
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>('none');
-  const [portfolio, setPortfolio] = useState<{url: string, category: string}[]>([]);
+  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
 
   // Step 3: Services
@@ -64,6 +91,12 @@ export default function OnboardingPage() {
   const [whatsapp, setWhatsapp] = useState('');
   const [instagram, setInstagram] = useState('');
   const [bio, setBio] = useState('');
+  const [headline, setHeadline] = useState('');
+
+  // New Identity State
+  const [yearsExperience, setYearsExperience] = useState('3-5');
+  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  const [selectedDifferentials, setSelectedDifferentials] = useState<string[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -92,6 +125,10 @@ export default function OnboardingPage() {
         if (profile.specialty) setSpecialty(profile.specialty);
         if (profile.city) setCity(profile.city);
         if (profile.neighborhood) setNeighborhood(profile.neighborhood);
+        if (profile.avatar) {
+          setAvatar(profile.avatar);
+          setAvatarPreview(profile.avatar);
+        }
         if (profile.studioAddress) {
           setStudioAddress(profile.studioAddress);
         } else if (profile.address) {
@@ -112,7 +149,15 @@ export default function OnboardingPage() {
         if (profile.whatsapp) setWhatsapp(profile.whatsapp);
         if (profile.instagram) setInstagram(profile.instagram);
         if (profile.bio) setBio(profile.bio);
+        if (profile.headline) setHeadline(profile.headline);
         if (profile.servicesDraft) setServices(profile.servicesDraft);
+
+        if (profile.professionalIdentity) {
+          if (profile.professionalIdentity.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
+          if (profile.professionalIdentity.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
+          if (profile.professionalIdentity.differentials) setSelectedDifferentials(profile.professionalIdentity.differentials);
+          if (profile.professionalIdentity.headline) setHeadline(profile.professionalIdentity.headline);
+        }
         
         if (profile.onboardingStep !== undefined) {
           console.log('[Onboarding] Syncing step from profile:', profile.onboardingStep);
@@ -121,6 +166,26 @@ export default function OnboardingPage() {
       }
     }
   }, [profile, isFinalizing, loading, user?.uid, step]);
+
+  const generateIdentityContent = () => {
+    if (!name || !specialty) return;
+
+    const stylesStr = selectedStyles.length > 0 
+      ? selectedStyles.join(' e ') 
+      : 'excelência';
+    
+    const diffsStr = selectedDifferentials.length > 0
+      ? selectedDifferentials.join(', ')
+      : 'qualidade';
+
+    const expText = yearsExperience === '5+' ? 'mais de 5' : yearsExperience;
+    
+    const newHeadline = `${specialty} com foco em ${selectedStyles[0] || 'naturalidade'}`;
+    const newBio = `Especialista em ${specialty}, ${name} trabalha com uma abordagem ${stylesStr.toLowerCase()}. Com ${expText} anos de experiência, oferece um atendimento exclusivo pautado em ${diffsStr.toLowerCase()}.`;
+    
+    setHeadline(newHeadline);
+    setBio(newBio);
+  };
 
   const saveProgress = async (nextStepNum: number) => {
     const locallyCompletedKey = `onboarding_completed_${user?.uid}`;
@@ -132,7 +197,7 @@ export default function OnboardingPage() {
     }
     console.log(`[Onboarding] Saving progress to step ${nextStepNum}...`);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      await setDoc(doc(db, 'users', user.uid), {
         name,
         specialty,
         city,
@@ -150,10 +215,19 @@ export default function OnboardingPage() {
         whatsapp,
         instagram,
         bio,
+        headline,
+        professionalIdentity: {
+          mainSpecialty: specialty,
+          yearsExperience,
+          serviceStyle: selectedStyles,
+          differentials: selectedDifferentials,
+          bio,
+          headline
+        },
         servicesDraft: services,
         onboardingStep: nextStepNum,
         updatedAt: new Date().toISOString()
-      });
+      }, { merge: true });
       console.log(`[Onboarding] Progress saved successfully.`);
     } catch (error) {
       console.error('[Onboarding] Error saving progress:', error);
@@ -171,40 +245,52 @@ export default function OnboardingPage() {
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+
     if (file && user) {
       setUploadingImage(true);
+      
+      // 1. Immediate Local Preview
+      const localUrl = URL.createObjectURL(file);
+      setAvatarPreview(localUrl);
+
       try {
-        console.log(`[Avatar] Processing image: ${file.name}`);
+        // 2. Compression
         const options = {
-          maxSizeMB: 0.1, // Increased slightly for better quality
+          maxSizeMB: 0.5,
           maxWidthOrHeight: 800,
           useWebWorker: true
         };
         const compressedFile = await imageCompression(file, options);
-        console.log(`[Avatar] Compressed size: ${(compressedFile.size / 1024).toFixed(2)} KB`);
         
-        const downloadUrl = await uploadImage(compressedFile, `avatars/${user.uid}/${Date.now()}_${file.name}`);
+        // 3. Upload
+        const downloadUrl = await uploadImageToStorage(compressedFile, `avatars/${user.uid}`);
         
         // Update local state
         setAvatar(downloadUrl);
         
-        // PERSISTENCE: Save immediately to Firestore to avoid loss
-        await updateDoc(doc(db, 'users', user.uid), {
-          avatar: downloadUrl,
-          updatedAt: new Date().toISOString()
-        });
+        // PERSISTENCE: Save immediately to Firestore if profile exists
+        if (profile) {
+          await saveProfilePartial(user.uid, { avatar: downloadUrl });
+        }
         
         toast.success('Foto de perfil salva com sucesso!');
       } catch (error: any) {
-        console.error('[Avatar] Error processing avatar:', error);
-        toast.error(`Erro ao salvar foto de perfil: ${error.message || 'Erro no servidor'}`);
+        console.error('[Avatar] upload flow failed:', error);
+        toast.error('Erro ao salvar foto de perfil');
+        // Revert preview on error
+        setAvatarPreview(avatar);
       } finally {
         setUploadingImage(false);
+        // Reset input
+        if (avatarInputRef.current) avatarInputRef.current.value = '';
       }
     }
   };
 
   const nextStep = async () => {
+    if (step === 2) {
+      generateIdentityContent();
+    }
     const nextStepNum = step + 1;
     await saveProgress(nextStepNum);
     setStep(nextStepNum);
@@ -239,6 +325,7 @@ export default function OnboardingPage() {
       const sanitizedName = name.trim();
       const sanitizedSpecialty = specialty.trim();
       const sanitizedBio = bio.trim();
+      const sanitizedHeadline = headline.trim();
       const sanitizedCity = city.trim();
       const sanitizedSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
       
@@ -296,42 +383,31 @@ export default function OnboardingPage() {
         whatsapp: whatsapp.trim().replace(/\D/g, ''),
         instagram: instagram.trim(),
         bio: sanitizedBio,
+        headline: sanitizedHeadline,
+        professionalIdentity: {
+          mainSpecialty: sanitizedSpecialty,
+          yearsExperience,
+          serviceStyle: selectedStyles,
+          differentials: selectedDifferentials,
+          bio: sanitizedBio,
+          headline: sanitizedHeadline
+        },
         onboardingCompleted: true,
-        onboardingStep: 7,
+        onboardingStep: 8,
         updatedAt: new Date().toISOString()
       };
 
       console.log('[Onboarding] Step 2: Saving final profile data (base)...');
       try {
-        await updateDoc(doc(db, 'users', user.uid), finalData);
+        await setDoc(doc(db, 'users', user.uid), finalData, { merge: true });
         console.log('[Onboarding] Step 2: Base profile saved OK');
       } catch (err) {
         console.error('[Onboarding] Step 2 Failed:', err);
         handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
       }
 
-      // 4. Try to save portfolio separately
-      if (portfolio && portfolio.length > 0) {
-        console.log(`[Onboarding] Step 3: Attempting to save ${portfolio.length} portfolio images...`);
-        try {
-          // Ensure no base64 is being saved
-          const hasBase64 = portfolio.some(p => p.url.startsWith('data:'));
-          if (hasBase64) {
-            console.warn('[Onboarding] Detected base64 images in portfolio. These should have been uploaded to Storage.');
-          }
-
-          await updateDoc(doc(db, 'users', user.uid), {
-            portfolio: portfolio
-          });
-          console.log('[Onboarding] Step 3: Portfolio saved OK');
-        } catch (portErr: any) {
-          console.error('[Onboarding] Step 3 Error: Error saving portfolio (likely size limit):', portErr);
-          toast.error('Algumas fotos do portfólio não puderam ser salvas devido ao tamanho, mas sua vitrine foi criada!');
-        }
-      }
-
       toast.success('Onboarding concluído!');
-      setStep(7);
+      setStep(8);
       console.log('[Onboarding] >>> FINALIZATION SUCCESSFUL <<<');
     } catch (error: any) {
       console.error('[Onboarding] !!! FINALIZATION CRITICAL ERROR !!!', error);
@@ -410,45 +486,70 @@ export default function OnboardingPage() {
 
   const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
+
     if (files && files.length > 0 && user) {
       setUploadingImage(true);
       const file = files[0];
+      const tempId = 'temp-' + Date.now();
       
+      // 1. Immediate Local Preview
       try {
-        console.log(`[Portfolio] Processing image: ${file.name} (${(file.size / 1024).toFixed(2)} KB)`);
-        
+        const localUrl = URL.createObjectURL(file);
+        setPortfolio(prev => [{ id: tempId, url: localUrl, category: specialty || 'Geral', isUploading: true }, ...prev]);
+      } catch (previewErr) {
+        console.error('[Portfolio] error creating preview:', previewErr);
+      }
+
+      try {
+        // 2. Compression
         const options = {
           maxSizeMB: 0.2, 
           maxWidthOrHeight: 1200,
-          useWebWorker: true
+          useWebWorker: false
         };
-
         const compressedFile = await imageCompression(file, options);
-        console.log(`[Portfolio] Compressed size: ${(compressedFile.size / 1024).toFixed(2)} KB`);
-
-        const downloadUrl = await uploadImage(compressedFile, `portfolio/${user.uid}/${Date.now()}_${file.name}`);
         
-        const newPortfolio = [...portfolio, { url: downloadUrl, category: specialty || 'Geral' }];
-        setPortfolio(newPortfolio);
-
-        // PERSISTENCE: Save immediately to Firestore
-        await updateDoc(doc(db, 'users', user.uid), {
-          portfolio: newPortfolio,
-          updatedAt: new Date().toISOString()
-        });
+        // 3. Upload
+        const downloadUrl = await uploadImageToStorage(compressedFile, `portfolio/${user.uid}`);
+        console.log('[Portfolio] upload finished:', downloadUrl);
+        
+        // 4. Persistence
+        console.log('[Portfolio] saving to Firestore');
+        const docId = await savePortfolioItem(user.uid, downloadUrl, specialty || 'Geral');
+        console.log('[Portfolio] saved successfully');
+        
+        // Update local state with real ID
+        setPortfolio(prev => prev.map(item => 
+          item.id === tempId ? { id: docId, url: downloadUrl, category: specialty || 'Geral' } : item
+        ));
 
         toast.success('Imagem adicionada ao seu portfólio!');
       } catch (error: any) {
-        console.error('[Portfolio] Error:', error);
-        toast.error(`Erro ao processar imagem: ${error.message || 'Erro desconhecido'}`);
+        console.error('[Portfolio] upload failed:', error);
+        toast.error('Erro ao carregar imagem');
+        setPortfolio(prev => prev.filter(item => item.id !== tempId));
       } finally {
         setUploadingImage(false);
+        if (portfolioInputRef.current) portfolioInputRef.current.value = '';
       }
     }
   };
 
-  const removePortfolioImage = (index: number) => {
-    setPortfolio(portfolio.filter((_, i) => i !== index));
+  const removePortfolioImage = async (id: string) => {
+    if (!user || !id) return;
+    
+    // Don't allow removing temp items that are still uploading
+    if (id.startsWith('temp-')) return;
+
+    try {
+      console.log('[Portfolio] Removing item:', id);
+      await deleteDoc(doc(db, 'users', user.uid, 'portfolio', id));
+      setPortfolio(prev => prev.filter(item => item.id !== id));
+      toast.success('Imagem removida');
+    } catch (err) {
+      console.error('[Portfolio] Error removing:', err);
+      toast.error('Erro ao remover imagem');
+    }
   };
 
   const removeArea = (index: number) => {
@@ -457,7 +558,7 @@ export default function OnboardingPage() {
 
   if (authLoading) return null;
 
-  const progress = (step / 6) * 100;
+  const progress = (step / 8) * 100;
 
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col">
@@ -490,17 +591,37 @@ export default function OnboardingPage() {
               <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
                 <div className="flex flex-col items-center">
                   <div className="relative group">
-                    <div className="w-32 h-32 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden relative">
-                      {avatar ? (
-                        <img src={avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    <div 
+                      onClick={() => {
+                        console.log('[Upload] Avatar click triggered');
+                        avatarInputRef.current?.click();
+                      }}
+                      className="w-32 h-32 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden relative cursor-pointer"
+                    >
+                      {avatarPreview || avatar ? (
+                        <img src={avatarPreview || avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                       ) : (
                         <User size={48} className="opacity-20" />
                       )}
+                      {uploadingImage && (
+                        <div className="absolute inset-0 bg-brand-ink/40 flex items-center justify-center">
+                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                            <Sparkles size={24} className="text-brand-white" />
+                          </motion.div>
+                        </div>
+                      )}
                     </div>
-                    <label className="absolute bottom-0 right-0 w-10 h-10 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-4 border-brand-white shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                    <div className="absolute bottom-0 right-0 w-10 h-10 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-4 border-brand-white shadow-lg pointer-events-none">
                       <Camera size={18} />
-                      <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} />
-                    </label>
+                    </div>
+                    <input 
+                      ref={avatarInputRef}
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handleFileUpload} 
+                      disabled={uploadingImage}
+                    />
                   </div>
                   <p className="mt-4 text-[10px] font-medium text-brand-stone uppercase tracking-widest">Sua melhor foto profissional</p>
                 </div>
@@ -593,6 +714,216 @@ export default function OnboardingPage() {
           {step === 2 && (
             <motion.div 
               key="step2"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
+                  <Sparkles size={32} />
+                </div>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Sua Identidade</h1>
+                <p className="text-brand-stone font-light">Como você quer ser percebida pelas clientes?</p>
+              </div>
+
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
+                <div className="space-y-6">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento (Escolha até 3)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {IDENTITY_STYLES.map(style => (
+                      <button
+                        key={style}
+                        onClick={() => {
+                          if (selectedStyles.includes(style)) {
+                            setSelectedStyles(selectedStyles.filter(s => s !== style));
+                          } else if (selectedStyles.length < 3) {
+                            setSelectedStyles([...selectedStyles, style]);
+                          }
+                        }}
+                        className={cn(
+                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
+                          selectedStyles.includes(style)
+                            ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
+                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                        )}
+                      >
+                        {style}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>
+                  <div className="flex flex-wrap gap-2">
+                    {IDENTITY_DIFFERENTIALS.map(diff => (
+                      <button
+                        key={diff}
+                        onClick={() => {
+                          if (selectedDifferentials.includes(diff)) {
+                            setSelectedDifferentials(selectedDifferentials.filter(d => d !== diff));
+                          } else {
+                            setSelectedDifferentials([...selectedDifferentials, diff]);
+                          }
+                        }}
+                        className={cn(
+                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
+                          selectedDifferentials.includes(diff)
+                            ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-md"
+                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                        )}
+                      >
+                        {diff}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo de Experiência</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {EXPERIENCE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setYearsExperience(opt.value)}
+                        className={cn(
+                          "p-4 rounded-2xl text-xs font-medium transition-all border flex flex-col items-center gap-1",
+                          yearsExperience === opt.value
+                            ? "bg-brand-linen border-brand-ink text-brand-ink shadow-sm"
+                            : "bg-brand-parchment border-brand-mist text-brand-stone hover:border-brand-stone"
+                        )}
+                      >
+                        <span className="text-lg font-serif italic">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
+                  <ArrowLeft size={24} />
+                </button>
+                <button 
+                  onClick={nextStep}
+                  disabled={selectedStyles.length === 0 || selectedDifferentials.length === 0}
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                >
+                  Continuar <ArrowRight size={18} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 3 && (
+            <motion.div 
+              key="step3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
+                  <Sparkles size={32} />
+                </div>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Sua Identidade</h1>
+                <p className="text-brand-stone font-light">Como você quer ser percebida pelas clientes?</p>
+              </div>
+
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
+                <div className="space-y-6">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento (Escolha até 3)</label>
+                  <div className="flex flex-wrap gap-2">
+                    {IDENTITY_STYLES.map(style => (
+                      <button
+                        key={style}
+                        onClick={() => {
+                          if (selectedStyles.includes(style)) {
+                            setSelectedStyles(selectedStyles.filter(s => s !== style));
+                          } else if (selectedStyles.length < 3) {
+                            setSelectedStyles([...selectedStyles, style]);
+                          }
+                        }}
+                        className={cn(
+                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
+                          selectedStyles.includes(style)
+                            ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
+                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                        )}
+                      >
+                        {style}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>
+                  <div className="flex flex-wrap gap-2">
+                    {IDENTITY_DIFFERENTIALS.map(diff => (
+                      <button
+                        key={diff}
+                        onClick={() => {
+                          if (selectedDifferentials.includes(diff)) {
+                            setSelectedDifferentials(selectedDifferentials.filter(d => d !== diff));
+                          } else {
+                            setSelectedDifferentials([...selectedDifferentials, diff]);
+                          }
+                        }}
+                        className={cn(
+                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
+                          selectedDifferentials.includes(diff)
+                            ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-md"
+                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                        )}
+                      >
+                        {diff}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo de Experiência</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {EXPERIENCE_OPTIONS.map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setYearsExperience(opt.value)}
+                        className={cn(
+                          "p-4 rounded-2xl text-xs font-medium transition-all border flex flex-col items-center gap-1",
+                          yearsExperience === opt.value
+                            ? "bg-brand-linen border-brand-ink text-brand-ink shadow-sm"
+                            : "bg-brand-parchment border-brand-mist text-brand-stone hover:border-brand-stone"
+                        )}
+                      >
+                        <span className="text-lg font-serif italic">{opt.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
+                  <ArrowLeft size={24} />
+                </button>
+                <button 
+                  onClick={nextStep}
+                  disabled={selectedStyles.length === 0 || selectedDifferentials.length === 0}
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                >
+                  Continuar <ArrowRight size={18} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 3 && (
+            <motion.div 
+              key="step3"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -814,9 +1145,9 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <motion.div 
-              key="step3"
+              key="step4"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -913,9 +1244,9 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <motion.div 
-              key="step4"
+              key="step5"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -997,9 +1328,9 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <motion.div 
-              key="step5"
+              key="step6"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -1009,61 +1340,74 @@ export default function OnboardingPage() {
                 <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   <Globe size={32} />
                 </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Sua Vitrine Digital</h1>
-                <p className="text-brand-stone font-light">Como as clientes vão te encontrar?</p>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Sua Vitrine</h1>
+                <p className="text-brand-stone font-light">Personalize como o mundo verá seu trabalho.</p>
               </div>
 
               <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
                 <div className="space-y-2">
                   <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seu Link Exclusivo</label>
-                  <div className="relative">
-                    <span className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-mist font-medium text-sm">nera.app/p/</span>
+                  <div className="flex items-center gap-2 bg-brand-parchment p-4 rounded-[20px] border border-brand-mist">
+                    <span className="text-brand-stone text-sm">nera.app/p/</span>
                     <input 
                       type="text" 
                       value={slug} 
-                      onChange={(e) => setSlug(e.target.value)} 
-                      className="w-full pl-28 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-terracotta"
+                      onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} 
+                      placeholder="seu-nome"
+                      className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-sm"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">WhatsApp</label>
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">WhatsApp (com DDD)</label>
                     <div className="relative">
-                      <MessageCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
+                      <MessageCircle className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
                       <input 
                         type="tel" 
                         value={whatsapp} 
                         onChange={(e) => setWhatsapp(e.target.value)} 
-                        placeholder="(00) 00000-0000"
-                        className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        placeholder="85 99999-9999"
+                        className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram</label>
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (Opcional)</label>
                     <div className="relative">
-                      <Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
+                      <Instagram className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
                       <input 
                         type="text" 
                         value={instagram} 
-                        onChange={(e) => setInstagram(e.target.value)} 
-                        placeholder="@seuusuario"
-                        className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        onChange={(e) => setInstagram(e.target.value.replace('@', ''))} 
+                        placeholder="seu.perfil"
+                        className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bio Curta (O que te torna única?)</label>
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Headline (Frase de impacto)</label>
+                  <input 
+                    type="text" 
+                    value={headline} 
+                    onChange={(e) => setHeadline(e.target.value)} 
+                    placeholder="Ex: Especialista em beleza natural"
+                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Bio (Gerada automaticamente)</label>
                   <textarea 
                     value={bio} 
                     onChange={(e) => setBio(e.target.value)} 
-                    placeholder="Ex: Especialista em beleza natural com mais de 5 anos de experiência."
-                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-24 resize-none font-light"
+                    placeholder="Descreva seu trabalho..."
+                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-32 resize-none font-light"
                   />
+                  <p className="text-[9px] text-brand-stone italic">* Você pode ajustar os textos gerados acima.</p>
                 </div>
               </div>
 
@@ -1098,9 +1442,9 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 6 && (
+          {step === 7 && (
             <motion.div 
-              key="step6"
+              key="step7"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -1117,10 +1461,10 @@ export default function OnboardingPage() {
               <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {portfolio.map((item, idx) => (
-                    <div key={idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
-                      <img src={item.url} className="w-full h-full object-cover" />
+                    <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
+                      <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" />
                       <button 
-                        onClick={() => removePortfolioImage(idx)}
+                        onClick={() => item.id && removePortfolioImage(item.id)}
                         className="absolute top-2 right-2 w-8 h-8 bg-brand-ink/80 text-brand-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <X size={16} />
@@ -1128,10 +1472,23 @@ export default function OnboardingPage() {
                       <div className="absolute bottom-0 left-0 w-full p-2 bg-brand-ink/40 backdrop-blur-sm">
                         <p className="text-[8px] text-brand-white font-medium uppercase truncate tracking-widest">{item.category}</p>
                       </div>
+                      {item.isUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                            <Sparkles size={24} className="text-brand-white" />
+                          </motion.div>
+                        </div>
+                      )}
                     </div>
                   ))}
                   
-                  <label className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta">
+                  <div 
+                    onClick={() => {
+                      console.log('[Upload] Portfolio click triggered');
+                      portfolioInputRef.current?.click();
+                    }}
+                    className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta"
+                  >
                     {uploadingImage ? (
                       <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
                         <Sparkles size={24} />
@@ -1142,8 +1499,15 @@ export default function OnboardingPage() {
                         <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
                       </>
                     )}
-                    <input type="file" accept="image/*" className="hidden" onChange={handlePortfolioUpload} disabled={uploadingImage} />
-                  </label>
+                    <input 
+                      ref={portfolioInputRef}
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handlePortfolioUpload} 
+                      disabled={uploadingImage} 
+                    />
+                  </div>
                 </div>
                 
                 <p className="text-[10px] text-brand-stone text-center italic font-light">Dica: Fotos bem iluminadas e de alta qualidade convertem até 3x mais!</p>
@@ -1164,9 +1528,9 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 7 && (
+          {step === 8 && (
             <motion.div 
-              key="step7"
+              key="step8"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="w-full space-y-12 text-center"

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, storage, handleFirestoreError, OperationType } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage, auth, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem } from '../firebase';
+import { doc, updateDoc, collection, query, orderBy, getDocs, deleteDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus
@@ -19,6 +19,10 @@ import MobileNav from '../components/MobileNav';
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const portfolioInputRef = useRef<HTMLInputElement>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>('');
   
   const [name, setName] = useState('');
   const [specialty, setSpecialty] = useState('');
@@ -41,11 +45,11 @@ export default function ProfilePage() {
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>('none');
-  const [portfolio, setPortfolio] = useState<{url: string, category: string}[]>([]);
+  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  React.useEffect(() => {
-    if (profile) {
+  useEffect(() => {
+    if (profile && user) {
       setName(profile.name || '');
       setSpecialty(profile.specialty || '');
       setBio(profile.bio || '');
@@ -53,6 +57,7 @@ export default function ProfilePage() {
       setWhatsapp(profile.whatsapp || '');
       setSlug(profile.slug || '');
       setAvatar(profile.avatar || '');
+      setAvatarPreview(profile.avatar || '');
       setNeighborhood(profile.neighborhood || '');
       setServiceMode(profile.serviceMode || 'studio');
       if (profile.studioAddress) {
@@ -62,9 +67,29 @@ export default function ProfilePage() {
       }
       setServiceAreas(profile.serviceAreas || []);
       setPricingStrategy(profile.pricingStrategy || 'none');
-      setPortfolio(profile.portfolio || []);
+
+      // Fetch portfolio from sub-collection
+      const fetchPortfolio = async () => {
+        try {
+          console.log('[Profile] Fetching portfolio sub-collection...');
+          const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
+          const q = query(portfolioRef, orderBy('createdAt', 'desc'));
+          const snapshot = await getDocs(q);
+          const items = snapshot.docs.map(doc => ({
+            id: doc.id,
+            url: doc.data().imageUrl,
+            category: doc.data().category
+          }));
+          console.log('[Profile] Portfolio items fetched:', items.length);
+          setPortfolio(items);
+        } catch (err) {
+          console.error('[Profile] Error fetching portfolio:', err);
+        }
+      };
+      
+      fetchPortfolio();
     }
-  }, [profile]);
+  }, [profile, user]);
 
   if (authLoading) {
     return <div className="flex items-center justify-center h-screen bg-brand-parchment text-brand-stone font-light">Carregando perfil...</div>;
@@ -127,12 +152,11 @@ export default function ProfilePage() {
         serviceAreas: sanitizedAreas,
         pricingStrategy,
         avatar,
-        portfolio,
         updatedAt: new Date().toISOString()
       };
 
       try {
-        await updateDoc(doc(db, 'users', user.uid), finalPayload);
+        await setDoc(doc(db, 'users', user.uid), finalPayload, { merge: true });
         console.log('[ProfileSave] Success');
         toast.success('Perfil atualizado com sucesso!');
       } catch (err: any) {
@@ -164,49 +188,116 @@ export default function ProfilePage() {
     setNewAreaFee('');
   };
 
-  const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0 && user) {
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    
+    if (file && user) {
       setUploadingImage(true);
-      const file = files[0];
-      console.log(`[Portfolio] Processing file: ${file.name}`);
       
+      // 1. Immediate Local Preview
+      const localUrl = URL.createObjectURL(file);
+      setAvatarPreview(localUrl);
+
       try {
+        // 2. Compression
         const options = {
-          maxSizeMB: 0.2,
-          maxWidthOrHeight: 1200,
+          maxSizeMB: 0.5,
+          maxWidthOrHeight: 800,
           useWebWorker: true
         };
-
-        console.log('[Portfolio] Compressing...');
         const compressedFile = await imageCompression(file, options);
         
-        // Upload to Storage
-        const timestamp = Date.now();
-        const fileName = `portfolio/${user.uid}/${timestamp}_${file.name}`;
-        const downloadUrl = await uploadImage(compressedFile, fileName);
-
-        const newPortfolio = [...portfolio, { url: downloadUrl, category: specialty || 'Geral' }];
-        setPortfolio(newPortfolio);
-
+        // 3. Upload
+        const url = await uploadImageToStorage(compressedFile, `avatars/${user.uid}`);
+        
+        setAvatar(url);
+        
         // PERSISTENCE: Save immediately
-        await updateDoc(doc(db, 'users', user.uid), {
-          portfolio: newPortfolio,
-          updatedAt: new Date().toISOString()
-        });
-
-        toast.success('Imagem adicionada ao portfólio!');
-      } catch (error: any) {
-        console.error('[Portfolio] Error:', error);
-        toast.error(`Erro ao processar imagem: ${error.message || 'Erro desconhecido'}`);
+        await saveProfilePartial(user.uid, { avatar: url });
+        
+        toast.success('Foto de perfil atualizada!');
+      } catch (err: any) {
+        console.error('[Avatar] upload flow failed:', err);
+        toast.error('Erro ao salvar foto de perfil');
+        // Revert preview on error
+        setAvatarPreview(avatar);
       } finally {
         setUploadingImage(false);
+        // Reset input
+        if (avatarInputRef.current) avatarInputRef.current.value = '';
       }
     }
   };
 
-  const removePortfolioImage = (index: number) => {
-    setPortfolio(portfolio.filter((_, i) => i !== index));
+  const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+
+    if (files && files.length > 0 && user) {
+      setUploadingImage(true);
+      const file = files[0];
+      const tempId = 'temp-' + Date.now();
+      
+      // 1. Immediate Local Preview
+      try {
+        const localUrl = URL.createObjectURL(file);
+        setPortfolio(prev => [{ id: tempId, url: localUrl, category: specialty || 'Geral', isUploading: true }, ...prev]);
+      } catch (previewErr) {
+        console.error('[Portfolio] error creating preview:', previewErr);
+      }
+
+      try {
+        // 2. Compression
+        const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
+        const compressed = await imageCompression(file, options);
+
+        // 3. Upload
+        const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}`);
+        console.log('[Portfolio] upload finished:', url);
+        
+        // 4. Persistence
+        console.log('[Portfolio] saving to Firestore');
+        const docId = await savePortfolioItem(user.uid, url, specialty || 'Geral');
+        console.log('[Portfolio] saved successfully');
+        
+        // Replace temp item with final item
+        setPortfolio(prev => prev.map(item => 
+          item.id === tempId ? { id: docId, url: url, category: specialty || 'Geral' } : item
+        ));
+
+        toast.success('Imagem adicionada ao portfólio!');
+      } catch (err: any) {
+        console.error('[Portfolio] upload failed:', err);
+        toast.error('Erro ao salvar imagem no portfólio');
+        // Remove temp item on error
+        setPortfolio(prev => prev.filter(item => item.id !== tempId));
+      } finally {
+        setUploadingImage(false);
+        if (portfolioInputRef.current) portfolioInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removePortfolioImage = async (id: string) => {
+    if (!user || !id) return;
+    
+    // Don't allow removing temp items that are still uploading
+    if (id.startsWith('temp-')) return;
+
+    const itemToRemove = portfolio.find(item => item.id === id);
+    if (!itemToRemove) return;
+
+    try {
+      console.log('[Portfolio] removing from Firestore');
+      const { deletePortfolioItem } = await import('../firebase');
+      await deletePortfolioItem(user.uid, itemToRemove);
+      console.log('[Portfolio] removed successfully');
+      
+      setPortfolio(prev => prev.filter(item => item.id !== id));
+      toast.success('Imagem removida do portfólio');
+    } catch (err) {
+      console.error('[Portfolio] Error removing:', err);
+      toast.error('Erro ao remover imagem');
+    }
   };
 
   const removeArea = (index: number) => {
@@ -255,57 +346,39 @@ export default function ProfilePage() {
           <div className="lg:col-span-1 space-y-8">
             <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm text-center">
               <div className="relative w-32 h-32 mx-auto mb-8">
-                <label className="w-full h-full bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden cursor-pointer group relative">
-                  {avatar ? <img src={avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" /> : <User size={48} className="opacity-20" />}
+                <div 
+                  onClick={() => {
+                    console.log('[Upload] Avatar click triggered');
+                    avatarInputRef.current?.click();
+                  }}
+                  className="w-full h-full bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden cursor-pointer group relative"
+                >
+                  {avatarPreview || avatar ? (
+                    <img src={avatarPreview || avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                  ) : (
+                    <User size={48} className="opacity-20" />
+                  )}
                   <div className="absolute inset-0 bg-brand-ink/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Camera size={24} className="text-brand-white" />
+                    {uploadingImage ? (
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                        <Sparkles size={24} className="text-brand-white" />
+                      </motion.div>
+                    ) : (
+                      <Camera size={24} className="text-brand-white" />
+                    )}
                   </div>
-                  <input 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    disabled={uploadingImage}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file && user) {
-                        setUploadingImage(true);
-                        try {
-                          const options = { maxSizeMB: 0.1, maxWidthOrHeight: 800, useWebWorker: true };
-                          const compressed = await imageCompression(file, options);
-                          const url = await uploadImage(compressed, `avatars/${user.uid}/${Date.now()}_${file.name}`);
-                          
-                          setAvatar(url);
-                          
-                          // PERSISTENCE: Save immediately
-                          await updateDoc(doc(db, 'users', user.uid), {
-                            avatar: url,
-                            updatedAt: new Date().toISOString()
-                          });
-                          
-                          toast.success('Foto de perfil atualizada!');
-                        } catch (err: any) {
-                          console.error('[Avatar] Error:', err);
-                          toast.error(`Erro ao salvar foto: ${err.message || 'Erro no servidor'}`);
-                        } finally {
-                          setUploadingImage(false);
-                        }
-                      }
-                    }} 
-                  />
-                </label>
+                </div>
+                <input 
+                  ref={avatarInputRef}
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  disabled={uploadingImage}
+                  onChange={handleAvatarUpload} 
+                />
                 <div className="absolute bottom-0 right-0 w-10 h-10 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-4 border-brand-white shadow-lg pointer-events-none">
                   <Camera size={16} />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest">URL da Foto</label>
-                <input 
-                  type="text" 
-                  value={avatar} 
-                  onChange={(e) => setAvatar(e.target.value)} 
-                  placeholder="https://..." 
-                  className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none text-xs text-center font-light focus:ring-1 focus:ring-brand-ink transition-all" 
-                />
               </div>
             </div>
           </div>
@@ -323,34 +396,74 @@ export default function ProfilePage() {
               
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {portfolio.map((item, idx) => (
-                  <div key={idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
-                    <img src={item.url} className="w-full h-full object-cover" />
+                  <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
+                    <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" />
                     <div className="absolute inset-0 bg-brand-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-3 backdrop-blur-[2px]">
                       <input 
                         type="text" 
                         value={item.category} 
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const newPortfolio = [...portfolio];
                           newPortfolio[idx].category = e.target.value;
                           setPortfolio(newPortfolio);
+                          
+                          // PERSISTENCE: Update category in sub-collection
+                          if (item.id && !item.id.startsWith('temp-')) {
+                            try {
+                              await updateDoc(doc(db, 'users', user.uid, 'portfolio', item.id), {
+                                category: e.target.value
+                              });
+                            } catch (err) {
+                              console.error('[Portfolio] Error updating category:', err);
+                            }
+                          }
                         }}
                         className="w-full bg-brand-white/10 border border-brand-white/20 rounded-lg px-2 py-1.5 text-[10px] text-brand-white placeholder:text-brand-white/50 outline-none text-center mb-3 font-light"
                         placeholder="Categoria"
                       />
                       <button 
                         type="button"
-                        onClick={() => removePortfolioImage(idx)}
+                        onClick={() => item.id && removePortfolioImage(item.id)}
                         className="w-8 h-8 bg-brand-white text-brand-terracotta rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
                       >
                         <X size={14} />
                       </button>
                     </div>
+                    {item.isUploading && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                          <Sparkles size={24} className="text-brand-white" />
+                        </motion.div>
+                      </div>
+                    )}
                   </div>
                 ))}
-                <label className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta">
-                  {uploadingImage ? <Sparkles size={20} className="animate-pulse" /> : <Plus size={20} />}
-                  <input type="file" accept="image/*" className="hidden" onChange={handlePortfolioUpload} />
-                </label>
+                <div 
+                  onClick={() => {
+                    console.log('[Upload] Portfolio click triggered');
+                    portfolioInputRef.current?.click();
+                  }}
+                  className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta"
+                >
+                  {uploadingImage ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                      <Sparkles size={24} />
+                    </motion.div>
+                  ) : (
+                    <>
+                      <Plus size={24} />
+                      <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
+                    </>
+                  )}
+                  <input 
+                    ref={portfolioInputRef}
+                    type="file" 
+                    accept="image/*" 
+                    className="hidden" 
+                    onChange={handlePortfolioUpload} 
+                    disabled={uploadingImage} 
+                  />
+                </div>
               </div>
             </div>
 

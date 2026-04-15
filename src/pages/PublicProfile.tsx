@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { db } from '../firebase';
-import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { db, createBookingRequest } from '../firebase';
+import { collection, query, where, getDocs, addDoc, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   MapPin, Phone, Calendar as CalendarIcon, Clock, 
@@ -65,8 +65,10 @@ export default function PublicProfile() {
   const [selectedArea, setSelectedArea] = useState<any>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
   const [clientAddress, setClientAddress] = useState('');
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 100);
@@ -166,6 +168,25 @@ export default function PublicProfile() {
           const reviewsSnapshot = await getDocs(reviewsQ);
           setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
 
+          // Fetch Portfolio
+          // The new structure stores portfolio as an array in the user document.
+          // We already have userData.portfolio from the first fetch.
+          // If it's missing or we want to support legacy sub-collection:
+          if (!userData.portfolio || userData.portfolio.length === 0) {
+            try {
+              const portfolioQ = query(collection(db, 'users', professionalId, 'portfolio'), orderBy('createdAt', 'desc'));
+              const portfolioSnapshot = await getDocs(portfolioQ);
+              if (!portfolioSnapshot.empty) {
+                const portfolioItems = portfolioSnapshot.docs.map(doc => ({
+                  url: doc.data().imageUrl,
+                  category: doc.data().category
+                }));
+                setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
+              }
+            } catch (portErr) {
+              console.warn('[PublicProfile] Error fetching legacy portfolio sub-collection:', portErr);
+            }
+          }
         } else {
           setProfile(null);
         }
@@ -180,6 +201,22 @@ export default function PublicProfile() {
     fetchData();
   }, [slug]);
 
+  useEffect(() => {
+    if (selectedDate && profile?.uid) {
+      const fetchBlockedSlots = async () => {
+        const slotsRef = collection(db, 'blocked_slots');
+        const q = query(
+          slotsRef, 
+          where('professionalId', '==', profile.uid),
+          where('date', '==', selectedDate)
+        );
+        const snapshot = await getDocs(q);
+        setBlockedSlots(snapshot.docs.map(doc => doc.data().time));
+      };
+      fetchBlockedSlots();
+    }
+  }, [selectedDate, profile?.uid]);
+
   const calculateTotalPrice = () => {
     if (!selectedService) return 0;
     const basePrice = Number(selectedService.price) || 0;
@@ -191,21 +228,22 @@ export default function PublicProfile() {
     setBookingLoading(true);
     try {
       const totalPrice = calculateTotalPrice();
-      await addDoc(collection(db, 'appointments'), {
+      await createBookingRequest({
         professionalId: profile.uid,
+        professionalName: profile.name,
         serviceId: selectedService.id,
         serviceName: selectedService.name,
         price: selectedService.price,
         travelFee: selectedArea?.fee || 0,
         totalPrice: totalPrice,
+        locationType: isHomeService ? 'home' : 'studio',
         neighborhood: selectedArea?.name || '',
         address: clientAddress,
         clientName,
-        clientPhone,
+        clientWhatsapp: clientPhone,
+        clientEmail,
         date: selectedDate,
         time: selectedTime,
-        status: 'pending',
-        createdAt: new Date().toISOString()
       });
       setStep(5); // Success
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -832,15 +870,24 @@ export default function PublicProfile() {
 
                   {selectedDate && (
                     <div className="grid grid-cols-3 gap-3">
-                      {['09:00', '10:30', '13:00', '14:30', '16:00', '17:30'].map(time => (
-                        <button 
-                          key={time}
-                          onClick={() => { setSelectedTime(time); setStep(3); }}
-                          className="py-4 bg-brand-parchment rounded-xl border border-brand-mist text-sm font-medium hover:border-brand-ink transition-all"
-                        >
-                          {time}
-                        </button>
-                      ))}
+                      {['09:00', '10:30', '13:00', '14:30', '16:00', '17:30'].map(time => {
+                        const isBlocked = blockedSlots.includes(time);
+                        return (
+                          <button 
+                            key={time}
+                            disabled={isBlocked}
+                            onClick={() => { setSelectedTime(time); setStep(3); }}
+                            className={cn(
+                              "py-4 rounded-xl border text-sm font-medium transition-all",
+                              isBlocked 
+                                ? "bg-brand-mist/20 border-transparent text-brand-stone/40 cursor-not-allowed line-through" 
+                                : "bg-brand-parchment border-brand-mist hover:border-brand-ink"
+                            )}
+                          >
+                            {time}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </motion.div>
@@ -912,6 +959,16 @@ export default function PublicProfile() {
                         className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">E-mail</label>
+                      <input 
+                        type="email" 
+                        value={clientEmail}
+                        onChange={(e) => setClientEmail(e.target.value)}
+                        placeholder="seu@email.com"
+                        className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
+                      />
+                    </div>
                   </div>
 
                   <div className="bg-brand-linen/50 p-8 rounded-3xl border border-brand-mist mb-10">
@@ -932,7 +989,7 @@ export default function PublicProfile() {
                   <PremiumButton 
                     onClick={handleBooking} 
                     loading={bookingLoading}
-                    disabled={!clientName || !clientPhone}
+                    disabled={!clientName || !clientPhone || !clientEmail}
                     className="w-full py-6"
                   >
                     Finalizar Agendamento

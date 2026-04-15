@@ -14,6 +14,19 @@
         "slug": { "type": "string" },
         "avatar": { "type": "string" },
         "neighborhood": { "type": "string" },
+        "professionalIdentity": {
+          "type": "object",
+          "properties": {
+            "mainSpecialty": { "type": "string" },
+            "subSpecialties": { "type": "array", "items": { "type": "string" } },
+            "yearsExperience": { "type": "string" },
+            "serviceStyle": { "type": "array", "items": { "type": "string" } },
+            "differentials": { "type": "array", "items": { "type": "string" } },
+            "attendsAt": { "type": "string", "enum": ["studio", "home", "hybrid"] },
+            "bio": { "type": "string" },
+            "headline": { "type": "string" }
+          }
+        },
         "studioAddress": {
           "type": "object",
           "properties": {
@@ -53,13 +66,20 @@
         "serviceId": { "type": "string" },
         "serviceName": { "type": "string" },
         "clientName": { "type": "string" },
-        "clientPhone": { "type": "string" },
+        "clientWhatsapp": { "type": "string" },
+        "clientEmail": { "type": "string" },
         "date": { "type": "string", "format": "date" },
         "time": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "confirmed", "cancelled"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "locationType": { "type": "string", "enum": ["studio", "home"] },
+        "neighborhood": { "type": "string" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending_confirmation", "confirmed", "declined", "cancelled", "completed", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "confirmedAt": { "type": "string", "format": "date-time" },
+        "declinedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["professionalId", "serviceId", "clientName", "date", "time"]
+      "required": ["professionalId", "serviceId", "clientName", "clientWhatsapp", "clientEmail", "date", "time", "status"]
     },
     "Availability": {
       "title": "Availability",
@@ -120,12 +140,39 @@
         "topTags": { "type": "array", "items": { "type": "string" } }
       },
       "required": ["professionalId"]
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "Item individual do portfólio da profissional",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["imageUrl", "createdAt"]
+    },
+    "BlockedSlot": {
+      "title": "Blocked Slot",
+      "description": "Horário bloqueado na agenda",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "appointmentId": { "type": "string" }
+      },
+      "required": ["professionalId", "date", "time"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "Perfil da profissional"
+    },
+    "/users/{userId}/portfolio/{itemId}": {
+      "schema": "PortfolioItem",
+      "description": "Itens do portfólio"
     },
     "/services/{serviceId}": {
       "schema": "Service",
@@ -138,6 +185,10 @@
     "/availability/{availabilityId}": {
       "schema": "Availability",
       "description": "Configuração de horários"
+    },
+    "/blocked_slots/{slotId}": {
+      "schema": "BlockedSlot",
+      "description": "Horários bloqueados"
     },
     "/review_requests/{requestId}": {
       "schema": "ReviewRequest",
