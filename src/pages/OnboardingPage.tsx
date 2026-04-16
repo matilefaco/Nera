@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { db, auth, storage, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem } from '../firebase';
+import { db, auth, storage, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem, deletePortfolioItem } from '../firebase';
 import { doc, updateDoc, collection, addDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
@@ -13,9 +13,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { generateSlug, formatCurrency, cn } from '../lib/utils';
+import { generateSlug, formatCurrency, cn, removeEmptyFields } from '../lib/utils';
 import Logo from '../components/Logo';
-import { ProfessionalIdentity } from '../types';
+import { ProfessionalIdentity, UserProfile, Service } from '../types';
+import { userProfileSchema, serviceSchema } from '../lib/validation';
+import { z } from 'zod';
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
 
@@ -40,6 +42,13 @@ const EXPERIENCE_OPTIONS = [
   { label: '3-5 anos', value: '3-5' },
   { label: '5+ anos', value: '5+' }
 ];
+
+const FORTALEZA_NEIGHBORHOODS = [
+  'Aldeota', 'Meireles', 'Papicu', 'Cocó', 'Praia de Iracema', 'Dionísio Torres', 
+  'Fátima', 'Centro', 'Parangaba', 'Messejana', 'Cambeba', 'Cidade dos Funcionários', 
+  'Sapiranga', 'Edson Queiroz', 'Passaré', 'Guararapes', 'Joquei Clube', 'Montese',
+  'Praia do Futuro', 'Varjota', 'Mucuripe', 'Benfica', 'Maraponga', 'Mondubim'
+].sort();
 
 export default function OnboardingPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -70,8 +79,10 @@ export default function OnboardingPage() {
     reference: ''
   });
   const [serviceAreas, setServiceAreas] = useState<{name: string, fee: number}[]>([]);
+  const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>('city_wide');
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
+  const [neighborhoodSuggestions, setNeighborhoodSuggestions] = useState<string[]>([]);
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>('none');
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -180,8 +191,43 @@ export default function OnboardingPage() {
 
     const expText = yearsExperience === '5+' ? 'mais de 5' : yearsExperience;
     
-    const newHeadline = `${specialty} com foco em ${selectedStyles[0] || 'naturalidade'}`;
-    const newBio = `Especialista em ${specialty}, ${name} trabalha com uma abordagem ${stylesStr.toLowerCase()}. Com ${expText} anos de experiência, oferece um atendimento exclusivo pautado em ${diffsStr.toLowerCase()}.`;
+    // More natural headline generation using templates
+    const style1 = selectedStyles[0]?.toLowerCase() || 'premium';
+    const style2 = selectedStyles[1]?.toLowerCase();
+    
+    // Normalization of concepts for better readability
+    const conceptsMap: Record<string, string> = {
+      'delicada e detalhista': 'foco em detalhes e delicadeza',
+      'rápida e eficiente': 'agilidade com alta qualidade',
+      'premium e sofisticada': 'acabamento sofisticado',
+      'técnica e precisa': 'técnica precisa',
+      'espontânea e criativa': 'design criativo',
+      'minimalista': 'estilo minimalista',
+      'moderna': 'visão moderna',
+      'atenciosa': 'atendimento humanizado',
+      'inovadora': 'técnicas inovadoras'
+    };
+
+    const normalize = (text: string) => conceptsMap[text.toLowerCase()] || text;
+    
+    const trait1 = normalize(selectedStyles[0] || 'Premium');
+    const trait2 = normalize(selectedStyles[1] || 'Exclusivo');
+
+    const headlines = [
+      `${specialty} | ${trait1}${selectedStyles.length > 1 ? ' · ' + trait2 : ''}`,
+      `${specialty} com ${expText} anos de experiência.`,
+      `Design de ${specialty.toLowerCase()} focado em ${trait1}.`,
+      `${specialty}: Excelência e ${trait1}.`
+    ];
+    
+    const bioTemplates = [
+      `${specialty} há ${expText} anos. Meu trabalho busca unir ${trait1} e ${trait2}, sempre priorizando ${diffsStr.toLowerCase()}.`,
+      `Especialista em ${specialty.toLowerCase()} com trajetória de ${expText} anos. Minha assinatura é o ${trait1}. Foco total em ${diffsStr.toLowerCase()}.`,
+      `${expText} anos transformando olhares e autoestimar. Atendimento voltado para ${trait1} com o diferencial de ${diffsStr.toLowerCase()}.`
+    ];
+    
+    const newHeadline = headlines[Math.floor(Math.random() * headlines.length)];
+    const newBio = bioTemplates[Math.floor(Math.random() * bioTemplates.length)];
     
     setHeadline(newHeadline);
     setBio(newBio);
@@ -196,38 +242,26 @@ export default function OnboardingPage() {
       return;
     }
     console.log(`[Onboarding] Saving progress to step ${nextStepNum}...`);
-    try {
-      await setDoc(doc(db, 'users', user.uid), {
-        name,
-        specialty,
-        city,
-        neighborhood,
-        studioAddress,
-        avatar,
-        serviceMode,
-        serviceAreas,
-        pricingStrategy,
-        portfolio,
-        workingDays,
-        startTime,
-        endTime,
-        slug,
-        whatsapp,
-        instagram,
+    
+    const payload: Partial<UserProfile> = {
+      name,
+      username: slug,
+      whatsapp: whatsapp.replace(/\D/g, ''),
+      bio,
+      serviceMode,
+      onboardingStep: nextStepNum,
+      professionalIdentity: {
+        mainSpecialty: specialty,
+        yearsExperience,
+        serviceStyle: selectedStyles,
+        differentials: selectedDifferentials,
         bio,
-        headline,
-        professionalIdentity: {
-          mainSpecialty: specialty,
-          yearsExperience,
-          serviceStyle: selectedStyles,
-          differentials: selectedDifferentials,
-          bio,
-          headline
-        },
-        servicesDraft: services,
-        onboardingStep: nextStepNum,
-        updatedAt: new Date().toISOString()
-      }, { merge: true });
+        headline
+      } as ProfessionalIdentity,
+    };
+
+    try {
+      await saveProfilePartial(user.uid, payload);
       console.log(`[Onboarding] Progress saved successfully.`);
     } catch (error) {
       console.error('[Onboarding] Error saving progress:', error);
@@ -303,127 +337,120 @@ export default function OnboardingPage() {
     const locallyCompleted = sessionStorage.getItem(locallyCompletedKey) === 'true';
 
     if (!user || isFinalizing || profile?.onboardingCompleted || locallyCompleted) {
-      console.log('[Onboarding] handleFinish blocked:', { 
-        isFinalizing, 
-        profileCompleted: profile?.onboardingCompleted,
-        locallyCompleted 
-      });
       if (profile?.onboardingCompleted || locallyCompleted) navigate('/dashboard');
+      return;
+    }
+
+    // 1. Validation
+    try {
+      userProfileSchema.parse({
+        name,
+        username: slug,
+        whatsapp,
+        email: user.email,
+        bio,
+        serviceMode,
+        workingHours: { startTime, endTime, workingDays }
+      });
+      
+      // Validate services
+      const activeServices = services.filter(s => s.name.trim() !== '');
+      if (activeServices.length === 0) {
+        toast.error('Adicione pelo menos um serviço');
+        return;
+      }
+      
+      activeServices.forEach(s => {
+        serviceSchema.parse({
+          id: 'temp',
+          name: s.name,
+          price: Number(s.price),
+          duration: Number(s.duration)
+        });
+      });
+
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast.error(err.issues[0].message);
+      } else {
+        toast.error('Erro de validação');
+      }
       return;
     }
     
     setLoading(true);
     setIsFinalizing(true);
-    console.log('[Onboarding] >>> STARTING FINALIZATION <<<');
-    
-    // Fail-safe: Mark as locally completed IMMEDIATELY to prevent any bounce during the process
     sessionStorage.setItem(locallyCompletedKey, 'true');
 
     try {
-      // 1. Sanitize Data
-      console.log('[Onboarding] Validating and sanitizing payload');
-      const sanitizedName = name.trim();
-      const sanitizedSpecialty = specialty.trim();
-      const sanitizedBio = bio.trim();
-      const sanitizedHeadline = headline.trim();
-      const sanitizedCity = city.trim();
-      const sanitizedSlug = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      
-      const sanitizedAreas = serviceAreas
-        .filter(area => area.name && area.name.trim())
-        .map(area => ({
-          name: area.name.trim(),
-          fee: Number(area.fee) || 0
-        }));
-
-      // 2. Add Services
-      const activeServices = services.filter(s => s.name && s.price);
-      console.log(`[Onboarding] Step 1: Saving ${activeServices.length} services...`);
-      
-      try {
-        const servicePromises = activeServices.map(service => {
-          return addDoc(collection(db, 'services'), {
-            professionalId: user.uid,
-            name: service.name.trim(),
-            duration: Number(service.duration) || 60,
-            price: Number(service.price) || 0,
-            description: (service.description || '').trim(),
-            active: true,
-            createdAt: new Date().toISOString()
-          });
-        });
-        await Promise.all(servicePromises);
-        console.log('[Onboarding] Step 1: Services saved OK');
-      } catch (svcErr) {
-        console.warn('[Onboarding] Step 1 Warning: Error saving services, but continuing...', svcErr);
-      }
-
-      // 3. Prepare Final Data (WITHOUT PORTFOLIO FIRST to ensure it fits)
-      const finalData = {
-        name: sanitizedName,
-        specialty: sanitizedSpecialty,
-        city: sanitizedCity,
-        neighborhood: neighborhood.trim(),
+      // 2. Prepare Final Data
+      const finalData: Partial<UserProfile> = {
+        name: name.trim(),
+        specialty: specialty.trim(), // Top-level specialty
+        city: (studioAddress.city || city).trim(), // Top-level city with fallback
+        neighborhood: (studioAddress.neighborhood || neighborhood).trim(), // Top-level neighborhood with fallback
+        username: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'), // Explicit slug field
+        whatsapp: whatsapp.replace(/\D/g, ''),
+        bio: bio.trim(),
+        headline: headline.trim(), // Top-level headline
         avatar,
         serviceMode,
-        studioAddress: {
-          street: (studioAddress.street || '').trim(),
-          number: (studioAddress.number || '').trim(),
-          complement: (studioAddress.complement || '').trim(),
-          neighborhood: (studioAddress.neighborhood || '').trim(),
-          city: (studioAddress.city || sanitizedCity).trim(),
-          reference: (studioAddress.reference || '').trim()
+        serviceAreaType,
+        studioAddress: removeEmptyFields({
+          street: studioAddress.street.trim(),
+          number: studioAddress.number.trim(),
+          complement: studioAddress.complement.trim(),
+          neighborhood: studioAddress.neighborhood.trim(),
+          city: studioAddress.city.trim() || city.trim(),
+          reference: studioAddress.reference.trim()
+        }),
+        serviceAreas: serviceAreas.map(area => ({
+          name: area.name.trim(),
+          fee: Number(area.fee) || 0
+        })),
+        workingHours: {
+          startTime,
+          endTime,
+          workingDays
         },
-        serviceAreas: sanitizedAreas,
-        pricingStrategy: serviceMode !== 'studio' ? pricingStrategy : 'none',
-        workingDays,
-        startTime,
-        endTime,
-        slug: sanitizedSlug,
-        whatsapp: whatsapp.trim().replace(/\D/g, ''),
-        instagram: instagram.trim(),
-        bio: sanitizedBio,
-        headline: sanitizedHeadline,
         professionalIdentity: {
-          mainSpecialty: sanitizedSpecialty,
+          mainSpecialty: specialty.trim(),
           yearsExperience,
           serviceStyle: selectedStyles,
           differentials: selectedDifferentials,
-          bio: sanitizedBio,
-          headline: sanitizedHeadline
-        },
+          bio: bio.trim(),
+          headline: headline.trim()
+        } as ProfessionalIdentity,
         onboardingCompleted: true,
-        onboardingStep: 8,
-        updatedAt: new Date().toISOString()
+        onboardingStep: 8
       };
 
-      console.log('[Onboarding] Step 2: Saving final profile data (base)...');
-      try {
-        await setDoc(doc(db, 'users', user.uid), finalData, { merge: true });
-        console.log('[Onboarding] Step 2: Base profile saved OK');
-      } catch (err) {
-        console.error('[Onboarding] Step 2 Failed:', err);
-        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
-      }
+      // 3. Save Services
+      const activeServices = services.filter(s => s.name && s.price);
+      const servicePromises = activeServices.map(service => {
+        return addDoc(collection(db, 'services'), {
+          professionalId: user.uid,
+          name: service.name.trim(),
+          duration: Number(service.duration) || 60,
+          price: Number(service.price) || 0,
+          description: (service.description || '').trim(),
+          active: true,
+          createdAt: new Date().toISOString()
+        });
+      });
+      await Promise.all(servicePromises);
+
+      // 4. Save Profile
+      await saveProfilePartial(user.uid, finalData);
 
       toast.success('Onboarding concluído!');
       setStep(8);
-      console.log('[Onboarding] >>> FINALIZATION SUCCESSFUL <<<');
     } catch (error: any) {
-      console.error('[Onboarding] !!! FINALIZATION CRITICAL ERROR !!!', error);
-      
-      const errorMsg = error?.message || String(error);
-      const errorCode = error?.code || 'unknown';
-      console.log('[Onboarding] Technical error details:', { errorCode, errorMsg });
-      
-      if (errorMsg.includes('too large') || errorCode === 'resource-exhausted') {
-        toast.error('Erro: Dados muito grandes. Tente remover algumas fotos ou serviços.');
-      } else {
-        toast.error(`Erro ao finalizar: ${errorCode} - ${errorMsg.substring(0, 100)}`);
-      }
-      
+      console.error('[Onboarding] Finalization error:', error);
+      toast.error('Erro ao finalizar onboarding');
       setIsFinalizing(false);
-      sessionStorage.removeItem(locallyCompletedKey); // Allow retry if it failed
+      sessionStorage.removeItem(locallyCompletedKey);
     } finally {
       setLoading(false);
     }
@@ -543,7 +570,13 @@ export default function OnboardingPage() {
 
     try {
       console.log('[Portfolio] Removing item:', id);
-      await deleteDoc(doc(db, 'users', user.uid, 'portfolio', id));
+      const itemToDelete = portfolio.find(item => item.id === id);
+      if (itemToDelete) {
+        await deletePortfolioItem(user.uid, itemToDelete);
+      } else {
+        // Fallback for subcollection if somehow mixed
+        await deleteDoc(doc(db, 'users', user.uid, 'portfolio', id));
+      }
       setPortfolio(prev => prev.filter(item => item.id !== id));
       toast.success('Imagem removida');
     } catch (err) {
@@ -826,111 +859,6 @@ export default function OnboardingPage() {
             >
               <div className="text-center space-y-4">
                 <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-                  <Sparkles size={32} />
-                </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Sua Identidade</h1>
-                <p className="text-brand-stone font-light">Como você quer ser percebida pelas clientes?</p>
-              </div>
-
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
-                <div className="space-y-6">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento (Escolha até 3)</label>
-                  <div className="flex flex-wrap gap-2">
-                    {IDENTITY_STYLES.map(style => (
-                      <button
-                        key={style}
-                        onClick={() => {
-                          if (selectedStyles.includes(style)) {
-                            setSelectedStyles(selectedStyles.filter(s => s !== style));
-                          } else if (selectedStyles.length < 3) {
-                            setSelectedStyles([...selectedStyles, style]);
-                          }
-                        }}
-                        className={cn(
-                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
-                          selectedStyles.includes(style)
-                            ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
-                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
-                        )}
-                      >
-                        {style}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>
-                  <div className="flex flex-wrap gap-2">
-                    {IDENTITY_DIFFERENTIALS.map(diff => (
-                      <button
-                        key={diff}
-                        onClick={() => {
-                          if (selectedDifferentials.includes(diff)) {
-                            setSelectedDifferentials(selectedDifferentials.filter(d => d !== diff));
-                          } else {
-                            setSelectedDifferentials([...selectedDifferentials, diff]);
-                          }
-                        }}
-                        className={cn(
-                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
-                          selectedDifferentials.includes(diff)
-                            ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-md"
-                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
-                        )}
-                      >
-                        {diff}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo de Experiência</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {EXPERIENCE_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setYearsExperience(opt.value)}
-                        className={cn(
-                          "p-4 rounded-2xl text-xs font-medium transition-all border flex flex-col items-center gap-1",
-                          yearsExperience === opt.value
-                            ? "bg-brand-linen border-brand-ink text-brand-ink shadow-sm"
-                            : "bg-brand-parchment border-brand-mist text-brand-stone hover:border-brand-stone"
-                        )}
-                      >
-                        <span className="text-lg font-serif italic">{opt.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
-                  <ArrowLeft size={24} />
-                </button>
-                <button 
-                  onClick={nextStep}
-                  disabled={selectedStyles.length === 0 || selectedDifferentials.length === 0}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
-                >
-                  Continuar <ArrowRight size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div 
-              key="step3"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   {serviceMode === 'home' ? <Home size={32} /> : <Building2 size={32} />}
                 </div>
                 <h1 className="text-4xl font-serif font-normal text-brand-ink">Onde você atende?</h1>
@@ -1023,106 +951,115 @@ export default function OnboardingPage() {
                     </div>
                     
                     <div className="space-y-4">
-                      <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Você cobra o mesmo valor em todos os bairros?</p>
-                      <div className="grid grid-cols-1 gap-3">
+                      <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Área de Atendimento</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <button 
-                          onClick={() => setPricingStrategy('none')}
-                          className={`p-5 rounded-[24px] border text-left transition-all ${pricingStrategy === 'none' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
+                          onClick={() => setServiceAreaType('city_wide')}
+                          className={`p-5 rounded-[24px] border text-left transition-all ${serviceAreaType === 'city_wide' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
                         >
-                          <p className="text-xs font-medium text-brand-ink mb-1">Sim, é o mesmo valor</p>
-                          <p className="text-[10px] text-brand-stone font-light leading-tight">O valor do serviço será o mesmo em todas as regiões atendidas.</p>
+                          <p className="text-xs font-medium text-brand-ink mb-1">Toda a cidade</p>
+                          <p className="text-[10px] text-brand-stone font-light leading-tight">Você atende em qualquer bairro de {city || 'sua cidade'}.</p>
                         </button>
                         <button 
-                          onClick={() => setPricingStrategy('extra')}
-                          className={`p-5 rounded-[24px] border text-left transition-all ${pricingStrategy === 'extra' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
+                          onClick={() => setServiceAreaType('custom')}
+                          className={`p-5 rounded-[24px] border text-left transition-all ${serviceAreaType === 'custom' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
                         >
-                          <p className="text-xs font-medium text-brand-ink mb-1">Não, varia por região</p>
-                          <p className="text-[10px] text-brand-stone font-light leading-tight">Você pode ajustar valores conforme a região para cobrir deslocamentos maiores.</p>
+                          <p className="text-xs font-medium text-brand-ink mb-1">Bairros específicos</p>
+                          <p className="text-[10px] text-brand-stone font-light leading-tight">Escolha exatamente quais bairros você atende e defina taxas.</p>
                         </button>
                       </div>
                     </div>
 
-                    {pricingStrategy === 'extra' && (
-                      <div className="space-y-6 pt-6 bg-brand-parchment p-8 rounded-[32px] border border-brand-mist">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Sparkles size={16} className="text-brand-terracotta" />
-                          <h4 className="text-[10px] font-medium text-brand-ink uppercase tracking-widest">Ajuste de valores por região</h4>
-                        </div>
-                        
-                        <div className="flex flex-col md:flex-row items-end gap-3">
-                          <div className="flex-1 space-y-2 w-full">
-                            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro / Região</label>
-                            <input 
-                              type="text" 
-                              value={newAreaName} 
-                              onChange={(e) => setNewAreaName(e.target.value)} 
-                              onKeyDown={(e) => e.key === 'Enter' && addArea()}
-                              placeholder="Ex: Aldeota" 
-                              className="w-full px-5 py-3 bg-brand-white border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
-                            />
-                          </div>
-                          <div className="w-full md:w-32 space-y-2">
-                            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Valor Adicional</label>
-                            <input 
-                              type="number" 
-                              value={newAreaFee} 
-                              onChange={(e) => setNewAreaFee(e.target.value)} 
-                              onKeyDown={(e) => e.key === 'Enter' && addArea()}
-                              placeholder="0,00" 
-                              className="w-full px-5 py-3 bg-brand-white border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
-                            />
-                          </div>
-                          <button 
-                            onClick={addArea} 
-                            className="bg-brand-ink text-brand-white px-8 h-[46px] rounded-xl text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
-                          >
-                            Adicionar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {pricingStrategy === 'none' && (
-                      <div className="space-y-4 pt-4">
-                        <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Quais bairros você atende?</p>
-                        <div className="flex flex-col md:flex-row items-end gap-3">
-                          <div className="flex-1 space-y-2 w-full">
-                            <input 
-                              type="text" 
-                              value={newAreaName} 
-                              onChange={(e) => setNewAreaName(e.target.value)} 
-                              onKeyDown={(e) => e.key === 'Enter' && addArea()}
-                              placeholder="Ex: Aldeota" 
-                              className="w-full px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
-                            />
-                          </div>
-                          <button 
-                            onClick={addArea} 
-                            className="bg-brand-ink text-brand-white px-8 h-[46px] rounded-xl text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
-                          >
-                            Adicionar
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      {serviceAreas.map((area, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-brand-parchment p-4 rounded-2xl border border-brand-mist">
-                          <span className="text-sm font-medium text-brand-ink">{area.name}</span>
-                          <div className="flex items-center gap-4">
-                            {pricingStrategy === 'extra' && area.fee > 0 && (
-                              <span className="text-xs font-medium text-brand-terracotta">
-                                + {formatCurrency(area.fee)}
-                              </span>
-                            )}
-                            <button onClick={() => removeArea(idx)} className="text-brand-stone hover:text-brand-terracotta transition-all">
-                              <X size={16} />
+                    {serviceAreaType === 'custom' && (
+                      <div className="space-y-6">
+                        <div className="space-y-4">
+                          <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Você cobra o mesmo valor em todos os bairros?</p>
+                          <div className="grid grid-cols-1 gap-3">
+                            <button 
+                              onClick={() => setPricingStrategy('none')}
+                              className={`p-5 rounded-[24px] border text-left transition-all ${pricingStrategy === 'none' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
+                            >
+                              <p className="text-xs font-medium text-brand-ink mb-1">Sim, é o mesmo valor</p>
+                              <p className="text-[10px] text-brand-stone font-light leading-tight">O valor do serviço será o mesmo em todas as regiões atendidas.</p>
+                            </button>
+                            <button 
+                              onClick={() => setPricingStrategy('extra')}
+                              className={`p-5 rounded-[24px] border text-left transition-all ${pricingStrategy === 'extra' ? 'border-brand-ink bg-brand-linen' : 'border-brand-mist bg-brand-parchment hover:border-brand-stone'}`}
+                            >
+                              <p className="text-xs font-medium text-brand-ink mb-1">Não, varia por região</p>
+                              <p className="text-[10px] text-brand-stone font-light leading-tight">Você pode ajustar valores conforme a região para cobrir deslocamentos maiores.</p>
                             </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
+
+                        <div className="space-y-6 pt-6 bg-brand-white p-8 rounded-[32px] border border-brand-mist shadow-sm">
+                          <div className="flex flex-col md:flex-row items-end gap-3">
+                            <div className="flex-1 space-y-2 w-full relative">
+                              <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro / Região</label>
+                              <input 
+                                type="text" 
+                                value={newAreaName} 
+                                onChange={(e) => setNewAreaName(e.target.value)} 
+                                onFocus={() => setNeighborhoodSuggestions(FORTALEZA_NEIGHBORHOODS.filter(n => n.toLowerCase().includes(newAreaName.toLowerCase())))}
+                                onKeyDown={(e) => e.key === 'Enter' && addArea()}
+                                placeholder="Busque ou digite o bairro" 
+                                className="w-full px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
+                              />
+                              {newAreaName && (
+                                <div className="absolute left-0 top-[100%] w-full bg-brand-white border border-brand-mist rounded-xl shadow-xl mt-1 z-50 max-h-48 overflow-auto">
+                                  {FORTALEZA_NEIGHBORHOODS.filter(n => n.toLowerCase().includes(newAreaName.toLowerCase())).map(suggestion => (
+                                    <button 
+                                      key={suggestion}
+                                      onClick={() => { setNewAreaName(suggestion); setNeighborhoodSuggestions([]); }}
+                                      className="w-full text-left px-5 py-3 text-xs hover:bg-brand-linen transition-colors border-b border-brand-mist last:border-0"
+                                    >
+                                      {suggestion}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {pricingStrategy === 'extra' && (
+                              <div className="w-full md:w-32 space-y-2">
+                                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Taxa Extra</label>
+                                <input 
+                                  type="number" 
+                                  value={newAreaFee} 
+                                  onChange={(e) => setNewAreaFee(e.target.value)} 
+                                  onKeyDown={(e) => e.key === 'Enter' && addArea()}
+                                  placeholder="0,00" 
+                                  className="w-full px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none text-sm focus:ring-1 focus:ring-brand-ink transition-all font-light" 
+                                />
+                              </div>
+                            )}
+                            <button 
+                              onClick={addArea} 
+                              className="bg-brand-ink text-brand-white px-8 h-[46px] rounded-xl text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
+                            >
+                              Adicionar
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          {serviceAreas.map((area, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-brand-parchment p-4 rounded-2xl border border-brand-mist">
+                              <span className="text-sm font-medium text-brand-ink">{area.name}</span>
+                              <div className="flex items-center gap-4">
+                                {pricingStrategy === 'extra' && area.fee > 0 && (
+                                  <span className="text-xs font-medium text-brand-terracotta">
+                                    + {formatCurrency(area.fee)}
+                                  </span>
+                                )}
+                                <button onClick={() => removeArea(idx)} className="text-brand-stone hover:text-brand-terracotta transition-all">
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1135,7 +1072,8 @@ export default function OnboardingPage() {
                   onClick={nextStep}
                   disabled={
                     (serviceMode !== 'home' && (!studioAddress.street || !studioAddress.number || !studioAddress.neighborhood)) || 
-                    (serviceMode !== 'studio' && serviceAreas.length === 0)
+                    (serviceMode === 'home' && serviceAreaType === 'custom' && serviceAreas.length === 0) ||
+                    (serviceMode === 'hybrid' && serviceAreaType === 'custom' && serviceAreas.length === 0)
                   }
                   className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
@@ -1260,7 +1198,7 @@ export default function OnboardingPage() {
                 <p className="text-brand-stone font-light">Não se preocupe: você poderá personalizar sua agenda com mais flexibilidade depois.</p>
               </div>
 
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
+              <div className="bg-brand-white p-6 sm:p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
                 <div className="space-y-4">
                   <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
                   <div className="flex justify-between">
@@ -1276,7 +1214,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 pt-8 border-t border-brand-mist">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-8 border-t border-brand-mist">
                   <div className="space-y-2">
                     <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início do Dia</label>
                     <input 
@@ -1331,6 +1269,92 @@ export default function OnboardingPage() {
           {step === 6 && (
             <motion.div 
               key="step6"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-10"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
+                  <Camera size={32} />
+                </div>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seu Portfólio</h1>
+                <p className="text-brand-stone font-light">Mostre o seu melhor trabalho para encantar as clientes.</p>
+              </div>
+
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {portfolio.map((item, idx) => (
+                    <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
+                      <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" />
+                      <button 
+                        onClick={() => item.id && removePortfolioImage(item.id)}
+                        className="absolute top-2 right-2 w-8 h-8 bg-brand-ink/80 text-brand-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X size={16} />
+                      </button>
+                      <div className="absolute bottom-0 left-0 w-full p-2 bg-brand-ink/40 backdrop-blur-sm">
+                        <p className="text-[8px] text-brand-white font-medium uppercase truncate tracking-widest">{item.category}</p>
+                      </div>
+                      {item.isUploading && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                            <Sparkles size={24} className="text-brand-white" />
+                          </motion.div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  
+                  <div 
+                    onClick={() => {
+                      console.log('[Upload] Portfolio click triggered');
+                      portfolioInputRef.current?.click();
+                    }}
+                    className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta"
+                  >
+                    {uploadingImage ? (
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                        <Sparkles size={24} />
+                      </motion.div>
+                    ) : (
+                      <>
+                        <Plus size={24} />
+                        <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
+                      </>
+                    )}
+                    <input 
+                      ref={portfolioInputRef}
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden" 
+                      onChange={handlePortfolioUpload} 
+                      disabled={uploadingImage} 
+                    />
+                  </div>
+                </div>
+                
+                <p className="text-[10px] text-brand-stone text-center italic font-light">Dica: Fotos bem iluminadas e de alta qualidade convertem até 3x mais!</p>
+              </div>
+
+              <div className="flex gap-4">
+                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
+                  <ArrowLeft size={24} />
+                </button>
+                <button 
+                  onClick={nextStep}
+                  disabled={loading}
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                >
+                  Continuar <ArrowRight size={18} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 7 && (
+            <motion.div 
+              key="step7"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -1432,94 +1456,8 @@ export default function OnboardingPage() {
                   <ArrowLeft size={24} />
                 </button>
                 <button 
-                  onClick={nextStep}
-                  disabled={loading || !slug || !whatsapp}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
-                >
-                  Continuar <ArrowRight size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 7 && (
-            <motion.div 
-              key="step7"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-                  <Camera size={32} />
-                </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seu Portfólio</h1>
-                <p className="text-brand-stone font-light">Mostre o seu melhor trabalho para encantar as clientes.</p>
-              </div>
-
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {portfolio.map((item, idx) => (
-                    <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
-                      <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" />
-                      <button 
-                        onClick={() => item.id && removePortfolioImage(item.id)}
-                        className="absolute top-2 right-2 w-8 h-8 bg-brand-ink/80 text-brand-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={16} />
-                      </button>
-                      <div className="absolute bottom-0 left-0 w-full p-2 bg-brand-ink/40 backdrop-blur-sm">
-                        <p className="text-[8px] text-brand-white font-medium uppercase truncate tracking-widest">{item.category}</p>
-                      </div>
-                      {item.isUploading && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                            <Sparkles size={24} className="text-brand-white" />
-                          </motion.div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  
-                  <div 
-                    onClick={() => {
-                      console.log('[Upload] Portfolio click triggered');
-                      portfolioInputRef.current?.click();
-                    }}
-                    className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta"
-                  >
-                    {uploadingImage ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                        <Sparkles size={24} />
-                      </motion.div>
-                    ) : (
-                      <>
-                        <Plus size={24} />
-                        <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
-                      </>
-                    )}
-                    <input 
-                      ref={portfolioInputRef}
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handlePortfolioUpload} 
-                      disabled={uploadingImage} 
-                    />
-                  </div>
-                </div>
-                
-                <p className="text-[10px] text-brand-stone text-center italic font-light">Dica: Fotos bem iluminadas e de alta qualidade convertem até 3x mais!</p>
-              </div>
-
-              <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
-                  <ArrowLeft size={24} />
-                </button>
-                <button 
                   onClick={handleFinish}
-                  disabled={loading}
+                  disabled={loading || !slug || !whatsapp}
                   className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
                   {loading ? 'Finalizando...' : 'Concluir Vitrine'} <CheckCircle2 size={18} />

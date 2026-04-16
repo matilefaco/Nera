@@ -3,6 +3,8 @@ import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, 
 import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
+import { UserProfile, Appointment, PortfolioItem } from './types';
+import { removeEmptyFields } from './lib/utils';
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
@@ -109,13 +111,17 @@ export async function uploadImageToStorage(file: File | Blob, folder: string): P
 /**
  * Updates a user profile with partial data.
  */
-export async function saveProfilePartial(userId: string, payload: any) {
-  console.log(`[Firestore] Saving profile partial for ${userId}...`, payload);
+export async function saveProfilePartial(userId: string, payload: Partial<UserProfile>) {
+  console.log(`[Firestore] Saving profile partial for ${userId}...`);
+  
+  // Clean data before saving
+  const cleanedPayload = removeEmptyFields(payload);
+  
   const userRef = doc(db, 'users', userId);
   try {
     // Use setDoc with merge: true to handle cases where the document might not exist yet
     await setDoc(userRef, {
-      ...payload,
+      ...cleanedPayload,
       updatedAt: new Date().toISOString()
     }, { merge: true });
     console.log('[Firestore] Profile partial saved OK');
@@ -155,7 +161,7 @@ export async function savePortfolioItem(userId: string, imageUrl: string, catego
 /**
  * Removes a portfolio item from the user's portfolio array.
  */
-export async function deletePortfolioItem(userId: string, item: any) {
+export async function deletePortfolioItem(userId: string, item: PortfolioItem) {
   console.log(`[Portfolio] removing item from Firestore for ${userId}...`);
   const userRef = doc(db, 'users', userId);
   try {
@@ -202,12 +208,16 @@ export async function notify(type: string, payload: any) {
 /**
  * Creates a booking request and notifies the professional.
  */
-export async function createBookingRequest(appointmentData: any) {
-  console.log('[Booking] Creating request...', appointmentData);
+export async function createBookingRequest(appointmentData: Partial<Appointment>) {
+  console.log('[Booking] Creating request...');
+  
+  // Clean data before saving
+  const cleanedData = removeEmptyFields(appointmentData);
+  
   try {
     const docRef = await addDoc(collection(db, 'appointments'), {
-      ...appointmentData,
-      status: 'pending_confirmation',
+      ...cleanedData,
+      status: 'pending',
       createdAt: serverTimestamp(),
       expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() // 2 hours
     });
@@ -217,7 +227,7 @@ export async function createBookingRequest(appointmentData: any) {
     // Trigger notification
     await notify('NEW_BOOKING_REQUEST', {
       appointmentId: docRef.id,
-      ...appointmentData
+      ...cleanedData
     });
     
     return docRef.id;
@@ -241,7 +251,7 @@ export async function respondToBookingRequest(appointmentId: string, decision: '
       if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
       
       const data = apptDoc.data();
-      if (data.status !== 'pending_confirmation') {
+      if (data.status !== 'pending') {
         throw new Error(`Este agendamento já foi ${data.status === 'confirmed' ? 'confirmado' : 'recusado'}`);
       }
 

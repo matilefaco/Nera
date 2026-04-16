@@ -7,63 +7,98 @@ import {
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp,
-  ChevronRight, Sparkles
+  ChevronRight, Sparkles, Home
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrency } from '../lib/utils';
 import MobileNav from '../components/MobileNav';
 import Logo from '../components/Logo';
+import { Appointment } from '../types';
+import { AnimatePresence } from 'motion/react';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [dailyRevenue, setDailyRevenue] = useState(0);
   const [travelRevenue, setTravelRevenue] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingRequests, setPendingRequests] = useState<Appointment[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<Appointment | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const q = query(
+    
+    // Query 1: Today's agenda
+    const qToday = query(
       collection(db, 'appointments'),
       where('professionalId', '==', user.uid),
       where('date', '==', today),
       orderBy('time', 'asc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    // Query 2: All pending appointments (to count)
+    const qPending = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', user.uid),
+      where('status', '==', 'pending')
+    );
+
+    const unsubToday = onSnapshot(qToday, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
       setAppointments(docs);
       
       const todayRev = docs
-        .filter((a: any) => a.status !== 'cancelled')
-        .reduce((acc: number, curr: any) => acc + (curr.price || 0) + (curr.travelFee || 0), 0);
+        .filter((a) => a.status !== 'cancelled' && a.status !== 'declined')
+        .reduce((acc: number, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0);
       const travelRev = docs
-        .filter((a: any) => a.status !== 'cancelled')
-        .reduce((acc: number, curr: any) => acc + (curr.travelFee || 0), 0);
+        .filter((a) => a.status !== 'cancelled' && a.status !== 'declined')
+        .reduce((acc: number, curr) => acc + (curr.travelFee || 0), 0);
       setDailyRevenue(todayRev);
       setTravelRevenue(travelRev);
-      setPendingCount(docs.filter((a: any) => a.status === 'pending_confirmation').length);
     });
 
-    return () => unsubscribe();
+    const unsubPending = onSnapshot(qPending, (snapshot) => {
+      setPendingCount(snapshot.size);
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+      setPendingRequests(docs);
+    });
+
+    return () => {
+      unsubToday();
+      unsubPending();
+    };
   }, [user]);
 
   const handleComplete = async (id: string) => {
     try {
-      await updateDoc(doc(db, 'appointments', id), { status: 'completed' });
+      await updateDoc(doc(db, 'appointments', id), { status: 'confirmed' }); // Using confirmed as completion for now or add 'completed' to status
       toast.success('Atendimento concluído!');
     } catch (error) {
       toast.error('Erro ao atualizar status');
     }
   };
 
-  const sendWhatsAppReminder = (appointment: any) => {
+  const sendWhatsAppReminder = (appointment: Appointment) => {
     const message = `Olá ${appointment.clientName}! Confirmado nosso horário hoje às ${appointment.time} para ${appointment.serviceName}? Aguardo você! ✨`;
     const url = `https://wa.me/${appointment.clientWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
+  };
+
+  const handleRespond = async (id: string, decision: 'confirmed' | 'declined') => {
+    try {
+      // Import this if needed, but it should be available in firebase.ts as respondToBookingRequest
+      // I'll make sure it's exported and used.
+      const { respondToBookingRequest } = await import('../firebase');
+      await respondToBookingRequest(id, decision);
+      toast.success(decision === 'confirmed' ? 'Agendamento confirmado!' : 'Agendamento recusado.');
+      if (selectedRequest?.id === id) setIsModalOpen(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao processar solicitação');
+    }
   };
 
   return (
@@ -113,7 +148,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <button 
               onClick={() => {
-                const url = `${window.location.origin}/p/${profile?.slug}`;
+                const url = `https://nera.app/p/${profile?.slug}`;
                 navigator.clipboard.writeText(url);
                 toast.success('Link da vitrine copiado!');
               }}
@@ -131,6 +166,64 @@ export default function Dashboard() {
             </Link>
           </div>
         </header>
+
+        {/* 0. PENDING REQUESTS (TOP PRIORITY) */}
+        {pendingRequests.length > 0 && (
+          <section className="mb-16">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-brand-terracotta animate-pulse" />
+                <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Solicitações Pendentes ({pendingRequests.length})</h2>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {pendingRequests.map((request) => (
+                <motion.div 
+                  key={request.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-brand-white p-8 rounded-[40px] border-2 border-brand-terracotta/20 shadow-xl relative overflow-hidden group"
+                >
+                  <div className="absolute top-0 right-0 p-4">
+                    <span className="text-[8px] font-medium uppercase tracking-widest px-3 py-1 bg-brand-terracotta/10 text-brand-terracotta rounded-full border border-brand-terracotta/20">Aguardando Resposta</span>
+                  </div>
+                  
+                  <div className="mb-8">
+                    <h3 className="text-2xl font-serif text-brand-ink mb-1">{request.clientName}</h3>
+                    <p className="text-[10px] text-brand-stone uppercase tracking-widest font-medium underline decoration-brand-terracotta/30">{request.serviceName}</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    <div className="flex items-center gap-3 text-brand-ink">
+                      <Calendar size={16} className="text-brand-terracotta" />
+                      <span className="text-sm font-light">{request.date.split('-').reverse().join('/')}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-brand-ink">
+                      <Clock size={16} className="text-brand-terracotta" />
+                      <span className="text-sm font-light">{request.time}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={() => handleRespond(request.id, 'confirmed')}
+                      className="flex-1 py-4 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg"
+                    >
+                      Confirmar
+                    </button>
+                    <button 
+                      onClick={() => { setSelectedRequest(request); setIsModalOpen(true); }}
+                      className="px-6 py-4 bg-brand-linen text-brand-ink rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist"
+                    >
+                      Ver Detalhes
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Stats Grid */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
@@ -177,15 +270,15 @@ export default function Dashboard() {
           <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm flex flex-col justify-between">
             <div>
               <p className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-8">Próximo Cliente</p>
-              {appointments.find(a => a.status === 'pending_confirmation') ? (
+              {appointments.find(a => a.status === 'pending') ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-brand-linen flex items-center justify-center text-brand-ink font-serif text-lg">
-                      {appointments.find(a => a.status === 'pending_confirmation')?.time}
+                      {appointments.find(a => a.status === 'pending')?.time}
                     </div>
                     <div>
-                      <p className="font-medium text-brand-ink">{appointments.find(a => a.status === 'pending_confirmation')?.clientName}</p>
-                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">{appointments.find(a => a.status === 'pending_confirmation')?.serviceName}</p>
+                      <p className="font-medium text-brand-ink">{appointments.find(a => a.status === 'pending')?.clientName}</p>
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">{appointments.find(a => a.status === 'pending')?.serviceName}</p>
                     </div>
                   </div>
                 </div>
@@ -239,7 +332,7 @@ export default function Dashboard() {
                     </div>
                     
                     <div className="flex items-center gap-3">
-                      {appointment.status === 'pending_confirmation' ? (
+                      {appointment.status === 'pending' ? (
                         <Link 
                           to={`/booking-request/${appointment.id}/respond`}
                           className="px-6 py-3 bg-brand-terracotta text-brand-white rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-md"
@@ -320,6 +413,109 @@ export default function Dashboard() {
       </main>
 
       <MobileNav />
+
+      {/* Request Details Modal */}
+      <AnimatePresence>
+        {isModalOpen && selectedRequest && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModalOpen(false)}
+              className="absolute inset-0 bg-brand-ink/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-lg bg-brand-white rounded-[40px] overflow-hidden shadow-2xl"
+            >
+              <div className="p-10 sm:p-12">
+                <div className="flex justify-between items-start mb-10">
+                  <div>
+                    <span className="text-[10px] font-medium text-brand-terracotta uppercase tracking-widest mb-2 block">Detalhes da Solicitação</span>
+                    <h2 className="text-3xl font-serif text-brand-ink">{selectedRequest.clientName}</h2>
+                  </div>
+                  <button onClick={() => setIsModalOpen(false)} className="p-2 text-brand-stone hover:text-brand-ink transition-colors">
+                    <LogOut size={24} className="rotate-180" />
+                  </button>
+                </div>
+
+                <div className="space-y-8">
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Serviço</p>
+                      <p className="text-brand-ink font-medium">{selectedRequest.serviceName}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Valor</p>
+                      <p className="text-brand-ink font-medium text-lg">{formatCurrency((selectedRequest.price || 0) + (selectedRequest.travelFee || 0))}</p>
+                      {selectedRequest.travelFee > 0 && <p className="text-[9px] text-brand-terracotta italic">Taxa de deslocamento incluída: {formatCurrency(selectedRequest.travelFee)}</p>}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-8 pt-8 border-t border-brand-mist">
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Data</p>
+                      <p className="text-brand-ink font-light">{selectedRequest.date.split('-').reverse().join('/')}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Horário</p>
+                      <p className="text-brand-ink font-light">{selectedRequest.time}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-8 border-t border-brand-mist flex flex-col gap-2">
+                    <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-2">Local de Atendimento</p>
+                    <div className="flex items-start gap-4 p-6 bg-brand-parchment rounded-[24px] border border-brand-mist">
+                      {selectedRequest.locationType === 'home' ? <Home size={20} className="text-brand-terracotta mt-1" /> : <MapPin size={20} className="text-brand-terracotta mt-1" />}
+                      <div>
+                        <p className="text-brand-ink font-medium text-sm mb-1">{selectedRequest.locationType === 'home' ? 'Em domicílio' : 'No Estúdio'}</p>
+                        <p className="text-brand-stone text-xs font-light leading-relaxed">
+                          {selectedRequest.locationType === 'home' 
+                            ? selectedRequest.address || `Bairro: ${selectedRequest.neighborhood}` 
+                            : 'Atendimento no seu endereço cadastrado'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-8 border-t border-brand-mist">
+                    <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-4">Contato da Cliente</p>
+                    <a 
+                      href={`https://wa.me/${selectedRequest.clientWhatsapp.replace(/\D/g, '')}`}
+                      target="_blank"
+                      className="flex items-center justify-between p-6 bg-brand-linen rounded-[24px] border border-brand-mist group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <MessageCircle size={20} className="text-brand-ink" />
+                        <span className="text-brand-ink font-medium">{selectedRequest.clientWhatsapp}</span>
+                      </div>
+                      <ChevronRight size={18} className="text-brand-stone group-hover:translate-x-1 transition-transform" />
+                    </a>
+                  </div>
+                </div>
+
+                <div className="mt-12 flex gap-4">
+                  <button 
+                    onClick={() => handleRespond(selectedRequest.id, 'confirmed')}
+                    className="flex-1 py-6 bg-brand-ink text-brand-white rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-xl"
+                  >
+                    Confirmar Agendamento
+                  </button>
+                  <button 
+                    onClick={() => handleRespond(selectedRequest.id, 'declined')}
+                    className="flex-1 py-6 bg-brand-white border border-brand-mist text-brand-stone rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all"
+                  >
+                    Recusar
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,20 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, storage, auth, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem } from '../firebase';
+import { db, storage, auth, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem, deletePortfolioItem } from '../firebase';
 import { doc, updateDoc, collection, query, orderBy, getDocs, deleteDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
-  Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus
+  Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { formatCurrency } from '../lib/utils';
-
+import { formatCurrency, cn } from '../lib/utils';
 import Logo from '../components/Logo';
 import MobileNav from '../components/MobileNav';
+
+const IDENTITY_DIFFERENTIALS = [
+  'Pontualidade',
+  'Biossegurança',
+  'Produtos premium',
+  'Atendimento exclusivo',
+  'Técnica avançada'
+];
 
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -32,6 +39,8 @@ export default function ProfilePage() {
   const [slug, setSlug] = useState('');
   const [avatar, setAvatar] = useState('');
   const [neighborhood, setNeighborhood] = useState('');
+  const [headline, setHeadline] = useState('');
+  const [differentials, setDifferentials] = useState<string[]>([]);
   const [serviceMode, setServiceMode] = useState<'home' | 'studio' | 'hybrid'>('studio');
   const [studioAddress, setStudioAddress] = useState({
     street: '',
@@ -51,14 +60,16 @@ export default function ProfilePage() {
   useEffect(() => {
     if (profile && user) {
       setName(profile.name || '');
-      setSpecialty(profile.specialty || '');
-      setBio(profile.bio || '');
-      setCity(profile.city || profile.location || '');
+      setSpecialty(profile.specialty || profile.professionalIdentity?.mainSpecialty || '');
+      setBio(profile.bio || profile.professionalIdentity?.bio || '');
+      setCity(profile.city || profile.studioAddress?.city || profile.location || '');
       setWhatsapp(profile.whatsapp || '');
       setSlug(profile.slug || '');
       setAvatar(profile.avatar || '');
       setAvatarPreview(profile.avatar || '');
-      setNeighborhood(profile.neighborhood || '');
+      setNeighborhood(profile.neighborhood || profile.studioAddress?.neighborhood || '');
+      setHeadline(profile.headline || profile.professionalIdentity?.headline || '');
+      setDifferentials(profile.professionalIdentity?.differentials || []);
       setServiceMode(profile.serviceMode || 'studio');
       if (profile.studioAddress) {
         setStudioAddress(profile.studioAddress);
@@ -68,26 +79,30 @@ export default function ProfilePage() {
       setServiceAreas(profile.serviceAreas || []);
       setPricingStrategy(profile.pricingStrategy || 'none');
 
-      // Fetch portfolio from sub-collection
-      const fetchPortfolio = async () => {
-        try {
-          console.log('[Profile] Fetching portfolio sub-collection...');
-          const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
-          const q = query(portfolioRef, orderBy('createdAt', 'desc'));
-          const snapshot = await getDocs(q);
-          const items = snapshot.docs.map(doc => ({
-            id: doc.id,
-            url: doc.data().imageUrl,
-            category: doc.data().category
-          }));
-          console.log('[Profile] Portfolio items fetched:', items.length);
-          setPortfolio(items);
-        } catch (err) {
-          console.error('[Profile] Error fetching portfolio:', err);
-        }
-      };
-      
-      fetchPortfolio();
+      // Load portfolio from profile array (Single Source of Truth)
+      if (profile.portfolio) {
+        setPortfolio(profile.portfolio);
+      } else {
+        // Fallback: Fetch portfolio from sub-collection if array is empty
+        const fetchPortfolio = async () => {
+          try {
+            console.log('[Profile] Fetching portfolio sub-collection...');
+            const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
+            const q = query(portfolioRef, orderBy('createdAt', 'desc'));
+            const snapshot = await getDocs(q);
+            const items = snapshot.docs.map(doc => ({
+              id: doc.id,
+              url: doc.data().imageUrl || doc.data().url,
+              category: doc.data().category
+            }));
+            console.log('[Profile] Portfolio items fetched from sub-collection:', items.length);
+            if (items.length > 0) setPortfolio(items);
+          } catch (err) {
+            console.error('[Profile] Error fetching portfolio:', err);
+          }
+        };
+        fetchPortfolio();
+      }
     }
   }, [profile, user]);
 
@@ -135,14 +150,15 @@ export default function ProfilePage() {
       const finalPayload = {
         name: sanitizedName,
         specialty: sanitizedSpecialty,
-        bio: sanitizedBio,
         city: sanitizedCity,
         neighborhood: neighborhood.trim(),
+        bio: sanitizedBio,
+        headline: headline.trim(),
         studioAddress: {
           street: (studioAddress.street || '').trim(),
           number: (studioAddress.number || '').trim(),
           complement: (studioAddress.complement || '').trim(),
-          neighborhood: (studioAddress.neighborhood || '').trim(),
+          neighborhood: (studioAddress.neighborhood || neighborhood.trim()).trim(),
           city: (studioAddress.city || sanitizedCity).trim(),
           reference: (studioAddress.reference || '').trim()
         },
@@ -152,6 +168,13 @@ export default function ProfilePage() {
         serviceAreas: sanitizedAreas,
         pricingStrategy,
         avatar,
+        professionalIdentity: {
+          ...profile?.professionalIdentity,
+          headline: headline.trim(),
+          differentials: differentials,
+          bio: sanitizedBio,
+          mainSpecialty: sanitizedSpecialty
+        },
         updatedAt: new Date().toISOString()
       };
 
@@ -288,7 +311,6 @@ export default function ProfilePage() {
 
     try {
       console.log('[Portfolio] removing from Firestore');
-      const { deletePortfolioItem } = await import('../firebase');
       await deletePortfolioItem(user.uid, itemToRemove);
       console.log('[Portfolio] removed successfully');
       
@@ -340,6 +362,51 @@ export default function ProfilePage() {
             Ver minha página <ExternalLink size={16} />
           </Link>
         </header>
+
+        {/* Profile Completion Guidance (Internal Only) */}
+        {profile && (
+          <div className="mb-12 grid grid-cols-1 md:grid-cols-3 gap-6">
+            {!profile.bio && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-brand-linen/50 border border-brand-mist p-6 rounded-[32px] flex items-start gap-4">
+                <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-serif text-brand-ink mb-1">Bio ausente</h4>
+                  <p className="text-[10px] text-brand-stone leading-relaxed">Perfis com biografia convertem até 40% mais. Conte sua história!</p>
+                </div>
+              </motion.div>
+            )}
+            {(!portfolio || portfolio.length < 3) && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-brand-linen/50 border border-brand-mist p-6 rounded-[32px] flex items-start gap-4">
+                <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm">
+                  <Camera size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-serif text-brand-ink mb-1">
+                    {!portfolio || portfolio.length === 0 ? 'Portfólio vazio' : 'Portfólio incompleto'}
+                  </h4>
+                  <p className="text-[10px] text-brand-stone leading-relaxed">
+                    {!portfolio || portfolio.length === 0 
+                      ? 'Adicione fotos do seu trabalho para passar confiança.' 
+                      : `Você tem ${portfolio.length} foto(s). Recomendamos pelo menos 3.`}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+            {(!profile.professionalIdentity?.differentials || profile.professionalIdentity.differentials.length === 0) && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-brand-linen/50 border border-brand-mist p-6 rounded-[32px] flex items-start gap-4">
+                <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm">
+                  <ShieldCheck size={18} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-serif text-brand-ink mb-1">Diferenciais</h4>
+                  <p className="text-[10px] text-brand-stone leading-relaxed">Destaque o que torna seu atendimento único e premium.</p>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        )}
 
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Left Column: Avatar & Identity */}
@@ -403,19 +470,19 @@ export default function ProfilePage() {
                         type="text" 
                         value={item.category} 
                         onChange={async (e) => {
+                          const newCategory = e.target.value;
                           const newPortfolio = [...portfolio];
-                          newPortfolio[idx].category = e.target.value;
+                          newPortfolio[idx].category = newCategory;
                           setPortfolio(newPortfolio);
                           
-                          // PERSISTENCE: Update category in sub-collection
-                          if (item.id && !item.id.startsWith('temp-')) {
-                            try {
-                              await updateDoc(doc(db, 'users', user.uid, 'portfolio', item.id), {
-                                category: e.target.value
-                              });
-                            } catch (err) {
-                              console.error('[Portfolio] Error updating category:', err);
-                            }
+                          // PERSISTENCE: Update the entire portfolio array in the user document
+                          try {
+                            const userRef = doc(db, 'users', user.uid);
+                            await updateDoc(userRef, {
+                              portfolio: newPortfolio
+                            });
+                          } catch (err) {
+                            console.error('[Portfolio] Error updating category:', err);
                           }
                         }}
                         className="w-full bg-brand-white/10 border border-brand-white/20 rounded-lg px-2 py-1.5 text-[10px] text-brand-white placeholder:text-brand-white/50 outline-none text-center mb-3 font-light"
@@ -480,6 +547,17 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Headline (Frase de impacto)</label>
+                <input 
+                  type="text" 
+                  value={headline} 
+                  onChange={(e) => setHeadline(e.target.value)} 
+                  placeholder="Ex: Especialista em beleza natural"
+                  className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                />
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bio / Descrição Boutique</label>
                 <textarea 
                   value={bio} 
@@ -487,6 +565,33 @@ export default function ProfilePage() {
                   className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-32 resize-none font-light" 
                   placeholder="Conte o diferencial do seu atendimento..." 
                 />
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>
+                <div className="flex flex-wrap gap-2">
+                  {IDENTITY_DIFFERENTIALS.map(diff => (
+                    <button
+                      key={diff}
+                      type="button"
+                      onClick={() => {
+                        if (differentials.includes(diff)) {
+                          setDifferentials(differentials.filter(d => d !== diff));
+                        } else {
+                          setDifferentials([...differentials, diff]);
+                        }
+                      }}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-[10px] font-medium transition-all border",
+                        differentials.includes(diff)
+                          ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm"
+                          : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                      )}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

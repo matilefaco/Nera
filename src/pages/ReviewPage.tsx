@@ -11,8 +11,20 @@ import {
   ChevronRight, Heart, MessageSquare, ShieldCheck, User
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { cn } from '../lib/utils';
+import { formatCurrency, cn } from '../lib/utils';
 import Logo from '../components/Logo';
+import { UserProfile, Appointment } from '../types';
+
+interface ReviewRequest {
+  id: string;
+  professionalId: string;
+  bookingId: string;
+  token: string;
+  status: 'pending' | 'submitted' | 'expired';
+  clientDisplayName?: string;
+  clientNeighborhood?: string;
+  submittedAt?: string;
+}
 
 const ATTRIBUTES = [
   'Pontualidade',
@@ -30,9 +42,9 @@ export default function ReviewPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [request, setRequest] = useState<any>(null);
-  const [professional, setProfessional] = useState<any>(null);
-  const [booking, setBooking] = useState<any>(null);
+  const [request, setRequest] = useState<ReviewRequest | null>(null);
+  const [professional, setProfessional] = useState<UserProfile | null>(null);
+  const [booking, setBooking] = useState<Appointment | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Form State

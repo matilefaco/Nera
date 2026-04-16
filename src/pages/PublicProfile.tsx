@@ -8,15 +8,25 @@ import {
   CheckCircle2, ChevronRight, ArrowLeft, Sparkles,
   ShieldCheck, Instagram, Heart, Info, MessageCircle,
   ExternalLink, ArrowDown, Star, Share2, Copy,
-  Check, Award, Users, Zap, HelpCircle, Home, Plus, X
+  Check, Award, Users, Zap, HelpCircle, Home, Plus, X, Camera, Building2, Globe
 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
+import { UserProfile, Service, Review, ServiceArea } from '../types';
+
+import { getAvailableSlots } from '../lib/bookingUtils';
 
 // --- Sub-components for the Premium Slug Page ---
 
-const SectionHeading = ({ label, title, subtitle, centered = true }: any) => (
+interface SectionHeadingProps {
+  label: string;
+  title: string;
+  subtitle?: string;
+  centered?: boolean;
+}
+
+const SectionHeading = ({ label, title, subtitle, centered = true }: SectionHeadingProps) => (
   <div className={cn("mb-16", centered ? "text-center" : "text-left")}>
     <span className="label-text mb-4 block">{label}</span>
     <h2 className="heading-section text-brand-ink mb-4">{title}</h2>
@@ -24,9 +34,18 @@ const SectionHeading = ({ label, title, subtitle, centered = true }: any) => (
   </div>
 );
 
-const PremiumButton = ({ children, onClick, variant = 'primary', className, disabled, loading }: any) => {
+interface PremiumButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'terracotta';
+  className?: string;
+  disabled?: boolean;
+  loading?: boolean;
+}
+
+const PremiumButton = ({ children, onClick, variant = 'primary', className, disabled, loading }: PremiumButtonProps) => {
   const baseStyles = "relative overflow-hidden px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] transition-all duration-500 flex items-center justify-center gap-3";
-  const variants: any = {
+  const variants: Record<string, string> = {
     primary: "bg-brand-ink text-brand-white hover:bg-brand-espresso premium-shadow",
     secondary: "bg-brand-white text-brand-ink border border-brand-mist hover:border-brand-ink",
     terracotta: "bg-brand-terracotta text-brand-white hover:bg-brand-sienna premium-shadow",
@@ -49,26 +68,50 @@ const PremiumButton = ({ children, onClick, variant = 'primary', className, disa
 
 export default function PublicProfile() {
   const { slug } = useParams();
-  const [profile, setProfile] = useState<any>(null);
-  const [services, setServices] = useState<any[]>([]);
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [services, setServices] = useState<Service[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [stats, setStats] = useState<any>(null); // Stats type not fully defined yet, keeping any for now
   const [loading, setLoading] = useState(true);
   const servicesRef = useRef<HTMLDivElement>(null);
   const [scrolled, setScrolled] = useState(false);
   
+  // Profile Completeness Logic
+  const profileState = React.useMemo(() => {
+    if (!profile) return null;
+    return {
+      hasBio: !!(profile.bio || profile.professionalIdentity?.bio),
+      hasPortfolio: !!(profile.portfolio && profile.portfolio.length > 0),
+      hasReviews: reviews.length > 0,
+      hasStats: !!(stats?.totalCompletedBookings > 0 || stats?.averageRating || profile.professionalIdentity?.yearsExperience),
+      hasDifferentials: !!(profile.professionalIdentity?.differentials && profile.professionalIdentity.differentials.length > 0),
+      hasServiceAreas: !!(profile.serviceAreas && profile.serviceAreas.length > 0),
+      isNew: reviews.length === 0 && (!stats || stats.totalCompletedBookings < 5)
+    };
+  }, [profile, reviews, stats]);
+
   // Booking Flow State
   const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState<any>(null);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [selectedArea, setSelectedArea] = useState<any>(null);
+  const [selectedArea, setSelectedArea] = useState<ServiceArea | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  const [bookingMode, setBookingMode] = useState<'studio' | 'home' | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [blockedSlots, setBlockedSlots] = useState<string[]>([]);
+
+  const availableSlots = React.useMemo(() => {
+    return getAvailableSlots({
+      selectedDate,
+      selectedService,
+      profile,
+      blockedSlots
+    });
+  }, [selectedDate, selectedService, profile, blockedSlots]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 100);
@@ -83,58 +126,6 @@ export default function PublicProfile() {
         return;
       }
 
-      // Fallback for Demo/Example
-      if (slug === 'helena-prado') {
-        const demoProfile = {
-          uid: 'demo-uid',
-          name: 'Helena Prado',
-          specialty: 'Design de Sobrancelhas e Brow Lamination',
-          city: 'Fortaleza',
-          bio: 'Atendimento em domicílio com experiência premium, foco em naturalidade e acabamento elegante.',
-          avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop',
-          avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop',
-          instagram: 'helenaprado.beauty',
-          whatsapp: '5585999999999',
-          serviceMode: 'home',
-          serviceAreas: [
-            { name: 'Aldeota', fee: 15 },
-            { name: 'Meireles', fee: 15 },
-            { name: 'Cocó', fee: 20 },
-            { name: 'Dionísio Torres', fee: 20 }
-          ],
-          portfolio: [
-            { url: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?q=80&w=1200&auto=format&fit=crop', category: 'Design Perfeito' },
-            { url: 'https://images.unsplash.com/photo-1620331311520-246422fd82f9?q=80&w=1200&auto=format&fit=crop', category: 'Brow Lamination' },
-            { url: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?q=80&w=1200&auto=format&fit=crop', category: 'Close Técnico' },
-            { url: 'https://images.unsplash.com/photo-1580618672591-eb180b1a973f?q=80&w=1200&auto=format&fit=crop', category: 'Processo' },
-            { url: 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?q=80&w=1200&auto=format&fit=crop', category: 'Resultado Final' },
-            { url: 'https://images.unsplash.com/photo-1600948836101-f9ffda59d250?q=80&w=1200&auto=format&fit=crop', category: 'Macro dos Fios' }
-          ]
-        };
-        const demoServices = [
-          { id: 's1', name: 'Design de Sobrancelhas', duration: 50, price: 80, description: 'Mapeamento facial completo e design personalizado.' },
-          { id: 's2', name: 'Brow Lamination', duration: 80, price: 140, description: 'Alinhamento dos fios para um olhar mais marcante e volumoso.' },
-          { id: 's3', name: 'Henna + Design', duration: 70, price: 95, description: 'Preenchimento natural com henna de alta durabilidade.' }
-        ];
-        const demoReviews = [
-          { id: 'r1', firstName: 'Mariana', neighborhood: 'Aldeota', rating: 5, comment: 'A Helena é impecável. O atendimento em domicílio é super prático e ela traz um clima de spa para casa.', serviceName: 'Design Premium', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString() },
-          { id: 'r2', firstName: 'Beatriz', neighborhood: 'Meireles', rating: 5, comment: 'Melhor brow lamination que já fiz! Super natural e duradouro. Recomendo de olhos fechados.', serviceName: 'Brow Lamination', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString() },
-          { id: 'r3', firstName: 'Carla', neighborhood: 'Cocó', rating: 5, comment: 'Profissional extremamente pontual e organizada. O material é todo esterilizado, me senti muito segura.', serviceName: 'Design + Henna', createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString() }
-        ];
-        const demoStats = {
-          averageRating: 4.9,
-          totalReviews: 84,
-          totalCompletedBookings: 320,
-          topTags: ['Pontualidade', 'Delicadeza', 'Organização', 'Resultado natural']
-        };
-        setProfile(demoProfile);
-        setServices(demoServices);
-        setReviews(demoReviews);
-        setStats(demoStats);
-        setLoading(false);
-        return;
-      }
-
       try {
         const q = query(collection(db, 'users'), where('slug', '==', slug));
         const snapshot = await getDocs(q);
@@ -143,6 +134,10 @@ export default function PublicProfile() {
           const userData = snapshot.docs[0].data();
           const professionalId = snapshot.docs[0].id;
           setProfile({ ...userData, uid: professionalId });
+          
+          // Set initial booking mode if not hybrid
+          if (userData.serviceMode === 'home') setBookingMode('home');
+          if (userData.serviceMode === 'studio') setBookingMode('studio');
           
           // Fetch Services
           const servicesQ = query(collection(db, 'services'), 
@@ -203,17 +198,52 @@ export default function PublicProfile() {
 
   useEffect(() => {
     if (selectedDate && profile?.uid) {
-      const fetchBlockedSlots = async () => {
-        const slotsRef = collection(db, 'blocked_slots');
-        const q = query(
-          slotsRef, 
-          where('professionalId', '==', profile.uid),
-          where('date', '==', selectedDate)
-        );
-        const snapshot = await getDocs(q);
-        setBlockedSlots(snapshot.docs.map(doc => doc.data().time));
+      const fetchAvailabilityData = async () => {
+        try {
+          // 1. Fetch manual blocked slots
+          const slotsRef = collection(db, 'blocked_slots');
+          const slotsQ = query(
+            slotsRef, 
+            where('professionalId', '==', profile.uid),
+            where('date', '==', selectedDate)
+          );
+          const slotsSnapshot = await getDocs(slotsQ);
+          const manualBlocked = slotsSnapshot.docs.map(doc => doc.data().time);
+
+          // 2. Fetch confirmed appointments to calculate occupied windows
+          const apptsRef = collection(db, 'appointments');
+          const apptsQ = query(
+            apptsRef,
+            where('professionalId', '==', profile.uid),
+            where('date', '==', selectedDate),
+            where('status', '==', 'confirmed')
+          );
+          const apptsSnapshot = await getDocs(apptsQ);
+          
+          const occupiedSlots = new Set(manualBlocked);
+          
+          apptsSnapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const startStr = data.time; // HH:mm
+            const duration = Number(data.duration) || 60;
+            
+            const [h, m] = startStr.split(':').map(Number);
+            const startTotal = h * 60 + m;
+            
+            // Mark every 30min slot within the appointment duration as blocked
+            for (let t = startTotal; t < startTotal + duration; t += 30) {
+              const hh = Math.floor(t / 60);
+              const mm = t % 60;
+              occupiedSlots.add(`${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`);
+            }
+          });
+
+          setBlockedSlots(Array.from(occupiedSlots));
+        } catch (err) {
+          console.error("[Availability] Error fetching data:", err);
+        }
       };
-      fetchBlockedSlots();
+      fetchAvailabilityData();
     }
   }, [selectedDate, profile?.uid]);
 
@@ -224,32 +254,53 @@ export default function PublicProfile() {
   };
 
   const handleBooking = async () => {
-    if (!profile || !selectedService) return;
+    if (!profile || !selectedService) {
+      console.warn('[Booking] Missing profile or service', { profile: !!profile, service: !!selectedService });
+      return;
+    }
+    
+    // Validation for home service
+    if (isHomeService && !clientAddress.trim()) {
+      toast.error('Por favor, informe o endereço para o atendimento');
+      return;
+    }
+
     setBookingLoading(true);
+    console.log('[Booking] Starting booking process...', {
+      professionalId: profile.uid,
+      service: selectedService.name,
+      date: selectedDate,
+      time: selectedTime,
+      client: clientName
+    });
+
     try {
       const totalPrice = calculateTotalPrice();
-      await createBookingRequest({
+      const bookingId = await createBookingRequest({
         professionalId: profile.uid,
         professionalName: profile.name,
         serviceId: selectedService.id,
         serviceName: selectedService.name,
+        duration: selectedService.duration,
         price: selectedService.price,
         travelFee: selectedArea?.fee || 0,
         totalPrice: totalPrice,
         locationType: isHomeService ? 'home' : 'studio',
         neighborhood: selectedArea?.name || '',
-        address: clientAddress,
-        clientName,
-        clientWhatsapp: clientPhone,
-        clientEmail,
+        address: clientAddress.trim(),
+        clientName: clientName.trim(),
+        clientWhatsapp: clientPhone.replace(/\D/g, ''),
+        clientEmail: clientEmail.trim().toLowerCase(),
         date: selectedDate,
         time: selectedTime,
       });
+      
+      console.log('[Booking] Success! Booking ID:', bookingId);
       setStep(5); // Success
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-      console.error("Booking error:", error);
-      toast.error('Erro ao agendar horário');
+      console.error("[Booking] CRITICAL ERROR:", error);
+      toast.error('Erro ao agendar horário. Por favor, tente novamente.');
     } finally {
       setBookingLoading(false);
     }
@@ -302,7 +353,7 @@ export default function PublicProfile() {
     </div>
   );
 
-  const isHomeService = profile.serviceMode === 'home' || profile.serviceMode === 'hybrid';
+  const isHomeService = bookingMode === 'home';
 
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10">
@@ -367,11 +418,15 @@ export default function PublicProfile() {
           <h1 className="display-hero text-brand-ink mb-6">{profile.name}</h1>
           
           <div className="flex flex-col items-center gap-4 mb-10">
-            <p className="text-[12px] md:text-[14px] font-medium text-brand-stone uppercase tracking-[0.4em]">{profile.specialty || 'Especialista em Beleza'}</p>
+            {profile.specialty && (
+              <p className="text-[12px] md:text-[14px] font-medium text-brand-stone uppercase tracking-[0.4em]">{profile.specialty}</p>
+            )}
             <div className="h-px w-12 bg-brand-mist" />
-            <p className="body-text text-brand-stone max-w-md italic text-lg">
-              "{profile.bio || 'Transformando olhares e elevando a autoestima com atendimento personalizado e exclusivo.'}"
-            </p>
+            {(profile.headline || profile.professionalIdentity?.headline) && (
+              <p className="body-text text-brand-stone max-w-md italic text-lg">
+                "{profile.headline || profile.professionalIdentity?.headline}"
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center justify-center gap-8 mb-16 text-[11px] font-medium uppercase tracking-widest text-brand-stone">
@@ -413,98 +468,149 @@ export default function PublicProfile() {
       </header>
 
       {/* 2. STATUS CARD / TRUST BAR */}
-      <section className="px-6 -mt-12 relative z-20">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
-          {[
-            { label: 'Atendimentos', value: `${stats?.totalCompletedBookings || profile.totalBookings || '320'}+`, icon: Users },
-            { label: 'Avaliação', value: `${stats?.averageRating || '4.9'}/5`, icon: Star },
-            { label: 'Experiência', value: '5 anos', icon: Award },
-            { label: 'Resposta', value: '< 1h', icon: Clock },
-          ].map((stat, i) => (
-            <motion.div 
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="bg-brand-white/80 backdrop-blur-md border border-brand-mist p-6 md:p-8 rounded-[32px] text-center premium-shadow"
-            >
-              <div className="w-10 h-10 bg-brand-linen rounded-2xl flex items-center justify-center text-brand-terracotta mx-auto mb-4">
-                <stat.icon size={20} />
-              </div>
-              <div className="text-2xl font-serif text-brand-ink mb-1">{stat.value}</div>
-              <div className="text-[9px] uppercase tracking-widest text-brand-stone font-medium">{stat.label}</div>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+      {profileState?.hasStats && (
+        <section className="px-6 -mt-12 relative z-20">
+          <div className="max-w-5xl mx-auto flex flex-wrap justify-center gap-4 md:gap-8">
+            {stats?.totalCompletedBookings > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="bg-brand-white/80 backdrop-blur-md border border-brand-mist p-6 md:p-8 rounded-[32px] text-center premium-shadow flex-1 min-w-[140px]"
+              >
+                <div className="w-10 h-10 bg-brand-linen rounded-2xl flex items-center justify-center text-brand-terracotta mx-auto mb-4">
+                  <Users size={20} />
+                </div>
+                <div className="text-2xl font-serif text-brand-ink mb-1">{stats.totalCompletedBookings}+</div>
+                <div className="text-[9px] uppercase tracking-widest text-brand-stone font-medium">Atendimentos</div>
+              </motion.div>
+            )}
+
+            {stats?.averageRating && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="bg-brand-white/80 backdrop-blur-md border border-brand-mist p-6 md:p-8 rounded-[32px] text-center premium-shadow flex-1 min-w-[140px]"
+              >
+                <div className="w-10 h-10 bg-brand-linen rounded-2xl flex items-center justify-center text-brand-terracotta mx-auto mb-4">
+                  <Star size={20} />
+                </div>
+                <div className="text-2xl font-serif text-brand-ink mb-1">{stats.averageRating}/5</div>
+                <div className="text-[9px] uppercase tracking-widest text-brand-stone font-medium">Avaliação</div>
+              </motion.div>
+            )}
+
+            {profile.professionalIdentity?.yearsExperience && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="bg-brand-white/80 backdrop-blur-md border border-brand-mist p-6 md:p-8 rounded-[32px] text-center premium-shadow flex-1 min-w-[140px]"
+              >
+                <div className="w-10 h-10 bg-brand-linen rounded-2xl flex items-center justify-center text-brand-terracotta mx-auto mb-4">
+                  <Award size={20} />
+                </div>
+                <div className="text-2xl font-serif text-brand-ink mb-1">{profile.professionalIdentity.yearsExperience} anos</div>
+                <div className="text-[9px] uppercase tracking-widest text-brand-stone font-medium">Experiência</div>
+              </motion.div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* 2.5 INSIGHTS AGGREGATED (Layer 3) */}
-      {stats && (
+      {profileState?.hasReviews && stats?.topTags && stats.topTags.length > 0 && (
         <section className="pt-24 px-6">
           <div className="max-w-5xl mx-auto flex flex-wrap justify-center gap-6">
-            {stats.topTags?.map((tag: string, i: number) => (
+            {stats.topTags.map((tag: string, i: number) => (
               <div key={i} className="flex items-center gap-3 px-6 py-3 bg-brand-white border border-brand-mist rounded-full shadow-sm">
                 <div className="w-2 h-2 rounded-full bg-brand-terracotta" />
                 <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">{tag}</span>
               </div>
             ))}
-            <div className="flex items-center gap-3 px-6 py-3 bg-brand-linen border border-brand-mist rounded-full shadow-sm">
-              <Heart size={14} className="text-brand-terracotta" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">98% Recomendariam</span>
-            </div>
           </div>
         </section>
       )}
 
       {/* 3. EDITORIAL ABOUT SECTION */}
-      <section className="py-32 px-6 overflow-hidden">
-        <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-          <motion.div 
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="relative"
-          >
-            <div className="aspect-[4/5] rounded-[40px] overflow-hidden border border-brand-mist premium-shadow">
-              <img 
-                src={(profile.portfolio?.[0]?.url || profile.portfolio?.[0]) || (profile.avatar || profile.avatarUrl)} 
-                alt="About" 
-                className="w-full h-full object-cover grayscale-[20%] hover:grayscale-0 transition-all duration-1000"
-                referrerPolicy="no-referrer"
-              />
-            </div>
-            <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-brand-linen rounded-[32px] p-8 hidden md:flex flex-col justify-end border border-brand-mist premium-shadow">
-              <Sparkles size={32} className="text-brand-terracotta mb-4" />
-              <p className="text-xs font-serif italic text-brand-ink">"Beleza é sobre como você se sente por dentro."</p>
-            </div>
-          </motion.div>
-
-          <motion.div 
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-          >
-            <span className="label-text mb-6 block">A Essência</span>
-            <h2 className="heading-section text-brand-ink mb-8">A arte de desenhar olhares com naturalidade.</h2>
-            <div className="space-y-6 body-text text-brand-stone text-lg">
-              <p>
-                Acredito que as sobrancelhas são a moldura do rosto. Meu trabalho é focado em realçar sua expressão através de um design personalizado, respeitando sua anatomia e buscando sempre a harmonia perfeita.
-              </p>
-              <p>
-                Especialista em {profile.specialty || 'Design e Brow Lamination'}, utilizo técnicas avançadas e materiais de alta qualidade para entregar um resultado sofisticado, duradouro e, acima de tudo, natural.
-              </p>
-              <div className="pt-6 flex flex-wrap gap-4">
-                {['Atendimento Exclusivo', 'Produtos Premium', 'Biossegurança', 'Pontualidade'].map((tag, i) => (
-                  <div key={i} className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest text-brand-stone">
-                    <Check size={12} className="text-brand-terracotta" /> {tag}
-                  </div>
-                ))}
+      {profileState?.hasBio && (
+        <section className="py-32 px-6 overflow-hidden">
+          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+            <motion.div 
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="relative"
+            >
+              <div className="aspect-[4/5] rounded-[40px] overflow-hidden border border-brand-mist premium-shadow">
+                <img 
+                  src={(profile.portfolio?.[0]?.url || profile.portfolio?.[0]) || (profile.avatar || profile.avatarUrl)} 
+                  alt="About" 
+                  className="w-full h-full object-cover grayscale-[20%] hover:grayscale-0 transition-all duration-1000"
+                  referrerPolicy="no-referrer"
+                />
               </div>
+            </motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <span className="label-text mb-6 block">Sobre</span>
+              <h2 className="heading-section text-brand-ink mb-8">
+                {profile.headline || profile.professionalIdentity?.headline || `Conheça ${profile.name.split(' ')[0]}`}
+              </h2>
+              <div className="space-y-6 body-text text-brand-stone text-lg">
+                <p className="whitespace-pre-line">
+                  {profile.bio || profile.professionalIdentity?.bio}
+                </p>
+                {profileState.hasDifferentials && (
+                  <div className="pt-6 flex flex-wrap gap-4">
+                    {profile.professionalIdentity?.differentials?.map((tag: string, i: number) => (
+                      <div key={i} className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest text-brand-stone">
+                        <Check size={12} className="text-brand-terracotta" /> {tag}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        </section>
+      )}
+
+      {/* 3.5 ALTERNATIVE TRUST BLOCK (For new profiles) */}
+      {profileState?.isNew && profileState.hasDifferentials && !profileState.hasBio && (
+        <section className="py-32 px-6 bg-brand-white border-y border-brand-mist">
+          <div className="max-w-5xl mx-auto text-center">
+            <SectionHeading 
+              label="Diferenciais" 
+              title="Por que agendar comigo?" 
+              subtitle="Compromisso com a excelência e satisfação em cada detalhe do atendimento."
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+              {profile.professionalIdentity?.differentials?.map((diff: string, i: number) => (
+                <motion.div 
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="p-8 bg-brand-parchment rounded-[32px] border border-brand-mist"
+                >
+                  <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta mx-auto mb-6 shadow-sm">
+                    <Sparkles size={24} />
+                  </div>
+                  <h4 className="text-lg font-serif text-brand-ink mb-2">{diff}</h4>
+                  <p className="text-xs text-brand-stone font-light uppercase tracking-widest">Garantia de Qualidade</p>
+                </motion.div>
+              ))}
             </div>
-          </motion.div>
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       {/* 4. SERVICES SECTION */}
       <section ref={servicesRef} className="py-32 px-6 bg-brand-white border-y border-brand-mist">
@@ -539,7 +645,7 @@ export default function PublicProfile() {
                         )}
                       </div>
                       <p className="body-text text-brand-stone text-sm leading-relaxed max-w-md">
-                        {service.description || 'Um atendimento completo focado em resultados impecáveis e naturais.'}
+                        {service.description}
                       </p>
                     </div>
                     <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2">
@@ -571,77 +677,135 @@ export default function PublicProfile() {
         </div>
       </section>
 
-      {/* 5. REGIONS / LOGISTICS */}
-      {isHomeService && (
-        <section className="py-32 px-6 bg-brand-parchment">
-          <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-            >
-              <span className="label-text mb-6 block">Logística & Conforto</span>
-              <h2 className="heading-section text-brand-ink mb-8">O luxo de ser atendida no conforto do seu lar.</h2>
-              <p className="body-text text-brand-stone text-lg mb-10">
-                Levo toda a estrutura necessária para proporcionar uma experiência de salão premium dentro da sua casa. Organização, higiene e pontualidade são meus pilares.
-              </p>
-              
-              <div className="space-y-4">
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink mb-6">Regiões Atendidas em {profile.city}</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {profile.serviceAreas?.map((area: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-brand-white border border-brand-mist rounded-2xl">
-                      <span className="text-sm font-medium text-brand-ink">{area.name}</span>
-                      <span className="text-[10px] text-brand-stone italic">+{formatCurrency(area.fee)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="bg-brand-white p-12 rounded-[40px] border border-brand-mist premium-shadow relative"
-            >
-              <div className="absolute -top-6 -left-6 w-16 h-16 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center shadow-xl">
-                <Home size={32} />
-              </div>
-              <h3 className="text-2xl font-serif text-brand-ink mb-8">Como funciona?</h3>
-              <ul className="space-y-6">
-                {[
-                  { title: 'Agendamento', desc: 'Escolha seu serviço e horário aqui na página.' },
-                  { title: 'Confirmação', desc: 'Receba os detalhes e orientações via WhatsApp.' },
-                  { title: 'Atendimento', desc: 'Chego no horário com todo o material necessário.' },
-                  { title: 'Finalização', desc: 'Pagamento facilitado após sua total satisfação.' },
-                ].map((item, i) => (
-                  <li key={i} className="flex gap-4">
-                    <div className="w-6 h-6 rounded-full bg-brand-linen text-brand-terracotta flex items-center justify-center text-[10px] font-bold shrink-0">{i + 1}</div>
-                    <div>
-                      <div className="text-sm font-medium text-brand-ink mb-1">{item.title}</div>
-                      <div className="text-xs text-brand-stone font-light">{item.desc}</div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
+      {/* 5. REGIONS / LOGISTICS / STUDIO ADDRESS */}
+      <section className="py-32 px-6 bg-brand-white border-y border-brand-mist">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center space-y-4 mb-20">
+            <span className="label-text block">Localização & Atendimento</span>
+            <h2 className="heading-section text-brand-ink">Aonde você deseja ser atendida?</h2>
           </div>
-        </section>
-      )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+            {/* Studio Card */}
+            {(profile.serviceMode === 'studio' || profile.serviceMode === 'hybrid') && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="bg-brand-parchment p-10 rounded-[40px] border border-brand-mist relative group overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-8 text-brand-mist group-hover:text-brand-terracotta/20 transition-colors">
+                  <Building2 size={80} />
+                </div>
+                <div className="relative z-10 flex flex-col h-full">
+                  <div className="w-14 h-14 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center mb-8 shadow-lg">
+                    <MapPin size={28} />
+                  </div>
+                  <h3 className="text-2xl font-serif text-brand-ink mb-6">Atendimento no Estúdio</h3>
+                  <div className="space-y-4 mb-10 flex-1">
+                    <p className="text-brand-stone font-light leading-relaxed">
+                      Conheça o nosso espaço preparado com todo carinho para te receber com segurança, conforto e privacidade.
+                    </p>
+                    <div className="pt-6 border-t border-brand-mist/50">
+                      <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest mb-2">Endereço</p>
+                      <p className="text-brand-ink font-medium leading-relaxed">
+                        {profile.studioAddress?.street}, {profile.studioAddress?.number}
+                        {profile.studioAddress?.complement && <span className="block italic font-light text-brand-stone">{profile.studioAddress.complement}</span>}
+                        <span className="block">{profile.studioAddress?.neighborhood} — {profile.studioAddress?.city}</span>
+                      </p>
+                      {profile.studioAddress?.reference && (
+                        <p className="mt-3 text-[11px] text-brand-stone italic flex items-start gap-2">
+                          <Info size={12} className="mt-0.5" /> Ref: {profile.studioAddress.reference}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <PremiumButton 
+                    variant="secondary" 
+                    className="w-full"
+                    onClick={() => {
+                      document.getElementById('booking-section')?.scrollIntoView({ behavior: 'smooth' });
+                      setStep(1);
+                      if (profile.serviceMode === 'hybrid') setBookingMode('studio');
+                    }}
+                  >
+                    Agendar no Estúdio
+                  </PremiumButton>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Home Service Card */}
+            {(profile.serviceMode === 'home' || profile.serviceMode === 'hybrid') && (
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="bg-brand-linen p-10 rounded-[40px] border border-brand-mist relative group overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-8 text-brand-mist group-hover:text-brand-terracotta/20 transition-colors">
+                  <Home size={80} />
+                </div>
+                <div className="relative z-10 flex flex-col h-full">
+                  <div className="w-14 h-14 bg-brand-terracotta text-brand-white rounded-2xl flex items-center justify-center mb-8 shadow-lg">
+                    <Globe size={28} />
+                  </div>
+                  <h3 className="text-2xl font-serif text-brand-ink mb-6">Atendimento em Domicílio</h3>
+                  <div className="space-y-4 mb-10 flex-1">
+                    <p className="text-brand-stone font-light leading-relaxed">
+                      {profile.serviceAreaType === 'city_wide' 
+                        ? `Atendimento VIP em todo o território de ${profile.city}. Levamos toda a estrutura necessária até você.`
+                        : `Atendimento exclusivo em bairros selecionados de ${profile.city}. Conforto e praticidade.`}
+                    </p>
+                    
+                    <div className="pt-6 border-t border-brand-mist/50">
+                      <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest mb-4">Regiões Atendidas</p>
+                      {profile.serviceAreaType === 'city_wide' ? (
+                        <div className="flex items-center gap-3 p-4 bg-brand-white/50 rounded-2xl border border-brand-mist/30">
+                          <CheckCircle2 size={16} className="text-green-600" />
+                          <span className="text-sm font-medium text-brand-ink">Toda a cidade de {profile.city}</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {profile.serviceAreas?.map((area: any) => (
+                            <span key={area.name} className="px-4 py-2 bg-brand-white/50 border border-brand-mist/30 rounded-xl text-xs font-medium text-brand-ink">
+                              {area.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <PremiumButton 
+                    variant="primary" 
+                    className="w-full"
+                    onClick={() => {
+                      document.getElementById('booking-section')?.scrollIntoView({ behavior: 'smooth' });
+                      setStep(1);
+                      if (profile.serviceMode === 'hybrid') setBookingMode('home');
+                    }}
+                  >
+                    Agendar em Casa
+                  </PremiumButton>
+                </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* 6. EDITORIAL PORTFOLIO GRID */}
-      {profile.portfolio && profile.portfolio.length > 0 && (
-        <section className="py-32 px-6 bg-brand-white overflow-hidden">
-          <div className="max-w-6xl mx-auto">
-            <SectionHeading 
-              label="O Olhar em Detalhes" 
-              title="Resultados com Precisão" 
-              subtitle="Naturalidade, definição e acabamento elegante em cada design."
-            />
+      <section className="py-32 px-6 bg-brand-white overflow-hidden">
+        <div className="max-w-6xl mx-auto">
+          <SectionHeading 
+            label="O Olhar em Detalhes" 
+            title="Resultados com Precisão" 
+            subtitle="Naturalidade, definição e acabamento elegante em cada design."
+          />
 
+          {profileState?.hasPortfolio ? (
             <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-8">
-              {profile.portfolio.map((item: any, i: number) => {
+              {profile.portfolio?.map((item: any, i: number) => {
                 const imageUrl = typeof item === 'string' ? item : item.url;
                 const category = typeof item === 'string' ? '' : item.category;
                 
@@ -669,18 +833,26 @@ export default function PublicProfile() {
                 );
               })}
             </div>
-          </div>
-        </section>
-      )}
+          ) : (
+            <div className="max-w-2xl mx-auto py-24 text-center border border-dashed border-brand-mist rounded-[40px] bg-brand-parchment/30">
+              <div className="w-16 h-16 bg-brand-white rounded-2xl flex items-center justify-center text-brand-mist mx-auto mb-6 shadow-sm">
+                <Camera size={32} strokeWidth={1} />
+              </div>
+              <h3 className="text-xl font-serif text-brand-ink mb-2">Portfólio em atualização</h3>
+              <p className="text-xs text-brand-stone font-medium uppercase tracking-widest">Novos trabalhos serão adicionados em breve.</p>
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* 7. PROVA SOCIAL / TESTIMONIALS (Layer 2) */}
-      <section className="py-32 px-6 bg-brand-linen/30">
-        <div className="max-w-5xl mx-auto">
-          <SectionHeading label="Experiências" title="O que elas dizem" subtitle="Avaliações reais de clientes que já vivenciaram a experiência Nera." />
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {reviews.length > 0 ? (
-              reviews.slice(0, 6).map((review, i) => (
+      {reviews.length > 0 && (
+        <section className="py-32 px-6 bg-brand-linen/30">
+          <div className="max-w-5xl mx-auto">
+            <SectionHeading label="Experiências" title="O que elas dizem" subtitle="Avaliações reais de clientes que já vivenciaram a experiência." />
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {reviews.slice(0, 6).map((review, i) => (
                 <motion.div 
                   key={review.id}
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -699,7 +871,9 @@ export default function PublicProfile() {
                       />
                     ))}
                   </div>
-                  <p className="body-text text-brand-ink italic mb-8">"{review.comment || 'Atendimento impecável e muito profissional.'}"</p>
+                  {review.comment && (
+                    <p className="body-text text-brand-ink italic mb-8">"{review.comment}"</p>
+                  )}
                   <div className="flex items-center justify-between pt-6 border-t border-brand-mist">
                     <div className="flex flex-col">
                       <span className="text-sm font-serif text-brand-ink">
@@ -712,15 +886,11 @@ export default function PublicProfile() {
                     <span className="text-[9px] uppercase tracking-widest text-brand-stone text-right">{review.serviceName}</span>
                   </div>
                 </motion.div>
-              ))
-            ) : (
-              <div className="col-span-full py-24 text-center">
-                <p className="text-brand-stone font-serif italic text-lg">Ainda não há avaliações públicas.</p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* 8. DISPONIBILIDADE / CTA FINAL */}
       <section className="py-32 px-6 bg-brand-ink text-brand-white relative overflow-hidden">
@@ -734,10 +904,9 @@ export default function PublicProfile() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <span className="text-[10px] font-medium uppercase tracking-[0.4em] text-brand-terracotta mb-8 block">Agenda Aberta</span>
             <h2 className="text-[42px] md:text-[56px] font-serif font-normal mb-10 leading-tight">Pronta para sua transformação?</h2>
             <p className="text-brand-blush/60 text-lg md:text-xl mb-12 max-w-xl mx-auto font-light">
-              Poucos horários disponíveis para esta semana. Garanta sua vaga e desfrute de um atendimento exclusivo.
+              Garanta sua vaga e desfrute de um atendimento exclusivo.
             </p>
             
             <div className="flex flex-col items-center gap-8">
@@ -755,32 +924,6 @@ export default function PublicProfile() {
               </div>
             </div>
           </motion.div>
-        </div>
-      </section>
-
-      {/* 9. FAQ SECTION */}
-      <section className="py-32 px-6 bg-brand-white">
-        <div className="max-w-3xl mx-auto">
-          <SectionHeading label="Dúvidas" title="Perguntas Frequentes" />
-          
-          <div className="space-y-4">
-            {[
-              { q: 'Como funciona o atendimento em domicílio?', a: 'Levo toda a estrutura (maca, iluminação, materiais) até você. Só preciso de um espaço pequeno e iluminado.' },
-              { q: 'Quais as formas de pagamento?', a: 'Aceito PIX, Cartão de Crédito e Débito no momento do atendimento.' },
-              { q: 'Posso remarcar meu horário?', a: 'Sim, com até 24h de antecedência sem custo adicional.' },
-              { q: 'Quanto tempo dura o procedimento?', a: 'Varia entre 50 min a 1h30 dependendo do serviço escolhido.' },
-            ].map((item, i) => (
-              <details key={i} className="group bg-brand-parchment rounded-[24px] border border-brand-mist overflow-hidden transition-all">
-                <summary className="flex items-center justify-between p-8 cursor-pointer list-none">
-                  <span className="text-sm font-medium text-brand-ink">{item.q}</span>
-                  <Plus size={18} className="text-brand-terracotta group-open:rotate-45 transition-transform" />
-                </summary>
-                <div className="px-8 pb-8 text-sm text-brand-stone font-light leading-relaxed">
-                  {item.a}
-                </div>
-              </details>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -870,64 +1013,105 @@ export default function PublicProfile() {
 
                   {selectedDate && (
                     <div className="grid grid-cols-3 gap-3">
-                      {['09:00', '10:30', '13:00', '14:30', '16:00', '17:30'].map(time => {
-                        const isBlocked = blockedSlots.includes(time);
-                        return (
+                      {availableSlots.length > 0 ? (
+                        availableSlots.map(time => (
                           <button 
                             key={time}
-                            disabled={isBlocked}
                             onClick={() => { setSelectedTime(time); setStep(3); }}
-                            className={cn(
-                              "py-4 rounded-xl border text-sm font-medium transition-all",
-                              isBlocked 
-                                ? "bg-brand-mist/20 border-transparent text-brand-stone/40 cursor-not-allowed line-through" 
-                                : "bg-brand-parchment border-brand-mist hover:border-brand-ink"
-                            )}
+                            className="py-4 rounded-xl border border-brand-mist text-sm font-medium text-brand-ink hover:border-brand-ink hover:bg-brand-linen transition-all"
                           >
                             {time}
                           </button>
-                        );
-                      })}
+                        ))
+                      ) : (
+                        <div className="col-span-3 py-10 text-center bg-brand-parchment rounded-2xl border border-dashed border-brand-mist">
+                          <p className="text-sm text-brand-stone font-light">Não há horários disponíveis nesta data.</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </motion.div>
               )}
 
-              {/* Step 3: Location */}
+              {/* Step 3: Location Selection / Details */}
               {step === 3 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                   <h3 className="text-2xl font-serif text-brand-ink mb-2">Local do Atendimento</h3>
                   <p className="text-xs text-brand-stone font-light mb-10">Onde a mágica vai acontecer?</p>
                   
-                  {isHomeService ? (
-                    <div className="space-y-3">
-                      {profile.serviceAreas?.map((area: any) => (
-                        <button 
-                          key={area.name}
-                          onClick={() => { setSelectedArea(area); setStep(4); }}
-                          className="w-full p-6 bg-brand-parchment border border-brand-mist rounded-2xl text-left flex justify-between items-center hover:border-brand-ink transition-all"
-                        >
-                          <div>
-                            <span className="font-medium block">{area.name}</span>
-                            <span className="text-[10px] text-brand-stone italic">Taxa de deslocamento: {formatCurrency(area.fee)}</span>
-                          </div>
-                          <ChevronRight size={18} className="text-brand-mist" />
-                        </button>
-                      ))}
+                  {profile.serviceMode === 'hybrid' && !bookingMode ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <button 
+                        onClick={() => setBookingMode('studio')}
+                        className="p-8 bg-brand-white border border-brand-mist rounded-[32px] text-center hover:border-brand-ink transition-all group"
+                      >
+                        <Building2 size={32} className="text-brand-terracotta mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                        <span className="font-medium block mb-1">No Estúdio</span>
+                        <span className="text-[10px] text-brand-stone font-light leading-tight">Vou até o estúdio da profissional.</span>
+                      </button>
+                      <button 
+                        onClick={() => setBookingMode('home')}
+                        className="p-8 bg-brand-white border border-brand-mist rounded-[32px] text-center hover:border-brand-ink transition-all group"
+                      >
+                        <Home size={32} className="text-brand-terracotta mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                        <span className="font-medium block mb-1">Em Domicílio</span>
+                        <span className="text-[10px] text-brand-stone font-light leading-tight">Desejo ser atendida no meu endereço.</span>
+                      </button>
                     </div>
                   ) : (
-                    <div className="bg-brand-parchment p-8 rounded-2xl border border-brand-mist text-center">
-                      <MapPin size={24} className="text-brand-terracotta mx-auto mb-4" />
-                      <p className="text-sm text-brand-ink font-medium mb-2">Atendimento no Estúdio</p>
-                      <p className="text-xs text-brand-stone font-light mb-8">
-                        {profile.serviceMode === 'home' 
-                          ? `Atendimento em domicílio em ${profile.city}` 
-                          : profile.studioAddress 
-                            ? `${profile.studioAddress.street}, ${profile.studioAddress.number}${profile.studioAddress.complement ? ` - ${profile.studioAddress.complement}` : ''}, ${profile.studioAddress.neighborhood}, ${profile.studioAddress.city}`
-                            : profile.address || profile.city}
-                      </p>
-                      <PremiumButton onClick={() => setStep(4)} className="w-full">Confirmar Local</PremiumButton>
-                    </div>
+                    <>
+                      {isHomeService ? (
+                        <div className="space-y-3">
+                          {profile.serviceAreaType === 'city_wide' ? (
+                            <div className="bg-brand-parchment p-8 rounded-2xl border border-brand-mist text-center">
+                              <MapPin size={24} className="text-brand-terracotta mx-auto mb-4" />
+                              <p className="text-sm text-brand-ink font-medium mb-2">Atendimento em domicílio</p>
+                              <p className="text-xs text-brand-stone font-light mb-8">
+                                Atendimento em qualquer bairro de {profile.city}.
+                              </p>
+                              <PremiumButton onClick={() => { setSelectedArea({ name: profile.city || '', fee: 0 }); setStep(4); }} className="w-full">Confirmar Cidade</PremiumButton>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-4 ml-1">Selecione seu bairro:</p>
+                              {profile.serviceAreas?.map((area: any) => (
+                                <button 
+                                  key={area.name}
+                                  onClick={() => { setSelectedArea(area); setStep(4); }}
+                                  className="w-full p-6 bg-brand-parchment border border-brand-mist rounded-2xl text-left flex justify-between items-center hover:border-brand-ink transition-all"
+                                >
+                                  <div>
+                                    <span className="font-medium block">{area.name}</span>
+                                    {area.fee > 0 && <span className="text-[10px] text-brand-stone italic">Taxa de deslocamento: {formatCurrency(area.fee)}</span>}
+                                  </div>
+                                  <ChevronRight size={18} className="text-brand-mist" />
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-brand-parchment p-8 rounded-2xl border border-brand-mist text-center">
+                          <MapPin size={24} className="text-brand-terracotta mx-auto mb-4" />
+                          <p className="text-sm text-brand-ink font-medium mb-2">Atendimento no Estúdio</p>
+                          <p className="text-xs text-brand-stone font-light mb-8 italic">
+                            {profile.studioAddress 
+                              ? `${profile.studioAddress.street}, ${profile.studioAddress.number}${profile.studioAddress.complement ? ` - ${profile.studioAddress.complement}` : ''}, ${profile.studioAddress.neighborhood}, ${profile.studioAddress.city}`
+                              : profile.address || profile.city}
+                          </p>
+                          <PremiumButton onClick={() => setStep(4)} className="w-full">Confirmar Estúdio</PremiumButton>
+                        </div>
+                      )}
+                      
+                      {profile.serviceMode === 'hybrid' && (
+                        <button 
+                          onClick={() => setBookingMode(null)}
+                          className="w-full mt-6 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
+                        >
+                          Alterar modalidade de atendimento
+                        </button>
+                      )}
+                    </>
                   )}
                 </motion.div>
               )}
@@ -969,6 +1153,22 @@ export default function PublicProfile() {
                         className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
                       />
                     </div>
+
+                    {isHomeService && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="space-y-1"
+                      >
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Endereço Completo (Rua, nº, apto)</label>
+                        <textarea 
+                          value={clientAddress}
+                          onChange={(e) => setClientAddress(e.target.value)}
+                          placeholder="Ex: Rua Silva Jatahy, 123 - Apto 402"
+                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm h-24 resize-none"
+                        />
+                      </motion.div>
+                    )}
                   </div>
 
                   <div className="bg-brand-linen/50 p-8 rounded-3xl border border-brand-mist mb-10">
@@ -989,7 +1189,7 @@ export default function PublicProfile() {
                   <PremiumButton 
                     onClick={handleBooking} 
                     loading={bookingLoading}
-                    disabled={!clientName || !clientPhone || !clientEmail}
+                    disabled={!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)}
                     className="w-full py-6"
                   >
                     Finalizar Agendamento

@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { formatCurrency } from '../lib/utils';
 import Logo from '../components/Logo';
 import MobileNav from '../components/MobileNav';
+import { Appointment } from '../types';
 
 export default function ClientsPage() {
   const { user } = useAuth();
@@ -29,36 +30,50 @@ export default function ClientsPage() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const appointments = snapshot.docs.map(doc => doc.data());
-      
-      // Aggregate by phone (unique identifier for client in this simple model)
-      const clientMap = new Map();
-      
-      appointments.forEach((app: any) => {
-        const key = app.clientPhone;
-        if (!clientMap.has(key)) {
-          clientMap.set(key, {
-            name: app.clientName,
-            phone: app.clientPhone,
-            totalSpent: 0,
-            appointmentsCount: 0,
-            lastAppointment: app.date,
-            services: new Set()
-          });
-        }
+      try {
+        const appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
         
-        const client = clientMap.get(key);
-        if (app.status === 'confirmed') {
-          client.totalSpent += (app.price || 0);
-        }
-        client.appointmentsCount += 1;
-        client.services.add(app.serviceName);
-        if (new Date(app.date) > new Date(client.lastAppointment)) {
-          client.lastAppointment = app.date;
-        }
-      });
+        // Aggregate by phone (unique identifier for client)
+        const clientMap = new Map();
+        
+        appointments.forEach((app) => {
+          const key = app.clientWhatsapp || 'unknown';
+          if (!clientMap.has(key)) {
+            clientMap.set(key, {
+              name: app.clientName || 'Cliente sem nome',
+              phone: app.clientWhatsapp || '',
+              email: app.clientEmail || '',
+              totalSpent: 0,
+              appointmentsCount: 0,
+              lastAppointment: app.date,
+              services: new Set<string>()
+            });
+          }
+          
+          const client = clientMap.get(key);
+          if (app.status === 'confirmed') {
+            client.totalSpent += (app.price || 0);
+          }
+          client.appointmentsCount += 1;
+          if (app.serviceName) client.services.add(app.serviceName);
+          
+          try {
+            if (new Date(app.date) > new Date(client.lastAppointment)) {
+              client.lastAppointment = app.date;
+            }
+          } catch {
+            // Ignore date errors
+          }
+        });
 
-      setClients(Array.from(clientMap.values()).sort((a, b) => b.totalSpent - a.totalSpent));
+        const aggregatedClients = Array.from(clientMap.values())
+          .map(c => ({ ...c, servicesList: Array.from(c.services) }))
+          .sort((a, b) => b.totalSpent - a.totalSpent);
+          
+        setClients(aggregatedClients);
+      } catch (err) {
+        console.error('[ClientsPage] Error aggregating clients:', err);
+      }
     });
 
     return () => unsubscribe();

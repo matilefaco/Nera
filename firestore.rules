@@ -104,7 +104,7 @@ service cloud.firestore {
              data.clientWhatsapp is string && data.clientWhatsapp.size() >= 10 &&
              data.clientEmail is string && data.clientEmail.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
              data.date is string && data.time is string &&
-             data.status in ['pending_confirmation', 'confirmed', 'declined', 'cancelled', 'completed', 'expired'];
+             data.status in ['pending', 'confirmed', 'declined', 'cancelled', 'completed', 'expired'];
     }
 
     // Rules
@@ -131,7 +131,7 @@ service cloud.firestore {
 
     match /appointments/{appointmentId} {
       allow read: if true; // Publicly readable for availability check (PII should be handled carefully)
-      allow create: if isValidAppointment(request.resource.data) && request.resource.data.status == 'pending_confirmation';
+      allow create: if isValidAppointment(request.resource.data) && request.resource.data.status == 'pending';
       allow update: if (isAuthenticated() && (request.auth.uid == resource.data.professionalId || isAdmin())) ||
                     (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) && request.resource.data.status == 'cancelled');
       allow delete: if isAdmin();

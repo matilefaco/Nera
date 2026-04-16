@@ -4,8 +4,21 @@ import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import dotenv from "dotenv";
+import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import { sendNewBookingEmail } from "./src/services/emailService.ts";
+import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
 dotenv.config();
+
+// Initialize Firebase Admin
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId,
+  });
+}
+
+const db = getFirestore(firebaseConfig.firestoreDatabaseId);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,28 +37,67 @@ async function startServer() {
 
   /**
    * Notification Endpoint
-   * Handles sending emails and (placeholder) WhatsApp messages.
-   * In a real production app, this would use Resend/SendGrid and Twilio/Meta API.
+   * Handles sending real emails via Resend.
    */
   app.post("/api/notify", async (req, res) => {
     const { type, payload } = req.body;
     
     console.log(`[Notification Service] Processing ${type}...`);
-    console.log(`[Notification Service] Payload:`, JSON.stringify(payload, null, 2));
-
-    // MOCK IMPLEMENTATION
-    // In a real scenario, you would use:
-    // const resend = new Resend(process.env.RESEND_API_KEY);
-    // await resend.emails.send({ ... });
     
-    // For now, we simulate the delay and log the "sent" message
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      if (type === 'NEW_BOOKING_REQUEST') {
+        const { professionalId, clientName, serviceName, date, time, locationType, neighborhood, totalPrice, appointmentId } = payload;
+        
+        console.log(`[Booking] New request detected for professional: ${professionalId}`);
 
-    res.json({ 
-      success: true, 
-      message: `Notification of type ${type} processed successfully.`,
-      channel: "Email & WhatsApp (Simulated)"
-    });
+        // 1. Fetch professional email from Firestore
+        const userDoc = await db.collection('users').doc(professionalId).get();
+        if (!userDoc.exists) {
+          throw new Error(`Professional ${professionalId} not found`);
+        }
+        
+        const professionalData = userDoc.data();
+        const professionalEmail = professionalData?.email;
+
+        if (!professionalEmail) {
+          throw new Error(`Professional ${professionalId} has no email configured`);
+        }
+
+        // 2. Format location
+        const location = locationType === 'home' ? `Domicílio (${neighborhood})` : 'Estúdio / Local Fixo';
+
+        // 3. Send real email
+        console.log(`[Email] Sending real notification to ${professionalEmail}`);
+        await sendNewBookingEmail({
+          clientName,
+          serviceName,
+          date,
+          time,
+          location,
+          totalPrice: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPrice || 0),
+          professionalEmail,
+          bookingId: appointmentId
+        });
+
+        console.log(`[Email] Send success for booking ${appointmentId}`);
+        
+        return res.json({ 
+          success: true, 
+          message: "Email notification sent successfully via Resend."
+        });
+      }
+
+      // Fallback for other types (can be implemented later)
+      console.log(`[Notification Service] Type ${type} not explicitly handled yet, but acknowledged.`);
+      res.json({ success: true, message: "Notification acknowledged." });
+
+    } catch (error: any) {
+      console.error(`[Notification Service] ERROR:`, error.message);
+      res.status(500).json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
   });
 
   // Vite middleware for development
