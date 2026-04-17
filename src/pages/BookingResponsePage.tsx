@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, respondToBookingRequest } from '../firebase';
+import { db, updateAppointmentStatus, handleBookingError } from '../firebase';
 import { motion } from 'motion/react';
 import { Check, X, Calendar, Clock, User, MessageCircle, MapPin, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ export default function BookingResponsePage() {
   const [appointment, setAppointment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<'confirmed' | 'declined' | null>(null);
+  const [result, setResult] = useState<'confirmed' | 'cancelled' | null>(null);
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -24,8 +24,8 @@ export default function BookingResponsePage() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setAppointment(data);
-          if (data.status !== 'pending_confirmation') {
-            setResult(data.status === 'confirmed' ? 'confirmed' : 'declined');
+          if (data.status !== 'pending') {
+            setResult(data.status === 'confirmed' ? 'confirmed' : 'cancelled');
           }
         }
       } catch (error) {
@@ -39,16 +39,15 @@ export default function BookingResponsePage() {
     fetchAppointment();
   }, [appointmentId]);
 
-  const handleResponse = async (decision: 'confirmed' | 'declined') => {
+  const handleResponse = async (decision: 'confirmed' | 'cancelled') => {
     if (!appointmentId) return;
     setProcessing(true);
     try {
-      await respondToBookingRequest(appointmentId, decision);
+      await updateAppointmentStatus(appointmentId, decision);
       setResult(decision);
       toast.success(decision === 'confirmed' ? 'Agendamento confirmado!' : 'Agendamento recusado.');
     } catch (error: any) {
-      console.error('Error responding to booking:', error);
-      toast.error(error.message || 'Erro ao processar resposta');
+      handleBookingError(error);
     } finally {
       setProcessing(false);
     }
@@ -192,7 +191,7 @@ export default function BookingResponsePage() {
             {processing ? 'Processando...' : <><Check size={20} /> Confirmar Horário</>}
           </button>
           <button
-            onClick={() => handleResponse('declined')}
+            onClick={() => handleResponse('cancelled')}
             disabled={processing}
             className="w-full py-6 bg-brand-white text-brand-stone border border-brand-mist rounded-2xl font-medium flex items-center justify-center gap-3 hover:bg-brand-parchment transition-all disabled:opacity-50"
           >

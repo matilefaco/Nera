@@ -4,76 +4,99 @@
  * Baseia-se no expediente da profissional, duração do serviço e bloqueios existentes.
  */
 
+import { Appointment, WorkingHours } from '../types';
+
 interface GetAvailableSlotsParams {
   selectedDate: string; // YYYY-MM-DD
-  selectedService: {
-    duration: number; // em minutos
-  } | null;
-  profile: {
-    startTime: string; // HH:mm
-    endTime: string; // HH:mm
-    workingDays: number[]; // [0, 1, 2, 3, 4, 5, 6] onde 0 é domingo
-  } | null;
-  blockedSlots: string[]; // ['09:00', '10:30', ...]
+  serviceDuration: number; // em minutos
+  workingHours: WorkingHours;
+  appointments: Appointment[];
+  manualBlockedSlots?: string[]; // HH:mm (opcional)
 }
 
+/**
+ * Calcula os horários disponíveis para um agendamento.
+ * Refatorado para ser tecnicamente robusto, evitando sobreposições e respeitando durações.
+ */
 export function getAvailableSlots({
   selectedDate,
-  selectedService,
-  profile,
-  blockedSlots
+  serviceDuration,
+  workingHours,
+  appointments,
+  manualBlockedSlots = []
 }: GetAvailableSlotsParams): string[] {
-  if (!selectedDate || !selectedService || !profile) return [];
+  // 1. Validação básica de entrada
+  if (!selectedDate || !serviceDuration || !workingHours) return [];
+  
+  const startTime = workingHours.startTime || '09:00';
+  const endTime = workingHours.endTime || '18:00';
+  const workingDays = workingHours.workingDays || [1, 2, 3, 4, 5];
 
+  // 2. Verificar se o dia da semana é trabalhado
   const date = new Date(selectedDate + 'T00:00:00');
   const dayOfWeek = date.getDay();
-
-  const startTime = profile.startTime || '09:00';
-  const endTime = profile.endTime || '18:00';
-  const workingDays = profile.workingDays || [1, 2, 3, 4, 5];
-
-  // REGRA A: Não exibir dia indisponível
   if (!workingDays.includes(dayOfWeek)) {
     return [];
   }
 
-  const slots: string[] = [];
+  // 3. Converter horários de expediente para minutos totais desde 00:00
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
-
   const startTotalMinutes = startHour * 60 + startMin;
   const endTotalMinutes = endHour * 60 + endMin;
-  const serviceDuration = Number(selectedService.duration);
 
-  // Gerar slots de 30 em 30 minutos
-  for (let current = startTotalMinutes; current < endTotalMinutes; current += 30) {
-    // REGRA B & D: O serviço deve terminar antes do fim do expediente
-    if (current + serviceDuration > endTotalMinutes) {
-      break;
+  // 4. Mapear janelas ocupadas (appointments ativos + bloqueios manuais)
+  const occupiedSegments: { start: number; end: number }[] = [];
+
+  // Adicionar appointments (apenas os que estão confirmados ou concluídos)
+  appointments.forEach(appt => {
+    if (['confirmed', 'completed'].includes(appt.status)) {
+      const [h, m] = appt.time.split(':').map(Number);
+      const start = h * 60 + m;
+      const duration = Number(appt.duration) || 60;
+      occupiedSegments.push({ start, end: start + duration });
     }
+  });
 
-    const hours = Math.floor(current / 60);
-    const minutes = current % 60;
-    const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  // Adicionar bloqueios manuais (considerados como janelas de 30min ou pontos de bloqueio)
+  manualBlockedSlots.forEach(timeStr => {
+    const [h, m] = timeStr.split(':').map(Number);
+    const start = h * 60 + m;
+    occupiedSegments.push({ start, end: start + 30 });
+  });
 
-    // REGRA C: Remover horários bloqueados
-    // Verificamos se o slot inicial ou qualquer intervalo de 30min dentro da duração do serviço está bloqueado
-    let isBlocked = false;
-    for (let check = current; check < current + serviceDuration; check += 30) {
-      const checkH = Math.floor(check / 60);
-      const checkM = check % 60;
-      const checkStr = `${checkH.toString().padStart(2, '0')}:${checkM.toString().padStart(2, '0')}`;
-      
-      if (blockedSlots.includes(checkStr)) {
-        isBlocked = true;
-        break;
-      }
-    }
+  const freeSlots: string[] = [];
+  const now = new Date();
+  const isToday = selectedDate === now.toISOString().split('T')[0];
+  const currentMinutesNow = now.getHours() * 60 + now.getMinutes();
 
-    if (!isBlocked) {
-      slots.push(timeString);
+  // 5. Gerar slots baseados na duração (step) e validar
+  // A regra solicita que os slots avancem de acordo com a duração (ex: 14:00, 15:00 para 60min)
+  const step = serviceDuration;
+  
+  for (let current = startTotalMinutes; current < endTotalMinutes; current += step) {
+    const proposedEnd = current + serviceDuration;
+
+    // REGRA: O serviço deve terminar antes do fim do expediente
+    if (proposedEnd > endTotalMinutes) break;
+
+    // REGRA: Não mostrar horários passados se for hoje
+    if (isToday && current <= currentMinutesNow + 30) continue; // +30min de margem para agendamento
+
+    // REGRA: O slot não pode sobrepor nenhuma janela ocupada
+    const hasOverlap = occupiedSegments.some(seg => {
+      // Condição de sobreposição: max(start1, start2) < min(end1, end2)
+      return Math.max(current, seg.start) < Math.min(proposedEnd, seg.end);
+    });
+
+    if (!hasOverlap) {
+      const hours = Math.floor(current / 60);
+      const minutes = current % 60;
+      const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      freeSlots.push(timeString);
     }
   }
 
-  return slots;
+  // Garantir unicidade e ordenação (embora o loop já garanta por natureza)
+  return Array.from(new Set(freeSlots)).sort();
 }

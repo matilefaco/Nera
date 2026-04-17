@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { db, auth, storage, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem, deletePortfolioItem } from '../firebase';
-import { doc, updateDoc, collection, addDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, addDoc, setDoc, deleteDoc, query, orderBy, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
   User, MapPin, Home, Building2, Briefcase, 
@@ -15,6 +15,9 @@ import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
 import { generateSlug, formatCurrency, cn, removeEmptyFields } from '../lib/utils';
 import Logo from '../components/Logo';
+import { FormIdentity } from '../components/FormIdentity';
+import { FormLocation } from '../components/FormLocation';
+import { FormServices } from '../components/FormServices';
 import { ProfessionalIdentity, UserProfile, Service } from '../types';
 import { userProfileSchema, serviceSchema } from '../lib/validation';
 import { z } from 'zod';
@@ -86,6 +89,7 @@ export default function OnboardingPage() {
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>('none');
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
 
   // Step 3: Services
   const [services, setServices] = useState<{name: string, duration: string, price: string, description: string}[]>([
@@ -111,27 +115,21 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (profile) {
-      const locallyCompletedKey = `onboarding_completed_${user?.uid}`;
-      const locallyCompleted = sessionStorage.getItem(locallyCompletedKey) === 'true';
-      
       console.log('[Onboarding] Profile snapshot received:', {
         step: profile.onboardingStep,
         completed: profile.onboardingCompleted,
-        locallyCompleted,
         isFinalizing,
         currentStep: step
       });
 
-      // 1. If onboarding is already completed (server or local), and we are not on the success step,
-      // let the App.tsx guard handle the redirect to dashboard.
-      if ((profile.onboardingCompleted || locallyCompleted) && !isFinalizing && step !== 7) {
-        console.log('[Onboarding] Onboarding completed (server or local), allowing App.tsx guard to redirect...');
+      // 1. If onboarding is already completed on server, App.tsx guard will handle redirect.
+      // We don't need complex local logic here.
+      if (profile.onboardingCompleted && !isFinalizing && step !== 5) {
         return;
       }
 
-      // 2. Sync local state with profile, but ONLY if we are not in the middle of a process
-      // AND not already completed locally
-      if (!loading && !isFinalizing && !locallyCompleted) {
+      // 2. Sync local state with profile
+      if (!loading && !isFinalizing) {
         if (profile.name) setName(profile.name);
         if (profile.specialty) setSpecialty(profile.specialty);
         if (profile.city) setCity(profile.city);
@@ -143,10 +141,8 @@ export default function OnboardingPage() {
         if (profile.studioAddress) {
           setStudioAddress(profile.studioAddress);
         } else if (profile.address) {
-          // Migration: if old address exists, put it in street for now
           setStudioAddress(prev => ({ ...prev, street: profile.address }));
         }
-        if (profile.avatar) setAvatar(profile.avatar);
         if (profile.serviceAreas) setServiceAreas(profile.serviceAreas);
         if (profile.pricingStrategy) setPricingStrategy(profile.pricingStrategy);
         if (profile.workingDays) setWorkingDays(profile.workingDays);
@@ -159,27 +155,35 @@ export default function OnboardingPage() {
         }
         if (profile.whatsapp) setWhatsapp(profile.whatsapp);
         if (profile.instagram) setInstagram(profile.instagram);
+        
         if (profile.bio) setBio(profile.bio);
         if (profile.headline) setHeadline(profile.headline);
+
         if (profile.servicesDraft) setServices(profile.servicesDraft);
 
         if (profile.professionalIdentity) {
           if (profile.professionalIdentity.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
           if (profile.professionalIdentity.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
           if (profile.professionalIdentity.differentials) setSelectedDifferentials(profile.professionalIdentity.differentials);
-          if (profile.professionalIdentity.headline) setHeadline(profile.professionalIdentity.headline);
+        }
+        
+        if (profile.portfolio && profile.portfolio.length > 0) {
+          setPortfolio(profile.portfolio);
         }
         
         if (profile.onboardingStep !== undefined) {
-          console.log('[Onboarding] Syncing step from profile:', profile.onboardingStep);
           setStep(profile.onboardingStep);
         }
       }
     }
-  }, [profile, isFinalizing, loading, user?.uid, step]);
+  }, [profile, isFinalizing, loading, user?.uid]); // Removed 'step' to prevent infinite loop or fighting
 
-  const generateIdentityContent = () => {
+  const generateIdentityContent = async () => {
     if (!name || !specialty) return;
+    setIsGeneratingContent(true);
+
+    // Simulate AI reflection
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const stylesStr = selectedStyles.length > 0 
       ? selectedStyles.join(' e ') 
@@ -231,23 +235,20 @@ export default function OnboardingPage() {
     
     setHeadline(newHeadline);
     setBio(newBio);
+    setIsGeneratingContent(false);
   };
 
   const saveProgress = async (nextStepNum: number) => {
-    const locallyCompletedKey = `onboarding_completed_${user?.uid}`;
-    const locallyCompleted = sessionStorage.getItem(locallyCompletedKey) === 'true';
-
-    if (!user || isFinalizing || profile?.onboardingCompleted || locallyCompleted) {
-      console.log('[Onboarding] Skipping saveProgress: already completed or finalizing');
+    if (!user || isFinalizing || profile?.onboardingCompleted) {
       return;
     }
-    console.log(`[Onboarding] Saving progress to step ${nextStepNum}...`);
     
     const payload: Partial<UserProfile> = {
       name,
-      username: slug,
+      slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       whatsapp: whatsapp.replace(/\D/g, ''),
       bio,
+      headline,
       serviceMode,
       onboardingStep: nextStepNum,
       professionalIdentity: {
@@ -255,14 +256,12 @@ export default function OnboardingPage() {
         yearsExperience,
         serviceStyle: selectedStyles,
         differentials: selectedDifferentials,
-        bio,
-        headline
+        attendsAt: serviceMode as any
       } as ProfessionalIdentity,
     };
 
     try {
       await saveProfilePartial(user.uid, payload);
-      console.log(`[Onboarding] Progress saved successfully.`);
     } catch (error) {
       console.error('[Onboarding] Error saving progress:', error);
     }
@@ -322,7 +321,7 @@ export default function OnboardingPage() {
   };
 
   const nextStep = async () => {
-    if (step === 2) {
+    if (step === 1) {
       generateIdentityContent();
     }
     const nextStepNum = step + 1;
@@ -333,11 +332,8 @@ export default function OnboardingPage() {
   const prevStep = () => setStep(s => s - 1);
 
   const handleFinish = async () => {
-    const locallyCompletedKey = `onboarding_completed_${user?.uid}`;
-    const locallyCompleted = sessionStorage.getItem(locallyCompletedKey) === 'true';
-
-    if (!user || isFinalizing || profile?.onboardingCompleted || locallyCompleted) {
-      if (profile?.onboardingCompleted || locallyCompleted) navigate('/dashboard');
+    if (!user || isFinalizing || profile?.onboardingCompleted) {
+      if (profile?.onboardingCompleted) navigate('/dashboard');
       return;
     }
 
@@ -345,7 +341,7 @@ export default function OnboardingPage() {
     try {
       userProfileSchema.parse({
         name,
-        username: slug,
+        slug,
         whatsapp,
         email: user.email,
         bio,
@@ -353,22 +349,11 @@ export default function OnboardingPage() {
         workingHours: { startTime, endTime, workingDays }
       });
       
-      // Validate services
       const activeServices = services.filter(s => s.name.trim() !== '');
       if (activeServices.length === 0) {
         toast.error('Adicione pelo menos um serviço');
         return;
       }
-      
-      activeServices.forEach(s => {
-        serviceSchema.parse({
-          id: 'temp',
-          name: s.name,
-          price: Number(s.price),
-          duration: Number(s.duration)
-        });
-      });
-
     } catch (err) {
       if (err instanceof z.ZodError) {
         toast.error(err.issues[0].message);
@@ -380,20 +365,19 @@ export default function OnboardingPage() {
     
     setLoading(true);
     setIsFinalizing(true);
-    sessionStorage.setItem(locallyCompletedKey, 'true');
 
     try {
-      // 2. Prepare Final Data
+      // 2. Prepare Final Data (without setting completed: true yet)
       const finalData: Partial<UserProfile> = {
         name: name.trim(),
-        specialty: specialty.trim(), // Top-level specialty
-        city: (studioAddress.city || city).trim(), // Top-level city with fallback
-        neighborhood: (studioAddress.neighborhood || neighborhood).trim(), // Top-level neighborhood with fallback
-        username: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'), // Explicit slug field
+        specialty: specialty.trim(),
+        city: (studioAddress.city || city).trim(),
+        neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
+        slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         whatsapp: whatsapp.replace(/\D/g, ''),
         bio: bio.trim(),
-        headline: headline.trim(), // Top-level headline
+        headline: headline.trim(),
+        instagram: instagram.trim().replace('@', ''),
         avatar,
         serviceMode,
         serviceAreaType,
@@ -419,11 +403,9 @@ export default function OnboardingPage() {
           yearsExperience,
           serviceStyle: selectedStyles,
           differentials: selectedDifferentials,
-          bio: bio.trim(),
-          headline: headline.trim()
+          attendsAt: serviceMode as any
         } as ProfessionalIdentity,
-        onboardingCompleted: true,
-        onboardingStep: 8
+        onboardingStep: 5
       };
 
       // 3. Save Services
@@ -444,15 +426,26 @@ export default function OnboardingPage() {
       // 4. Save Profile
       await saveProfilePartial(user.uid, finalData);
 
-      toast.success('Onboarding concluído!');
-      setStep(8);
+      setStep(5);
     } catch (error: any) {
       console.error('[Onboarding] Finalization error:', error);
-      toast.error('Erro ao finalizar onboarding');
+      toast.error('Erro ao salvar dados');
       setIsFinalizing(false);
-      sessionStorage.removeItem(locallyCompletedKey);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const completeOnboarding = async () => {
+    if (!user || isFinalizing) return;
+    
+    setIsFinalizing(true);
+    try {
+      await saveProfilePartial(user.uid, { onboardingCompleted: true });
+      navigate('/dashboard');
+    } catch (error) {
+      toast.error('Erro ao concluir');
+      setIsFinalizing(false);
     }
   };
 
@@ -591,7 +584,7 @@ export default function OnboardingPage() {
 
   if (authLoading) return null;
 
-  const progress = (step / 8) * 100;
+  const progress = (step / 5) * 100;
 
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col">
@@ -615,128 +608,24 @@ export default function OnboardingPage() {
               exit={{ opacity: 0, y: -10 }}
               className="w-full space-y-10"
             >
-              <div className="text-center space-y-4">
-                <Logo className="mx-auto mb-8 scale-110" />
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Como as clientes devem te conhecer?</h1>
-                <p className="text-brand-stone font-light">Sua identidade é o primeiro passo para criar confiança.</p>
-              </div>
-
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
-                <div className="flex flex-col items-center">
-                  <div className="relative group">
-                    <div 
-                      onClick={() => {
-                        console.log('[Upload] Avatar click triggered');
-                        avatarInputRef.current?.click();
-                      }}
-                      className="w-32 h-32 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden relative cursor-pointer"
-                    >
-                      {avatarPreview || avatar ? (
-                        <img src={avatarPreview || avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      ) : (
-                        <User size={48} className="opacity-20" />
-                      )}
-                      {uploadingImage && (
-                        <div className="absolute inset-0 bg-brand-ink/40 flex items-center justify-center">
-                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                            <Sparkles size={24} className="text-brand-white" />
-                          </motion.div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute bottom-0 right-0 w-10 h-10 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-4 border-brand-white shadow-lg pointer-events-none">
-                      <Camera size={18} />
-                    </div>
-                    <input 
-                      ref={avatarInputRef}
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handleFileUpload} 
-                      disabled={uploadingImage}
-                    />
-                  </div>
-                  <p className="mt-4 text-[10px] font-medium text-brand-stone uppercase tracking-widest">Sua melhor foto profissional</p>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Nome que aparece na agenda</label>
-                    <input 
-                      type="text" 
-                      value={name} 
-                      onChange={(e) => setName(e.target.value)} 
-                      placeholder="Ex: Bruna Designer" 
-                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Especialidade Principal</label>
-                    <input 
-                      type="text" 
-                      value={specialty} 
-                      onChange={(e) => setSpecialty(e.target.value)} 
-                      placeholder="Ex: Nail Designer" 
-                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Cidade Base</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
-                      <input 
-                        type="text" 
-                        value={city} 
-                        onChange={(e) => setCity(e.target.value)} 
-                        placeholder="Ex: Fortaleza, CE" 
-                        className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro Base</label>
-                  <input 
-                    type="text" 
-                    value={neighborhood} 
-                    onChange={(e) => setNeighborhood(e.target.value)} 
-                    placeholder="Ex: Aldeota" 
-                    className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-[24px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                  />
-                </div>
-
-                <div className="space-y-4">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Onde você atende?</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <button 
-                      onClick={() => setServiceMode('studio')}
-                      className={`p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2 ${serviceMode === 'studio' ? 'border-brand-ink bg-brand-linen text-brand-ink' : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'}`}
-                    >
-                      <Building2 size={24} />
-                      <span className="text-[10px] font-medium uppercase">Estúdio</span>
-                    </button>
-                    <button 
-                      onClick={() => setServiceMode('home')}
-                      className={`p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2 ${serviceMode === 'home' ? 'border-brand-ink bg-brand-linen text-brand-ink' : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'}`}
-                    >
-                      <Home size={24} />
-                      <span className="text-[10px] font-medium uppercase">Domicílio</span>
-                    </button>
-                    <button 
-                      onClick={() => setServiceMode('hybrid')}
-                      className={`p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2 ${serviceMode === 'hybrid' ? 'border-brand-ink bg-brand-linen text-brand-ink' : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'}`}
-                    >
-                      <Briefcase size={24} />
-                      <span className="text-[10px] font-medium uppercase">Híbrido</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <FormIdentity
+                title="Como as clientes devem te conhecer?"
+                subtitle="Sua identidade é o primeiro passo para criar confiança."
+                name={name}
+                setName={setName}
+                specialty={specialty}
+                setSpecialty={setSpecialty}
+                avatar={avatar}
+                avatarPreview={avatarPreview}
+                uploadingImage={uploadingImage}
+                onAvatarClick={() => avatarInputRef.current?.click()}
+                inputRef={avatarInputRef}
+                onFileUpload={handleFileUpload}
+              />
 
               <button 
                 onClick={nextStep}
-                disabled={!name || !specialty || !city || !neighborhood || uploadingImage}
+                disabled={!name || !specialty || uploadingImage}
                 className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
               >
                 {uploadingImage ? 'Processando...' : 'Continuar'} <ArrowRight size={18} />
@@ -752,120 +641,104 @@ export default function OnboardingPage() {
               exit={{ opacity: 0, y: -10 }}
               className="w-full space-y-10"
             >
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-                  <Sparkles size={32} />
-                </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Sua Identidade</h1>
-                <p className="text-brand-stone font-light">Como você quer ser percebida pelas clientes?</p>
-              </div>
+              <FormLocation
+                title="Onde você atende?"
+                subtitle="Configure sua logística de atendimento."
+                city={city}
+                setCity={setCity}
+                neighborhood={neighborhood}
+                setNeighborhood={setNeighborhood}
+                serviceMode={serviceMode}
+                setServiceMode={setServiceMode}
+              />
 
               <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
-                <div className="space-y-6">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento (Escolha até 3)</label>
-                  <div className="flex flex-wrap gap-2">
-                    {IDENTITY_STYLES.map(style => (
-                      <button
-                        key={style}
-                        onClick={() => {
-                          if (selectedStyles.includes(style)) {
-                            setSelectedStyles(selectedStyles.filter(s => s !== style));
-                          } else if (selectedStyles.length < 3) {
-                            setSelectedStyles([...selectedStyles, style]);
-                          }
-                        }}
-                        className={cn(
-                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
-                          selectedStyles.includes(style)
-                            ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
-                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
-                        )}
+                {/* AI Bio Preview Section */}
+
+                {/* AI Bio Preview Section */}
+                <div className="pt-6 border-t border-brand-mist space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={16} className="text-brand-terracotta" />
+                      <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-widest">Sua Bio Inteligente</h3>
+                    </div>
+                    {isGeneratingContent ? (
+                      <span className="text-[10px] text-brand-stone animate-pulse uppercase tracking-widest">Refinando...</span>
+                    ) : (
+                      <button 
+                        onClick={generateIdentityContent}
+                        className="text-[10px] text-brand-terracotta hover:underline uppercase tracking-widest font-medium"
                       >
-                        {style}
+                        Recriar
                       </button>
-                    ))}
+                    )}
                   </div>
-                </div>
 
-                <div className="space-y-6">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>
-                  <div className="flex flex-wrap gap-2">
-                    {IDENTITY_DIFFERENTIALS.map(diff => (
-                      <button
-                        key={diff}
-                        onClick={() => {
-                          if (selectedDifferentials.includes(diff)) {
-                            setSelectedDifferentials(selectedDifferentials.filter(d => d !== diff));
-                          } else {
-                            setSelectedDifferentials([...selectedDifferentials, diff]);
-                          }
-                        }}
-                        className={cn(
-                          "px-6 py-3 rounded-full text-xs font-medium transition-all border",
-                          selectedDifferentials.includes(diff)
-                            ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-md"
-                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
-                        )}
+                  <AnimatePresence mode="wait">
+                    {isGeneratingContent ? (
+                      <motion.div 
+                        key="placeholder"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="space-y-4"
                       >
-                        {diff}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo de Experiência</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {EXPERIENCE_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setYearsExperience(opt.value)}
-                        className={cn(
-                          "p-4 rounded-2xl text-xs font-medium transition-all border flex flex-col items-center gap-1",
-                          yearsExperience === opt.value
-                            ? "bg-brand-linen border-brand-ink text-brand-ink shadow-sm"
-                            : "bg-brand-parchment border-brand-mist text-brand-stone hover:border-brand-stone"
-                        )}
+                        <div className="h-4 bg-brand-parchment rounded-full w-3/4 animate-pulse" />
+                        <div className="space-y-2">
+                          <div className="h-3 bg-brand-parchment rounded-full w-full animate-pulse" />
+                          <div className="h-3 bg-brand-parchment rounded-full w-5/6 animate-pulse" />
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        key="content"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="space-y-6"
                       >
-                        <span className="text-lg font-serif italic">{opt.label}</span>
-                      </button>
-                    ))}
-                  </div>
+                        <div className="bg-brand-parchment p-6 rounded-[24px] border border-brand-mist space-y-4 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Sparkles size={14} className="text-brand-terracotta/40" />
+                          </div>
+                          
+                          <div className="space-y-3">
+                            <input 
+                              type="text"
+                              value={headline}
+                              onChange={(e) => setHeadline(e.target.value)}
+                              className="w-full bg-transparent font-serif text-xl text-brand-ink outline-none border-b border-transparent focus:border-brand-mist transition-all"
+                              placeholder="Sua frase de destaque..."
+                            />
+                            <textarea 
+                              value={bio}
+                              onChange={(e) => setBio(e.target.value)}
+                              className="w-full bg-transparent font-light text-sm text-brand-stone outline-none border-b border-transparent focus:border-brand-mist transition-all resize-none h-20"
+                              placeholder="Sua biografia profissional..."
+                            />
+                          </div>
+                        </div>
+
+                        {/* Visual Preview Badge */}
+                        <div className="flex items-center gap-3 p-4 bg-brand-linen/30 rounded-2xl border border-brand-linen/50">
+                          <div className="w-12 h-12 bg-brand-white rounded-full flex-shrink-0 border border-brand-mist overflow-hidden shadow-sm">
+                            {avatarPreview || avatar ? (
+                              <img src={avatarPreview || avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-brand-stone">
+                                <User size={20} />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-serif text-brand-ink truncate">{name || 'Seu Nome'}</p>
+                            <p className="text-[10px] text-brand-stone truncate italic">{headline || 'Headline automática...'}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
 
-              <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
-                  <ArrowLeft size={24} />
-                </button>
-                <button 
-                  onClick={nextStep}
-                  disabled={selectedStyles.length === 0 || selectedDifferentials.length === 0}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
-                >
-                  Continuar <ArrowRight size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div 
-              key="step3"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-                  {serviceMode === 'home' ? <Home size={32} /> : <Building2 size={32} />}
-                </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Onde você atende?</h1>
-                <p className="text-brand-stone font-light">Configure sua logística de atendimento.</p>
-              </div>
-
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
                 {(serviceMode === 'studio' || serviceMode === 'hybrid') && (
                   <div className="space-y-8">
                     <div className="flex items-center gap-3 text-brand-ink">
@@ -1071,6 +944,7 @@ export default function OnboardingPage() {
                 <button 
                   onClick={nextStep}
                   disabled={
+                    !city || !neighborhood ||
                     (serviceMode !== 'home' && (!studioAddress.street || !studioAddress.number || !studioAddress.neighborhood)) || 
                     (serviceMode === 'home' && serviceAreaType === 'custom' && serviceAreas.length === 0) ||
                     (serviceMode === 'hybrid' && serviceAreaType === 'custom' && serviceAreas.length === 0)
@@ -1083,89 +957,20 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 4 && (
+          {step === 3 && (
             <motion.div 
-              key="step4"
+              key="step3"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               className="w-full space-y-10"
             >
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-                  <Sparkles size={32} />
-                </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seus Serviços</h1>
-                <p className="text-brand-stone font-light">O que suas clientes vão agendar?</p>
-              </div>
-
-              <div className="space-y-6">
-                {services.map((service, idx) => (
-                  <div key={idx} className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl relative">
-                    {services.length > 1 && (
-                      <button onClick={() => removeService(idx)} className="absolute top-8 right-8 text-brand-stone hover:text-brand-terracotta transition-colors">
-                        <X size={20} />
-                      </button>
-                    )}
-                    <div className="space-y-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Nome do Serviço</label>
-                        <input 
-                          type="text" 
-                          value={service.name} 
-                          onChange={(e) => updateService(idx, 'name', e.target.value)} 
-                          placeholder="Ex: Design de Sobrancelhas" 
-                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Duração (min)</label>
-                          <div className="relative">
-                            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
-                            <input 
-                              type="number" 
-                              value={service.duration} 
-                              onChange={(e) => updateService(idx, 'duration', e.target.value)} 
-                              className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Preço (R$)</label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
-                            <input 
-                              type="number" 
-                              value={service.price} 
-                              onChange={(e) => updateService(idx, 'price', e.target.value)} 
-                              placeholder="0,00"
-                              className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Descrição Curta (Opcional)</label>
-                        <input 
-                          type="text" 
-                          value={service.description} 
-                          onChange={(e) => updateService(idx, 'description', e.target.value)} 
-                          placeholder="Ex: Inclui mapeamento e finalização" 
-                          className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <button 
-                  onClick={addService}
-                  className="w-full py-6 border border-dashed border-brand-terracotta/30 rounded-[40px] text-brand-terracotta font-medium text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-linen transition-all"
-                >
-                  <Plus size={18} /> Adicionar outro serviço
-                </button>
-              </div>
+              <FormServices
+                title="Seus Serviços"
+                subtitle="O que suas clientes vão agendar?"
+                services={services}
+                setServices={setServices}
+              />
 
               <div className="flex gap-4">
                 <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
@@ -1182,179 +987,9 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 5 && (
+          {step === 4 && (
             <motion.div 
-              key="step5"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-                  <Clock size={32} />
-                </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seus Horários</h1>
-                <p className="text-brand-stone font-light">Não se preocupe: você poderá personalizar sua agenda com mais flexibilidade depois.</p>
-              </div>
-
-              <div className="bg-brand-white p-6 sm:p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
-                <div className="space-y-4">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
-                  <div className="flex justify-between">
-                    {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
-                      <button 
-                        key={idx}
-                        onClick={() => toggleDay(idx)}
-                        className={`w-10 h-10 rounded-full font-medium text-xs transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone'}`}
-                      >
-                        {day}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-8 border-t border-brand-mist">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início do Dia</label>
-                    <input 
-                      type="time" 
-                      value={startTime} 
-                      onChange={(e) => setStartTime(e.target.value)} 
-                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Fim do Dia</label>
-                    <input 
-                      type="time" 
-                      value={endTime} 
-                      onChange={(e) => setEndTime(e.target.value)} 
-                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <button 
-                    onClick={() => {
-                      setWorkingDays([1, 2, 3, 4, 5]);
-                      setStartTime('09:00');
-                      setEndTime('18:00');
-                      toast.info('Horário padrão aplicado!');
-                    }}
-                    className="w-full py-5 bg-brand-linen text-brand-ink rounded-[20px] text-[10px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist"
-                  >
-                    Usar horário padrão (Seg a Sex, 9h às 18h)
-                  </button>
-                  <p className="text-[10px] text-brand-stone text-center italic font-light">Esse é só o seu horário inicial. Você poderá ajustar dias, pausas e exceções depois.</p>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
-                  <ArrowLeft size={24} />
-                </button>
-                <button 
-                  onClick={nextStep}
-                  disabled={workingDays.length === 0}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
-                >
-                  Continuar <ArrowRight size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 6 && (
-            <motion.div 
-              key="step6"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-                  <Camera size={32} />
-                </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seu Portfólio</h1>
-                <p className="text-brand-stone font-light">Mostre o seu melhor trabalho para encantar as clientes.</p>
-              </div>
-
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {portfolio.map((item, idx) => (
-                    <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
-                      <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" />
-                      <button 
-                        onClick={() => item.id && removePortfolioImage(item.id)}
-                        className="absolute top-2 right-2 w-8 h-8 bg-brand-ink/80 text-brand-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <X size={16} />
-                      </button>
-                      <div className="absolute bottom-0 left-0 w-full p-2 bg-brand-ink/40 backdrop-blur-sm">
-                        <p className="text-[8px] text-brand-white font-medium uppercase truncate tracking-widest">{item.category}</p>
-                      </div>
-                      {item.isUploading && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                            <Sparkles size={24} className="text-brand-white" />
-                          </motion.div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  
-                  <div 
-                    onClick={() => {
-                      console.log('[Upload] Portfolio click triggered');
-                      portfolioInputRef.current?.click();
-                    }}
-                    className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta"
-                  >
-                    {uploadingImage ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                        <Sparkles size={24} />
-                      </motion.div>
-                    ) : (
-                      <>
-                        <Plus size={24} />
-                        <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
-                      </>
-                    )}
-                    <input 
-                      ref={portfolioInputRef}
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handlePortfolioUpload} 
-                      disabled={uploadingImage} 
-                    />
-                  </div>
-                </div>
-                
-                <p className="text-[10px] text-brand-stone text-center italic font-light">Dica: Fotos bem iluminadas e de alta qualidade convertem até 3x mais!</p>
-              </div>
-
-              <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
-                  <ArrowLeft size={24} />
-                </button>
-                <button 
-                  onClick={nextStep}
-                  disabled={loading}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
-                >
-                  Continuar <ArrowRight size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 7 && (
-            <motion.div 
-              key="step7"
+              key="step4"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -1411,28 +1046,6 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Headline (Frase de impacto)</label>
-                  <input 
-                    type="text" 
-                    value={headline} 
-                    onChange={(e) => setHeadline(e.target.value)} 
-                    placeholder="Ex: Especialista em beleza natural"
-                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Bio (Gerada automaticamente)</label>
-                  <textarea 
-                    value={bio} 
-                    onChange={(e) => setBio(e.target.value)} 
-                    placeholder="Descreva seu trabalho..."
-                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-32 resize-none font-light"
-                  />
-                  <p className="text-[9px] text-brand-stone italic">* Você pode ajustar os textos gerados acima.</p>
-                </div>
               </div>
 
               {/* Mini Preview */}
@@ -1466,9 +1079,9 @@ export default function OnboardingPage() {
             </motion.div>
           )}
 
-          {step === 8 && (
+          {step === 5 && (
             <motion.div 
-              key="step8"
+              key="step5"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="w-full space-y-12 text-center"
@@ -1530,15 +1143,16 @@ export default function OnboardingPage() {
 
               <div className="flex flex-col gap-6">
                 <button 
-                  onClick={() => navigate('/dashboard')}
-                  className="w-full bg-brand-ink text-brand-white py-7 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 shadow-xl"
+                  onClick={completeOnboarding}
+                  className="w-full bg-brand-ink text-brand-white py-7 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-50"
+                  disabled={isFinalizing}
                 >
-                  Ir para meu Dashboard <ArrowRight size={20} />
+                  {isFinalizing ? 'Finalizando...' : 'Ir para meu Dashboard'} <ArrowRight size={20} />
                 </button>
                 <Link 
                   to={`/p/${slug}`} 
                   target="_blank"
-                  className="text-[11px] font-medium text-brand-terracotta uppercase tracking-widest hover:text-brand-sienna transition-colors"
+                  className="text-[11px] font-medium text-brand-terracotta uppercase tracking-widest hover:text-brand-sienna transition-colors text-center"
                 >
                   Ver minha página pública
                 </Link>
@@ -1555,7 +1169,6 @@ export default function OnboardingPage() {
           <p>FINALIZING: {isFinalizing ? 'YES' : 'NO'}</p>
           <p>LOADING: {loading ? 'YES' : 'NO'}</p>
           <p>PROFILE_COMPLETED: {profile?.onboardingCompleted ? 'YES' : 'NO'}</p>
-          <p>LOCAL_COMPLETED: {sessionStorage.getItem(`onboarding_completed_${user?.uid}`) === 'true' ? 'YES' : 'NO'}</p>
         </div>
       )}
     </div>

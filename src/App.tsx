@@ -35,15 +35,13 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   // CRITICAL: Single Source of Truth for Onboarding
-  const locallyCompleted = sessionStorage.getItem(`onboarding_completed_${user.uid}`) === 'true';
-  const isCompleted = profile?.onboardingCompleted === true || locallyCompleted;
+  const isCompleted = profile?.onboardingCompleted === true;
   
   console.log('[Guard] Checking access:', {
     path: location.pathname,
     uid: user.uid,
     hasProfile: !!profile,
     isCompleted,
-    locallyCompleted,
     step: profile?.onboardingStep
   });
 

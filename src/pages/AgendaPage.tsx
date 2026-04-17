@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db } from '../firebase';
+import { db, updateAppointmentStatus, handleBookingError } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { 
   Calendar, Clock, MessageCircle, 
@@ -9,7 +9,7 @@ import {
   Users, List, Settings, Check, Sparkles
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey } from '../lib/utils';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import MobileNav from '../components/MobileNav';
@@ -17,7 +17,7 @@ import MobileNav from '../components/MobileNav';
 export default function AgendaPage() {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(getTodayLocale());
   const [loading, setLoading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,9 +38,9 @@ export default function AgendaPage() {
   }, [user, selectedDate]);
 
   const changeDate = (days: number) => {
-    const date = new Date(selectedDate);
+    const date = parseLocalDate(selectedDate);
     date.setDate(date.getDate() + days);
-    setSelectedDate(date.toISOString().split('T')[0]);
+    setSelectedDate(formatDateKey(date));
   };
 
   const handleComplete = async (app: any) => {
@@ -48,9 +48,7 @@ export default function AgendaPage() {
     setLoading(app.id);
     try {
       // 1. Update appointment status
-      await updateDoc(doc(db, 'appointments', app.id), {
-        status: 'completed'
-      });
+      await updateAppointmentStatus(app.id, 'completed');
 
       // 2. Create review request
       const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -72,8 +70,7 @@ export default function AgendaPage() {
       toast.info('Link de avaliação copiado para a área de transferência.');
 
     } catch (err) {
-      console.error('Error completing appointment:', err);
-      toast.error('Erro ao concluir atendimento.');
+      handleBookingError(err);
     } finally {
       setLoading(null);
     }
@@ -120,10 +117,10 @@ export default function AgendaPage() {
           </button>
           <div className="text-center">
             <p className="text-[10px] font-medium text-brand-terracotta uppercase tracking-[0.3em] mb-2">
-              {new Date(selectedDate).toLocaleDateString('pt-BR', { weekday: 'long' })}
+              {formatLocalDate(selectedDate, { weekday: 'long' })}
             </p>
             <p className="text-2xl font-serif font-normal text-brand-ink">
-              {new Date(selectedDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
+              {formatLocalDate(selectedDate, { day: '2-digit', month: 'long' })}
             </p>
           </div>
           <button onClick={() => changeDate(1)} className="p-3 hover:bg-brand-parchment rounded-2xl text-brand-mist hover:text-brand-ink transition-all border border-transparent hover:border-brand-mist">

@@ -22,9 +22,7 @@
             "yearsExperience": { "type": "string" },
             "serviceStyle": { "type": "array", "items": { "type": "string" } },
             "differentials": { "type": "array", "items": { "type": "string" } },
-            "attendsAt": { "type": "string", "enum": ["studio", "home", "hybrid"] },
-            "bio": { "type": "string" },
-            "headline": { "type": "string" }
+            "attendsAt": { "type": "string", "enum": ["studio", "home", "hybrid"] }
           }
         },
         "studioAddress": {

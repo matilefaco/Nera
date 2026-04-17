@@ -5,6 +5,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, upl
 import firebaseConfig from '../firebase-applet-config.json';
 import { UserProfile, Appointment, PortfolioItem } from './types';
 import { removeEmptyFields } from './lib/utils';
+import { toast } from 'sonner';
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
@@ -43,6 +44,39 @@ export interface FirestoreErrorInfo {
       photoUrl: string | null;
     }[];
   }
+}
+
+/**
+ * Centrally handles booking-related errors and shows clear feedback to the user.
+ */
+export function handleBookingError(error: any) {
+  console.error('[Booking Error Handler]:', error);
+
+  let message = 'Erro ao processar agendamento. Por favor, tente novamente.';
+
+  // 1. Specific Business Logic Errors
+  if (error.message === 'Esse horário acabou de ser reservado' || error.message === 'Horário indisponível') {
+    message = 'Esse horário acabou de ser reservado ou está bloqueado. Por favor, escolha outro.';
+  } 
+  // 2. Status Transition errors
+  else if (error.message?.includes('não permitida')) {
+    message = 'Este agendamento já foi processado e não pode ser alterado.';
+  }
+  // 3. Connection/Network Errors
+  else if (error.code === 'unavailable' || error.message?.includes('network-error') || error.message?.includes('failed to fetch') || error.message?.includes('offline')) {
+    message = 'Verifique sua conexão com a internet e tente novamente.';
+  }
+  // 4. Data/Permission Errors
+  else if (error.code === 'permission-denied' || error.message?.includes('insufficient permissions')) {
+    message = 'Dados inválidos ou erro de permissão. Verifique os campos.';
+  }
+  // 5. Not Found
+  else if (error.message === 'Agendamento não encontrado') {
+    message = 'O agendamento solicitado não foi encontrado.';
+  }
+
+  toast.error(message);
+  return message;
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
@@ -207,97 +241,183 @@ export async function notify(type: string, payload: any) {
 
 /**
  * Creates a booking request and notifies the professional.
+ * Uses a transaction to ensure no two appointments can be created for the same slot.
  */
 export async function createBookingRequest(appointmentData: Partial<Appointment>) {
   console.log('[Booking] Creating request...');
   
-  // Clean data before saving
-  const cleanedData = removeEmptyFields(appointmentData);
-  
+  if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
+    throw new Error('Dados de agendamento incompletos');
+  }
+
+  const slotId = `${appointmentData.date}_${appointmentData.time}`;
+  const lockId = `${appointmentData.professionalId}_${slotId}`;
+  const lockRef = doc(db, 'blocked_slots', lockId);
+
   try {
-    const docRef = await addDoc(collection(db, 'appointments'), {
-      ...cleanedData,
-      status: 'pending',
-      createdAt: serverTimestamp(),
-      expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString() // 2 hours
-    });
+    // 1. Conflict check: Only check for CONFIRMED or COMPLETED appointments
+    const qConflict = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', appointmentData.professionalId),
+      where('date', '==', appointmentData.date),
+      where('time', '==', appointmentData.time),
+      where('status', 'in', ['confirmed', 'completed'])
+    );
     
-    console.log('[Booking] Request created:', docRef.id);
+    const conflictSnap = await getDocs(qConflict);
+    if (!conflictSnap.empty) {
+      throw new Error('Esse horário já está ocupado por um agendamento confirmado.');
+    }
+
+    // 2. Create the appointment. 
+    // We do NOT create a record in blocked_slots yet for 'pending' status.
+    // This makes the block "inexistente" (or purely logical) during the request phase.
+    const bookingId = await runTransaction(db, async (transaction) => {
+      // Clean data
+      const cleanedData = removeEmptyFields(appointmentData);
+      
+      // Create appointment ref (new doc)
+      const apptRef = doc(collection(db, 'appointments'));
+      
+      // Create the appointment
+      transaction.set(apptRef, {
+        ...cleanedData,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+        expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+      });
+
+      return apptRef.id;
+    });
+
+    console.log('[Booking] Request created:', bookingId);
     
     // Trigger notification
     await notify('NEW_BOOKING_REQUEST', {
-      appointmentId: docRef.id,
-      ...cleanedData
+      appointmentId: bookingId,
+      ...appointmentData
     });
     
-    return docRef.id;
-  } catch (error) {
+    return bookingId;
+  } catch (error: any) {
+    if (error.message === 'Horário indisponível') {
+      throw error;
+    }
     console.error('[Booking] Failed to create request:', error);
     handleFirestoreError(error, OperationType.CREATE, 'appointments');
+    throw error;
   }
 }
 
 /**
- * Responds to a booking request (Confirm/Decline) with transaction for consistency.
+ * Standardized function to update appointment status with transition validation.
+ * Manages the logic for freeing slots and notifications.
  */
-export async function respondToBookingRequest(appointmentId: string, decision: 'confirmed' | 'declined') {
-  console.log(`[Booking] Responding to ${appointmentId} with ${decision}...`);
+export async function updateAppointmentStatus(appointmentId: string, newStatus: Appointment['status']) {
+  console.log(`[Status] Transitioning ${appointmentId} to ${newStatus}...`);
   
   try {
-    await runTransaction(db, async (transaction) => {
+    const result = await runTransaction(db, async (transaction) => {
       const apptRef = doc(db, 'appointments', appointmentId);
       const apptDoc = await transaction.get(apptRef);
       
       if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
       
-      const data = apptDoc.data();
-      if (data.status !== 'pending') {
-        throw new Error(`Este agendamento já foi ${data.status === 'confirmed' ? 'confirmado' : 'recusado'}`);
+      const data = apptDoc.data() as Appointment;
+      const currentStatus = data.status;
+
+      // 1. Validate Transitions
+      const allowedTransitions: Record<string, string[]> = {
+        'pending': ['confirmed', 'cancelled'],
+        'confirmed': ['completed', 'cancelled'],
+        'completed': [],
+        'cancelled': []
+      };
+
+      if (!allowedTransitions[currentStatus]?.includes(newStatus)) {
+        throw new Error(`Transição de ${currentStatus} para ${newStatus} não permitida`);
       }
 
-      if (decision === 'confirmed') {
-        // Check if slot is already blocked
-        const slotId = `${data.date}_${data.time}`;
-        const slotRef = doc(db, 'blocked_slots', `${data.professionalId}_${slotId}`);
-        const slotDoc = await transaction.get(slotRef);
-        
-        if (slotDoc.exists()) {
-          throw new Error('Este horário já foi preenchido por outro agendamento');
+      // 2. Logic for Blocked Slots
+      const slotId = `${data.date}_${data.time}`;
+      const slotRef = doc(db, 'blocked_slots', `${data.professionalId}_${slotId}`);
+
+      if (newStatus === 'confirmed') {
+        // Before confirming, check if the slot was already blocked by another confirmed appointment
+        const slotSnap = await transaction.get(slotRef);
+        if (slotSnap.exists()) {
+          throw new Error('Este horário já foi preenchido por outra confirmação.');
         }
 
-        // Block slot
+        // Create permanent lock
         transaction.set(slotRef, {
           professionalId: data.professionalId,
           date: data.date,
           time: data.time,
           appointmentId: appointmentId,
-          createdAt: serverTimestamp()
+          isPending: false,
+          updatedAt: serverTimestamp()
         });
-
-        // Update appointment
-        transaction.update(apptRef, {
-          status: 'confirmed',
-          confirmedAt: serverTimestamp()
-        });
-      } else {
-        // Update appointment to declined
-        transaction.update(apptRef, {
-          status: 'declined',
-          declinedAt: serverTimestamp()
-        });
+      } else if (newStatus === 'cancelled') {
+        // Free the slot
+        transaction.delete(slotRef);
+      } else if (newStatus === 'completed') {
+        // Ensure the slot remains blocked even after completion 
+        // to maintain its "occupied" state for that specific date/time.
+        transaction.set(slotRef, { 
+          isPending: false,
+          status: 'completed',
+          updatedAt: serverTimestamp() 
+        }, { merge: true });
       }
+
+      // 3. Update Appointment
+      const updateData: any = {
+        status: newStatus,
+        updatedAt: serverTimestamp()
+      };
+
+      if (newStatus === 'confirmed') updateData.confirmedAt = serverTimestamp();
+      if (newStatus === 'cancelled') updateData.cancelledAt = serverTimestamp();
+      if (newStatus === 'completed') updateData.completedAt = serverTimestamp();
+
+      transaction.update(apptRef, updateData);
+      
+      return data; // Return original data for notifications
     });
 
-    console.log('[Booking] Transaction successful');
+    console.log(`[Status] Successfully updated to ${newStatus}`);
     
-    // Notify client (async, don't block)
-    const apptDoc = await getDoc(doc(db, 'appointments', appointmentId));
-    const data = apptDoc.data();
-    notify(decision === 'confirmed' ? 'BOOKING_CONFIRMED' : 'BOOKING_DECLINED', data);
+    // 4. Notifications
+    const notificationMap: Record<string, string> = {
+      'confirmed': 'BOOKING_CONFIRMED',
+      'cancelled': 'BOOKING_CANCELLED',
+      'completed': 'BOOKING_COMPLETED'
+    };
+
+    if (notificationMap[newStatus]) {
+      notify(notificationMap[newStatus], result);
+    }
     
     return { success: true };
   } catch (error: any) {
-    console.error('[Booking] Response failed:', error);
+    console.error('[Status] Update failed:', error);
     throw error;
   }
+}
+
+/**
+ * DEPRECATED: Use updateAppointmentStatus instead.
+ * Maintained as a wrapper for backward compatibility during transition.
+ */
+export async function respondToBookingRequest(appointmentId: string, decision: 'confirmed' | 'declined') {
+  const status = decision === 'confirmed' ? 'confirmed' : 'cancelled';
+  return updateAppointmentStatus(appointmentId, status as Appointment['status']);
+}
+
+/**
+ * DEPRECATED: Use updateAppointmentStatus instead.
+ */
+export async function cancelBooking(appointmentId: string) {
+  return updateAppointmentStatus(appointmentId, 'cancelled');
 }

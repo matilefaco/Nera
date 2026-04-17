@@ -18,12 +18,12 @@ export default function ClientsPage() {
   const { user } = useAuth();
   const [clients, setClients] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
 
-    // In a real app, we'd have a 'clients' collection or aggregate from appointments
-    // For now, let's aggregate from appointments to show LTV
+    // Aggregate from appointments to show LTV
     const q = query(
       collection(db, 'appointments'),
       where('professionalId', '==', user.uid)
@@ -33,46 +33,57 @@ export default function ClientsPage() {
       try {
         const appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
         
-        // Aggregate by phone (unique identifier for client)
+        // Aggregate by phone
         const clientMap = new Map();
         
         appointments.forEach((app) => {
-          const key = app.clientWhatsapp || 'unknown';
+          // Use whatsapp as key, fallback to a derived key if missing
+          const key = app.clientWhatsapp?.replace(/\D/g, '') || app.clientEmail || `anon-${app.clientName}`;
+          
           if (!clientMap.has(key)) {
             clientMap.set(key, {
+              id: key,
               name: app.clientName || 'Cliente sem nome',
               phone: app.clientWhatsapp || '',
               email: app.clientEmail || '',
               totalSpent: 0,
               appointmentsCount: 0,
               lastAppointment: app.date,
-              services: new Set<string>()
+              servicesList: new Set<string>()
             });
           }
           
           const client = clientMap.get(key);
-          if (app.status === 'confirmed') {
-            client.totalSpent += (app.price || 0);
+          
+          // Only add value if confirmed or completed
+          if (app.status === 'confirmed' || app.status === 'completed') {
+            client.totalSpent += (app.price || 0) + (app.travelFee || 0);
           }
+          
           client.appointmentsCount += 1;
-          if (app.serviceName) client.services.add(app.serviceName);
+          if (app.serviceName) client.servicesList.add(app.serviceName);
           
           try {
-            if (new Date(app.date) > new Date(client.lastAppointment)) {
+            if (app.date && (!client.lastAppointment || new Date(app.date) > new Date(client.lastAppointment))) {
               client.lastAppointment = app.date;
             }
-          } catch {
-            // Ignore date errors
+          } catch (e) {
+            // Safe date parsing
           }
         });
 
         const aggregatedClients = Array.from(clientMap.values())
-          .map(c => ({ ...c, servicesList: Array.from(c.services) }))
+          .map(c => ({ 
+            ...c, 
+            services: Array.from(c.servicesList as Set<string>).slice(0, 2) // Top 2 services
+          }))
           .sort((a, b) => b.totalSpent - a.totalSpent);
           
         setClients(aggregatedClients);
       } catch (err) {
-        console.error('[ClientsPage] Error aggregating clients:', err);
+        console.error('[ClientsPage] Aggregate Error:', err);
+      } finally {
+        setLoading(false);
       }
     });
 
@@ -124,7 +135,7 @@ export default function ClientsPage() {
           </div>
           <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
             <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-1">Clientes VIP</p>
-            <p className="text-3xl font-serif text-brand-terracotta">{clients.filter(c => c.totalSpent > 500).length}</p>
+            <p className="text-3xl font-serif text-brand-terracotta">{clients.filter(c => c.totalSpent > 1000).length}</p>
           </div>
         </div>
 
@@ -142,48 +153,64 @@ export default function ClientsPage() {
 
         {/* Clients List */}
         <div className="space-y-4">
-          {filteredClients.length > 0 ? (
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-4">
+              <div className="w-12 h-12 border-4 border-brand-mist border-t-brand-terracotta rounded-full animate-spin" />
+              <p className="text-brand-stone font-serif italic">Carregando sua base de clientes...</p>
+            </div>
+          ) : filteredClients.length > 0 ? (
             filteredClients.map((client, idx) => (
               <motion.div 
-                key={client.phone}
+                key={client.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="bg-brand-white p-6 rounded-[32px] border border-brand-mist flex items-center justify-between hover:border-brand-stone transition-all shadow-sm group"
+                transition={{ delay: idx * 0.03 }}
+                className="bg-brand-white p-5 md:p-6 rounded-[32px] border border-brand-mist flex items-center justify-between hover:border-brand-stone transition-all shadow-sm group"
               >
-                <div className="flex items-center gap-6">
-                  <div className="w-16 h-16 rounded-[20px] bg-brand-parchment flex items-center justify-center text-brand-terracotta font-serif text-2xl border border-brand-mist">
-                    {client.name[0]}
+                <div className="flex items-center gap-4 md:gap-6 overflow-hidden">
+                  <div className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 rounded-[20px] bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-mist shadow-inner">
+                    <span className="font-serif text-xl md:text-2xl">{client.name[0]}</span>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-serif text-xl text-brand-ink">{client.name}</h4>
-                      {client.totalSpent > 500 && <Star size={14} className="fill-brand-terracotta text-brand-terracotta" />}
+                  <div className="overflow-hidden">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-serif text-lg md:text-xl text-brand-ink truncate">{client.name}</h4>
+                      {client.totalSpent > 1000 && (
+                        <div className="bg-brand-terracotta/10 text-brand-terracotta p-1 rounded-full border border-brand-terracotta/20" title="Cliente VIP">
+                          <Star size={10} className="fill-brand-terracotta" />
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center gap-4 text-[10px] text-brand-stone font-medium uppercase tracking-widest mt-1">
-                      <span className="flex items-center gap-1.5"><Calendar size={12} /> {client.appointmentsCount} visitas</span>
-                      <span className="text-brand-terracotta">{formatCurrency(client.totalSpent)} total</span>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] md:text-[10px] text-brand-stone font-medium uppercase tracking-widest">
+                      <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.appointmentsCount} visitas</span>
+                      <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)}</span>
+                      {client.services && client.services.length > 0 && (
+                        <span className="hidden sm:inline italic text-brand-stone/60 truncate max-w-[150px]">
+                          • {client.services.join(', ')}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
                   <a 
                     href={`https://wa.me/${client.phone.replace(/\D/g, '')}`}
-                    className="p-4 hover:bg-brand-linen rounded-2xl text-brand-ink transition-all border border-transparent hover:border-brand-mist"
+                    target="_blank"
+                    className="p-3 md:p-4 text-brand-ink hover:bg-green-50 hover:text-green-600 rounded-2xl transition-all border border-transparent hover:border-green-100"
                   >
                     <MessageCircle size={20} />
                   </a>
-                  <button className="p-4 hover:bg-brand-linen rounded-2xl text-brand-stone transition-all border border-transparent hover:border-brand-mist">
+                  <button className="hidden md:flex p-4 text-brand-stone hover:bg-brand-linen rounded-2xl transition-all border border-transparent hover:border-brand-mist">
                     <ChevronRight size={20} />
                   </button>
                 </div>
               </motion.div>
             ))
           ) : (
-            <div className="text-center py-24 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist">
-              <Users size={40} className="text-brand-mist mx-auto mb-6" />
-              <p className="text-brand-stone font-serif italic text-lg font-light">Nenhuma cliente encontrada.</p>
+            <div className="text-center py-20 md:py-32 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist px-6">
+              <Users size={40} className="text-brand-mist mx-auto mb-6 opacity-50" />
+              <p className="text-brand-stone font-serif italic text-lg font-light mb-2">Sua lista está vazia por enquanto.</p>
+              <p className="text-[10px] text-brand-stone uppercase tracking-widest max-w-xs mx-auto">Suas clientes aparecerão aqui conforme você agendar e atender.</p>
             </div>
           )}
         </div>

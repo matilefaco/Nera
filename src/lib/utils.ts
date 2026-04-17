@@ -51,3 +51,36 @@ export function removeEmptyFields<T>(obj: T): T {
   
   return obj;
 }
+
+/**
+ * Parses a "YYYY-MM-DD" string into a Date object at local midnight.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * Formats a "YYYY-MM-DD" string into a localized Portuguese string without timezone shift.
+ */
+export function formatLocalDate(dateStr: string, options: Intl.DateTimeFormatOptions): string {
+  const date = parseLocalDate(dateStr);
+  return date.toLocaleDateString('pt-BR', options);
+}
+
+/**
+ * Returns today's date in "YYYY-MM-DD" format relative to local time.
+ */
+export function getTodayLocale(): string {
+  return formatDateKey(new Date());
+}
+
+/**
+ * Converts a Date object into a "YYYY-MM-DD" string in local time.
+ */
+export function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

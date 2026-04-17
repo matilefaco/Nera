@@ -14,6 +14,8 @@ import imageCompression from 'browser-image-compression';
 import { formatCurrency, cn } from '../lib/utils';
 import Logo from '../components/Logo';
 import MobileNav from '../components/MobileNav';
+import { FormIdentity } from '../components/FormIdentity';
+import { FormLocation } from '../components/FormLocation';
 
 const IDENTITY_DIFFERENTIALS = [
   'Pontualidade',
@@ -57,18 +59,25 @@ export default function ProfilePage() {
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  // Working Hours State
+  const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('18:00');
+
   useEffect(() => {
     if (profile && user) {
       setName(profile.name || '');
       setSpecialty(profile.specialty || profile.professionalIdentity?.mainSpecialty || '');
-      setBio(profile.bio || profile.professionalIdentity?.bio || '');
+      // bio/headline synchronization with migration fallback
+      setBio(profile.bio || (profile.professionalIdentity as any)?.bio || '');
+      setHeadline(profile.headline || (profile.professionalIdentity as any)?.headline || '');
       setCity(profile.city || profile.studioAddress?.city || profile.location || '');
       setWhatsapp(profile.whatsapp || '');
       setSlug(profile.slug || '');
       setAvatar(profile.avatar || '');
       setAvatarPreview(profile.avatar || '');
       setNeighborhood(profile.neighborhood || profile.studioAddress?.neighborhood || '');
-      setHeadline(profile.headline || profile.professionalIdentity?.headline || '');
+      setHeadline(profile.headline || '');
       setDifferentials(profile.professionalIdentity?.differentials || []);
       setServiceMode(profile.serviceMode || 'studio');
       if (profile.studioAddress) {
@@ -78,6 +87,17 @@ export default function ProfilePage() {
       }
       setServiceAreas(profile.serviceAreas || []);
       setPricingStrategy(profile.pricingStrategy || 'none');
+
+      // Load working hours with fallback
+      if (profile.workingHours) {
+        setWorkingDays(profile.workingHours.workingDays || [1, 2, 3, 4, 5]);
+        setStartTime(profile.workingHours.startTime || '09:00');
+        setEndTime(profile.workingHours.endTime || '18:00');
+      } else if (profile.startTime) {
+        setStartTime(profile.startTime);
+        setEndTime(profile.endTime || '18:00');
+        setWorkingDays(profile.workingDays || [1, 2, 3, 4, 5]);
+      }
 
       // Load portfolio from profile array (Single Source of Truth)
       if (profile.portfolio) {
@@ -168,12 +188,17 @@ export default function ProfilePage() {
         serviceAreas: sanitizedAreas,
         pricingStrategy,
         avatar,
+        workingHours: {
+          startTime,
+          endTime,
+          workingDays
+        },
         professionalIdentity: {
-          ...profile?.professionalIdentity,
-          headline: headline.trim(),
+          mainSpecialty: sanitizedSpecialty,
           differentials: differentials,
-          bio: sanitizedBio,
-          mainSpecialty: sanitizedSpecialty
+          yearsExperience: profile?.professionalIdentity?.yearsExperience || '3-5',
+          serviceStyle: profile?.professionalIdentity?.serviceStyle || [],
+          attendsAt: serviceMode as any
         },
         updatedAt: new Date().toISOString()
       };
@@ -326,6 +351,14 @@ export default function ProfilePage() {
     setServiceAreas(serviceAreas.filter((_, i) => i !== index));
   };
 
+  const toggleDay = (day: number) => {
+    if (workingDays.includes(day)) {
+      setWorkingDays(workingDays.filter(d => d !== day));
+    } else {
+      setWorkingDays([...workingDays, day].sort());
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-parchment pb-24 md:pb-0 md:flex">
       {/* Desktop Sidebar (Hidden on Mobile) */}
@@ -411,43 +444,19 @@ export default function ProfilePage() {
         <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
           {/* Left Column: Avatar & Identity */}
           <div className="lg:col-span-1 space-y-8">
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm text-center">
-              <div className="relative w-32 h-32 mx-auto mb-8">
-                <div 
-                  onClick={() => {
-                    console.log('[Upload] Avatar click triggered');
-                    avatarInputRef.current?.click();
-                  }}
-                  className="w-full h-full bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden cursor-pointer group relative"
-                >
-                  {avatarPreview || avatar ? (
-                    <img src={avatarPreview || avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  ) : (
-                    <User size={48} className="opacity-20" />
-                  )}
-                  <div className="absolute inset-0 bg-brand-ink/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    {uploadingImage ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                        <Sparkles size={24} className="text-brand-white" />
-                      </motion.div>
-                    ) : (
-                      <Camera size={24} className="text-brand-white" />
-                    )}
-                  </div>
-                </div>
-                <input 
-                  ref={avatarInputRef}
-                  type="file" 
-                  accept="image/*" 
-                  className="hidden" 
-                  disabled={uploadingImage}
-                  onChange={handleAvatarUpload} 
-                />
-                <div className="absolute bottom-0 right-0 w-10 h-10 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-4 border-brand-white shadow-lg pointer-events-none">
-                  <Camera size={16} />
-                </div>
-              </div>
-            </div>
+            <FormIdentity
+              name={name}
+              setName={setName}
+              specialty={specialty}
+              setSpecialty={setSpecialty}
+              avatar={avatar}
+              avatarPreview={avatarPreview}
+              uploadingImage={uploadingImage}
+              onAvatarClick={() => avatarInputRef.current?.click()}
+              inputRef={avatarInputRef}
+              onFileUpload={handleAvatarUpload}
+              showLabels={true}
+            />
           </div>
 
           {/* Right Column: Details */}
@@ -535,18 +544,21 @@ export default function ProfilePage() {
             </div>
 
             <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Nome Profissional</label>
-                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light" required />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Especialidade</label>
-                  <input type="text" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex: Nail Designer" className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light" />
-                </div>
-              </div>
+              <FormIdentity
+                name={name}
+                setName={setName}
+                specialty={specialty}
+                setSpecialty={setSpecialty}
+                avatar={avatar}
+                avatarPreview={avatarPreview}
+                uploadingImage={uploadingImage}
+                onAvatarClick={() => avatarInputRef.current?.click()}
+                inputRef={avatarInputRef}
+                onFileUpload={handleAvatarUpload}
+                showLabels={true}
+              />
 
-              <div className="space-y-2">
+              <div className="space-y-2 pt-8 border-t border-brand-mist">
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Headline (Frase de impacto)</label>
                 <input 
                   type="text" 
@@ -792,6 +804,51 @@ export default function ProfilePage() {
                     </div>
                   </motion.div>
                 )}
+              </div>
+
+              {/* Working Hours Section */}
+              <div className="pt-8 border-t border-brand-mist space-y-8">
+                <div className="flex items-center gap-3">
+                  <Calendar size={20} className="text-brand-terracotta" />
+                  <h3 className="font-serif italic text-xl text-brand-ink">Horários de Atendimento</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
+                  <div className="flex justify-between">
+                    {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, idx) => (
+                      <button 
+                        key={idx}
+                        type="button"
+                        onClick={() => toggleDay(idx)}
+                        className={`w-10 h-10 rounded-full font-medium text-xs transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone'}`}
+                      >
+                        {day}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-6 pt-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início do Dia</label>
+                    <input 
+                      type="time" 
+                      value={startTime} 
+                      onChange={(e) => setStartTime(e.target.value)} 
+                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Fim do Dia</label>
+                    <input 
+                      type="time" 
+                      value={endTime} 
+                      onChange={(e) => setEndTime(e.target.value)} 
+                      className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 

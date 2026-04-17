@@ -39,7 +39,7 @@ export const workingHoursSchema = z.object({
 // User Profile Schema (Partial for onboarding/updates)
 export const userProfileSchema = z.object({
   name: nameSchema.optional(),
-  username: z.string().min(3).optional(),
+  slug: z.string().min(3).optional(),
   email: emailSchema.optional(),
   whatsapp: whatsappSchema.optional(),
   bio: z.string().max(500).optional(),

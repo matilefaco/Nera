@@ -19,8 +19,8 @@ export interface ServiceArea {
 }
 
 export interface WorkingHours {
-  startTime: string;
-  endTime: string;
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
   workingDays: number[]; // 0-6 (Sunday-Saturday)
 }
 
@@ -31,35 +31,36 @@ export interface ProfessionalIdentity {
   serviceStyle: string[]; // e.g., ["Delicada e detalhista", "Rápida e eficiente"]
   differentials: string[]; // e.g., ["Pontualidade", "Biossegurança"]
   attendsAt: 'studio' | 'home' | 'hybrid';
-  bio: string;
-  headline: string;
 }
 
 export interface UserProfile {
   uid: string;
   name: string;
-  username: string; // slug/username
   email: string;
   whatsapp: string;
+  slug: string; // Unique public identifier (official)
+  
   avatar?: string;
-  bio?: string;
-  headline?: string;
+  bio?: string; // Top-level official (removed from professionalIdentity)
+  headline?: string; // Top-level official (removed from professionalIdentity)
   specialty?: string;
   city?: string;
   neighborhood?: string;
-  slug?: string; // Alias for username
-  serviceAreaType?: 'city_wide' | 'custom';
   
-  professionalIdentity?: ProfessionalIdentity;
-  
-  services: Service[];
-  
-  workingHours: WorkingHours;
+  instagram?: string; // Official social link
+  pinterest?: string;
+  facebook?: string;
   
   serviceMode: 'studio' | 'home' | 'hybrid';
+  serviceAreaType?: 'city_wide' | 'custom';
+  pricingStrategy?: 'extra' | 'none'; // Official pricing strategy
   
+  workingHours: WorkingHours; // Official format
+  
+  professionalIdentity?: ProfessionalIdentity; // Official structure
+  
+  services: Service[];
   serviceAreas?: ServiceArea[];
-  
   portfolio?: PortfolioItem[];
   
   studioAddress?: {
@@ -76,6 +77,11 @@ export interface UserProfile {
   
   createdAt: string;
   updatedAt: string;
+
+  // --- LEGACY FIELDS FOR COMPATIBILITY ---
+  startTime?: string; // Legacy field
+  endTime?: string; // Legacy field
+  workingDays?: number[]; // Legacy field
 }
 
 export interface Review {
@@ -116,7 +122,8 @@ export interface Appointment {
   neighborhood?: string;
   address?: string;
   
-  status: 'pending' | 'confirmed' | 'declined' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  notes?: string;
   
   professionalId: string;
   professionalName?: string;
