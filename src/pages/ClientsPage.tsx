@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { formatCurrency } from '../lib/utils';
 import Logo from '../components/Logo';
 import MobileNav from '../components/MobileNav';
+import AppLoadingScreen from '../components/AppLoadingScreen';
 import { Appointment } from '../types';
 
 export default function ClientsPage() {
@@ -154,10 +155,7 @@ export default function ClientsPage() {
         {/* Clients List */}
         <div className="space-y-4">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-4">
-              <div className="w-12 h-12 border-4 border-brand-mist border-t-brand-terracotta rounded-full animate-spin" />
-              <p className="text-brand-stone font-serif italic">Carregando sua base de clientes...</p>
-            </div>
+            <AppLoadingScreen fullScreen={false} message="Carregando sua base de clientes..." />
           ) : filteredClients.length > 0 ? (
             filteredClients.map((client, idx) => (
               <motion.div 

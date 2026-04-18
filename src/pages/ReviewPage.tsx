@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { formatCurrency, cn } from '../lib/utils';
 import Logo from '../components/Logo';
+import AppLoadingScreen from '../components/AppLoadingScreen';
 import { UserProfile, Appointment } from '../types';
 
 interface ReviewRequest {
@@ -124,7 +125,7 @@ export default function ReviewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
-      toast.error('Por favor, selecione uma nota.');
+      toast.error('Por favor, deixe sua avaliação.');
       return;
     }
 
@@ -187,23 +188,17 @@ export default function ReviewPage() {
       }
 
       setSuccess(true);
-      toast.success('Avaliação enviada com sucesso!');
+      toast.success('Obrigada por compartilhar sua experiência!');
     } catch (err) {
       console.error('Error submitting review:', err);
-      toast.error('Erro ao enviar avaliação. Tente novamente.');
+      toast.error('Não foi possível enviar agora. Tente novamente.');
     } finally {
       setSubmitting(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-brand-parchment">
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }} className="text-brand-terracotta">
-          <Sparkles size={32} />
-        </motion.div>
-      </div>
-    );
+    return <AppLoadingScreen message="Validando convite..." />;
   }
 
   if (error) {

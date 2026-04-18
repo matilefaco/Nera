@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, getHumanError } from '../lib/utils';
 import Logo from '../components/Logo';
 import MobileNav from '../components/MobileNav';
 
@@ -53,16 +53,15 @@ export default function ServicesPage() {
       };
       if (editingId) {
         await updateDoc(doc(db, 'services', editingId), serviceData);
-        toast.success('Serviço atualizado!');
+        toast.success('Experiência atualizada com sucesso.');
       } else {
         await addDoc(collection(db, 'services'), serviceData);
-        toast.success('Serviço adicionado!');
+        toast.success('Nova experiência adicionada ao seu menu.');
       }
       closeModal();
     } catch (error: any) {
       console.error('[ServicesSave] Error:', error);
-      const technicalDetail = error.code || error.message || 'Erro desconhecido';
-      toast.error(`Erro ao salvar serviço: ${technicalDetail}`);
+      toast.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -74,13 +73,12 @@ export default function ServicesPage() {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'services', serviceToDelete));
-      toast.success('Serviço excluído');
+      toast.success('Experiência removida.');
       setIsDeleteModalOpen(false);
       setServiceToDelete(null);
     } catch (error: any) {
       console.error('[ServicesDelete] Error:', error);
-      const technicalDetail = error.code || error.message || 'Erro desconhecido';
-      toast.error(`Erro ao excluir: ${technicalDetail}`);
+      toast.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);
     }

@@ -52,27 +52,27 @@ export interface FirestoreErrorInfo {
 export function handleBookingError(error: any) {
   console.error('[Booking Error Handler]:', error);
 
-  let message = 'Erro ao processar agendamento. Por favor, tente novamente.';
+  let message = 'Não foi possível concluir agora. Tente novamente.';
 
   // 1. Specific Business Logic Errors
   if (error.message === 'Esse horário acabou de ser reservado' || error.message === 'Horário indisponível') {
-    message = 'Esse horário acabou de ser reservado ou está bloqueado. Por favor, escolha outro.';
+    message = 'Este horário acaba de ficar indisponível. Por favor, escolha outro momento.';
   } 
   // 2. Status Transition errors
   else if (error.message?.includes('não permitida')) {
-    message = 'Este agendamento já foi processado e não pode ser alterado.';
+    message = 'Esta reserva já foi finalizada e não pode mais ser alterada.';
   }
   // 3. Connection/Network Errors
   else if (error.code === 'unavailable' || error.message?.includes('network-error') || error.message?.includes('failed to fetch') || error.message?.includes('offline')) {
-    message = 'Verifique sua conexão com a internet e tente novamente.';
+    message = 'Sua conexão parece instável. Tente novamente em instantes.';
   }
   // 4. Data/Permission Errors
   else if (error.code === 'permission-denied' || error.message?.includes('insufficient permissions')) {
-    message = 'Dados inválidos ou erro de permissão. Verifique os campos.';
+    message = 'Ops! Verifique as informações e tente novamente.';
   }
   // 5. Not Found
   else if (error.message === 'Agendamento não encontrado') {
-    message = 'O agendamento solicitado não foi encontrado.';
+    message = 'A reserva solicitada não foi encontrada.';
   }
 
   toast.error(message);

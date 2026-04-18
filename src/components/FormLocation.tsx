@@ -1,6 +1,6 @@
 import React from 'react';
-import { MapPin, Building2, Home, Briefcase } from 'lucide-react';
-import { motion } from 'motion/react';
+import { MapPin, Building2, Home, Briefcase, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
 export interface FormLocationProps {
@@ -10,10 +10,53 @@ export interface FormLocationProps {
   setNeighborhood: (val: string) => void;
   serviceMode: 'home' | 'studio' | 'hybrid';
   setServiceMode: (val: 'home' | 'studio' | 'hybrid') => void;
+  
+  // Optional studio fields
+  studioAddress?: {
+    street: string;
+    number: string;
+    complement: string;
+    neighborhood: string;
+    city: string;
+    reference: string;
+  };
+  setStudioAddress?: (val: any) => void;
+  
+  // Optional home service fields
+  serviceAreas?: { name: string, fee: number }[];
+  setServiceAreas?: (val: any[]) => void;
+  pricingStrategy?: 'extra' | 'none';
+  setPricingStrategy?: (val: 'extra' | 'none') => void;
+  newAreaName?: string;
+  setNewAreaName?: (val: string) => void;
+  newAreaFee?: string;
+  setNewAreaFee?: (val: string) => void;
+  serviceAreaType?: 'city_wide' | 'specific_neighborhoods';
+  setServiceAreaType?: (val: 'city_wide' | 'specific_neighborhoods') => void;
+  addArea?: () => void;
+  removeArea?: (idx: number) => void;
+  formatCurrency?: (val: number) => string;
+  errors?: Record<string, string>;
+
   title?: string;
   subtitle?: string;
   showLabels?: boolean;
 }
+
+const FormError = ({ message }: { message?: string }) => (
+  <AnimatePresence>
+    {message && (
+      <motion.p 
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        exit={{ opacity: 0, height: 0 }}
+        className="text-[10px] text-brand-terracotta font-bold uppercase tracking-wider ml-1 mt-1"
+      >
+        {message}
+      </motion.p>
+    )}
+  </AnimatePresence>
+);
 
 export const FormLocation = ({
   city,
@@ -22,6 +65,22 @@ export const FormLocation = ({
   setNeighborhood,
   serviceMode,
   setServiceMode,
+  studioAddress,
+  setStudioAddress,
+  serviceAreas,
+  setServiceAreas,
+  pricingStrategy,
+  setPricingStrategy,
+  newAreaName,
+  setNewAreaName,
+  newAreaFee,
+  setNewAreaFee,
+  serviceAreaType,
+  setServiceAreaType,
+  addArea,
+  removeArea,
+  formatCurrency,
+  errors = {},
   title,
   subtitle,
   showLabels = true
@@ -41,7 +100,11 @@ export const FormLocation = ({
       <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Cidade Base</label>}
+            {showLabels && (
+              <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                Cidade Base <span className="text-brand-terracotta">*</span>
+              </label>
+            )}
             <div className="relative">
               <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
               <input 
@@ -49,24 +112,36 @@ export const FormLocation = ({
                 value={city} 
                 onChange={(e) => setCity(e.target.value)} 
                 placeholder="Ex: Fortaleza, CE" 
-                className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                className={cn(
+                  "w-full pl-14 pr-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                  errors.city ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                )}
               />
             </div>
+            <FormError message={errors.city} />
           </div>
           <div className="space-y-2">
-            {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro Base</label>}
+            {showLabels && (
+              <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                Bairro Base <span className="text-brand-terracotta">*</span>
+              </label>
+            )}
             <input 
               type="text" 
               value={neighborhood} 
               onChange={(e) => setNeighborhood(e.target.value)} 
               placeholder="Ex: Aldeota" 
-              className="w-full px-6 py-[15px] bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+              className={cn(
+                "w-full px-6 py-[15px] bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                errors.neighborhood ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+              )}
             />
+            <FormError message={errors.neighborhood} />
           </div>
         </div>
 
         <div className="space-y-4">
-          {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Modo de Atendimento</label>}
+          {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento</label>}
           <div className="grid grid-cols-3 gap-3">
             <button 
               type="button"
@@ -79,7 +154,7 @@ export const FormLocation = ({
               )}
             >
               <Building2 size={24} />
-              <span className="text-[10px] font-medium uppercase">Estúdio</span>
+              <span className="text-[10px] font-medium uppercase tracking-widest">Seu Espaço</span>
             </button>
             <button 
               type="button"
@@ -92,7 +167,7 @@ export const FormLocation = ({
               )}
             >
               <Home size={24} />
-              <span className="text-[10px] font-medium uppercase">Domicílio</span>
+              <span className="text-[10px] font-medium uppercase tracking-widest">Domicílio</span>
             </button>
             <button 
               type="button"
@@ -105,10 +180,228 @@ export const FormLocation = ({
               )}
             >
               <Briefcase size={24} />
-              <span className="text-[10px] font-medium uppercase">Híbrido</span>
+              <span className="text-[10px] font-medium uppercase tracking-widest">Híbrido</span>
             </button>
           </div>
         </div>
+
+        {/* Studio Address fields if applicable */}
+        {(serviceMode === 'studio' || serviceMode === 'hybrid') && studioAddress && setStudioAddress && (
+          <div className="space-y-8 pt-8 border-t border-brand-mist">
+            <div className="flex items-center gap-3 text-brand-ink">
+              <Building2 size={20} className="text-brand-terracotta" />
+              <h3 className="font-medium text-lg">Localização do seu espaço</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Rua</label>
+                <input 
+                  type="text"
+                  value={studioAddress.street} 
+                  onChange={(e) => setStudioAddress({...studioAddress, street: e.target.value})} 
+                  placeholder="Ex: Rua Silva Jatahy" 
+                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Número</label>
+                <input 
+                  type="text"
+                  value={studioAddress.number} 
+                  onChange={(e) => setStudioAddress({...studioAddress, number: e.target.value})} 
+                  placeholder="Ex: 123" 
+                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Complemento</label>
+                <input 
+                  type="text"
+                  value={studioAddress.complement} 
+                  onChange={(e) => setStudioAddress({...studioAddress, complement: e.target.value})} 
+                  placeholder="Ex: Sala 402" 
+                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro do Estúdio</label>
+                <input 
+                  type="text"
+                  value={studioAddress.neighborhood} 
+                  onChange={(e) => setStudioAddress({...studioAddress, neighborhood: e.target.value})} 
+                  placeholder="Ex: Meireles" 
+                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Cidade do Estúdio</label>
+                <input 
+                  type="text"
+                  value={studioAddress.city} 
+                  onChange={(e) => setStudioAddress({...studioAddress, city: e.target.value})} 
+                  placeholder="Ex: Fortaleza" 
+                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                />
+              </div>
+              
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Ponto de Referência</label>
+                <input 
+                  type="text"
+                  value={studioAddress.reference} 
+                  onChange={(e) => setStudioAddress({...studioAddress, reference: e.target.value})} 
+                  placeholder="Ex: Próximo ao Shopping Del Paseo" 
+                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Home service fields if applicable */}
+        {(serviceMode === 'home' || serviceMode === 'hybrid') && serviceAreas && setServiceAreas && pricingStrategy && setPricingStrategy && (
+          <div className="space-y-8 pt-8 border-t border-brand-mist">
+            <div className="flex items-center gap-3 text-brand-ink">
+              <Home size={20} className="text-brand-terracotta" />
+              <h3 className="font-medium text-lg">Atendimento em Domicílio</h3>
+            </div>
+            
+            <div className="space-y-6">
+              {setServiceAreaType && (
+                <div className="space-y-4">
+                  <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest">Onde você atende em domicílio?</p>
+                  <div className="flex gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => setServiceAreaType('city_wide')}
+                      className={cn(
+                        "flex-1 py-4 px-6 rounded-2xl border transition-all text-xs font-medium",
+                        serviceAreaType === 'city_wide' 
+                          ? 'border-brand-ink bg-brand-linen text-brand-ink' 
+                          : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'
+                      )}
+                    >
+                      Toda a cidade
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setServiceAreaType('specific_neighborhoods')}
+                      className={cn(
+                        "flex-1 py-4 px-6 rounded-2xl border transition-all text-xs font-medium",
+                        serviceAreaType === 'specific_neighborhoods' 
+                          ? 'border-brand-ink bg-brand-linen text-brand-ink' 
+                          : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'
+                      )}
+                    >
+                      Bairros específicos
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {serviceAreaType === 'specific_neighborhoods' && (
+                <div className="space-y-4">
+                  <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest">Você cobra o mesmo valor em todos os bairros?</p>
+                  <div className="flex gap-4">
+                    <button 
+                      type="button"
+                      onClick={() => setPricingStrategy!('none')}
+                      className={cn(
+                        "flex-1 py-4 px-6 rounded-2xl border transition-all text-xs font-medium",
+                        pricingStrategy === 'none' 
+                          ? 'border-brand-ink bg-brand-linen text-brand-ink' 
+                          : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'
+                      )}
+                    >
+                      Sim, mesmo valor
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setPricingStrategy!('extra')}
+                      className={cn(
+                        "flex-1 py-4 px-6 rounded-2xl border transition-all text-xs font-medium",
+                        pricingStrategy === 'extra' 
+                          ? 'border-brand-ink bg-brand-linen text-brand-ink' 
+                          : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'
+                      )}
+                    >
+                      Não, varia por região
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(serviceAreaType === 'specific_neighborhoods' || !setServiceAreaType) && (
+                <div className="bg-brand-parchment p-8 rounded-[32px] border border-brand-mist space-y-6">
+                  <h4 className="text-[10px] font-medium text-brand-ink uppercase tracking-widest">Configurar Regiões</h4>
+                  
+                  {setNewAreaName && setNewAreaFee && addArea && (
+                    <div className="flex flex-col md:flex-row items-end gap-3">
+                      <div className="flex-1 space-y-2 w-full">
+                        <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bairro / Região</label>
+                        <input 
+                          type="text" 
+                          value={newAreaName} 
+                          onChange={(e) => setNewAreaName(e.target.value)} 
+                          placeholder="Ex: Aldeota" 
+                          className="w-full px-5 py-3 bg-brand-white border border-brand-mist rounded-xl outline-none text-sm font-light focus:ring-1 focus:ring-brand-ink transition-all" 
+                        />
+                      </div>
+                      {pricingStrategy === 'extra' && (
+                        <div className="w-full md:w-48 space-y-2">
+                          <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Valor Adicional (R$)</label>
+                          <input 
+                            type="number" 
+                            value={newAreaFee} 
+                            onChange={(e) => setNewAreaFee(e.target.value)} 
+                            placeholder="0,00" 
+                            className="w-full px-5 py-3 bg-brand-white border border-brand-mist rounded-xl outline-none text-sm font-light focus:ring-1 focus:ring-brand-ink transition-all" 
+                          />
+                        </div>
+                      )}
+                      <button 
+                        type="button"
+                        onClick={addArea} 
+                        className="bg-brand-ink text-brand-white px-8 h-[46px] rounded-xl text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    {serviceAreas.map((area, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-brand-white p-4 rounded-2xl border border-brand-mist">
+                        <span className="text-sm font-medium text-brand-ink">{area.name}</span>
+                        <div className="flex items-center gap-4">
+                          {pricingStrategy === 'extra' && area.fee > 0 && formatCurrency && (
+                            <span className="text-xs font-medium text-brand-terracotta">
+                              + {formatCurrency(area.fee)}
+                            </span>
+                          )}
+                          {removeArea && (
+                            <button 
+                              type="button"
+                              onClick={() => removeArea(idx)} 
+                              className="text-brand-stone hover:text-brand-terracotta transition-all"
+                            >
+                              <X size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

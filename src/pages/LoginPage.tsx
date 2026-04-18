@@ -6,6 +6,7 @@ import { auth } from '../firebase';
 import { Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
+import { getHumanError } from '../lib/utils';
 import Logo from '../components/Logo';
 
 export default function LoginPage() {
@@ -20,15 +21,11 @@ export default function LoginPage() {
     try {
       const provider = new GoogleAuthProvider();
       await signInWithPopup(auth, provider);
-      toast.success('Bem-vinda de volta!');
+      toast.success('Que bom ter você de volta!');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('[Login] Erro no login Google:', error);
-      if (error.code === 'auth/popup-blocked') {
-        toast.error('O popup foi bloqueado pelo navegador.');
-      } else {
-        toast.error('Erro ao entrar com Google');
-      }
+      toast.error('Não foi possível realizar o acesso. Verifique seus dados.');
     } finally {
       setLoading(false);
     }
@@ -41,11 +38,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      toast.success('Bem-vinda de volta!');
+      toast.success('Que bom ter você de volta!');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('[Login] Erro no login manual:', error);
-      toast.error('E-mail ou senha incorretos');
+      toast.error('Não foi possível realizar o acesso. Verifique seus dados.');
     } finally {
       setLoading(false);
     }
@@ -53,7 +50,7 @@ export default function LoginPage() {
 
   const handleLogoutAndStay = async () => {
     await signOut(auth);
-    toast.info('Sessão encerrada.');
+    toast.success('Até breve!');
   };
 
   return (

@@ -84,3 +84,38 @@ export function formatDateKey(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+/**
+ * Humanizes technical error messages for the user.
+ */
+export function getHumanError(error: any): string {
+  if (!error) return "Algo deu errado. Tente novamente.";
+
+  const code = error.code || (typeof error === 'string' ? error : '');
+  
+  const errorMap: Record<string, string> = {
+    'permission-denied': "Você não tem permissão para realizar esta ação.",
+    'firestore/permission-denied': "Você não tem permissão para realizar esta ação.",
+    'unavailable': "O serviço está temporariamente indisponível. Tente novamente em instantes.",
+    'firestore/unavailable': "O serviço está temporariamente indisponível. Tente novamente em instantes.",
+    'not-found': "Não conseguimos encontrar essa informação.",
+    'firestore/not-found': "Não conseguimos encontrar essa informação.",
+    'already-exists': "Isso já foi cadastrado no nosso sistema.",
+    'firestore/already-exists': "Isso já foi cadastrado no nosso sistema.",
+    'unauthenticated': "Sua sessão expirou. Por favor, entre na sua conta novamente.",
+    'auth/unauthenticated': "Sua sessão expirou. Por favor, entre na sua conta novamente.",
+    'auth/user-not-found': "Usuário não encontrado.",
+    'auth/wrong-password': "E-mail ou senha incorretos.",
+    'auth/invalid-email': "E-mail inválido.",
+    'auth/email-already-in-use': "Este e-mail já está em uso.",
+    'auth/weak-password': "A senha é muito fraca.",
+    'auth/popup-blocked': "O navegador bloqueou a janela de login. Por favor, permita popups.",
+  };
+
+  // Check for partial matches or specific codes
+  for (const [key, message] of Object.entries(errorMap)) {
+    if (code.includes(key)) return message;
+  }
+
+  return "Algo deu errado. Tente novamente.";
+}

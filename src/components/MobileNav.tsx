@@ -12,11 +12,11 @@ export default function MobileNav() {
   const location = useLocation();
   
   const navItems = [
-    { icon: LayoutDashboard, label: 'Início', path: '/dashboard' },
+    { icon: LayoutDashboard, label: 'Painel', path: '/dashboard' },
     { icon: Calendar, label: 'Agenda', path: '/agenda' },
-    { icon: Users, label: 'Clientes', path: '/clients' },
-    { icon: List, label: 'Serviços', path: '/services' },
-    { icon: User, label: 'Perfil', path: '/profile' },
+    { icon: Users, label: 'Relacionamentos', path: '/clients' },
+    { icon: List, label: 'Experiências', path: '/services' },
+    { icon: User, label: 'Minha Marca', path: '/profile' },
   ];
 
   return (

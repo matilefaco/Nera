@@ -7,7 +7,7 @@ import {
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp,
-  ChevronRight, Sparkles, Home
+  ChevronRight, Sparkles, Home, X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -30,6 +30,9 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [dailyTip, setDailyTip] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [confirmedId, setConfirmedId] = useState<string | null>(null);
+  const [isConfirmRejectOpen, setIsConfirmRejectOpen] = useState(false);
+  const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
 
   const tips = [
     "Dica: Peça para suas clientes avaliarem o serviço no Nera para subir no ranking!",
@@ -115,7 +118,17 @@ export default function Dashboard() {
     setProcessingId(id);
     try {
       await updateAppointmentStatus(id, decision);
-      toast.success(decision === 'confirmed' ? 'Agendamento confirmado!' : 'Agendamento recusado.');
+      
+      if (decision === 'confirmed') {
+        setConfirmedId(id);
+        toast.success('Reserva confirmada com sucesso!');
+        // Allow some time for the success state to be visible before it's removed by snapshot
+        await new Promise(resolve => setTimeout(resolve, 800));
+      } else {
+        toast.success('Reserva marcada como indisponível.');
+        setIsConfirmRejectOpen(false);
+        setRequestToReject(null);
+      }
       
       // If closing details modal
       if (selectedRequest?.id === id) {
@@ -125,6 +138,7 @@ export default function Dashboard() {
       handleBookingError(error);
     } finally {
       setProcessingId(null);
+      setConfirmedId(null);
     }
   };
 
@@ -132,11 +146,14 @@ export default function Dashboard() {
     setProcessingId(id);
     try {
       await updateAppointmentStatus(id, 'completed'); 
-      toast.success('Atendimento concluído e arquivado!');
+      setConfirmedId(id); // Re-using state for completion visual
+      toast.success('Experiência concluída e registrada.');
+      await new Promise(resolve => setTimeout(resolve, 800));
     } catch (error) {
       handleBookingError(error);
     } finally {
       setProcessingId(null);
+      setConfirmedId(null);
     }
   };
 
@@ -149,19 +166,19 @@ export default function Dashboard() {
         </div>
         <nav className="flex-1 space-y-1">
           <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all">
-            <TrendingUp size={18} className="text-brand-terracotta" /> Dashboard
+            <TrendingUp size={18} className="text-brand-terracotta" /> Painel
           </Link>
           <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
             <Calendar size={18} className="group-hover:text-brand-terracotta transition-colors" /> Agenda
           </Link>
           <Link to="/clients" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
-            <Users size={18} className="group-hover:text-brand-terracotta transition-colors" /> Clientes
+            <Users size={18} className="group-hover:text-brand-terracotta transition-colors" /> Relacionamentos
           </Link>
           <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
-            <List size={18} className="group-hover:text-brand-terracotta transition-colors" /> Serviços
+            <List size={18} className="group-hover:text-brand-terracotta transition-colors" /> Experiências
           </Link>
           <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
-            <Settings size={18} className="group-hover:text-brand-terracotta transition-colors" /> Perfil
+            <Settings size={18} className="group-hover:text-brand-terracotta transition-colors" /> Minha Marca
           </Link>
         </nav>
         
@@ -170,7 +187,7 @@ export default function Dashboard() {
             onClick={() => auth.signOut()}
             className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:text-brand-terracotta transition-all text-[11px] font-medium uppercase tracking-widest w-full"
           >
-            <LogOut size={18} /> Sair
+            <LogOut size={18} /> Encerrar Sessão
           </button>
         </div>
       </aside>
@@ -189,7 +206,7 @@ export default function Dashboard() {
               onClick={() => {
                 const url = `https://nera.app/p/${profile?.slug}`;
                 navigator.clipboard.writeText(url);
-                toast.success('Link da vitrine copiado!');
+                toast.success('Link copiado.');
               }}
               className="flex items-center gap-3 px-6 py-4 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm group"
             >
@@ -210,13 +227,13 @@ export default function Dashboard() {
           <div className="bg-brand-white border border-brand-mist px-5 py-3 rounded-2xl flex items-center gap-3 shadow-sm">
             <div className={`w-2 h-2 rounded-full ${pendingCount > 0 ? 'bg-brand-terracotta animate-pulse' : 'bg-brand-mist'}`} />
             <span className="text-[10px] font-medium uppercase tracking-widest text-brand-stone">
-              {pendingCount} Pendentes
+              {pendingCount} Aguardando
             </span>
           </div>
           <div className="bg-brand-white border border-brand-mist px-5 py-3 rounded-2xl flex items-center gap-3 shadow-sm">
             <div className="w-2 h-2 rounded-full bg-green-500" />
             <span className="text-[10px] font-medium uppercase tracking-widest text-brand-stone">
-              {confirmedToday.length} Confirmados hoje
+              {confirmedToday.length} Reservas hoje
             </span>
           </div>
           <div className="bg-brand-linen border border-brand-mist px-5 py-3 rounded-2xl flex items-center gap-3 shadow-sm">
@@ -231,19 +248,43 @@ export default function Dashboard() {
         {pendingRequests.length > 0 && (
           <section className="mb-16">
             <div className="flex items-center gap-4 mb-8">
-              <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Novas Solicitações</h2>
+              <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Novas Reservas</h2>
               <div className="h-px flex-1 bg-brand-terracotta/20" />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {pendingRequests.map((request) => (
-                <motion.div 
-                  key={request.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-brand-white p-6 rounded-[32px] border-2 border-brand-terracotta shadow-xl relative overflow-hidden group"
-                >
-                  <div className="flex justify-between items-start mb-6">
+              <AnimatePresence mode="popLayout">
+                {pendingRequests.map((request) => (
+                  <motion.div 
+                    key={request.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    className="bg-brand-white p-6 rounded-[32px] border-2 border-brand-terracotta shadow-xl relative overflow-hidden group"
+                  >
+                    {/* Success Overlay */}
+                    <AnimatePresence>
+                      {confirmedId === request.id && (
+                        <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="absolute inset-0 z-20 bg-brand-ink flex flex-col items-center justify-center text-brand-white"
+                        >
+                          <motion.div 
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: 'spring', damping: 12 }}
+                            className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mb-3"
+                          >
+                            <Check size={32} className="text-brand-terracotta" />
+                          </motion.div>
+                          <p className="text-[10px] font-medium uppercase tracking-[0.2em]">Confirmado</p>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <div className="flex justify-between items-start mb-6">
                     <div>
                       <h3 className="text-xl font-serif text-brand-ink mb-1">{request.clientName}</h3>
                       <p className="text-[10px] text-brand-terracotta uppercase tracking-widest font-bold tracking-tighter bg-brand-terracotta/5 px-2 py-0.5 rounded inline-block">
@@ -276,19 +317,26 @@ export default function Dashboard() {
                   <div className="flex gap-3">
                     <button 
                       onClick={() => handleRespond(request.id, 'confirmed')}
-                      className="flex-1 py-4 bg-brand-ink text-brand-white rounded-xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg text-center"
+                      disabled={processingId === request.id}
+                      className="flex-1 py-4 bg-brand-ink text-brand-white rounded-xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg text-center flex items-center justify-center gap-2"
                     >
-                      Confirmar
+                      {processingId === request.id ? (
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                          <Sparkles size={14} />
+                        </motion.div>
+                      ) : 'Confirmar reserva'}
                     </button>
                     <button 
                       onClick={() => { setSelectedRequest(request); setIsModalOpen(true); }}
-                      className="px-5 py-4 bg-brand-white text-brand-ink border border-brand-mist rounded-xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all"
+                      disabled={processingId === request.id}
+                      className="px-5 py-4 bg-brand-white text-brand-ink border border-brand-mist rounded-xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all disabled:opacity-50"
                     >
-                      Detalhes
+                      Consultar
                     </button>
                   </div>
                 </motion.div>
               ))}
+              </AnimatePresence>
             </div>
           </section>
         )}
@@ -300,7 +348,7 @@ export default function Dashboard() {
             {/* 3. NEXT APPOINTMENT (PRIORITY 2) */}
             <section>
               <div className="flex items-center gap-4 mb-8">
-                <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Próximo Atendimento</h2>
+                <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Próxima Experiência</h2>
                 <div className="h-px flex-1 bg-brand-mist" />
               </div>
               
@@ -315,7 +363,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-8">
                       <div className="w-24 h-24 rounded-[32px] bg-brand-white/10 flex flex-col items-center justify-center border border-white/10 backdrop-blur-md">
                         <span className="text-[9px] uppercase tracking-[0.2em] text-brand-terracotta font-bold mb-1">
-                          {nextAppointment.date === getTodayLocale() ? 'Hoje' : nextAppointment.date.split('-').reverse().slice(0, 2).join('/')}
+                          {nextAppointment.date === getTodayLocale() ? 'Agenda de Hoje' : nextAppointment.date.split('-').reverse().slice(0, 2).join('/')}
                         </span>
                         <span className="text-3xl font-serif">{nextAppointment.time}</span>
                       </div>
@@ -351,7 +399,7 @@ export default function Dashboard() {
                 </motion.div>
               ) : (
                 <div className="bg-brand-white border border-brand-mist border-dashed p-12 rounded-[40px] text-center">
-                  <p className="text-brand-stone font-serif italic text-lg">Sem atendimentos confirmados para agora.</p>
+                  <p className="text-brand-stone font-serif italic text-lg">Sua agenda está leve hoje.</p>
                   <Link to="/agenda" className="text-[10px] font-medium uppercase tracking-widest text-brand-terracotta mt-4 inline-block hover:underline">Abrir Agenda Completa</Link>
                 </div>
               )}
@@ -365,12 +413,33 @@ export default function Dashboard() {
               </div>
               
               <div className="space-y-4">
+                <AnimatePresence mode="popLayout">
                 {confirmedToday.length > 0 ? (
                   confirmedToday.map((appt) => (
-                    <div 
+                    <motion.div 
                       key={appt.id}
-                      className="bg-brand-white p-6 rounded-[28px] border border-brand-mist flex items-center justify-between shadow-sm hover:shadow-md transition-all group"
+                      layout
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
+                      className="bg-brand-white p-6 rounded-[28px] border border-brand-mist flex items-center justify-between shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
                     >
+                      {/* Completion Overlay */}
+                      <AnimatePresence>
+                        {confirmedId === appt.id && (
+                          <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="absolute inset-0 z-20 bg-brand-ink/90 backdrop-blur-sm flex items-center justify-center text-brand-white"
+                          >
+                            <div className="flex items-center gap-3">
+                              <Check size={18} className="text-brand-terracotta" />
+                              <span className="text-[10px] font-medium uppercase tracking-[0.2em]">Concluído</span>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
                       <div className="flex items-center gap-6">
                         <div className={`w-16 h-16 rounded-2xl flex items-center justify-center font-serif text-lg ${appt.id === nextAppointment?.id ? 'bg-brand-terracotta text-brand-white' : 'bg-brand-parchment text-brand-ink'}`}>
                           {appt.time}
@@ -383,25 +452,56 @@ export default function Dashboard() {
                       <div className="flex items-center gap-2">
                         <button 
                           onClick={() => handleComplete(appt.id)}
-                          className="w-10 h-10 flex items-center justify-center bg-brand-linen text-brand-stone rounded-full hover:bg-brand-ink hover:text-brand-white transition-all"
+                          disabled={processingId === appt.id}
+                          className="w-10 h-10 flex items-center justify-center bg-brand-linen text-brand-stone rounded-full hover:bg-brand-ink hover:text-brand-white transition-all disabled:opacity-50"
                         >
-                          <Check size={18} />
+                          {processingId === appt.id ? (
+                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                              <Sparkles size={16} />
+                            </motion.div>
+                          ) : <Check size={18} />}
                         </button>
                         <button 
                           onClick={() => { setSelectedRequest(appt); setIsModalOpen(true); }}
+                          disabled={processingId === appt.id}
                           className="w-10 h-10 flex items-center justify-center bg-brand-linen text-brand-stone rounded-full hover:bg-brand-ink hover:text-brand-white transition-all"
                         >
                           <ChevronRight size={18} />
                         </button>
                       </div>
-                    </div>
+                    </motion.div>
                   ))
                 ) : (
-                  <div className="py-12 bg-brand-parchment/50 border border-brand-mist border-dashed rounded-[32px] text-center">
-                    <Sparkles className="mx-auto text-brand-mist mb-3" size={24} />
-                    <p className="text-brand-stone text-xs uppercase tracking-widest">Nenhum atendimento confirmado hoje</p>
-                  </div>
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-brand-white p-12 rounded-[40px] border border-brand-mist shadow-sm text-center flex flex-col items-center gap-8"
+                  >
+                    <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center">
+                      <Sparkles size={32} />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3">
+                        Momentos de tranquilidade hoje, {profile?.name?.split(' ')[0]}.
+                      </h3>
+                      <p className="text-brand-stone font-light italic text-lg">
+                        Compartilhe sua marca para despertar novos desejos.
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const url = window.location.origin + '/p/' + profile?.slug;
+                        navigator.clipboard.writeText(url);
+                        toast.success('Link copiado.');
+                      }}
+                      className="flex items-center gap-4 px-10 py-5 bg-brand-ink text-brand-white rounded-full text-[11px] font-medium uppercase tracking-[0.2em] hover:bg-brand-espresso transition-all shadow-xl group"
+                    >
+                      <Share2 size={18} className="group-hover:scale-110 transition-transform" /> 
+                      Copiar link do meu espaço
+                    </button>
+                  </motion.div>
                 )}
+                </AnimatePresence>
               </div>
             </section>
           </div>
@@ -410,16 +510,16 @@ export default function Dashboard() {
           <div className="space-y-8">
             {/* 5. REVENUE (PRIORITY 4) */}
             <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
-              <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-8">Performance Hoje</h3>
+              <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-8">Faturamento</h3>
               
               <div className="mb-8">
-                <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-1">Receita Confirmada</p>
+                <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-1">Confirmado</p>
                 <p className="text-4xl font-serif text-brand-ink">{formatCurrency(dailyRevenue)}</p>
               </div>
 
               <div className="space-y-4 pt-8 border-t border-brand-mist">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] text-brand-stone uppercase tracking-widest">Potencial Pendente</span>
+                  <span className="text-[10px] text-brand-stone uppercase tracking-widest">Potencial a Confirmar</span>
                   <span className="text-sm font-medium text-brand-terracotta">+{formatCurrency(potentialRevenue)}</span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -429,7 +529,7 @@ export default function Dashboard() {
               </div>
 
               <Link to="/clients" className="mt-8 flex items-center justify-between text-[10px] font-medium uppercase tracking-widest text-brand-terracotta hover:gap-2 transition-all">
-                Ver Carteira de Clientes <ChevronRight size={14} />
+                Minha Carteira de Clientes <ChevronRight size={14} />
               </Link>
             </section>
 
@@ -444,7 +544,7 @@ export default function Dashboard() {
                   <MessageCircle size={14} className="text-brand-terracotta" /> Lembretes em Massa
                 </button>
                 <Link to="/services" className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all">
-                  <Settings size={14} className="text-brand-terracotta" /> Configurar Serviços
+                  <Settings size={14} className="text-brand-terracotta" /> Gerenciar Experiências
                 </Link>
               </div>
             </section>
@@ -586,16 +686,63 @@ export default function Dashboard() {
                     disabled={!!processingId}
                     className="flex-1 py-6 bg-brand-ink text-brand-white rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {processingId === selectedRequest.id ? 'Processando...' : 'Confirmar Agendamento'}
+                    {processingId === selectedRequest.id ? 'Fidelizando...' : 'Confirmar Reserva'}
                   </button>
                   <button 
-                    onClick={() => handleRespond(selectedRequest.id, 'cancelled')}
+                    onClick={() => {
+                      setRequestToReject(selectedRequest);
+                      setIsConfirmRejectOpen(true);
+                    }}
                     disabled={!!processingId}
                     className="flex-1 py-6 bg-brand-white border border-brand-mist text-brand-stone rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all disabled:opacity-50"
                   >
-                    Recusar
+                    Indisponível
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Rejection Confirmation Modal */}
+      <AnimatePresence>
+        {isConfirmRejectOpen && requestToReject && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => { setIsConfirmRejectOpen(false); setRequestToReject(null); }}
+              className="absolute inset-0 bg-brand-ink/40 backdrop-blur-[2px]"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-sm bg-brand-white rounded-[32px] p-8 shadow-2xl border border-brand-mist text-center"
+            >
+              <div className="w-16 h-16 bg-brand-terracotta/10 text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                <X size={32} />
+              </div>
+              <h3 className="text-xl font-serif text-brand-ink mb-2">Confirmar recusa?</h3>
+              <p className="text-sm text-brand-stone font-light mb-8 leading-relaxed">
+                Tem certeza que deseja marcar como <span className="font-medium text-brand-ink">indisponível</span> esta reserva de <span className="font-medium text-brand-ink">{requestToReject.clientName}</span>? Esta ação não poderá ser desfeita.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => handleRespond(requestToReject.id, 'cancelled')}
+                  disabled={processingId === requestToReject.id}
+                  className="w-full py-4 bg-brand-terracotta text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg"
+                >
+                  {processingId === requestToReject.id ? 'Finalizando...' : 'Indisponível'}
+                </button>
+                <button 
+                  onClick={() => { setIsConfirmRejectOpen(false); setRequestToReject(null); }}
+                  className="w-full py-4 bg-brand-parchment text-brand-stone rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all"
+                >
+                  Cancelar
+                </button>
               </div>
             </motion.div>
           </div>

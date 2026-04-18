@@ -62,12 +62,12 @@ export default function AgendaPage() {
         createdAt: new Date().toISOString()
       });
 
-      toast.success('Atendimento concluído! Link de avaliação gerado.');
+      toast.success('Experiência finalizada! Link de feedback pronto para envio.');
       
       // Copy link to clipboard for the professional to send
       const reviewLink = `${window.location.origin}/review/${token}`;
       await navigator.clipboard.writeText(reviewLink);
-      toast.info('Link de avaliação copiado para a área de transferência.');
+      toast.success('Link copiado. Pronta para enviar?');
 
     } catch (err) {
       handleBookingError(err);
@@ -94,10 +94,10 @@ export default function AgendaPage() {
             <Users size={18} /> Clientes
           </Link>
           <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <List size={18} /> Serviços
+            <List size={18} /> Experiências
           </Link>
           <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Settings size={18} /> Perfil
+            <Settings size={18} /> Minha Marca
           </Link>
         </nav>
       </aside>

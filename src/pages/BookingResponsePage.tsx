@@ -30,7 +30,7 @@ export default function BookingResponsePage() {
         }
       } catch (error) {
         console.error('Error fetching appointment:', error);
-        toast.error('Erro ao carregar agendamento');
+        toast.error('Não foi possível carregar as informações agora.');
       } finally {
         setLoading(false);
       }
@@ -45,7 +45,7 @@ export default function BookingResponsePage() {
     try {
       await updateAppointmentStatus(appointmentId, decision);
       setResult(decision);
-      toast.success(decision === 'confirmed' ? 'Agendamento confirmado!' : 'Agendamento recusado.');
+      toast.success(decision === 'confirmed' ? 'Reserva confirmada com sucesso.' : 'Reserva marcada como indisponível.');
     } catch (error: any) {
       handleBookingError(error);
     } finally {
@@ -68,8 +68,8 @@ export default function BookingResponsePage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
         <X size={48} className="text-brand-mist mb-6" />
-        <h1 className="text-2xl font-serif text-brand-ink mb-4">Agendamento não encontrado</h1>
-        <p className="text-brand-stone max-w-xs">Este link pode ter expirado ou o agendamento foi removido.</p>
+        <h1 className="text-2xl font-serif text-brand-ink mb-4">Reserva não encontrada</h1>
+        <p className="text-brand-stone max-w-xs">Este link pode ter expirado ou a reserva foi removida.</p>
       </div>
     );
   }
@@ -88,12 +88,12 @@ export default function BookingResponsePage() {
           {result === 'confirmed' ? <Check size={40} /> : <X size={40} />}
         </motion.div>
         <h1 className="text-3xl font-serif text-brand-ink mb-4">
-          {result === 'confirmed' ? 'Confirmado!' : 'Recusado'}
+          {result === 'confirmed' ? 'Reserva Confirmada' : 'Indisponível'}
         </h1>
         <p className="text-brand-stone max-w-xs mb-10">
           {result === 'confirmed' 
             ? 'O horário foi bloqueado na sua agenda e a cliente foi notificada.' 
-            : 'A cliente foi notificada que você não poderá atendê-la neste horário.'}
+            : 'A cliente foi notificada que este horário não está disponível.'}
         </p>
         <div className="bg-brand-white p-6 rounded-3xl border border-brand-mist w-full max-w-sm text-left">
           <div className="flex items-center gap-3 mb-4">
@@ -130,12 +130,12 @@ export default function BookingResponsePage() {
       >
         <div className="flex items-center gap-2 text-brand-terracotta mb-8">
           <Sparkles size={20} />
-          <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Nova Solicitação</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Nova Reserva</span>
         </div>
 
-        <h1 className="text-3xl font-serif text-brand-ink mb-2">Confirmar Agendamento?</h1>
+        <h1 className="text-3xl font-serif text-brand-ink mb-2">Confirmar Reserva?</h1>
         <p className="text-sm text-brand-stone font-light mb-10">
-          {appointment.clientName} deseja realizar o serviço <strong>{appointment.serviceName}</strong>.
+          {appointment.clientName} deseja desfrutar da experiência <strong>{appointment.serviceName}</strong>.
         </p>
 
         <div className="space-y-6 mb-12">
@@ -188,14 +188,14 @@ export default function BookingResponsePage() {
             disabled={processing}
             className="w-full py-6 bg-brand-ink text-brand-white rounded-2xl font-medium flex items-center justify-center gap-3 hover:bg-brand-espresso transition-all disabled:opacity-50"
           >
-            {processing ? 'Processando...' : <><Check size={20} /> Confirmar Horário</>}
+            {processing ? 'Processando...' : <><Check size={20} /> Confirmar Reserva</>}
           </button>
           <button
             onClick={() => handleResponse('cancelled')}
             disabled={processing}
             className="w-full py-6 bg-brand-white text-brand-stone border border-brand-mist rounded-2xl font-medium flex items-center justify-center gap-3 hover:bg-brand-parchment transition-all disabled:opacity-50"
           >
-            <X size={20} /> Recusar Solicitação
+            <X size={20} /> Indisponível
           </button>
         </div>
       </motion.div>

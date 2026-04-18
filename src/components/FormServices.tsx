@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, DollarSign, Plus, X, Briefcase } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
 export interface ServiceDraft {
@@ -12,13 +13,30 @@ export interface ServiceDraft {
 export interface FormServicesProps {
   services: ServiceDraft[];
   setServices: (services: ServiceDraft[]) => void;
+  errors?: any[];
   title?: string;
   subtitle?: string;
 }
 
+const FormError = ({ message }: { message?: string }) => (
+  <AnimatePresence>
+    {message && (
+      <motion.p 
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        exit={{ opacity: 0, height: 0 }}
+        className="text-[10px] text-brand-terracotta font-bold uppercase tracking-wider ml-1 mt-1"
+      >
+        {message}
+      </motion.p>
+    )}
+  </AnimatePresence>
+);
+
 export const FormServices = ({
   services,
   setServices,
+  errors = [],
   title,
   subtitle
 }: FormServicesProps) => {
@@ -64,17 +82,23 @@ export const FormServices = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2 space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Nome do Serviço</label>
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                  Nome da Experiência <span className="text-brand-terracotta">*</span>
+                </label>
                 <input 
                   type="text" 
                   value={service.name} 
                   onChange={(e) => updateService(index, 'name', e.target.value)} 
-                  placeholder="Ex: Alongamento de Cílios" 
-                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                  placeholder="Ex: Consultoria de Imagem" 
+                  className={cn(
+                    "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                    errors[index]?.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                  )}
                 />
+                <FormError message={errors[index]?.name} />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Duração (min)</label>
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo Previsto (min)</label>
                 <div className="relative">
                   <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                   <input 
@@ -87,7 +111,9 @@ export const FormServices = ({
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Preço (R$)</label>
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                  Valor (R$) <span className="text-brand-terracotta">*</span>
+                </label>
                 <div className="relative">
                   <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                   <input 
@@ -95,17 +121,21 @@ export const FormServices = ({
                     value={service.price} 
                     onChange={(e) => updateService(index, 'price', e.target.value)} 
                     placeholder="0,00" 
-                    className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                    className={cn(
+                      "w-full pl-14 pr-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                      errors[index]?.price ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                    )}
                   />
                 </div>
+                <FormError message={errors[index]?.price} />
               </div>
               <div className="md:col-span-2 space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Descrição Curta (Opcional)</label>
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sutilezas e Detalhes (Opcional)</label>
                 <input 
                   type="text" 
                   value={service.description} 
                   onChange={(e) => updateService(index, 'description', e.target.value)} 
-                  placeholder="Ex: Inclui remoção e hidratação..." 
+                  placeholder="Ex: Realçando sua beleza com naturalidade..." 
                   className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                 />
               </div>
@@ -118,7 +148,7 @@ export const FormServices = ({
           onClick={addService}
           className="w-full py-6 border border-dashed border-brand-mist rounded-3xl text-brand-stone hover:text-brand-ink hover:border-brand-ink transition-all flex items-center justify-center gap-3 font-medium text-sm"
         >
-          <Plus size={18} /> Adicionar outro serviço
+          <Plus size={18} /> Propor nova experiência
         </button>
       </div>
     </div>

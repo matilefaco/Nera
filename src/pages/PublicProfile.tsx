@@ -10,9 +10,10 @@ import {
   ExternalLink, ArrowDown, Star, Share2, Copy,
   Check, Award, Users, Zap, HelpCircle, Home, Plus, X, Camera, Building2, Globe, ChevronDown, ArrowRight
 } from 'lucide-react';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, getHumanError } from '../lib/utils';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
+import AppLoadingScreen from '../components/AppLoadingScreen';
 import { UserProfile, Service, Review, ServiceArea, Appointment } from '../types';
 
 import { getAvailableSlots } from '../lib/bookingUtils';
@@ -69,6 +70,55 @@ const PremiumButton = ({ children, onClick, variant = 'primary', className, disa
   );
 };
 
+const PublicProfileSkeleton = () => (
+  <div className="min-h-screen bg-brand-parchment flex flex-col items-center pt-40 px-6">
+    {/* Avatar Skeleton */}
+    <div className="relative mb-16">
+      <div className="w-56 h-72 rounded-[60px] bg-brand-linen/60 border-8 border-brand-white shadow-2xl relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer" />
+      </div>
+    </div>
+
+    {/* Identity Skeleton */}
+    <div className="flex flex-col items-center w-full max-w-4xl space-y-12 mb-20 text-center">
+      <div className="space-y-4">
+        <div className="h-4 w-40 bg-brand-linen/60 rounded-full mx-auto animate-pulse" />
+        <div className="h-10 w-64 bg-brand-linen/80 rounded-xl mx-auto animate-pulse" />
+      </div>
+
+      <div className="w-full space-y-6">
+        <div className="h-20 md:h-32 w-full bg-brand-linen/40 rounded-[40px] animate-pulse overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
+        </div>
+        <div className="h-4 w-3/4 bg-brand-linen/30 rounded-full mx-auto animate-pulse" />
+        <div className="h-4 w-1/2 bg-brand-linen/20 rounded-full mx-auto animate-pulse" />
+      </div>
+    </div>
+
+    {/* Section Divider Skeleton */}
+    <div className="w-full max-w-6xl flex items-center gap-4 mb-16">
+      <div className="h-px flex-1 bg-brand-mist/50" />
+      <div className="h-4 w-32 bg-brand-linen/40 rounded-full animate-pulse" />
+      <div className="h-px flex-1 bg-brand-mist/50" />
+    </div>
+
+    {/* Services Grid Skeleton */}
+    <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20 text-left">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="bg-brand-white p-10 rounded-[40px] border border-brand-mist h-64 flex flex-col justify-between relative overflow-hidden group">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-brand-parchment/30 to-transparent -translate-x-full animate-shimmer" />
+          <div className="space-y-4 relative z-10">
+            <div className="h-7 w-3/4 bg-brand-linen/60 rounded-lg animate-pulse" />
+            <div className="h-4 w-full bg-brand-linen/30 rounded-lg animate-pulse" />
+            <div className="h-4 w-5/6 bg-brand-linen/20 rounded-lg animate-pulse" />
+          </div>
+          <div className="h-14 w-full bg-brand-linen/30 rounded-full relative z-10 animate-pulse" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
 export default function PublicProfile() {
   const { slug } = useParams();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -103,6 +153,7 @@ export default function PublicProfile() {
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  const [bookingAttempted, setBookingAttempted] = useState(false);
   const [bookingMode, setBookingMode] = useState<'studio' | 'home' | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
@@ -330,7 +381,7 @@ export default function PublicProfile() {
         }
       } catch (error) {
         console.error("Error fetching public profile:", error);
-        toast.error("Erro ao carregar perfil");
+        toast.error('Não foi possível carregar as informações agora.');
       } finally {
         setLoading(false);
       }
@@ -386,26 +437,21 @@ export default function PublicProfile() {
   };
 
   const handleBooking = async () => {
+    setBookingAttempted(true);
     if (!profile || !selectedService) {
       console.warn('[Booking] Missing profile or service', { profile: !!profile, service: !!selectedService });
       return;
     }
+
+    if (!clientName.trim() || !clientPhone.trim() || !clientEmail.trim() || (isHomeService && !clientAddress.trim())) {
+      toast.error('Por favor, preencha os campos destacados.');
+      return;
+    }
     
     // Validation for email
-    if (!clientEmail.trim()) {
-      toast.error('O e-mail é obrigatório para a confirmação');
-      return;
-    }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(clientEmail.trim())) {
-      toast.error('Por favor, informe um e-mail válido');
-      return;
-    }
-
-    // Validation for home service
-    if (isHomeService && !clientAddress.trim()) {
-      toast.error('Por favor, informe o endereço para o atendimento');
+      toast.error('O e-mail informado parece não ser válido.');
       return;
     }
 
@@ -460,17 +506,7 @@ export default function PublicProfile() {
     servicesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-brand-parchment">
-      <motion.div 
-        animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }} 
-        transition={{ repeat: Infinity, duration: 2 }} 
-        className="text-brand-terracotta"
-      >
-        <Logo variant="light" className="w-24 opacity-20" />
-      </motion.div>
-    </div>
-  );
+  if (loading) return <PublicProfileSkeleton />;
   
   if (!profile) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
@@ -527,7 +563,7 @@ export default function PublicProfile() {
               onClick={() => setStep(2)}
               className="bg-brand-ink text-brand-white px-6 py-3 rounded-full text-[9px] font-medium uppercase tracking_widest"
             >
-              Agendar
+              Reservar
             </button>
           </motion.div>
         )}
@@ -638,7 +674,7 @@ export default function PublicProfile() {
                 className="w-full sm:w-auto min-w-[320px] py-8 text-[13px] font-bold shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
                 variant="terracotta"
               >
-                Agendar Agora <ChevronRight size={18} className="ml-1" />
+                Reservar agora <ChevronRight size={18} className="ml-1" />
               </PremiumButton>
               
               {profile.instagram && (
@@ -1388,7 +1424,7 @@ export default function PublicProfile() {
                     )}
 
                     <div className="space-y-4">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Selecione o serviço</label>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Qual experiência deseja viver hoje?</label>
                       <div className="space-y-3">
                         {services.map((service) => (
                           <button
@@ -1432,9 +1468,9 @@ export default function PublicProfile() {
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                   <div className="flex items-center gap-4 mb-2">
                     <button onClick={() => setStep(2)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                    <h3 className="text-2xl font-serif text-brand-ink">Escolha o melhor momento</h3>
+                    <h3 className="text-2xl font-serif text-brand-ink">Selecione o melhor dia para você</h3>
                   </div>
-                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Selecione a data e o horário para sua experiência.</p>
+                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Escolha a data ideal para sua experiência.</p>
                   
                   {/* Calendar Strip */}
                   <div className="flex overflow-x-auto gap-3 pb-4 mb-10 no-scrollbar -mx-2 px-2">
@@ -1465,34 +1501,37 @@ export default function PublicProfile() {
                   </div>
 
                   {/* Time Slots */}
-                  <div className="grid grid-cols-3 gap-3 mb-12">
-                    {selectedDate ? (
-                      availableSlots.length > 0 ? (
-                        availableSlots.map(time => (
-                          <button 
-                            key={time}
-                            onClick={() => setSelectedTime(time)}
-                            className={cn(
-                              "py-5 rounded-2xl border transition-all text-sm font-medium flex items-center justify-center gap-2",
-                              selectedTime === time 
-                                ? "bg-brand-ink text-brand-white border-brand-ink" 
-                                : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-ink"
-                            )}
-                          >
-                            <Clock size={14} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist"} />
-                            {time}
-                          </button>
-                        ))
+                  <div className="space-y-4 mb-12">
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Horários disponíveis</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {selectedDate ? (
+                        availableSlots.length > 0 ? (
+                          availableSlots.map(time => (
+                            <button 
+                              key={time}
+                              onClick={() => setSelectedTime(time)}
+                              className={cn(
+                                "py-5 rounded-2xl border transition-all text-sm font-medium flex items-center justify-center gap-2",
+                                selectedTime === time 
+                                  ? "bg-brand-ink text-brand-white border-brand-ink" 
+                                  : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-ink"
+                              )}
+                            >
+                              <Clock size={14} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist"} />
+                              {time}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="col-span-3 py-16 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist">
+                            <p className="text-sm text-brand-stone font-light italic">Sem horários para este dia</p>
+                          </div>
+                        )
                       ) : (
-                        <div className="col-span-3 py-16 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist">
-                          <p className="text-sm text-brand-stone font-light italic">Sem horários para este dia</p>
+                        <div className="col-span-3 py-16 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
+                          <p className="text-sm text-brand-stone font-light italic">Selecione uma data acima</p>
                         </div>
-                      )
-                    ) : (
-                      <div className="col-span-3 py-16 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
-                        <p className="text-sm text-brand-stone font-light italic">Selecione uma data acima</p>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
 
                   <PremiumButton 
@@ -1501,7 +1540,7 @@ export default function PublicProfile() {
                     disabled={!selectedDate || !selectedTime}
                     onClick={() => setStep(4)}
                   >
-                    Confirmar Horário <ArrowRight size={18} className="ml-1" />
+                    Confirmar este horário <ArrowRight size={18} className="ml-1" />
                   </PremiumButton>
                 </motion.div>
               )}
@@ -1511,9 +1550,9 @@ export default function PublicProfile() {
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                   <div className="flex items-center gap-4 mb-2">
                     <button onClick={() => setStep(3)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                    <h3 className="text-2xl font-serif text-brand-ink">Último Passo</h3>
+                    <h3 className="text-2xl font-serif text-brand-ink">Só falta confirmar seus dados</h3>
                   </div>
-                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Preencha seus dados para finalizar a reserva.</p>
+                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Quase lá! Revise as informações da sua reserva.</p>
                   
                   <div className="bg-brand-ink text-brand-white rounded-[32px] p-8 mb-8 space-y-6 shadow-xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/20 rounded-full -mr-16 -mt-16 blur-3xl opacity-50" />
@@ -1543,8 +1582,14 @@ export default function PublicProfile() {
                         value={clientName}
                         onChange={(e) => setClientName(e.target.value)}
                         placeholder="Nome completo"
-                        className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
+                        className={cn(
+                          "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm",
+                          !clientName && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                        )}
                       />
+                      {!clientName && bookingAttempted && (
+                        <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -1556,8 +1601,14 @@ export default function PublicProfile() {
                           value={clientPhone}
                           onChange={(e) => setClientPhone(e.target.value)}
                           placeholder="(85) 99999-9999"
-                          className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
+                          className={cn(
+                            "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm",
+                            !clientPhone && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                          )}
                         />
+                        {!clientPhone && bookingAttempted && (
+                          <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
+                        )}
                       </div>
                       <div className="space-y-1">
                         <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
@@ -1568,9 +1619,15 @@ export default function PublicProfile() {
                           value={clientEmail}
                           onChange={(e) => setClientEmail(e.target.value)}
                           placeholder="seu@e-mail.com"
-                          className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm"
+                          className={cn(
+                            "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm",
+                            !clientEmail && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                          )}
                         />
-                        <p className="text-[9px] text-brand-stone/60 ml-2 font-light">
+                        {!clientEmail && bookingAttempted && (
+                          <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
+                        )}
+                        <p className="text-[9px] text-brand-stone/60 ml-2 font-light mt-1">
                           Usaremos seu e-mail para enviar a confirmação do agendamento
                         </p>
                       </div>
@@ -1585,8 +1642,14 @@ export default function PublicProfile() {
                           value={clientAddress}
                           onChange={(e) => setClientAddress(e.target.value)}
                           placeholder="Rua, número, bairro e qualquer ponto de referência"
-                          className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm resize-none h-28"
+                          className={cn(
+                            "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm resize-none h-28",
+                            !clientAddress && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                          )}
                         />
+                        {!clientAddress && bookingAttempted && (
+                          <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1595,11 +1658,11 @@ export default function PublicProfile() {
                     variant="terracotta" 
                     className="w-full py-7"
                     loading={bookingLoading}
-                    loadingText="Processando..."
+                    loadingText="Finalizando solicitação..."
                     disabled={!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)}
                     onClick={handleBooking}
                   >
-                    Confirmar Agendamento <Check size={18} className="ml-1" />
+                    Solicitar meu horário <Check size={18} className="ml-1" />
                   </PremiumButton>
                 </motion.div>
               )}
@@ -1625,9 +1688,9 @@ export default function PublicProfile() {
               <Check size={48} />
             </motion.div>
             
-            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Agendamento solicitado com sucesso</h2>
+            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Reserva recebida com sucesso</h2>
             <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
-              A profissional irá confirmar seu horário em breve
+              Sua solicitação foi enviada e em breve você receberá a confirmação diretamente no WhatsApp.
             </p>
 
             {/* Resume Card */}

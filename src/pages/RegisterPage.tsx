@@ -7,7 +7,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { User, Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
-import { generateSlug } from '../lib/utils';
+import { generateSlug, getHumanError } from '../lib/utils';
 import Logo from '../components/Logo';
 
 export default function RegisterPage() {
@@ -50,15 +50,15 @@ export default function RegisterPage() {
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      toast.success('Bem-vinda à nera!');
+      toast.success('Que prazer ter você conosco! Bem-vinda à Nera.');
       setTimeout(() => navigate('/onboarding'), 500);
 
     } catch (error: any) {
       console.error('>>> [DEBUG] [Register] Erro no cadastro Google:', error);
       if (error.code === 'auth/popup-blocked') {
-        toast.error('O popup foi bloqueado pelo navegador.');
+        toast.error('O acesso foi bloqueado pelo navegador. Por favor, permita popups.');
       } else {
-        toast.error('Erro ao cadastrar com Google');
+        toast.error('Não foi possível realizar o cadastro agora. Tente novamente.');
       }
     } finally {
       setLoading(false);
@@ -106,15 +106,12 @@ export default function RegisterPage() {
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      toast.success('Conta criada com sucesso!');
+      toast.success('Perfil criado com sucesso. Vamos começar?');
       setTimeout(() => navigate('/onboarding'), 500);
 
     } catch (error: any) {
       console.error('>>> [DEBUG] [Register] ERRO NO CADASTRO:', error);
-      let errorMessage = 'Erro ao criar conta';
-      if (error.code === 'auth/email-already-in-use') errorMessage = 'Este e-mail já está em uso.';
-      else if (error.code === 'auth/weak-password') errorMessage = 'A senha é muito fraca.';
-      toast.error(errorMessage);
+      toast.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -122,7 +119,7 @@ export default function RegisterPage() {
 
   const handleLogoutAndStay = async () => {
     await signOut(auth);
-    toast.info('Sessão encerrada.');
+    toast.success('Até breve!');
   };
 
   return (

@@ -16,6 +16,13 @@
   --color-brand-stone: #8A7060;
   --color-brand-mist: #E5DDD6;
   --color-brand-white: #FDFAF7;
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  --animate-shimmer: shimmer 2s infinite ease-in-out;
 }
 
 @layer base {

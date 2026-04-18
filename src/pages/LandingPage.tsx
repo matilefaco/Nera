@@ -17,7 +17,7 @@ export default function LandingPage() {
             Entrar
           </Link>
           <Link to="/register" className="bg-brand-ink text-brand-white px-6 py-3 rounded-full text-[10px] font-medium uppercase tracking-[0.15em] hover:bg-brand-espresso transition-all">
-            Criar conta
+            Fazer parte
           </Link>
         </div>
       </nav>
@@ -43,12 +43,12 @@ export default function LandingPage() {
               
               <p className="text-brand-stone text-lg md:text-xl max-w-2xl mb-12 leading-relaxed font-light">
                 O sistema central para profissionais de beleza com atendimento em domicílio. 
-                Agenda automática, zero WhatsApp, zero falta.
+                Reservas inteligentes, zero WhatsApp, zero falta.
               </p>
               
               <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
                 <Link to="/register" className="w-full sm:w-auto bg-brand-ink text-brand-white px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-espresso transition-all flex items-center justify-between gap-8 group">
-                  <span>Criar minha agenda grátis</span>
+                  <span>Criar minha marca grátis</span>
                   <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <Link to="/p/helena-prado" className="w-full sm:w-auto bg-transparent text-brand-ink border border-brand-mist px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-linen transition-all text-center">
@@ -111,8 +111,8 @@ export default function LandingPage() {
             <div className="grid md:grid-cols-3 gap-8">
               {[
                 { 
-                  title: "Agendamento 24/7", 
-                  desc: "Sua cliente agenda sozinha enquanto você atende ou dorme. Sem idas e vindas no WhatsApp.",
+                  title: "Reservas 24/7", 
+                  desc: "Sua cliente reserva sozinha enquanto você atende ou dorme. Sem idas e vindas no WhatsApp.",
                   icon: <Clock size={24} />
                 },
                 { 
@@ -181,7 +181,7 @@ export default function LandingPage() {
               Crie sua conta em 2 minutos e comece a receber agendamentos hoje mesmo.
             </p>
             <Link to="/register" className="inline-flex w-full sm:w-auto bg-brand-white text-brand-terracotta px-12 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-parchment transition-all items-center justify-center gap-8 group">
-              <span>Criar minha agenda grátis</span>
+              <span>Fazer parte da revolução</span>
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </Link>
             <p className="text-brand-white/40 text-[10px] uppercase tracking-[0.1em] mt-8">

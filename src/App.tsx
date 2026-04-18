@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './AuthContext';
+import AppLoadingScreen from './components/AppLoadingScreen';
 
 // Pages (to be created)
 import LandingPage from './pages/LandingPage';
@@ -27,7 +28,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return <div className="flex items-center justify-center h-screen bg-brand-cream">Carregando...</div>;
+  if (loading) return <AppLoadingScreen />;
   
   if (!user) {
     console.log('[Guard] No user found, redirecting to login');
