@@ -119,3 +119,38 @@ export function getHumanError(error: any): string {
 
   return "Algo deu errado. Tente novamente.";
 }
+
+/**
+ * Removes all non-numeric characters from a string.
+ */
+export function cleanWhatsapp(raw: string): string {
+  return (raw || '').replace(/\D/g, '');
+}
+
+/**
+ * Formats a numeric string into the "(XX) XXXXX-XXXX" pattern for display.
+ */
+export function formatWhatsappDisplay(raw: string): string {
+  const cleaned = cleanWhatsapp(raw);
+  // Matches 11 digits: XX XXXXX XXXX
+  const match = cleaned.match(/^(\d{2})(\d{5})(\d{4})$/);
+  if (match) {
+    return `(${match[1]}) ${match[2]}-${match[3]}`;
+  }
+  // Matches 10 digits (no 9): XX XXXX XXXX
+  const matchShort = cleaned.match(/^(\d{2})(\d{4})(\d{4})$/);
+  if (matchShort) {
+    return `(${matchShort[1]}) ${matchShort[2]}-${matchShort[3]}`;
+  }
+  return raw;
+}
+
+/**
+ * Builds a standard WhatsApp chat link.
+ */
+export function buildWhatsappLink(raw: string, message?: string): string {
+  const cleaned = cleanWhatsapp(raw);
+  // Ensure we don't have double 55 if the cleaning didn't catch it
+  const phone = cleaned.startsWith('55') && cleaned.length > 11 ? cleaned.substring(2) : cleaned;
+  return `https://wa.me/55${phone}?text=${encodeURIComponent(message || '')}`;
+}

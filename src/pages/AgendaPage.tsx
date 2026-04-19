@@ -12,7 +12,8 @@ import { Link } from 'react-router-dom';
 import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey } from '../lib/utils';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
-import MobileNav from '../components/MobileNav';
+import AppLayout from '../components/AppLayout';
+import { cn } from '../lib/utils';
 
 export default function AgendaPage() {
   const { user } = useAuth();
@@ -77,31 +78,7 @@ export default function AgendaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-parchment pb-24 md:pb-0 md:flex">
-      {/* Desktop Sidebar (Hidden on Mobile) */}
-      <aside className="hidden md:flex w-64 bg-brand-white border-r border-brand-mist p-8 flex-col">
-        <div className="mb-12">
-          <Logo />
-        </div>
-        <nav className="flex-1 space-y-2">
-          <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Painel
-          </Link>
-          <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Agenda
-          </Link>
-          <Link to="/clients" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Users size={18} /> Relacionamentos
-          </Link>
-          <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <List size={18} /> Experiências
-          </Link>
-          <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Settings size={18} /> Minha Marca
-          </Link>
-        </nav>
-      </aside>
-
+    <AppLayout activeRoute="agenda">
       <main className="flex-1 p-6 md:p-12 max-w-2xl mx-auto w-full">
         <header className="mb-12 flex items-center justify-between">
           <h1 className="text-4xl font-serif font-normal text-brand-ink">Agenda</h1>
@@ -190,9 +167,6 @@ export default function AgendaPage() {
         </div>
       </main>
 
-      <MobileNav />
-    </div>
+      </AppLayout>
   );
 }
-
-const cn = (...classes: any[]) => classes.filter(Boolean).join(' ');

@@ -11,11 +11,11 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { formatCurrency, getTodayLocale } from '../lib/utils';
-import MobileNav from '../components/MobileNav';
+import { formatCurrency, getTodayLocale, buildWhatsappLink } from '../lib/utils';
 import Logo from '../components/Logo';
 import { Appointment } from '../types';
 import { AnimatePresence } from 'motion/react';
+import AppLayout from '../components/AppLayout';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -206,40 +206,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-parchment pb-24 md:pb-0 md:flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-72 bg-brand-white border-r border-brand-mist p-8 flex-col sticky top-0 h-screen">
-        <div className="mb-12">
-          <Logo />
-        </div>
-        <nav className="flex-1 space-y-1">
-          <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all">
-            <TrendingUp size={18} className="text-brand-terracotta" /> Painel
-          </Link>
-          <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
-            <Calendar size={18} className="group-hover:text-brand-terracotta transition-colors" /> Agenda
-          </Link>
-          <Link to="/clients" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
-            <Users size={18} className="group-hover:text-brand-terracotta transition-colors" /> Relacionamentos
-          </Link>
-          <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
-            <List size={18} className="group-hover:text-brand-terracotta transition-colors" /> Experiências
-          </Link>
-          <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-2xl text-[11px] font-medium uppercase tracking-widest transition-all group">
-            <Settings size={18} className="group-hover:text-brand-terracotta transition-colors" /> Minha Marca
-          </Link>
-        </nav>
-        
-        <div className="mt-auto pt-8 border-t border-brand-mist">
-          <button 
-            onClick={() => auth.signOut()}
-            className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:text-brand-terracotta transition-all text-[11px] font-medium uppercase tracking-widest w-full"
-          >
-            <LogOut size={18} /> Encerrar Sessão
-          </button>
-        </div>
-      </aside>
-
+    <AppLayout activeRoute="dashboard">
       {/* Main Content */}
       <main className="flex-1 p-6 md:p-16 max-w-5xl mx-auto w-full">
         <header className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-8">
@@ -427,7 +394,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex gap-3">
                       <a 
-                        href={`https://wa.me/${nextAppointment.clientWhatsapp.replace(/\D/g, '')}`}
+                        href={buildWhatsappLink(nextAppointment.clientWhatsapp)}
                         target="_blank"
                         className="p-4 bg-brand-white/10 rounded-2xl hover:bg-brand-white/20 transition-all border border-white/5"
                       >
@@ -603,8 +570,7 @@ export default function Dashboard() {
                           onClick={() => {
                             const url = `${window.location.origin}/p/${profile?.slug}`;
                             const message = `Oi ${client.name.split(' ')[0]}! Gostou da experiência de hoje? ✨ Ficaria muito feliz se pudesse me indicar para uma amiga. Você pode compartilhar meu perfil por aqui: ${url}`;
-                            const phone = client.phone?.replace(/\D/g, '');
-                            window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                            window.open(buildWhatsappLink(client.phone, message), '_blank');
                           }}
                           className="px-4 py-2 flex items-center gap-2 bg-brand-white text-brand-ink border border-brand-mist rounded-xl text-[9px] font-bold uppercase tracking-widest hover:border-brand-terracotta transition-all shadow-sm"
                         >
@@ -641,8 +607,7 @@ export default function Dashboard() {
                         <button 
                           onClick={() => {
                             const message = "Oi! Abri novos horários essa semana e lembrei de você ✨";
-                            const phone = client.phone?.replace(/\D/g, '');
-                            window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                            window.open(buildWhatsappLink(client.phone, message), '_blank');
                           }}
                           className="w-10 h-10 flex items-center justify-center bg-brand-linen text-brand-terracotta rounded-xl hover:bg-brand-terracotta hover:text-brand-white transition-all shadow-sm"
                           title="Enviar mensagem"
@@ -724,7 +689,7 @@ export default function Dashboard() {
                   onClick={() => {
                     const url = `https://nera.app/p/${profile?.slug}`;
                     const text = `Acabei de abrir novos horários ✨ Reserve online comigo: ${url}`;
-                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    window.open(buildWhatsappLink('', text), '_blank');
                     setIsShareModalOpen(false);
                   }}
                   className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
@@ -794,8 +759,6 @@ export default function Dashboard() {
           </div>
         )}
       </AnimatePresence>
-
-      <MobileNav />
 
       {/* Request Details Modal */}
       <AnimatePresence>
@@ -889,7 +852,7 @@ export default function Dashboard() {
                     <p className="text-[10px] text-brand-stone uppercase tracking-widest">Contato</p>
                     <div className="flex flex-col gap-2">
                       <a 
-                        href={`https://wa.me/${selectedRequest.clientWhatsapp.replace(/\D/g, '')}`}
+                        href={buildWhatsappLink(selectedRequest.clientWhatsapp)}
                         target="_blank"
                         className="flex items-center justify-between p-4 bg-white rounded-2xl border border-brand-mist group"
                       >
@@ -976,6 +939,6 @@ export default function Dashboard() {
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </AppLayout>
   );
 }

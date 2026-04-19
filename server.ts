@@ -6,6 +6,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
+import { rateLimit } from "express-rate-limit";
+import { GoogleGenAI, Type } from "@google/genai";
 import { sendNewBookingEmail } from "./src/services/emailService.ts";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -30,9 +32,86 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Rate limiting for AI generation
+  const aiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 5, // 5 requests per IP
+    message: { error: "Muitas solicitações. Tente novamente em um minuto." }
+  });
+
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  app.post("/api/generate-content", aiLimiter, async (req, res) => {
+    const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
+    
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("[BioAI] GEMINI_API_KEY is missing in server environment");
+      return res.status(500).json({ error: "Configuração de IA ausente." });
+    }
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      
+      const prompt = `
+        Crie uma Headline (frase curta de impacto) e uma Bio (descrição boutique) para uma profissional de beleza.
+        
+        PERFIL:
+        - Nome: ${name}
+        - Especialidade: ${specialty}
+        - Experiência: ${yearsExperience} anos
+        - Estilo solicitado: ${bioStyle}
+        - Diferenciais: ${(differentials || []).join(', ')}
+        - Vibe desejada: ${(serviceStyle || []).join(', ')}
+        
+        REGRAS CRÍTICAS:
+        1. Tom: Sofisticado, premium e profissional.
+        2. Língua: Português natural do Brasil.
+        3. Headline: Curta (max 60 caracteres).
+        4. Bio: No máximo 2 parágrafos curtos.
+        5. PROIBIDO: 
+           - Clichês ("há X anos transformando vidas", "sonhos em realidade").
+           - Repetições.
+           - Mistura de idiomas.
+
+        VARIAÇÃO DE ESTILO (${(bioStyle || 'elegante').toUpperCase()}):
+        - elegante: polido, discreto, clássico.
+        - delicada: suave, detalhista, feminina.
+        - premium: exclusivo, luxuoso.
+        - minimalista: direto ao ponto, clean.
+        - acolhedora: humano, caloroso.
+        - técnica: foco em precisão, ciência.
+        - sofisticada: moderno, alta estética.
+        - autoral: único, assinatura própria.
+
+        Retorne no formato JSON com as chaves "headline" e "bio".
+      `;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              headline: { type: Type.STRING },
+              bio: { type: Type.STRING }
+            },
+            required: ["headline", "bio"]
+          }
+        }
+      });
+
+      const response = JSON.parse(result.text || "{}");
+      res.json(response);
+
+    } catch (error: any) {
+      console.error("[BioAI] Generation error:", error.message);
+      res.status(500).json({ error: "Erro ao gerar conteúdo." });
+    }
   });
 
   /**

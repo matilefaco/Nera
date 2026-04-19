@@ -9,9 +9,9 @@ import {
   List, Settings
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, buildWhatsappLink } from '../lib/utils';
 import Logo from '../components/Logo';
-import MobileNav from '../components/MobileNav';
+import AppLayout from '../components/AppLayout';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { Appointment } from '../types';
 
@@ -97,31 +97,7 @@ export default function ClientsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-brand-parchment pb-24 md:pb-0 md:flex">
-      {/* Desktop Sidebar (Hidden on Mobile) */}
-      <aside className="hidden md:flex w-64 bg-brand-white border-r border-brand-mist p-8 flex-col">
-        <div className="mb-12">
-          <Logo />
-        </div>
-        <nav className="flex-1 space-y-2">
-          <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Painel
-          </Link>
-          <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Agenda
-          </Link>
-          <Link to="/clients" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-xl font-medium text-sm transition-all">
-            <Users size={18} /> Relacionamentos
-          </Link>
-          <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <List size={18} /> Experiências
-          </Link>
-          <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Settings size={18} /> Minha Marca
-          </Link>
-        </nav>
-      </aside>
-
+    <AppLayout activeRoute="clients">
       <main className="flex-1 p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="mb-12">
           <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Seus Relacionamentos</h1>
@@ -192,7 +168,7 @@ export default function ClientsPage() {
                 
                 <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
                   <a 
-                    href={`https://wa.me/${client.phone.replace(/\D/g, '')}`}
+                    href={buildWhatsappLink(client.phone)}
                     target="_blank"
                     className="p-3 md:p-4 text-brand-ink hover:bg-green-50 hover:text-green-600 rounded-2xl transition-all border border-transparent hover:border-green-100"
                   >
@@ -214,7 +190,6 @@ export default function ClientsPage() {
         </div>
       </main>
 
-      <MobileNav />
-    </div>
+      </AppLayout>
   );
 }

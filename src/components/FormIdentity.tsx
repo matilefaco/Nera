@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Camera, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, cleanWhatsapp, formatWhatsappDisplay } from '../lib/utils';
 
 export interface FormIdentityProps {
   name: string;
@@ -279,8 +279,8 @@ export const FormIdentity = ({
               )}
               <input 
                 type="tel" 
-                value={whatsapp} 
-                onChange={(e) => setWhatsapp(e.target.value)} 
+                value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 
+                onChange={(e) => setWhatsapp?.(cleanWhatsapp(e.target.value))} 
                 placeholder="(00) 00000-0000" 
                 className={cn(
                   "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",

@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrency, getHumanError } from '../lib/utils';
 import Logo from '../components/Logo';
-import MobileNav from '../components/MobileNav';
+import AppLayout from '../components/AppLayout';
 
 export default function ServicesPage() {
   const { user } = useAuth();
@@ -110,31 +110,7 @@ export default function ServicesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-parchment pb-24 md:pb-0 md:flex">
-      {/* Desktop Sidebar (Hidden on Mobile) */}
-      <aside className="hidden md:flex w-64 bg-brand-white border-r border-brand-mist p-8 flex-col">
-        <div className="mb-12">
-          <Logo />
-        </div>
-        <nav className="flex-1 space-y-2">
-          <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Dashboard
-          </Link>
-          <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Agenda
-          </Link>
-          <Link to="/clients" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Users size={18} /> Clientes
-          </Link>
-          <Link to="/services" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-xl font-medium text-sm">
-            <List size={18} /> Serviços
-          </Link>
-          <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Settings size={18} /> Perfil
-          </Link>
-        </nav>
-      </aside>
-
+    <AppLayout activeRoute="services">
       <main className="flex-1 p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
           <div>
@@ -304,7 +280,6 @@ export default function ServicesPage() {
           )}
         </AnimatePresence>
       </main>
-      <MobileNav />
-    </div>
+    </AppLayout>
   );
 }

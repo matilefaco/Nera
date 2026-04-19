@@ -10,10 +10,12 @@ import {
   ExternalLink, ArrowDown, Star, Share2, Copy,
   Check, Award, Users, Zap, HelpCircle, Home, Plus, X, Camera, Building2, Globe, ChevronDown, ArrowRight
 } from 'lucide-react';
-import { formatCurrency, cn, getHumanError } from '../lib/utils';
+import { formatCurrency, cn, getHumanError, buildWhatsappLink } from '../lib/utils';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
+import PremiumButton from '../components/PremiumButton';
+import BookingModal from '../components/BookingModal';
 import { UserProfile, Service, Review, ServiceArea, Appointment } from '../types';
 
 import { getAvailableSlots } from '../lib/bookingUtils';
@@ -90,41 +92,6 @@ const SectionHeading = ({ label, title, subtitle, centered = true }: SectionHead
   </div>
 );
 
-interface PremiumButtonProps {
-  children: React.ReactNode;
-  onClick?: () => void;
-  variant?: 'primary' | 'secondary' | 'terracotta';
-  className?: string;
-  disabled?: boolean;
-  loading?: boolean;
-}
-
-const PremiumButton = ({ children, onClick, variant = 'primary', className, disabled, loading, loadingText }: PremiumButtonProps & { loadingText?: string }) => {
-  const baseStyles = "relative overflow-hidden px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] transition-all duration-500 flex items-center justify-center gap-3";
-  const variants: Record<string, string> = {
-    primary: "bg-brand-ink text-brand-white hover:bg-brand-espresso premium-shadow",
-    secondary: "bg-brand-white text-brand-ink border border-brand-mist hover:border-brand-ink",
-    terracotta: "bg-brand-terracotta text-brand-white hover:bg-brand-sienna premium-shadow",
-  };
-
-  return (
-    <button 
-      onClick={onClick} 
-      disabled={disabled || loading}
-      className={cn(baseStyles, variants[variant], className, (disabled || loading) && "opacity-50 cursor-not-allowed")}
-    >
-      {loading ? (
-        <div className="flex items-center gap-3">
-          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-            <Sparkles size={18} />
-          </motion.div>
-          {loadingText && <span>{loadingText}</span>}
-        </div>
-      ) : children}
-    </button>
-  );
-};
-
 const PublicProfileSkeleton = () => (
   <div className="min-h-screen bg-brand-parchment flex flex-col items-center pt-40 px-6">
     {/* Avatar Skeleton */}
@@ -198,171 +165,115 @@ export default function PublicProfile() {
     };
   }, [profile, reviews, stats]);
 
-  // Booking Flow State
-  const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [selectedArea, setSelectedArea] = useState<ServiceArea | null>(null);
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
-  const [clientAddress, setClientAddress] = useState('');
-  const [bookingAttempted, setBookingAttempted] = useState(false);
-  const [bookingMode, setBookingMode] = useState<'studio' | 'home' | null>(null);
-  const [bookingLoading, setBookingLoading] = useState(false);
-  const [bookingSuccess, setBookingSuccess] = useState(false);
+  // UI & Summary State
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [preSelectedService, setPreSelectedService] = useState<Service | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
-  const [manualBlockedSlots, setManualBlockedSlots] = useState<string[]>([]);
-  const [showRestoreDraft, setShowRestoreDraft] = useState(false);
   const [hasInteractedWithService, setHasInteractedWithService] = useState(false);
   const [showInterestPopup, setShowInterestPopup] = useState(false);
   const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
-
-  // Persistence Logic: Saving draft to localStorage
-  useEffect(() => {
-    if (!profile?.uid) return;
-
-    const draft = {
-      professionalId: profile.uid,
-      serviceId: selectedService?.id,
-      mode: bookingMode,
-      date: selectedDate,
-      time: selectedTime,
-      clientName,
-      clientPhone,
-      clientEmail,
-      selectedAreaId: selectedArea?.name
-    };
-    
-    // Only save if at least one meaningful field is filled
-    if (selectedService || selectedDate || clientName || clientPhone) {
-      localStorage.setItem('booking_draft', JSON.stringify(draft));
-    }
-  }, [selectedService, bookingMode, selectedDate, selectedTime, clientName, clientPhone, clientEmail, selectedArea, profile?.uid]);
-
-  // Persistence Logic: Checking for existing draft on mount or after delay
-  useEffect(() => {
-    const savedDraft = localStorage.getItem('booking_draft');
-    if (savedDraft && profile?.uid) {
-      try {
-        const parsed = JSON.parse(savedDraft);
-        // Only show modal if the draft belongs to this specific professional
-        if (parsed.professionalId === profile.uid && step === 1) {
-          // Prefill phone to show WhatsApp CTA in modal if needed
-          if (parsed.clientPhone) setClientPhone(parsed.clientPhone);
-          // Show immediately on return (mount)
-          setShowRestoreDraft(true);
-        }
-      } catch (e) {
-        localStorage.removeItem('booking_draft');
-      }
-    }
-
-    // Abandonment timer: if they start filling but don't finish
-    let timer: NodeJS.Timeout;
-    
-    const handleVisibilityChange = () => {
-      if (document.hidden && step > 1 && step < 5) {
-        // User left the tab, start the recovery timer
-        timer = setTimeout(() => {
-          // Flag that they've been away long enough
-          sessionStorage.setItem('was_abandoned', 'true');
-        }, 30000);
-      } else {
-        clearTimeout(timer);
-        // If they return and were away for more than the limit
-        if (sessionStorage.getItem('was_abandoned') === 'true') {
-          sessionStorage.removeItem('was_abandoned');
-          // Close flow and show recovery modal
-          setStep(1);
-          setShowRestoreDraft(true);
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [profile?.uid, step, showRestoreDraft]);
-
-  const handleRestoreDraft = () => {
-    const savedDraft = localStorage.getItem('booking_draft');
-    if (!savedDraft) return;
-
-    try {
-      const draft = JSON.parse(savedDraft);
-      
-      // Map service ID to actual service object
-      if (draft.serviceId) {
-        const service = services.find(s => s.id === draft.serviceId);
-        if (service) setSelectedService(service);
-      }
-      
-      if (draft.mode) setBookingMode(draft.mode);
-      if (draft.date) setSelectedDate(draft.date);
-      if (draft.time) setSelectedTime(draft.time);
-      if (draft.clientName) setClientName(draft.clientName);
-      if (draft.clientPhone) setClientPhone(draft.clientPhone);
-      if (draft.clientEmail) setClientEmail(draft.clientEmail);
-      
-      if (draft.selectedAreaId && profile?.serviceAreas) {
-        const area = profile.serviceAreas.find((a: ServiceArea) => a.name === draft.selectedAreaId);
-        if (area) setSelectedArea(area);
-      }
-
-      // Determine the best step to resume
-      if (draft.clientName || draft.clientPhone) {
-        setStep(4);
-      } else if (draft.date && draft.time) {
-        setStep(4);
-      } else if (draft.date) {
-        setStep(3);
-      } else {
-        setStep(2);
-      }
-      
-      setShowRestoreDraft(false);
-    } catch (e) {
-      console.error("Error restoring draft", e);
-      localStorage.removeItem('booking_draft');
-    }
-  };
-
-  const handleClearDraft = () => {
-    localStorage.removeItem('booking_draft');
-    // Clear states
-    setSelectedService(null);
-    setSelectedDate('');
-    setSelectedTime('');
-    setClientName('');
-    setClientPhone('');
-    setClientEmail('');
-    setClientAddress('');
-    setSelectedArea(null);
-    setBookingMode(null);
-    setStep(1);
-    setShowRestoreDraft(false);
-  };
-
-  const availableSlots = React.useMemo(() => {
-    if (!profile?.workingHours || !selectedDate) return [];
-    
-    return getAvailableSlots({
-      selectedDate,
-      serviceDuration: Number(selectedService?.duration) || 60,
-      workingHours: profile.workingHours,
-      appointments: dayAppointments,
-      manualBlockedSlots
-    });
-  }, [selectedDate, selectedService, profile, dayAppointments, manualBlockedSlots]);
-
-  // Finding next available slot for hero and total slots for urgency
   const [nextSlot, setNextSlot] = useState<{ date: string, time: string } | null>(null);
   const [totalWeeklySlots, setTotalWeeklySlots] = useState<number | null>(null);
+
+  // Interest detection logic stays in PublicProfile
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 100);
+      
+      // Interest Detection: Scroll reach 70%
+      const scrollPercent = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+      if (scrollPercent > 0.7 && !showInterestPopup && !interestPopupDismissed && !isBookingModalOpen) {
+        setShowInterestPopup(true);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [showInterestPopup, interestPopupDismissed, isBookingModalOpen]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!slug) {
+        setLoading(false);
+        return;
+      }
+
+      // Check for Example/Demo Slug
+      if (slug === 'helena-prado' || slug === 'exemplo') {
+        setTimeout(() => {
+          setProfile(MOCK_PROFILE);
+          setServices(MOCK_SERVICES);
+          setReviews(MOCK_REVIEWS);
+          setStats(MOCK_STATS);
+          setLoading(false);
+        }, 500); // Small delay for UX transition
+        return;
+      }
+
+      try {
+        const q = query(collection(db, 'users'), where('slug', '==', slug));
+        const snapshot = await getDocs(q);
+        
+        if (!snapshot.empty) {
+          const userData = snapshot.docs[0].data();
+          const professionalId = snapshot.docs[0].id;
+          setProfile({ ...userData, uid: professionalId });
+          
+          // Fetch Services
+          const servicesQ = query(collection(db, 'services'), 
+            where('professionalId', '==', professionalId), 
+            where('active', '==', true)
+          );
+          const servicesSnapshot = await getDocs(servicesQ);
+          setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+          // Fetch Stats
+          const statsDoc = await getDocs(query(collection(db, 'review_stats'), where('professionalId', '==', professionalId)));
+          if (!statsDoc.empty) {
+            setStats(statsDoc.docs[0].data());
+          }
+
+          // Fetch Reviews
+          const reviewsQ = query(
+            collection(db, 'reviews'), 
+            where('professionalId', '==', professionalId),
+            where('publicApproved', '==', true),
+            where('publicDisplayMode', 'in', ['named', 'anonymous'])
+          );
+          const reviewsSnapshot = await getDocs(reviewsQ);
+          setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
+          // Fetch Portfolio
+          // New structure stores portfolio as an array of PortfolioItem in the user document.
+          if (!userData.portfolio || userData.portfolio.length === 0) {
+            try {
+              const portfolioQ = query(collection(db, 'users', professionalId, 'portfolio'), orderBy('createdAt', 'desc'));
+              const portfolioSnapshot = await getDocs(portfolioQ);
+              if (!portfolioSnapshot.empty) {
+                const portfolioItems = portfolioSnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  url: doc.data().url || doc.data().imageUrl,
+                  category: doc.data().category,
+                  createdAt: doc.data().createdAt || new Date().toISOString()
+                }));
+                setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
+              }
+            } catch (portErr) {
+              console.warn('[PublicProfile] Error fetching legacy portfolio sub-collection:', portErr);
+            }
+          }
+        } else {
+          setProfile(null);
+        }
+      } catch (error) {
+        console.error("Error fetching public profile:", error);
+        toast.error('Não foi possível carregar as informações agora.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [slug]);
 
   useEffect(() => {
     const findAvailabilityData = async () => {
@@ -442,221 +353,6 @@ export default function PublicProfile() {
     };
   }, [profile, services, nextSlot, totalWeeklySlots]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 100);
-      
-      // Interest Detection: Scroll reach 70%
-      const scrollPercent = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
-      if (scrollPercent > 0.7 && !showInterestPopup && !interestPopupDismissed && step === 1 && !bookingSuccess) {
-        setShowInterestPopup(true);
-      }
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [showInterestPopup, interestPopupDismissed, step, bookingSuccess]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!slug) {
-        setLoading(false);
-        return;
-      }
-
-      // Check for Example/Demo Slug
-      if (slug === 'helena-prado' || slug === 'exemplo') {
-        setTimeout(() => {
-          setProfile(MOCK_PROFILE);
-          setServices(MOCK_SERVICES);
-          setReviews(MOCK_REVIEWS);
-          setStats(MOCK_STATS);
-          setLoading(false);
-        }, 500); // Small delay for UX transition
-        return;
-      }
-
-      try {
-        const q = query(collection(db, 'users'), where('slug', '==', slug));
-        const snapshot = await getDocs(q);
-        
-        if (!snapshot.empty) {
-          const userData = snapshot.docs[0].data();
-          const professionalId = snapshot.docs[0].id;
-          setProfile({ ...userData, uid: professionalId });
-          
-          // Set initial booking mode if not hybrid
-          if (userData.serviceMode === 'home') setBookingMode('home');
-          if (userData.serviceMode === 'studio') setBookingMode('studio');
-          
-          // Fetch Services
-          const servicesQ = query(collection(db, 'services'), 
-            where('professionalId', '==', professionalId), 
-            where('active', '==', true)
-          );
-          const servicesSnapshot = await getDocs(servicesQ);
-          setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
-          // Fetch Stats
-          const statsDoc = await getDocs(query(collection(db, 'review_stats'), where('professionalId', '==', professionalId)));
-          if (!statsDoc.empty) {
-            setStats(statsDoc.docs[0].data());
-          }
-
-          // Fetch Reviews
-          const reviewsQ = query(
-            collection(db, 'reviews'), 
-            where('professionalId', '==', professionalId),
-            where('publicApproved', '==', true),
-            where('publicDisplayMode', 'in', ['named', 'anonymous'])
-          );
-          const reviewsSnapshot = await getDocs(reviewsQ);
-          setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
-          // Fetch Portfolio
-          // New structure stores portfolio as an array of PortfolioItem in the user document.
-          if (!userData.portfolio || userData.portfolio.length === 0) {
-            try {
-              const portfolioQ = query(collection(db, 'users', professionalId, 'portfolio'), orderBy('createdAt', 'desc'));
-              const portfolioSnapshot = await getDocs(portfolioQ);
-              if (!portfolioSnapshot.empty) {
-                const portfolioItems = portfolioSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  url: doc.data().url || doc.data().imageUrl,
-                  category: doc.data().category,
-                  createdAt: doc.data().createdAt || new Date().toISOString()
-                }));
-                setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
-              }
-            } catch (portErr) {
-              console.warn('[PublicProfile] Error fetching legacy portfolio sub-collection:', portErr);
-            }
-          }
-        } else {
-          setProfile(null);
-        }
-      } catch (error) {
-        console.error("Error fetching public profile:", error);
-        toast.error('Não foi possível carregar as informações agora.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
-  }, [slug]);
-
-  useEffect(() => {
-    if (selectedDate && profile?.uid) {
-      // 1. Listen for manual blocked slots
-      const slotsRef = collection(db, 'blocked_slots');
-      const slotsQ = query(
-        slotsRef, 
-        where('professionalId', '==', profile.uid),
-        where('date', '==', selectedDate)
-      );
-      
-      const unsubscribeSlots = onSnapshot(slotsQ, (snapshot) => {
-        const manualBlocked = snapshot.docs.map(doc => doc.data().time);
-        setManualBlockedSlots(manualBlocked);
-      }, (err) => {
-        console.error("[Availability] Error listening to blocks:", err);
-      });
-
-      // 2. Listen for confirmed or completed appointments
-      const apptsRef = collection(db, 'appointments');
-      const apptsQ = query(
-        apptsRef,
-        where('professionalId', '==', profile.uid),
-        where('date', '==', selectedDate),
-        where('status', 'in', ['confirmed', 'completed'])
-      );
-      
-      const unsubscribeAppts = onSnapshot(apptsQ, (snapshot) => {
-        const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-        setDayAppointments(appointmentsData);
-      }, (err) => {
-        console.error("[Availability] Error listening to appointments:", err);
-      });
-
-      return () => {
-        unsubscribeSlots();
-        unsubscribeAppts();
-      };
-    }
-  }, [selectedDate, profile?.uid]);
-
-  const calculateTotalPrice = () => {
-    if (!selectedService) return 0;
-    const basePrice = Number(selectedService.price) || 0;
-    return basePrice + (selectedArea?.fee || 0);
-  };
-
-  const handleBooking = async () => {
-    setBookingAttempted(true);
-    if (!profile || !selectedService) {
-      console.warn('[Booking] Missing profile or service', { profile: !!profile, service: !!selectedService });
-      return;
-    }
-
-    if (!clientName.trim() || !clientPhone.trim() || !clientEmail.trim() || (isHomeService && !clientAddress.trim())) {
-      toast.error('Por favor, preencha os campos destacados.');
-      return;
-    }
-    
-    // Validation for email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(clientEmail.trim())) {
-      toast.error('O e-mail informado parece não ser válido.');
-      return;
-    }
-
-    setBookingLoading(true);
-    setBookingSuccess(false);
-    console.log('[Booking] Starting booking process...', {
-      professionalId: profile.uid,
-      service: selectedService.name,
-      date: selectedDate,
-      time: selectedTime,
-      client: clientName
-    });
-
-    try {
-      const totalPrice = calculateTotalPrice();
-      const bookingId = await createBookingRequest({
-        professionalId: profile.uid,
-        professionalName: profile.name,
-        serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        duration: selectedService.duration,
-        price: selectedService.price,
-        travelFee: selectedArea?.fee || 0,
-        totalPrice: totalPrice,
-        locationType: isHomeService ? 'home' : 'studio',
-        neighborhood: selectedArea?.name || '',
-        address: clientAddress.trim(),
-        clientName: clientName.trim(),
-        clientWhatsapp: clientPhone.replace(/\D/g, ''),
-        clientEmail: clientEmail.trim().toLowerCase(),
-        date: selectedDate,
-        time: selectedTime,
-      });
-      
-      console.log('[Booking] Success! Booking ID:', bookingId);
-      setBookingSuccess(true);
-      localStorage.removeItem('booking_draft');
-      
-      // Short delay to show success on the button before switching screen
-      setTimeout(() => {
-        setStep(5); // Success screen (now step 5)
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }, 800);
-    } catch (error: any) {
-      handleBookingError(error);
-    } finally {
-      setBookingLoading(false);
-    }
-  };
-
   const scrollToServices = () => {
     servicesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -694,14 +390,12 @@ export default function PublicProfile() {
     </div>
   );
 
-  const isHomeService = bookingMode === 'home';
-
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10">
       
       {/* Intelligent Mobile Floating CTA */}
       <AnimatePresence>
-        {scrolled && step === 1 && !loading && (
+        {scrolled && !isBookingModalOpen && !loading && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
@@ -712,8 +406,7 @@ export default function PublicProfile() {
               variant="terracotta" 
               className="w-full py-6 shadow-2xl backdrop-blur-md bg-brand-terracotta/95 border border-white/20"
               onClick={() => {
-                setStep(2);
-                window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top to ensure modal looks correct or just rely on overlay
+                setIsBookingModalOpen(true);
               }}
             >
               <div className="flex items-center justify-between w-full px-2">
@@ -725,39 +418,6 @@ export default function PublicProfile() {
                   <ChevronRight size={16} />
                 </div>
               </div>
-            </PremiumButton>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Floating CTA for inside the Modal steps (Mobile only) */}
-      <AnimatePresence>
-        {step >= 2 && step <= 4 && (
-          <motion.div 
-            initial={{ y: 100, opacity: 0 }} 
-            animate={{ y: 0, opacity: 1 }} 
-            exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-0 left-0 right-0 z-[250] md:hidden p-6 bg-gradient-to-t from-brand-white via-brand-white to-transparent pt-12"
-          >
-            <PremiumButton 
-              variant="terracotta" 
-              className="w-full py-7"
-              disabled={
-                (step === 2 && (!selectedService || (isHomeService && profile?.serviceAreaType === 'custom' && !selectedArea))) ||
-                (step === 3 && (!selectedDate || !selectedTime)) ||
-                (step === 4 && (!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)))
-              }
-              loading={step === 4 && bookingLoading}
-              onClick={() => {
-                if (step === 2) setStep(3);
-                else if (step === 3) setStep(4);
-                else if (step === 4) handleBooking();
-              }}
-            >
-              {step === 2 && (selectedService ? `Reservar ${selectedService.name.split(' ')[0]}` : 'Escolher Experiência')}
-              {step === 3 && (selectedTime ? `Confirmar para ${selectedTime}` : 'Escolher Horário')}
-              {step === 4 && 'Finalizar Reserva'}
-              <ArrowRight size={18} className="ml-1" />
             </PremiumButton>
           </motion.div>
         )}
@@ -801,7 +461,7 @@ export default function PublicProfile() {
                 Profissional Verificada Nera
               </span>
               <p className="text-[9px] text-brand-stone font-medium uppercase tracking-widest">Atendimento profissional e personalizado</p>
-              <h1 className="text-3xl md:text-4xl font-serif font-normal text-brand-ink/40 tracking-tight">
+              <h1 className="text-3xl md:text-4xl font-serif font-normal text-brand-ink tracking-tight">
                 {profile.name}
               </h1>
             </div>
@@ -845,18 +505,14 @@ export default function PublicProfile() {
               </motion.div>
             )}
 
-            <div className="max-w-4xl mx-auto">
-              <h2 className="text-[52px] md:text-[88px] font-serif font-normal text-brand-ink leading-[1.05] tracking-tight mb-10">
+            <div className="max-w-4xl mx-auto text-center">
+              <h2 className="text-[52px] md:text-[88px] font-serif font-normal text-brand-ink leading-[1.05] tracking-tight">
                 {profile.headline || (
                   profile.specialty 
-                    ? `${profile.specialty} sofisticado com acabamento impecável` 
-                    : "Beleza minimalista com precisão absoluta"
+                    ? `Especialista em ${profile.specialty}` 
+                    : (services[0]?.name ? `Atendimento de ${services[0].name}` : null)
                 )}
               </h2>
-              
-              <p className="text-lg md:text-2xl font-light text-brand-stone italic max-w-2xl mx-auto leading-relaxed border-l border-brand-mist/50 pl-8">
-                "Cada detalhe pensado para valorizar sua beleza de forma única e elevar sua confiança."
-              </p>
             </div>
           </div>
 
@@ -865,7 +521,12 @@ export default function PublicProfile() {
             <div className="flex flex-wrap items-center justify-center gap-6 text-[11px] md:text-[12px] font-medium uppercase tracking-[0.25em] text-brand-stone">
               <div className="flex items-center gap-2.5">
                 <MapPin size={16} className="text-brand-terracotta" />
-                <span className="border-b border-brand-mist pb-0.5">Atendimento em {profile.city}</span>
+                <span className="border-b border-brand-mist pb-0.5">
+                  Atendimento em {profile.city}
+                  {(profile.serviceMode === 'studio' || profile.serviceMode === 'hybrid') && profile.studioAddress?.neighborhood && (
+                    <span className="ml-1 opacity-60 font-light normal-case tracking-normal">• {profile.studioAddress.neighborhood}</span>
+                  )}
+                </span>
               </div>
               <span className="w-1 h-1 bg-brand-mist rounded-full hidden md:block" />
               <div className="flex items-center gap-2.5">
@@ -911,8 +572,8 @@ export default function PublicProfile() {
                 )}
                 <PremiumButton 
                   onClick={() => {
-                    if (services.length > 0 && !selectedService) setSelectedService(services[0]);
-                    setStep(2);
+                    if (services.length > 0 && !preSelectedService) setPreSelectedService(services[0]);
+                    setIsBookingModalOpen(true);
                   }} 
                   className="w-full sm:w-auto min-w-[320px] py-8 text-[13px] font-bold shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
                   variant="terracotta"
@@ -1030,12 +691,6 @@ export default function PublicProfile() {
                 </div>
                 <div>
                   <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-brand-ink mb-1 group-hover:text-brand-terracotta transition-colors">{diff}</h4>
-                  <p className="text-xs text-brand-stone leading-relaxed font-light">
-                    {diff.toLowerCase().includes('pontual') ? 'Respeito total ao seu tempo com agendamentos precisos.' :
-                     diff.toLowerCase().includes('premium') || diff.toLowerCase().includes('produto') ? 'Produtos selecionados das melhores marcas mundiais.' :
-                     diff.toLowerCase().includes('silencioso') || diff.toLowerCase().includes('confort') ? 'Ambiente planejado para seu total relaxamento.' :
-                     'Padrão de excelência e cuidado em cada detalhe do atendimento.'}
-                  </p>
                 </div>
               </motion.div>
             ))}
@@ -1150,9 +805,9 @@ export default function PublicProfile() {
                   viewport={{ once: true }}
                   transition={{ delay: i * 0.1 }}
                   onClick={() => {
-                    setSelectedService(service);
+                    setPreSelectedService(service);
                     setHasInteractedWithService(true);
-                    setStep(2); // Goes to Service + Mode (Step 1 of the new flow)
+                    setIsBookingModalOpen(true);
                   }}
                   className="group relative bg-brand-white border border-brand-mist p-12 rounded-[56px] cursor-pointer hover:border-brand-terracotta/30 hover:shadow-2xl transition-all duration-700 flex flex-col justify-between h-full overflow-hidden"
                 >
@@ -1167,9 +822,6 @@ export default function PublicProfile() {
                           <h3 className="text-3xl md:text-4xl font-serif text-brand-ink group-hover:text-brand-terracotta transition-colors leading-[1.1] mb-2">
                              {service.name}
                           </h3>
-                          <span className="text-[11px] text-brand-terracotta/60 font-bold uppercase tracking-[0.2em]">
-                             Acabamento natural e impecável
-                          </span>
                         </div>
                         <div className="text-xl md:text-2xl font-serif text-brand-stone/50 tracking-tighter shrink-0 pt-1">
                           {formatCurrency(service.price)}
@@ -1209,123 +861,6 @@ export default function PublicProfile() {
                 <Sparkles size={32} className="text-brand-mist mx-auto mb-4" />
                 <p className="text-brand-stone font-serif italic text-lg">Consulte a disponibilidade via WhatsApp.</p>
               </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. REGIONS / LOGISTICS / STUDIO ADDRESS */}
-      <section className="py-32 px-6 bg-brand-white border-y border-brand-mist">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center space-y-4 mb-20">
-            <span className="label-text block">Localização & Atendimento</span>
-            <h2 className="heading-section text-brand-ink">Onde você deseja ser atendida?</h2>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Studio Card */}
-            {(profile.serviceMode === 'studio' || profile.serviceMode === 'hybrid') && (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                className="bg-brand-parchment p-10 rounded-[40px] border border-brand-mist relative group overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 p-8 text-brand-mist group-hover:text-brand-terracotta/20 transition-colors">
-                  <Building2 size={80} />
-                </div>
-                <div className="relative z-10 flex flex-col h-full">
-                  <div className="w-14 h-14 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center mb-8 shadow-lg">
-                    <MapPin size={28} />
-                  </div>
-                  <h3 className="text-2xl font-serif text-brand-ink mb-6">Atendimento no Estúdio</h3>
-                  <div className="space-y-4 mb-10 flex-1">
-                    <p className="text-brand-stone font-light leading-relaxed">
-                      Conheça o nosso espaço preparado com todo carinho para te receber com segurança, conforto e privacidade.
-                    </p>
-                    <div className="pt-6 border-t border-brand-mist/50">
-                      <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest mb-2">Endereço</p>
-                      <p className="text-brand-ink font-medium leading-relaxed">
-                        {profile.studioAddress?.street}, {profile.studioAddress?.number}
-                        {profile.studioAddress?.complement && <span className="block italic font-light text-brand-stone">{profile.studioAddress.complement}</span>}
-                        <span className="block">{profile.studioAddress?.neighborhood} — {profile.studioAddress?.city}</span>
-                      </p>
-                      {profile.studioAddress?.reference && (
-                        <p className="mt-3 text-[11px] text-brand-stone italic flex items-start gap-2">
-                          <Info size={12} className="mt-0.5" /> Ref: {profile.studioAddress.reference}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <PremiumButton 
-                    variant="secondary" 
-                    className="w-full"
-                    onClick={() => {
-                      if (profile.serviceMode === 'hybrid') setBookingMode('studio');
-                      if (services.length > 0 && !selectedService) setSelectedService(services[0]);
-                      setStep(2);
-                    }}
-                  >
-                    Agendar no Estúdio
-                  </PremiumButton>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Home Service Card */}
-            {(profile.serviceMode === 'home' || profile.serviceMode === 'hybrid') && (
-              <motion.div 
-                initial={{ opacity: 0, x: 20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                className="bg-brand-linen p-10 rounded-[40px] border border-brand-mist relative group overflow-hidden"
-              >
-                <div className="absolute top-0 right-0 p-8 text-brand-mist group-hover:text-brand-terracotta/20 transition-colors">
-                  <Home size={80} />
-                </div>
-                <div className="relative z-10 flex flex-col h-full">
-                  <div className="w-14 h-14 bg-brand-terracotta text-brand-white rounded-2xl flex items-center justify-center mb-8 shadow-lg">
-                    <Globe size={28} />
-                  </div>
-                  <h3 className="text-2xl font-serif text-brand-ink mb-6">Atendimento em Domicílio</h3>
-                  <div className="space-y-4 mb-10 flex-1">
-                    <p className="text-brand-stone font-light leading-relaxed">
-                      {profile.serviceAreaType === 'city_wide' 
-                        ? `Atendimento VIP em todo o território de ${profile.city}. Levamos toda a estrutura necessária até você.`
-                        : `Atendimento exclusivo em bairros selecionados de ${profile.city}. Conforto e praticidade.`}
-                    </p>
-                    
-                    <div className="pt-6 border-t border-brand-mist/50">
-                      <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest mb-4">Regiões Atendidas</p>
-                      {profile.serviceAreaType === 'city_wide' ? (
-                        <div className="flex items-center gap-3 p-4 bg-brand-white/50 rounded-2xl border border-brand-mist/30">
-                          <CheckCircle2 size={16} className="text-green-600" />
-                          <span className="text-sm font-medium text-brand-ink">Toda a cidade de {profile.city}</span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {profile.serviceAreas?.map((area: any) => (
-                            <span key={area.name} className="px-4 py-2 bg-brand-white/50 border border-brand-mist/30 rounded-xl text-xs font-medium text-brand-ink">
-                              {area.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <PremiumButton 
-                    variant="primary" 
-                    className="w-full"
-                    onClick={() => {
-                      if (profile.serviceMode === 'hybrid') setBookingMode('home');
-                      if (services.length > 0 && !selectedService) setSelectedService(services[0]);
-                      setStep(2);
-                    }}
-                  >
-                    Agendar em Casa
-                  </PremiumButton>
-                </div>
-              </motion.div>
             )}
           </div>
         </div>
@@ -1500,7 +1035,7 @@ export default function PublicProfile() {
                 variant="terracotta" 
                 className="min-w-[320px] py-8 text-sm group"
                 onClick={() => {
-                  setStep(2);
+                  setIsBookingModalOpen(true);
                   document.getElementById('booking-section')?.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
@@ -1523,9 +1058,6 @@ export default function PublicProfile() {
         <div className="max-w-5xl mx-auto flex flex-col items-center gap-12">
           <div className="space-y-4">
             <Logo variant="light" className="w-20 opacity-30 grayscale mx-auto" />
-            <div className="font-signature text-3xl text-brand-terracotta/30">
-               Beauty in Details
-            </div>
           </div>
           
           <div className="flex flex-wrap justify-center gap-10 text-[10px] font-medium uppercase tracking-widest text-brand-stone">
@@ -1541,7 +1073,7 @@ export default function PublicProfile() {
                 <Instagram size={18} />
               </a>
             )}
-            <a href={`https://wa.me/${profile.whatsapp}`} target="_blank" className="w-10 h-10 rounded-full border border-brand-mist flex items-center justify-center text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta transition-all">
+            <a href={buildWhatsappLink(profile.whatsapp)} target="_blank" className="w-10 h-10 rounded-full border border-brand-mist flex items-center justify-center text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta transition-all">
               <MessageCircle size={18} />
             </a>
           </div>
@@ -1552,537 +1084,18 @@ export default function PublicProfile() {
         </div>
       </footer>
 
-      {/* --- RESTORE DRAFT MODAL --- */}
-      <AnimatePresence>
-        {showRestoreDraft && (
-          <div className="fixed inset-0 bg-brand-ink/60 backdrop-blur-md z-[600] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-brand-white w-full max-w-md rounded-[40px] p-10 text-center shadow-2xl border border-brand-mist"
-            >
-              <div className="w-16 h-16 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-8">
-                <Clock size={32} />
-              </div>
-              <h3 className="text-2xl font-serif text-brand-ink mb-3">Seu horário ainda pode estar disponível.</h3>
-              <p className="text-sm text-brand-stone font-light mb-10 leading-relaxed">
-                Continue sua reserva de onde parou.
-              </p>
-              
-              <div className="flex flex-col gap-4">
-                <PremiumButton 
-                  variant="terracotta" 
-                  className="w-full py-6"
-                  onClick={handleRestoreDraft}
-                >
-                  Continuar Reserva
-                </PremiumButton>
-                <button 
-                  onClick={handleClearDraft}
-                  className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:text-brand-ink transition-colors py-2"
-                >
-                  Começar novamente
-                </button>
-
-                {clientPhone && (
-                  <div className="mt-6 pt-6 border-t border-brand-mist">
-                    <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-4">Precisa de ajuda?</p>
-                    <a 
-                      href={`https://wa.me/${profile.whatsapp}?text=${encodeURIComponent('Olá! Estava iniciando um agendamento e gostaria de tirar uma dúvida.')}`}
-                      target="_blank"
-                      className="flex items-center justify-center gap-2 text-brand-ink font-medium text-xs hover:text-brand-terracotta transition-colors"
-                    >
-                      <MessageCircle size={16} /> Fale direto com a profissional
-                    </a>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* --- BOOKING MODAL OVERLAY --- */}
-      <AnimatePresence>
-        {step >= 2 && step <= 4 && (
-          <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-0 md:p-6">
-            <motion.div 
-              initial={{ y: "100%" }} 
-              animate={{ y: 0 }} 
-              exit={{ y: "100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar"
-            >
-              <button 
-                onClick={() => setStep(1)} 
-                className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors"
-              >
-                <X size={24} />
-              </button>
-
-              {/* Progress Indicator */}
-              <div className="flex gap-2 mb-8">
-                {[2, 3, 4].map((s) => (
-                   <div key={s} className={cn("h-1 flex-1 rounded-full transition-all duration-500", step >= s ? "bg-brand-terracotta" : "bg-brand-mist")} />
-                ))}
-              </div>
-
-              {/* Step 2: Escolha do Serviço + Modo */}
-              {step === 2 && (
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                  <h3 className="text-2xl font-serif text-brand-ink mb-2">Sua Experiência</h3>
-                  <p className="text-xs text-brand-stone font-light mb-10">Selecione o serviço e onde deseja ser atendida.</p>
-                  
-                  <div className="space-y-8">
-                    {/* Modo de Atendimento (if hybrid) */}
-                    {profile.serviceMode === 'hybrid' && (
-                      <div className="space-y-4">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Onde prefere o atendimento?</label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <button 
-                            onClick={() => setBookingMode('studio')}
-                            className={cn(
-                              "flex items-center gap-4 p-5 rounded-2xl border transition-all",
-                              bookingMode === 'studio' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink"
-                            )}
-                          >
-                            <Building2 size={20} className={bookingMode === 'studio' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-xs font-medium uppercase tracking-widest">No Estúdio</span>
-                          </button>
-                          <button 
-                            onClick={() => setBookingMode('home')}
-                            className={cn(
-                              "flex items-center gap-4 p-5 rounded-2xl border transition-all",
-                              bookingMode === 'home' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink"
-                            )}
-                          >
-                            <Home size={20} className={bookingMode === 'home' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-xs font-medium uppercase tracking-widest">Em Casa</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Neighborhood selection for home service */}
-                    {isHomeService && profile.serviceAreaType === 'custom' && (
-                      <div className="space-y-4">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Em qual bairro você está?</label>
-                        <div className="flex flex-wrap gap-2">
-                          {profile.serviceAreas?.map((area) => (
-                            <button
-                              key={area.name}
-                              onClick={() => setSelectedArea(area)}
-                              className={cn(
-                                "px-6 py-3 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all",
-                                selectedArea?.name === area.name 
-                                  ? "bg-brand-ink text-brand-white border-brand-ink" 
-                                  : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink"
-                              )}
-                            >
-                              {area.name} {area.fee > 0 && `(+${formatCurrency(area.fee)})`}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-4">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Qual experiência deseja viver hoje?</label>
-                      <div className="space-y-3">
-                        {services.map((service) => (
-                          <button
-                            key={service.id}
-                            onClick={() => { setSelectedService(service); }}
-                            className={cn(
-                              "w-full p-6 text-left rounded-[24px] border transition-all flex justify-between items-center group relative overflow-hidden",
-                              selectedService?.id === service.id 
-                                ? "bg-brand-ink border-brand-ink text-brand-white" 
-                                : "bg-brand-parchment border-brand-mist hover:border-brand-ink"
-                            )}
-                          >
-                            <div className="flex-1 relative z-10">
-                              <h4 className={cn("font-serif text-lg", selectedService?.id === service.id ? "text-brand-white" : "text-brand-ink")}>
-                                {service.name}
-                              </h4>
-                              <span className="text-[10px] uppercase tracking-widest opacity-60">{service.duration} min</span>
-                            </div>
-                            <div className="text-xl font-serif text-brand-terracotta relative z-10">
-                              {formatCurrency(service.price)}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="hidden md:block">
-                      <PremiumButton 
-                        className="w-full mt-8" 
-                        variant="terracotta"
-                        disabled={!selectedService || (isHomeService && profile.serviceAreaType === 'custom' && !selectedArea)}
-                        onClick={() => setStep(3)}
-                      >
-                        Continuar <ArrowRight size={18} className="ml-1" />
-                      </PremiumButton>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 3: Data e Horário (Consolidated) */}
-              {step === 3 && (
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                  <div className="flex items-center gap-4 mb-2">
-                    <button onClick={() => setStep(2)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                    <h3 className="text-2xl font-serif text-brand-ink">Selecione o melhor dia para você</h3>
-                  </div>
-                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Escolha a data ideal para sua experiência.</p>
-                  
-                  {/* Calendar Strip */}
-                  <div className="flex overflow-x-auto gap-3 pb-4 mb-10 no-scrollbar -mx-2 px-2">
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(offset => {
-                      const date = new Date();
-                      date.setDate(date.getDate() + offset);
-                      const dateStr = date.toISOString().split('T')[0];
-                      const isSelected = selectedDate === dateStr;
-                      
-                      return (
-                        <button 
-                          key={offset}
-                          onClick={() => setSelectedDate(dateStr)}
-                          className={cn(
-                            "min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0",
-                            isSelected 
-                              ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105" 
-                              : "bg-brand-parchment border-brand-mist hover:border-brand-ink"
-                          )}
-                        >
-                          <span className="text-[8px] font-bold uppercase tracking-widest mb-1 opacity-40">
-                            {date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
-                          </span>
-                          <span className="text-lg font-serif">{date.getDate()}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Time Slots */}
-                  <div className="space-y-4 mb-24 md:mb-12">
-                    <div className="flex items-center justify-between ml-1 mb-1">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Horários disponíveis</label>
-                      {urgencyInfo?.isSlotsFew && (
-                        <span className="text-[9px] font-bold text-brand-terracotta uppercase tracking-widest animate-pulse">Últimos horários disponíveis</span>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      {selectedDate ? (
-                        availableSlots.length > 0 ? (
-                          availableSlots.map(time => (
-                            <button 
-                              key={time}
-                              onClick={() => setSelectedTime(time)}
-                              className={cn(
-                                "py-5 rounded-2xl border transition-all text-sm font-medium flex items-center justify-center gap-2",
-                                selectedTime === time 
-                                  ? "bg-brand-ink text-brand-white border-brand-ink" 
-                                  : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-ink"
-                              )}
-                            >
-                              <Clock size={14} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist"} />
-                              {time}
-                            </button>
-                          ))
-                        ) : (
-                          <div className="col-span-3 py-16 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist">
-                            <p className="text-sm text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura nos próximos dias</p>
-                            <p className="text-xs text-brand-stone font-light italic">Tente outra data ou solicite um encaixe via WhatsApp</p>
-                          </div>
-                        )
-                      ) : (
-                        <div className="col-span-3 py-16 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
-                          <p className="text-sm text-brand-stone font-light italic">Selecione uma data acima</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <PremiumButton 
-                    variant="terracotta" 
-                    className="w-full" 
-                    disabled={!selectedDate || !selectedTime}
-                    onClick={() => setStep(4)}
-                  >
-                    Confirmar este horário <ArrowRight size={18} className="ml-1" />
-                  </PremiumButton>
-                </motion.div>
-              )}
-
-              {/* Step 4: Seus Dados + Confirmação (Consolidated) */}
-              {step === 4 && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <div className="flex items-center gap-4 mb-2">
-                    <button onClick={() => setStep(3)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                    <h3 className="text-2xl font-serif text-brand-ink">Só falta confirmar seus dados</h3>
-                  </div>
-                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Quase lá! Revise as informações da sua reserva.</p>
-                  
-                  <div className="bg-brand-ink text-brand-white rounded-[32px] p-8 mb-8 space-y-6 shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/20 rounded-full -mr-16 -mt-16 blur-3xl opacity-50" />
-                    
-                    <div className="flex justify-between items-start pb-6 border-b border-brand-white/10 relative z-10">
-                      <div className="flex-1">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-brand-blush/40 block mb-2">{selectedService?.name}</span>
-                        <div className="flex items-center gap-4 text-xs font-light text-brand-blush/80">
-                          <span className="flex items-center gap-1.5"><CalendarIcon size={12} /> {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
-                          <span className="flex items-center gap-1.5"><Clock size={12} /> {selectedTime}</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-brand-blush/40 block mb-2">Total</span>
-                        <h4 className="text-2xl font-serif text-brand-terracotta leading-none">{formatCurrency(calculateTotalPrice())}</h4>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4 mb-8">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
-                        Seu Nome <span className="text-brand-terracotta">*</span>
-                      </label>
-                      <input 
-                        type="text" 
-                        value={clientName}
-                        onChange={(e) => setClientName(e.target.value)}
-                        placeholder="Nome completo"
-                        className={cn(
-                          "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm",
-                          !clientName && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
-                        )}
-                      />
-                      {!clientName && bookingAttempted && (
-                        <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
-                          WhatsApp <span className="text-brand-terracotta">*</span>
-                        </label>
-                        <input 
-                          type="tel" 
-                          value={clientPhone}
-                          onChange={(e) => setClientPhone(e.target.value)}
-                          placeholder="(85) 99999-9999"
-                          className={cn(
-                            "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm",
-                            !clientPhone && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
-                          )}
-                        />
-                        {!clientPhone && bookingAttempted && (
-                          <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
-                        )}
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
-                          E-mail <span className="text-brand-terracotta">*</span>
-                        </label>
-                        <input 
-                          type="email" 
-                          value={clientEmail}
-                          onChange={(e) => setClientEmail(e.target.value)}
-                          placeholder="seu@e-mail.com"
-                          className={cn(
-                            "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm",
-                            !clientEmail && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
-                          )}
-                        />
-                        {!clientEmail && bookingAttempted && (
-                          <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
-                        )}
-                        <p className="text-[9px] text-brand-stone/60 ml-2 font-light mt-1">
-                          Usaremos seu e-mail para enviar a confirmação do agendamento
-                        </p>
-                      </div>
-                    </div>
-
-                    {isHomeService && (
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
-                          Endereço de Atendimento <span className="text-brand-terracotta">*</span>
-                        </label>
-                        <textarea 
-                          value={clientAddress}
-                          onChange={(e) => setClientAddress(e.target.value)}
-                          placeholder="Rua, número, bairro e qualquer ponto de referência"
-                          className={cn(
-                            "w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm resize-none h-28",
-                            !clientAddress && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
-                          )}
-                        />
-                        {!clientAddress && bookingAttempted && (
-                          <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                    <div className="hidden md:block">
-                      <PremiumButton 
-                        variant="terracotta" 
-                        className="w-full py-7"
-                        disabled={!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)}
-                        onClick={handleBooking}
-                        loading={bookingLoading}
-                        loadingText="Finalizando solicitação..."
-                      >
-                        Solicitar meu horário <Check size={18} className="ml-1" />
-                      </PremiumButton>
-                    </div>
-                  <p className="text-center text-[10px] text-brand-stone font-light mt-4 uppercase tracking-widest flex items-center justify-center gap-2">
-                    <ShieldCheck size={12} className="text-brand-terracotta" /> Confirmação direta via WhatsApp
-                  </p>
-                </motion.div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Step 5: Success Overlay (Full Screen) */}
-      <AnimatePresence>
-        {step === 5 && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center justify-center p-8 text-center"
-          >
-            <motion.div 
-              initial={{ scale: 0.5, opacity: 0 }} 
-              animate={{ scale: 1, opacity: 1 }} 
-              transition={{ type: "spring", damping: 15 }}
-              className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8"
-            >
-              <Check size={48} />
-            </motion.div>
-            
-            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Reserva recebida com sucesso</h2>
-            <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
-              Sua solicitação foi enviada e em breve você receberá a confirmação diretamente no WhatsApp.
-            </p>
-
-            {/* Resume Card */}
-            {selectedService && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-brand-parchment rounded-3xl border border-brand-mist p-8 w-full max-w-sm mb-12 text-left shadow-sm"
-              >
-                <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-4 border-b border-brand-mist/50 pb-2">Resumo da solicitação</span>
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Serviço</span>
-                    <span className="font-serif text-brand-ink">{selectedService.name}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Data</span>
-                      <span className="text-sm font-medium text-brand-ink">
-                        {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Horário</span>
-                      <span className="text-sm font-medium text-brand-ink">{selectedTime}</span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Actions & Sharing */}
-            <div className="w-full max-w-sm space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <PremiumButton 
-                  variant="secondary"
-                  className="w-full py-4 !text-[9px]"
-                  onClick={() => {
-                    const start = new Date(selectedDate + 'T' + selectedTime);
-                    const end = new Date(start.getTime() + (Number(selectedService?.duration) || 60) * 60000);
-                    
-                    const formatTemplate = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Reserva: ' + selectedService?.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent('Agendamento realizado via Nera.')}&location=${encodeURIComponent(profile?.location || '')}`;
-                    window.open(url, '_blank');
-                  }}
-                >
-                  <CalendarIcon size={14} /> Adicionar calendário
-                </PremiumButton>
-
-                <a 
-                  href={`https://wa.me/55${(profile?.phone || profile?.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Acabei de solicitar um horário para ' + selectedService?.name + ' pelo Nera e gostaria de confirmar os detalhes.')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist"
-                >
-                  <MessageCircle size={14} /> Falar com a profissional
-                </a>
-              </div>
-
-              {/* Referral Block */}
-              <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-8 mt-12 text-center">
-                <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm">
-                  <Heart size={24} className="fill-brand-terracotta/10" />
-                </div>
-                <h4 className="text-lg font-serif text-brand-ink mb-2">Gostou da experiência? Indique uma amiga.</h4>
-                <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">Compartilhe sua descoberta com quem você ama</p>
-                
-                <PremiumButton 
-                  variant="primary"
-                  className="w-full py-5 !text-[10px]"
-                  onClick={() => {
-                    const url = window.location.origin + '/p/' + (profile?.slug || '');
-                    const text = `Te recomendo essa profissional ✨`;
-                    const fullText = `${text} Reserve online aqui: ${url}`;
-                    
-                    if (navigator.share) {
-                      navigator.share({
-                        title: profile?.name,
-                        text: text,
-                        url: url
-                      }).catch(() => {
-                        navigator.clipboard.writeText(fullText);
-                        toast.success('Link de indicação copiado!');
-                      });
-                    } else {
-                      navigator.clipboard.writeText(fullText);
-                      toast.success('Link de indicação copiado!');
-                    }
-                  }}
-                >
-                  Compartilhar perfil <Share2 size={14} className="ml-1" />
-                </PremiumButton>
-              </div>
-
-              <button 
-                onClick={() => {
-                  setStep(1);
-                  setSelectedService(null);
-                  setSelectedDate('');
-                  setSelectedTime('');
-                  setBookingSuccess(false);
-                }}
-                className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors"
-              >
-                Voltar para o perfil
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* --- BOOKING MODAL COMPONENT --- */}
+      <BookingModal 
+        profile={profile}
+        services={services}
+        open={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        initialService={preSelectedService}
+      />
 
       {/* --- INTEREST DETECTION POPUP (SOFT CTA) --- */}
       <AnimatePresence>
-        {showInterestPopup && step === 1 && !showRestoreDraft && !bookingSuccess && (
+        {showInterestPopup && !isBookingModalOpen && (
           <div className="fixed bottom-8 left-6 right-6 md:left-auto md:right-10 md:w-96 z-[400]">
             <motion.div 
               initial={{ y: 100, opacity: 0, scale: 0.9 }}
@@ -2090,7 +1103,6 @@ export default function PublicProfile() {
               exit={{ y: 100, opacity: 0, scale: 0.9 }}
               className="bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10"
             >
-              {/* Background Glow */}
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl" />
               
               <button 
@@ -2122,13 +1134,13 @@ export default function PublicProfile() {
                     className="w-full py-4 text-[10px]"
                     onClick={() => {
                       setShowInterestPopup(false);
-                      setStep(2);
+                      setIsBookingModalOpen(true);
                     }}
                   >
                     Reservar agora
                   </PremiumButton>
                   <a 
-                    href={`https://wa.me/${profile?.whatsapp}?text=${encodeURIComponent('Oi! Estava vendo seu perfil no Nera e gostaria de tirar uma dúvida sobre os horários.')}`}
+                    href={buildWhatsappLink(profile?.whatsapp, 'Oi! Estava vendo seu perfil no Nera e gostaria de tirar uma dúvida sobre os horários.')}
                     target="_blank"
                     className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors"
                   >
@@ -2138,6 +1150,36 @@ export default function PublicProfile() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- FLOATING CTA (Mobile) --- */}
+      <AnimatePresence>
+        {!isBookingModalOpen && scrolled && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-6 right-6 z-[150] md:hidden"
+          >
+            <PremiumButton 
+              variant="terracotta" 
+              className="w-full py-6 shadow-2xl backdrop-blur-md bg-brand-terracotta/95 border border-white/20"
+              onClick={() => setIsBookingModalOpen(true)}
+            >
+              <div className="flex items-center justify-between w-full px-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Agendar Horário</span>
+                <div className="flex items-center gap-2">
+                  {stats?.totalCompletedBookings > 0 && (
+                    <span className="text-[9px] text-white/60 normal-case tracking-normal">
+                      Próximo: {urgencyInfo?.isAgendaFull ? 'Sob consulta' : (nextSlot ? `${new Date(nextSlot.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` : 'Em breve')}
+                    </span>
+                  )}
+                  <ChevronRight size={16} />
+                </div>
+              </div>
+            </PremiumButton>
+          </motion.div>
         )}
       </AnimatePresence>
 

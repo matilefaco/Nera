@@ -255,24 +255,15 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
   const lockRef = doc(db, 'blocked_slots', lockId);
 
   try {
-    // 1. Conflict check: Only check for CONFIRMED or COMPLETED appointments
-    const qConflict = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', appointmentData.professionalId),
-      where('date', '==', appointmentData.date),
-      where('time', '==', appointmentData.time),
-      where('status', 'in', ['confirmed', 'completed'])
-    );
-    
-    const conflictSnap = await getDocs(qConflict);
-    if (!conflictSnap.empty) {
-      throw new Error('Esse horário já está ocupado por um agendamento confirmado.');
-    }
-
-    // 2. Create the appointment. 
-    // We do NOT create a record in blocked_slots yet for 'pending' status.
-    // This makes the block "inexistente" (or purely logical) during the request phase.
     const bookingId = await runTransaction(db, async (transaction) => {
+      // 1. Conflict check: Move inside transaction and check blocked_slots for confirmed/completed appointments
+      const slotSnap = await transaction.get(lockRef);
+      if (slotSnap.exists()) {
+        throw new Error('Esse horário já está ocupado por um agendamento confirmado.');
+      }
+
+      // 2. Create the appointment. 
+      // We do NOT create a record in blocked_slots yet for 'pending' status.
       // Clean data
       const cleanedData = removeEmptyFields(appointmentData);
       

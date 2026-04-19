@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError } from '../lib/utils';
+import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
@@ -22,9 +22,6 @@ import { FormServices } from '../components/FormServices';
 import { ProfessionalIdentity, UserProfile, Service } from '../types';
 import { userProfileSchema, serviceSchema } from '../lib/validation';
 import { z } from 'zod';
-import { GoogleGenAI, Type } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
 
@@ -199,69 +196,37 @@ export default function OnboardingPage() {
     console.log(`[BioAI] Generating for ${name} (${specialty}) with style: ${selectedBioStyle}`);
 
     try {
-      const prompt = `
-        Crie uma Headline (frase curta de impacto) e uma Bio (descrição boutique) para uma profissional de beleza.
-        
-        PERFIL:
-        - Nome: ${name}
-        - Especialidade: ${specialty}
-        - Experiência: ${yearsExperience} anos
-        - Estilo solicitado: ${selectedBioStyle}
-        - Diferenciais: ${selectedDifferentials.join(', ')}
-        - Vibe desejada: ${selectedStyles.join(', ')}
-        
-        REGRAS CRÍTICAS:
-        1. Tom: Sofisticado, premium e profissional.
-        2. Língua: Português natural do Brasil, sem traduções literais estranhas.
-        3. Headline: Curta (max 60 caracteres), forte e memorável.
-        4. Bio: No máximo 2 parágrafos curtos. Elegante e autoral.
-        5. PROIBIDO: 
-           - Frases genéricas ("há X anos transformando vidas").
-           - Repetições excessivas.
-           - Mistura de conceitos sem nexo.
-           - Clichês de marketing barato.
-           - Estruturas robóticas como "Com trajetória de...".
-        
-        VARIAÇÃO DE ESTILO (${selectedBioStyle.toUpperCase()}):
-        - elegante: polido, discreto, clássico.
-        - delicada: suave, detalhista, feminina.
-        - premium: exclusivo, luxuoso, acabamento impecável.
-        - minimalista: direto ao ponto, essencial, clean.
-        - acolhedora: humano, caloroso, atendimento próximo.
-        - técnica: foco em precisão, ciência, especialização.
-        - sofisticada: moderno, cosmopolita, alta estética.
-        - autoral: único, assinatura própria, criativo.
-
-        Retorne no formato JSON com as chaves "headline" e "bio".
-      `;
-
-      console.log('[BioAI] Prompt:', prompt);
-
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              headline: { type: Type.STRING },
-              bio: { type: Type.STRING }
-            },
-            required: ["headline", "bio"]
-          }
-        }
+      const response = await fetch('/api/generate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          specialty,
+          yearsExperience,
+          serviceStyle: selectedStyles,
+          differentials: selectedDifferentials,
+          bioStyle: selectedBioStyle
+        })
       });
 
-      const { headline: aiHeadline, bio: aiBio } = JSON.parse(response.text);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro na geração');
+      }
+
+      const { headline: aiHeadline, bio: aiBio } = await response.json();
       console.log('[BioAI] Result:', { aiHeadline, aiBio });
 
       setHeadline(aiHeadline);
       setBio(aiBio);
       toast.success('Sua marca foi personalizada com IA ✨');
-    } catch (error) {
+    } catch (error: any) {
       console.error('[BioAI] Generation failed:', error);
-      toast.error('O concierge está ocupado agora. Tente novamente em instantes.');
+      toast.error(error.message === 'Muitas solicitações. Tente novamente em um minuto.' 
+        ? error.message 
+        : 'O concierge está ocupado agora. Tente novamente em instantes.');
     } finally {
       setIsGeneratingContent(false);
     }
@@ -275,7 +240,7 @@ export default function OnboardingPage() {
     const payload: Partial<UserProfile> = {
       name,
       slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-      whatsapp: whatsapp.replace(/\D/g, ''),
+      whatsapp: cleanWhatsapp(whatsapp),
       bio,
       headline,
       serviceMode,
@@ -430,7 +395,7 @@ export default function OnboardingPage() {
       if (!whatsapp.trim()) errors.whatsapp = 'O WhatsApp de contato é obrigatório';
       
       // Basic WhatsApp validation (at least 10 digits)
-      const digits = whatsapp.replace(/\D/g, '');
+      const digits = cleanWhatsapp(whatsapp);
       if (whatsapp.trim() && (digits.length < 10 || digits.length > 11)) {
         errors.whatsapp = 'Informe um WhatsApp válido com DDD';
       }
@@ -478,7 +443,7 @@ export default function OnboardingPage() {
         city: (studioAddress.city || city).trim(),
         neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
         slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        whatsapp: whatsapp.replace(/\D/g, ''),
+        whatsapp: cleanWhatsapp(whatsapp),
         bio: bio.trim(),
         headline: headline.trim(),
         instagram: instagram.trim().replace('@', ''),
@@ -1082,7 +1047,7 @@ export default function OnboardingPage() {
                   <button 
                     onClick={() => {
                       const text = `Olá! Agora você pode agendar seus horários comigo diretamente pelo meu link: https://nera.app/p/${slug} ✨`;
-                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                      window.open(buildWhatsappLink('', text), '_blank');
                     }}
                     className="flex flex-col items-center gap-4 p-8 bg-brand-parchment rounded-[32px] border border-brand-mist hover:bg-brand-linen transition-all group"
                   >
