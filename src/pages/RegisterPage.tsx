@@ -159,7 +159,7 @@ export default function RegisterPage() {
                 to="/dashboard"
                 className="w-full bg-brand-linen text-brand-ink py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all text-center"
               >
-                Ir para meu Dashboard
+                Ir para meu Painel
               </Link>
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function RegisterPage() {
 
         <div className="text-center mb-10">
           <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Sua nova era</h2>
-          <p className="text-brand-stone text-sm font-light">Crie sua vitrine premium em menos de 2 minutos.</p>
+          <p className="text-brand-stone text-sm font-light">Inicie sua presença premium agora.</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-5 mb-10">
@@ -179,7 +179,7 @@ export default function RegisterPage() {
                 type="text" 
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Como quer ser chamada?"
+                placeholder="Qual o seu nome profissional?"
                 className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] focus:ring-1 focus:ring-brand-ink outline-none transition-all text-brand-ink font-light"
                 required
               />
@@ -222,7 +222,7 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full bg-brand-terracotta text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
           >
-            {loading ? 'Criando...' : 'Criar Minha Vitrine'} <ArrowRight size={18} />
+            {loading ? 'Preparando sua experiência...' : 'Iniciar Minha Marca'} <ArrowRight size={18} />
           </button>
         </form>
 

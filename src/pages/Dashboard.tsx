@@ -6,8 +6,8 @@ import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from 'f
 import { 
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
-  Share2, Plus, MapPin, Check, TrendingUp,
-  ChevronRight, Sparkles, Home, X
+  Share2, Plus, MapPin, Check, TrendingUp, Heart,
+  ChevronRight, Sparkles, Home, X, Instagram, Copy
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -33,6 +33,9 @@ export default function Dashboard() {
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
   const [isConfirmRejectOpen, setIsConfirmRejectOpen] = useState(false);
   const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [inactiveClients, setInactiveClients] = useState<any[]>([]);
+  const [recentCompletedClients, setRecentCompletedClients] = useState<any[]>([]);
 
   const tips = [
     "Dica: Peça para suas clientes avaliarem o serviço no Nera para subir no ranking!",
@@ -107,10 +110,55 @@ export default function Dashboard() {
       setNextAppointment(future[0] || null);
     });
 
+    // Query: All appointments to calculate inactivity
+    const qAll = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', user.uid)
+    );
+
+    const unsubAll = onSnapshot(qAll, (snapshot) => {
+      const appointments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+      
+      const clientMap = new Map();
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const todayStr = getTodayLocale();
+
+      appointments.forEach((app) => {
+        const key = app.clientWhatsapp?.replace(/\D/g, '') || app.clientEmail || app.clientName;
+        if (!clientMap.has(key)) {
+          clientMap.set(key, { name: app.clientName, phone: app.clientWhatsapp, lastDate: app.date, hasFuture: false });
+        }
+        const c = clientMap.get(key);
+        if (app.date > c.lastDate) c.lastDate = app.date;
+        if (app.date >= todayStr && (app.status === 'confirmed' || app.status === 'pending')) {
+          c.hasFuture = true;
+        }
+      });
+
+      const inactive = Array.from(clientMap.values()).filter(c => {
+        const lastDate = new Date(c.lastDate + 'T12:00:00');
+        return lastDate < thirtyDaysAgo && !c.hasFuture;
+      }).sort((a, b) => b.lastDate.localeCompare(a.lastDate)).slice(0, 3);
+
+      setInactiveClients(inactive);
+
+      // Referral candidates: Completed today
+      const completedToday = appointments.filter(app => 
+        app.status === 'completed' && app.date === todayStr
+      ).map(app => ({
+        name: app.clientName,
+        phone: app.clientWhatsapp,
+        service: app.serviceName
+      }));
+      setRecentCompletedClients(completedToday.slice(0, 3));
+    });
+
     return () => {
       unsubToday();
       unsubPending();
       unsubNext();
+      unsubAll();
     };
   }, [user]);
 
@@ -200,26 +248,23 @@ export default function Dashboard() {
             <h1 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-ink leading-tight">
               Olá, {profile?.name?.split(' ')[0]}
             </h1>
+            <p className="text-brand-stone text-xs md:text-sm font-light italic mt-2">Tudo organizado para você focar no atendimento.</p>
           </div>
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => {
-                const url = `https://nera.app/p/${profile?.slug}`;
-                navigator.clipboard.writeText(url);
-                toast.success('Link copiado.');
-              }}
-              className="flex items-center gap-3 px-6 py-4 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm group"
-            >
-              <Share2 size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-              Minha Vitrine
-            </button>
-            <Link 
-              to="/agenda"
-              className="px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg flex items-center gap-2"
-            >
-              <Plus size={14} /> Novo
-            </Link>
-          </div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsShareModalOpen(true)}
+                className="flex items-center gap-3 px-6 py-4 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm group"
+              >
+                <Share2 size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                Compartilhar Vitrine
+              </button>
+              <Link 
+                to="/agenda"
+                className="px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg flex items-center gap-2"
+              >
+                <Plus size={14} /> Novo
+              </Link>
+            </div>
         </header>
 
         {/* 1. OPERATIONAL SUMMARY BAR */}
@@ -508,7 +553,7 @@ export default function Dashboard() {
 
           {/* RIGHT COLUMN: PERFORMANCE & ACTIONS */}
           <div className="space-y-8">
-            {/* 5. REVENUE (PRIORITY 4) */}
+            {/* REVENUE SECTION */}
             <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
               <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-8">Faturamento</h3>
               
@@ -532,6 +577,88 @@ export default function Dashboard() {
                 Minha Carteira de Clientes <ChevronRight size={14} />
               </Link>
             </section>
+
+            {/* 7. RECENT CLIENTS (REFERRAL) */}
+            {recentCompletedClients.length > 0 && (
+              <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-linen rounded-full -mr-8 -mt-8 blur-2xl" />
+                
+                <h3 className="text-[10px] font-bold text-brand-ink uppercase tracking-[0.3em] mb-8 flex items-center gap-2 relative z-10">
+                  <Heart size={12} className="text-brand-terracotta" /> Expandir seu Nome
+                </h3>
+                
+                <div className="space-y-6 relative z-10">
+                  <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-2 font-medium">Pedir indicação para clientes de hoje</p>
+                  
+                  <div className="space-y-4">
+                    {recentCompletedClients.map((client, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-brand-parchment/50 rounded-2xl border border-brand-mist/30">
+                        <div>
+                          <p className="text-xs font-semibold text-brand-ink mb-0.5">{client.name}</p>
+                          <p className="text-[9px] text-brand-stone uppercase tracking-widest">
+                            {client.service}
+                          </p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const url = `${window.location.origin}/p/${profile?.slug}`;
+                            const message = `Oi ${client.name.split(' ')[0]}! Gostou da experiência de hoje? ✨ Ficaria muito feliz se pudesse me indicar para uma amiga. Você pode compartilhar meu perfil por aqui: ${url}`;
+                            const phone = client.phone?.replace(/\D/g, '');
+                            window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                          }}
+                          className="px-4 py-2 flex items-center gap-2 bg-brand-white text-brand-ink border border-brand-mist rounded-xl text-[9px] font-bold uppercase tracking-widest hover:border-brand-terracotta transition-all shadow-sm"
+                        >
+                          <Share2 size={12} /> Pedir
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* 6. INACTIVE CLIENTS (RECOVERY) */}
+            {inactiveClients.length > 0 && (
+              <section className="bg-brand-parchment p-8 rounded-[40px] border border-brand-mist shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-terracotta/5 rounded-full -mr-8 -mt-8 blur-2xl" />
+                
+                <h3 className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] mb-8 flex items-center gap-2 relative z-10">
+                  <TrendingUp size={12} /> Trazer Receita Escondida
+                </h3>
+                
+                <div className="space-y-6 relative z-10">
+                  <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-2 font-medium">Relacionamentos para reativar</p>
+                  
+                  <div className="space-y-4">
+                    {inactiveClients.map((client, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-brand-white rounded-2xl border border-brand-mist/50">
+                        <div>
+                          <p className="text-xs font-semibold text-brand-ink mb-0.5">{client.name}</p>
+                          <p className="text-[9px] text-brand-stone uppercase tracking-widest">
+                            Última vez em {new Date(client.lastDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                          </p>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const message = "Oi! Abri novos horários essa semana e lembrei de você ✨";
+                            const phone = client.phone?.replace(/\D/g, '');
+                            window.open(`https://wa.me/55${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                          }}
+                          className="w-10 h-10 flex items-center justify-center bg-brand-linen text-brand-terracotta rounded-xl hover:bg-brand-terracotta hover:text-brand-white transition-all shadow-sm"
+                          title="Enviar mensagem"
+                        >
+                          <MessageCircle size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Link to="/clients" className="block text-center p-4 border border-dashed border-brand-mist rounded-2xl text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone hover:text-brand-ink transition-all">
+                    Ver todos os relacionamentos
+                  </Link>
+                </div>
+              </section>
+            )}
 
             {/* QUICK ACTIONS */}
             <section className="bg-brand-linen p-8 rounded-[40px] border border-brand-mist">
@@ -566,6 +693,107 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+
+      {/* --- SHARE VITRINE MODAL --- */}
+      <AnimatePresence>
+        {isShareModalOpen && (
+          <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-brand-white w-full max-w-md rounded-[40px] p-8 shadow-2xl border border-brand-mist relative"
+            >
+              <button 
+                onClick={() => setIsShareModalOpen(false)}
+                className="absolute top-6 right-6 p-2 hover:bg-brand-parchment rounded-full text-brand-stone transition-colors"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="text-center mb-10">
+                <div className="w-16 h-16 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Share2 size={32} />
+                </div>
+                <h3 className="text-2xl font-serif text-brand-ink mb-2">Compartilhar minha Vitrine</h3>
+                <p className="text-sm text-brand-stone font-light">Transforme cada acesso em um possível agendamento.</p>
+              </div>
+
+              <div className="space-y-4">
+                <button 
+                  onClick={() => {
+                    const url = `https://nera.app/p/${profile?.slug}`;
+                    const text = `Acabei de abrir novos horários ✨ Reserve online comigo: ${url}`;
+                    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    setIsShareModalOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta group-hover:scale-110 transition-transform">
+                      <MessageCircle size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-semibold text-brand-ink uppercase tracking-widest">WhatsApp</p>
+                      <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Enviar para minhas contatos</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-brand-mist" />
+                </button>
+
+                <button 
+                  onClick={() => {
+                    const url = `https://nera.app/p/${profile?.slug}`;
+                    navigator.clipboard.writeText(url);
+                    toast.success('Link copiado. Abra o Instagram e cole nos seus Stories!');
+                    setIsShareModalOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta group-hover:scale-110 transition-transform">
+                      <Instagram size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-semibold text-brand-ink uppercase tracking-widest">Instagram Stories</p>
+                      <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Copiar link para o sticker</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-brand-mist" />
+                </button>
+
+                <button 
+                  onClick={() => {
+                    const url = `https://nera.app/p/${profile?.slug}`;
+                    navigator.clipboard.writeText(url);
+                    toast.success('Link copiado para a área de transferência.');
+                    setIsShareModalOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-stone group-hover:scale-110 transition-transform">
+                      <Copy size={20} />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-semibold text-brand-ink uppercase tracking-widest">Copiar Link</p>
+                      <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Link direto da vitrine</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-brand-mist" />
+                </button>
+              </div>
+
+              <div className="mt-8 p-5 bg-brand-linen/30 rounded-[24px] border border-brand-mist/50">
+                <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.2em] mb-2">Sugestão de texto:</p>
+                <p className="text-xs text-brand-ink font-light italic">
+                  "Acabei de abrir novos horários ✨ Reserve online comigo: nera.app/p/{profile?.slug}"
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <MobileNav />
 

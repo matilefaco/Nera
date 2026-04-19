@@ -85,13 +85,13 @@ export default function AgendaPage() {
         </div>
         <nav className="flex-1 space-y-2">
           <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Dashboard
+            <Calendar size={18} /> Painel
           </Link>
           <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-xl font-medium text-sm transition-all">
             <Calendar size={18} /> Agenda
           </Link>
           <Link to="/clients" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Users size={18} /> Clientes
+            <Users size={18} /> Relacionamentos
           </Link>
           <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
             <List size={18} /> Experiências
@@ -184,7 +184,7 @@ export default function AgendaPage() {
           ) : (
             <div className="text-center py-24 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist">
               <Calendar size={40} className="text-brand-mist mx-auto mb-6" />
-              <p className="text-brand-stone font-serif italic text-lg font-light">Nenhum agendamento para este dia.</p>
+              <p className="text-brand-stone font-serif italic text-lg font-light">Sua agenda está livre para este dia.</p>
             </div>
           )}
         </div>

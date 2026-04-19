@@ -90,7 +90,7 @@ export default function LoginPage() {
                 to="/dashboard"
                 className="w-full bg-brand-linen text-brand-ink py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all text-center"
               >
-                Ir para meu Dashboard
+                Ir para meu Painel
               </Link>
             </div>
           </div>
@@ -98,7 +98,7 @@ export default function LoginPage() {
 
         <div className="text-center mb-10">
           <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Bem-vinda de volta</h2>
-          <p className="text-brand-stone text-sm font-light">Sua vitrine premium está esperando por você.</p>
+          <p className="text-brand-stone text-sm font-light">Sua marca premium espera por você.</p>
         </div>
 
         <form onSubmit={handleEmailLogin} className="space-y-6 mb-10">
@@ -137,7 +137,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-brand-ink text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            {loading ? 'Acessando...' : 'Acessar Minha Vitrine'} <ArrowRight size={18} />
+            {loading ? 'Preparando seu acesso...' : 'Acessar Meu Painel'} <ArrowRight size={18} />
           </button>
         </form>
 

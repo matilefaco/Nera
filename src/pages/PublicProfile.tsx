@@ -18,6 +18,61 @@ import { UserProfile, Service, Review, ServiceArea, Appointment } from '../types
 
 import { getAvailableSlots } from '../lib/bookingUtils';
 
+// --- Static Mock Data for Example Profile ---
+const MOCK_PROFILE: UserProfile = {
+  uid: 'mock-helena',
+  name: 'Helena Prado',
+  email: 'helena@exemplo.com',
+  whatsapp: '11999999999',
+  slug: 'helena-prado',
+  avatar: 'https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?auto=format&fit=crop&q=80&w=800',
+  bio: 'Especialista em beleza natural e cuidados integrativos. Com mais de 10 anos de experiência, acredito que a beleza real nasce do equilíbrio e do autocuidado consciente.',
+  headline: 'Visagista & Especialista em Design de Olhar',
+  specialty: 'Beauty Artist',
+  city: 'São Paulo',
+  neighborhood: 'Jardins',
+  serviceMode: 'hybrid',
+  workingHours: {
+    startTime: '09:00',
+    endTime: '19:00',
+    workingDays: [1, 2, 3, 4, 5, 6]
+  },
+  professionalIdentity: {
+    mainSpecialty: 'Estética Facial',
+    subSpecialties: ['Microagulhamento', 'Limpeza de Pele', 'Peeling'],
+    yearsExperience: '5+',
+    serviceStyle: ['Premium e sofisticada', 'Técnica e precisa'],
+    differentials: ['Pontualidade', 'Biossegurança', 'Produtos premium'],
+    attendsAt: 'hybrid'
+  },
+  portfolio: [
+    { id: '1', url: 'https://picsum.photos/seed/beauty1/800/1000', category: 'Design', createdAt: new Date().toISOString() },
+    { id: '2', url: 'https://picsum.photos/seed/beauty2/800/1000', category: 'Skincare', createdAt: new Date().toISOString() },
+    { id: '3', url: 'https://picsum.photos/seed/beauty3/800/1000', category: 'Maquiagem', createdAt: new Date().toISOString() }
+  ],
+  services: [], // Placeholder, fetched separately in mock logic
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString()
+};
+
+const MOCK_SERVICES: Service[] = [
+  { id: 's1', name: 'Design de Sobrancelhas Premium', price: 120, duration: 45, description: 'Mapeamento facial completo e design personalizado com pinça e acabamento.' },
+  { id: 's2', name: 'Limpeza de Pele Profunda', price: 250, duration: 90, description: 'Extração cuidadosa, peeling de diamante e máscara revitalizante.' },
+  { id: 's3', name: 'Revitalização Facial Nera', price: 180, duration: 60, description: 'Ritual de hidratação profunda com massagem relaxante e ativos botânicos.' }
+];
+
+const MOCK_REVIEWS: Review[] = [
+  { id: 'r1', bookingId: 'b1', professionalId: 'mock-helena', serviceId: 's1', serviceName: 'Design', rating: 5, tags: ['Pontualidade', 'Excelente'], comment: 'Incrível! O cuidado da Helena é sem igual.', publicDisplayMode: 'named', publicApproved: true, firstName: 'Mariana', neighborhood: 'Pinheiros', createdAt: new Date().toISOString() },
+  { id: 'r2', bookingId: 'b2', professionalId: 'mock-helena', serviceId: 's2', serviceName: 'Limpeza', rating: 5, tags: ['Biossegurança'], comment: 'Me sinto renovada após cada sessão.', publicDisplayMode: 'named', publicApproved: true, firstName: 'Beatriz', neighborhood: 'Vila Madalena', createdAt: new Date().toISOString() }
+];
+
+const MOCK_STATS = {
+  averageRating: 4.9,
+  totalReviews: 48,
+  totalCompletedBookings: 156,
+  topTags: ['Excelência', 'Pontualidade', 'Ambiente Acolhedor']
+};
+
 // --- Sub-components for the Premium Slug Page ---
 
 interface SectionHeadingProps {
@@ -161,6 +216,9 @@ export default function PublicProfile() {
   const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
   const [manualBlockedSlots, setManualBlockedSlots] = useState<string[]>([]);
   const [showRestoreDraft, setShowRestoreDraft] = useState(false);
+  const [hasInteractedWithService, setHasInteractedWithService] = useState(false);
+  const [showInterestPopup, setShowInterestPopup] = useState(false);
+  const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
 
   // Persistence Logic: Saving draft to localStorage
   useEffect(() => {
@@ -184,21 +242,52 @@ export default function PublicProfile() {
     }
   }, [selectedService, bookingMode, selectedDate, selectedTime, clientName, clientPhone, clientEmail, selectedArea, profile?.uid]);
 
-  // Persistence Logic: Checking for existing draft on mount
+  // Persistence Logic: Checking for existing draft on mount or after delay
   useEffect(() => {
     const savedDraft = localStorage.getItem('booking_draft');
     if (savedDraft && profile?.uid) {
       try {
         const parsed = JSON.parse(savedDraft);
         // Only show modal if the draft belongs to this specific professional
-        if (parsed.professionalId === profile.uid) {
+        if (parsed.professionalId === profile.uid && step === 1) {
+          // Prefill phone to show WhatsApp CTA in modal if needed
+          if (parsed.clientPhone) setClientPhone(parsed.clientPhone);
+          // Show immediately on return (mount)
           setShowRestoreDraft(true);
         }
       } catch (e) {
         localStorage.removeItem('booking_draft');
       }
     }
-  }, [profile?.uid]);
+
+    // Abandonment timer: if they start filling but don't finish
+    let timer: NodeJS.Timeout;
+    
+    const handleVisibilityChange = () => {
+      if (document.hidden && step > 1 && step < 5) {
+        // User left the tab, start the recovery timer
+        timer = setTimeout(() => {
+          // Flag that they've been away long enough
+          sessionStorage.setItem('was_abandoned', 'true');
+        }, 30000);
+      } else {
+        clearTimeout(timer);
+        // If they return and were away for more than the limit
+        if (sessionStorage.getItem('was_abandoned') === 'true') {
+          sessionStorage.removeItem('was_abandoned');
+          // Close flow and show recovery modal
+          setStep(1);
+          setShowRestoreDraft(true);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [profile?.uid, step, showRestoreDraft]);
 
   const handleRestoreDraft = () => {
     const savedDraft = localStorage.getItem('booking_draft');
@@ -245,6 +334,17 @@ export default function PublicProfile() {
 
   const handleClearDraft = () => {
     localStorage.removeItem('booking_draft');
+    // Clear states
+    setSelectedService(null);
+    setSelectedDate('');
+    setSelectedTime('');
+    setClientName('');
+    setClientPhone('');
+    setClientEmail('');
+    setClientAddress('');
+    setSelectedArea(null);
+    setBookingMode(null);
+    setStep(1);
     setShowRestoreDraft(false);
   };
 
@@ -260,15 +360,18 @@ export default function PublicProfile() {
     });
   }, [selectedDate, selectedService, profile, dayAppointments, manualBlockedSlots]);
 
-  // Finding next available slot for hero
+  // Finding next available slot for hero and total slots for urgency
   const [nextSlot, setNextSlot] = useState<{ date: string, time: string } | null>(null);
+  const [totalWeeklySlots, setTotalWeeklySlots] = useState<number | null>(null);
 
   useEffect(() => {
-    const findNextSlot = async () => {
+    const findAvailabilityData = async () => {
       if (!profile?.uid || !profile?.workingHours || services.length === 0) return;
       
       const duration = Number(services[0]?.duration) || 60;
-      const daysToCheck = [0, 1, 2, 3, 4, 5, 6, 7]; // Check next 7 days
+      const daysToCheck = [0, 1, 2, 3, 4, 5, 6]; 
+      let totalCount = 0;
+      let firstSlotFound = false;
       
       for (const dayOffset of daysToCheck) {
         const date = new Date();
@@ -291,32 +394,84 @@ export default function PublicProfile() {
           serviceDuration: duration,
           workingHours: profile.workingHours,
           appointments: appts,
-          manualBlockedSlots: [] // Can't easily check manual blocks here without multiple queries, 
-                                 // but appointments are the main constraint
+          manualBlockedSlots: []
         });
 
-        if (slots.length > 0) {
+        totalCount += slots.length;
+
+        if (slots.length > 0 && !firstSlotFound) {
           setNextSlot({ date: dateStr, time: slots[0] });
-          break;
+          firstSlotFound = true;
         }
       }
+      setTotalWeeklySlots(totalCount);
     };
     
     if (profile && services.length > 0) {
-      findNextSlot();
+      findAvailabilityData();
     }
   }, [profile, services]);
 
+  // Scarcity & Urgency Logic
+  const urgencyInfo = React.useMemo(() => {
+    if (!profile || services.length === 0 || totalWeeklySlots === null) return null;
+    
+    let message = "Horários limitados nesta semana";
+    let isUrgent = true;
+
+    if (totalWeeklySlots === 0) {
+      message = "Alta procura nos próximos dias";
+    } else if (totalWeeklySlots <= 3) {
+      message = "Últimos horários disponíveis esta semana";
+    } else if (totalWeeklySlots > 10) {
+      message = "Agenda aberta para novos atendimentos";
+      isUrgent = false; // "Desejo" but not "Urgency" in a stressing way
+    } else if (nextSlot) {
+      const today = new Date();
+      const nextDate = new Date(nextSlot.date + 'T12:00:00');
+      const diffDays = Math.ceil(Math.abs(nextDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays >= 3) {
+        message = "Agenda concorrida — reserve com antecedência";
+      }
+    }
+
+    return {
+      message,
+      isUrgent,
+      isAgendaFull: totalWeeklySlots === 0
+    };
+  }, [profile, services, nextSlot, totalWeeklySlots]);
+
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 100);
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 100);
+      
+      // Interest Detection: Scroll reach 70%
+      const scrollPercent = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
+      if (scrollPercent > 0.7 && !showInterestPopup && !interestPopupDismissed && step === 1 && !bookingSuccess) {
+        setShowInterestPopup(true);
+      }
+    };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [showInterestPopup, interestPopupDismissed, step, bookingSuccess]);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!slug) {
         setLoading(false);
+        return;
+      }
+
+      // Check for Example/Demo Slug
+      if (slug === 'helena-prado' || slug === 'exemplo') {
+        setTimeout(() => {
+          setProfile(MOCK_PROFILE);
+          setServices(MOCK_SERVICES);
+          setReviews(MOCK_REVIEWS);
+          setStats(MOCK_STATS);
+          setLoading(false);
+        }, 500); // Small delay for UX transition
         return;
       }
 
@@ -544,27 +699,66 @@ export default function PublicProfile() {
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10">
       
-      {/* Sticky Header for Mobile Conversion */}
+      {/* Intelligent Mobile Floating CTA */}
       <AnimatePresence>
-        {scrolled && step === 1 && (
+        {scrolled && step === 1 && !loading && (
           <motion.div 
-            initial={{ y: -100 }} 
-            animate={{ y: 0 }} 
-            exit={{ y: -100 }}
-            className="fixed top-0 left-0 w-full bg-brand-white/80 backdrop-blur-md border-b border-brand-mist z-[100] px-6 py-4 flex items-center justify-between md:hidden"
+            initial={{ y: 100, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-6 right-6 z-[150] md:hidden"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden border border-brand-mist">
-                <img src={profile.avatar || profile.avatarUrl} alt={profile.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-              <span className="font-serif text-brand-ink text-sm">{profile.name.split(' ')[0]}</span>
-            </div>
-            <button 
-              onClick={() => setStep(2)}
-              className="bg-brand-ink text-brand-white px-6 py-3 rounded-full text-[9px] font-medium uppercase tracking_widest"
+            <PremiumButton 
+              variant="terracotta" 
+              className="w-full py-6 shadow-2xl backdrop-blur-md bg-brand-terracotta/95 border border-white/20"
+              onClick={() => {
+                setStep(2);
+                window.scrollTo({ top: 0, behavior: 'smooth' }); // Scroll to top to ensure modal looks correct or just rely on overlay
+              }}
             >
-              Reservar
-            </button>
+              <div className="flex items-center justify-between w-full px-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Agendar Horário</span>
+                <div className="flex items-center gap-2">
+                  {stats?.totalCompletedBookings > 0 && (
+                    <span className="text-[9px] text-white/60 normal-case tracking-normal">Próximo: {urgencyInfo?.isAgendaFull ? 'Sob consulta' : (nextSlot ? `${new Date(nextSlot.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}` : 'Em breve')}</span>
+                  )}
+                  <ChevronRight size={16} />
+                </div>
+              </div>
+            </PremiumButton>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating CTA for inside the Modal steps (Mobile only) */}
+      <AnimatePresence>
+        {step >= 2 && step <= 4 && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-0 left-0 right-0 z-[250] md:hidden p-6 bg-gradient-to-t from-brand-white via-brand-white to-transparent pt-12"
+          >
+            <PremiumButton 
+              variant="terracotta" 
+              className="w-full py-7"
+              disabled={
+                (step === 2 && (!selectedService || (isHomeService && profile?.serviceAreaType === 'custom' && !selectedArea))) ||
+                (step === 3 && (!selectedDate || !selectedTime)) ||
+                (step === 4 && (!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)))
+              }
+              loading={step === 4 && bookingLoading}
+              onClick={() => {
+                if (step === 2) setStep(3);
+                else if (step === 3) setStep(4);
+                else if (step === 4) handleBooking();
+              }}
+            >
+              {step === 2 && (selectedService ? `Reservar ${selectedService.name.split(' ')[0]}` : 'Escolher Experiência')}
+              {step === 3 && (selectedTime ? `Confirmar para ${selectedTime}` : 'Escolher Horário')}
+              {step === 4 && 'Finalizar Reserva'}
+              <ArrowRight size={18} className="ml-1" />
+            </PremiumButton>
           </motion.div>
         )}
       </AnimatePresence>
@@ -606,10 +800,50 @@ export default function PublicProfile() {
               <span className="text-[10px] md:text-[11px] font-bold text-brand-terracotta uppercase tracking-[0.6em] block">
                 Profissional Verificada Nera
               </span>
+              <p className="text-[9px] text-brand-stone font-medium uppercase tracking-widest">Atendimento profissional e personalizado</p>
               <h1 className="text-3xl md:text-4xl font-serif font-normal text-brand-ink/40 tracking-tight">
                 {profile.name}
               </h1>
             </div>
+
+            {/* Social Proof Dynamic Block */}
+            {stats && (stats.totalCompletedBookings > 0 || stats.averageRating > 0) && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="flex flex-wrap items-center justify-center gap-4"
+              >
+                {stats.totalCompletedBookings > 10 ? (
+                  <div className="flex items-center gap-2.5 px-6 py-3 bg-brand-white border border-brand-mist rounded-full shadow-sm">
+                    <Users size={14} className="text-brand-terracotta" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
+                      +{stats.totalCompletedBookings} clientes atendidas
+                    </span>
+                  </div>
+                ) : stats.totalCompletedBookings > 0 ? (
+                  <div className="flex items-center gap-2.5 px-6 py-3 bg-brand-white border border-brand-mist rounded-full shadow-sm">
+                    <CheckCircle2 size={14} className="text-brand-terracotta" />
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
+                      Profissional em destaque
+                    </span>
+                  </div>
+                ) : null}
+
+                {stats.averageRating > 4.5 && (
+                  <div className="flex items-center gap-2.5 px-6 py-3 bg-brand-white border border-brand-mist rounded-full shadow-sm">
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star key={i} size={10} className={i <= Math.round(stats.averageRating) ? "text-brand-terracotta fill-brand-terracotta" : "text-brand-mist"} />
+                      ))}
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
+                      {stats.averageRating.toFixed(1)} de excelência
+                    </span>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
             <div className="max-w-4xl mx-auto">
               <h2 className="text-[52px] md:text-[88px] font-serif font-normal text-brand-ink leading-[1.05] tracking-tight mb-10">
@@ -665,17 +899,27 @@ export default function PublicProfile() {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 px-4 w-full">
-              <PremiumButton 
-                onClick={() => {
-                  if (services.length > 0 && !selectedService) setSelectedService(services[0]);
-                  setStep(2);
-                }} 
-                className="w-full sm:w-auto min-w-[320px] py-8 text-[13px] font-bold shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
-                variant="terracotta"
-              >
-                Reservar agora <ChevronRight size={18} className="ml-1" />
-              </PremiumButton>
+            <div className="flex flex-col items-center justify-center gap-10 pt-8 w-full">
+              <div className="flex flex-col items-center gap-4 w-full">
+                {urgencyInfo && (
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase tracking-[0.3em]",
+                    urgencyInfo.isUrgent ? "text-brand-terracotta animate-pulse" : "text-brand-stone"
+                  )}>
+                    {urgencyInfo.message}
+                  </span>
+                )}
+                <PremiumButton 
+                  onClick={() => {
+                    if (services.length > 0 && !selectedService) setSelectedService(services[0]);
+                    setStep(2);
+                  }} 
+                  className="w-full sm:w-auto min-w-[320px] py-8 text-[13px] font-bold shadow-2xl hover:scale-[1.02] active:scale-[0.98]"
+                  variant="terracotta"
+                >
+                  Reservar agora <ChevronRight size={18} className="ml-1" />
+                </PremiumButton>
+              </div>
               
               {profile.instagram && (
                 <a 
@@ -752,7 +996,11 @@ export default function PublicProfile() {
             >
               <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta mb-6">Excelência</span>
               <h3 className="text-2xl md:text-3xl font-serif text-brand-ink leading-tight">
-                {stats?.totalCompletedBookings > 10 ? 'Centenas de atendimentos realizados com excelência' : 'Foco absoluto em naturalidade e precisão'}
+                {stats?.totalCompletedBookings > 20 
+                  ? 'Centenas de atendimentos realizados com total precisão' 
+                  : stats?.totalCompletedBookings > 0 
+                    ? `Mais de ${stats.totalCompletedBookings} experiências de beleza concluídas`
+                    : 'Foco absoluto em naturalidade e precisão técnica'}
               </h3>
             </motion.div>
           </div>
@@ -903,6 +1151,7 @@ export default function PublicProfile() {
                   transition={{ delay: i * 0.1 }}
                   onClick={() => {
                     setSelectedService(service);
+                    setHasInteractedWithService(true);
                     setStep(2); // Goes to Service + Mode (Step 1 of the new flow)
                   }}
                   className="group relative bg-brand-white border border-brand-mist p-12 rounded-[56px] cursor-pointer hover:border-brand-terracotta/30 hover:shadow-2xl transition-all duration-700 flex flex-col justify-between h-full overflow-hidden"
@@ -1238,7 +1487,9 @@ export default function PublicProfile() {
             viewport={{ once: true }}
             className="space-y-12"
           >
-            <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta/60 block">Últimas vagas disponíveis</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta/60 block">
+              {urgencyInfo?.isNextSlotDistant ? "Agenda concorrida — reserve com antecedência" : "Horários limitados nesta semana"}
+            </span>
             <h2 className="text-5xl md:text-7xl font-serif font-normal leading-tight">Pronta para agendar seu horário?</h2>
             <p className="text-brand-blush/60 text-lg md:text-xl max-w-2xl mx-auto font-light leading-relaxed">
               Junte-se a clientes que já transformaram seu olhar e autoestima com um atendimento exclusivo e personalizado.
@@ -1314,9 +1565,9 @@ export default function PublicProfile() {
               <div className="w-16 h-16 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-8">
                 <Clock size={32} />
               </div>
-              <h3 className="text-2xl font-serif text-brand-ink mb-3">Continuar agendamento?</h3>
+              <h3 className="text-2xl font-serif text-brand-ink mb-3">Seu horário ainda pode estar disponível.</h3>
               <p className="text-sm text-brand-stone font-light mb-10 leading-relaxed">
-                Identificamos que você iniciou um agendamento anteriormente. Deseja continuar de onde parou?
+                Continue sua reserva de onde parou.
               </p>
               
               <div className="flex flex-col gap-4">
@@ -1325,14 +1576,27 @@ export default function PublicProfile() {
                   className="w-full py-6"
                   onClick={handleRestoreDraft}
                 >
-                  Continuar Agendamento
+                  Continuar Reserva
                 </PremiumButton>
                 <button 
                   onClick={handleClearDraft}
                   className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:text-brand-ink transition-colors py-2"
                 >
-                  Começar do zero
+                  Começar novamente
                 </button>
+
+                {clientPhone && (
+                  <div className="mt-6 pt-6 border-t border-brand-mist">
+                    <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-4">Precisa de ajuda?</p>
+                    <a 
+                      href={`https://wa.me/${profile.whatsapp}?text=${encodeURIComponent('Olá! Estava iniciando um agendamento e gostaria de tirar uma dúvida.')}`}
+                      target="_blank"
+                      className="flex items-center justify-center gap-2 text-brand-ink font-medium text-xs hover:text-brand-terracotta transition-colors"
+                    >
+                      <MessageCircle size={16} /> Fale direto com a profissional
+                    </a>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -1451,14 +1715,16 @@ export default function PublicProfile() {
                       </div>
                     </div>
 
-                    <PremiumButton 
-                      className="w-full mt-8" 
-                      variant="terracotta"
-                      disabled={!selectedService || (isHomeService && profile.serviceAreaType === 'custom' && !selectedArea)}
-                      onClick={() => setStep(3)}
-                    >
-                      Continuar <ArrowRight size={18} className="ml-1" />
-                    </PremiumButton>
+                    <div className="hidden md:block">
+                      <PremiumButton 
+                        className="w-full mt-8" 
+                        variant="terracotta"
+                        disabled={!selectedService || (isHomeService && profile.serviceAreaType === 'custom' && !selectedArea)}
+                        onClick={() => setStep(3)}
+                      >
+                        Continuar <ArrowRight size={18} className="ml-1" />
+                      </PremiumButton>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -1501,8 +1767,13 @@ export default function PublicProfile() {
                   </div>
 
                   {/* Time Slots */}
-                  <div className="space-y-4 mb-12">
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Horários disponíveis</label>
+                  <div className="space-y-4 mb-24 md:mb-12">
+                    <div className="flex items-center justify-between ml-1 mb-1">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Horários disponíveis</label>
+                      {urgencyInfo?.isSlotsFew && (
+                        <span className="text-[9px] font-bold text-brand-terracotta uppercase tracking-widest animate-pulse">Últimos horários disponíveis</span>
+                      )}
+                    </div>
                     <div className="grid grid-cols-3 gap-3">
                       {selectedDate ? (
                         availableSlots.length > 0 ? (
@@ -1523,7 +1794,8 @@ export default function PublicProfile() {
                           ))
                         ) : (
                           <div className="col-span-3 py-16 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist">
-                            <p className="text-sm text-brand-stone font-light italic">Sem horários para este dia</p>
+                            <p className="text-sm text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura nos próximos dias</p>
+                            <p className="text-xs text-brand-stone font-light italic">Tente outra data ou solicite um encaixe via WhatsApp</p>
                           </div>
                         )
                       ) : (
@@ -1654,16 +1926,21 @@ export default function PublicProfile() {
                     )}
                   </div>
 
-                  <PremiumButton 
-                    variant="terracotta" 
-                    className="w-full py-7"
-                    loading={bookingLoading}
-                    loadingText="Finalizando solicitação..."
-                    disabled={!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)}
-                    onClick={handleBooking}
-                  >
-                    Solicitar meu horário <Check size={18} className="ml-1" />
-                  </PremiumButton>
+                    <div className="hidden md:block">
+                      <PremiumButton 
+                        variant="terracotta" 
+                        className="w-full py-7"
+                        disabled={!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)}
+                        onClick={handleBooking}
+                        loading={bookingLoading}
+                        loadingText="Finalizando solicitação..."
+                      >
+                        Solicitar meu horário <Check size={18} className="ml-1" />
+                      </PremiumButton>
+                    </div>
+                  <p className="text-center text-[10px] text-brand-stone font-light mt-4 uppercase tracking-widest flex items-center justify-center gap-2">
+                    <ShieldCheck size={12} className="text-brand-terracotta" /> Confirmação direta via WhatsApp
+                  </p>
                 </motion.div>
               )}
             </motion.div>
@@ -1723,19 +2000,69 @@ export default function PublicProfile() {
               </motion.div>
             )}
 
-            <div className="flex flex-col w-full max-w-sm gap-4">
-              <PremiumButton 
-                variant="terracotta"
-                className="w-full py-6"
-                onClick={() => {
-                  const message = `Olá! Acabei de solicitar um agendamento de ${selectedService?.name} para o dia ${new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR')} às ${selectedTime} pelo Nera.`;
-                  const phone = profile?.phone || profile?.whatsapp || '';
-                  window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
-                }}
-              >
-                <MessageCircle size={18} /> Falar no WhatsApp
-              </PremiumButton>
-              
+            {/* Actions & Sharing */}
+            <div className="w-full max-w-sm space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <PremiumButton 
+                  variant="secondary"
+                  className="w-full py-4 !text-[9px]"
+                  onClick={() => {
+                    const start = new Date(selectedDate + 'T' + selectedTime);
+                    const end = new Date(start.getTime() + (Number(selectedService?.duration) || 60) * 60000);
+                    
+                    const formatTemplate = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Reserva: ' + selectedService?.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent('Agendamento realizado via Nera.')}&location=${encodeURIComponent(profile?.location || '')}`;
+                    window.open(url, '_blank');
+                  }}
+                >
+                  <CalendarIcon size={14} /> Adicionar calendário
+                </PremiumButton>
+
+                <a 
+                  href={`https://wa.me/55${(profile?.phone || profile?.whatsapp || '').replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Acabei de solicitar um horário para ' + selectedService?.name + ' pelo Nera e gostaria de confirmar os detalhes.')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist"
+                >
+                  <MessageCircle size={14} /> Falar com a profissional
+                </a>
+              </div>
+
+              {/* Referral Block */}
+              <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-8 mt-12 text-center">
+                <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm">
+                  <Heart size={24} className="fill-brand-terracotta/10" />
+                </div>
+                <h4 className="text-lg font-serif text-brand-ink mb-2">Gostou da experiência? Indique uma amiga.</h4>
+                <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">Compartilhe sua descoberta com quem você ama</p>
+                
+                <PremiumButton 
+                  variant="primary"
+                  className="w-full py-5 !text-[10px]"
+                  onClick={() => {
+                    const url = window.location.origin + '/p/' + (profile?.slug || '');
+                    const text = `Te recomendo essa profissional ✨`;
+                    const fullText = `${text} Reserve online aqui: ${url}`;
+                    
+                    if (navigator.share) {
+                      navigator.share({
+                        title: profile?.name,
+                        text: text,
+                        url: url
+                      }).catch(() => {
+                        navigator.clipboard.writeText(fullText);
+                        toast.success('Link de indicação copiado!');
+                      });
+                    } else {
+                      navigator.clipboard.writeText(fullText);
+                      toast.success('Link de indicação copiado!');
+                    }
+                  }}
+                >
+                  Compartilhar perfil <Share2 size={14} className="ml-1" />
+                </PremiumButton>
+              </div>
+
               <button 
                 onClick={() => {
                   setStep(1);
@@ -1744,12 +2071,73 @@ export default function PublicProfile() {
                   setSelectedTime('');
                   setBookingSuccess(false);
                 }}
-                className="text-[11px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink py-4 transition-colors"
+                className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors"
               >
                 Voltar para o perfil
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* --- INTEREST DETECTION POPUP (SOFT CTA) --- */}
+      <AnimatePresence>
+        {showInterestPopup && step === 1 && !showRestoreDraft && !bookingSuccess && (
+          <div className="fixed bottom-8 left-6 right-6 md:left-auto md:right-10 md:w-96 z-[400]">
+            <motion.div 
+              initial={{ y: 100, opacity: 0, scale: 0.9 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 100, opacity: 0, scale: 0.9 }}
+              className="bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10"
+            >
+              {/* Background Glow */}
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl" />
+              
+              <button 
+                onClick={() => {
+                  setShowInterestPopup(false);
+                  setInterestPopupDismissed(true);
+                }}
+                className="absolute top-6 right-6 p-1 text-white/40 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-8 h-8 rounded-full bg-brand-terracotta flex items-center justify-center text-white">
+                    <Sparkles size={16} />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Convite Especial</span>
+                </div>
+                
+                <h3 className="text-xl font-serif mb-2 leading-tight">Quer garantir um horário?</h3>
+                <p className="text-xs text-white/60 font-light mb-8 leading-relaxed">
+                  Notei seu interesse! A agenda da {profile?.name.split(' ')[0]} costuma lotar rápido nestes dias.
+                </p>
+
+                <div className="flex flex-col gap-3">
+                  <PremiumButton 
+                    variant="terracotta" 
+                    className="w-full py-4 text-[10px]"
+                    onClick={() => {
+                      setShowInterestPopup(false);
+                      setStep(2);
+                    }}
+                  >
+                    Reservar agora
+                  </PremiumButton>
+                  <a 
+                    href={`https://wa.me/${profile?.whatsapp}?text=${encodeURIComponent('Oi! Estava vendo seu perfil no Nera e gostaria de tirar uma dúvida sobre os horários.')}`}
+                    target="_blank"
+                    className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                  >
+                    <MessageCircle size={14} /> Falar no WhatsApp
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 

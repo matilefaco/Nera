@@ -22,6 +22,9 @@ import { FormServices } from '../components/FormServices';
 import { ProfessionalIdentity, UserProfile, Service } from '../types';
 import { userProfileSchema, serviceSchema } from '../lib/validation';
 import { z } from 'zod';
+import { GoogleGenAI, Type } from "@google/genai";
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
 
@@ -91,6 +94,7 @@ export default function OnboardingPage() {
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [selectedBioStyle, setSelectedBioStyle] = useState('elegante');
 
   // Step 3: Services
   const [services, setServices] = useState<{name: string, duration: string, price: string, description: string}[]>([
@@ -187,63 +191,80 @@ export default function OnboardingPage() {
   }, [profile, isFinalizing, loading, user?.uid]); // Removed 'step' to prevent infinite loop or fighting
 
   const generateIdentityContent = async () => {
-    if (!name || !specialty) return;
+    if (!name || !specialty) {
+      toast.error('Informe seu nome e especialidade primeiro.');
+      return;
+    }
     setIsGeneratingContent(true);
+    console.log(`[BioAI] Generating for ${name} (${specialty}) with style: ${selectedBioStyle}`);
 
-    // Simulate AI reflection
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    try {
+      const prompt = `
+        Crie uma Headline (frase curta de impacto) e uma Bio (descrição boutique) para uma profissional de beleza.
+        
+        PERFIL:
+        - Nome: ${name}
+        - Especialidade: ${specialty}
+        - Experiência: ${yearsExperience} anos
+        - Estilo solicitado: ${selectedBioStyle}
+        - Diferenciais: ${selectedDifferentials.join(', ')}
+        - Vibe desejada: ${selectedStyles.join(', ')}
+        
+        REGRAS CRÍTICAS:
+        1. Tom: Sofisticado, premium e profissional.
+        2. Língua: Português natural do Brasil, sem traduções literais estranhas.
+        3. Headline: Curta (max 60 caracteres), forte e memorável.
+        4. Bio: No máximo 2 parágrafos curtos. Elegante e autoral.
+        5. PROIBIDO: 
+           - Frases genéricas ("há X anos transformando vidas").
+           - Repetições excessivas.
+           - Mistura de conceitos sem nexo.
+           - Clichês de marketing barato.
+           - Estruturas robóticas como "Com trajetória de...".
+        
+        VARIAÇÃO DE ESTILO (${selectedBioStyle.toUpperCase()}):
+        - elegante: polido, discreto, clássico.
+        - delicada: suave, detalhista, feminina.
+        - premium: exclusivo, luxuoso, acabamento impecável.
+        - minimalista: direto ao ponto, essencial, clean.
+        - acolhedora: humano, caloroso, atendimento próximo.
+        - técnica: foco em precisão, ciência, especialização.
+        - sofisticada: moderno, cosmopolita, alta estética.
+        - autoral: único, assinatura própria, criativo.
 
-    const stylesStr = selectedStyles.length > 0 
-      ? selectedStyles.join(' e ') 
-      : 'excelência';
-    
-    const diffsStr = selectedDifferentials.length > 0
-      ? selectedDifferentials.join(', ')
-      : 'qualidade';
+        Retorne no formato JSON com as chaves "headline" e "bio".
+      `;
 
-    const expText = yearsExperience === '5+' ? 'mais de 5' : yearsExperience;
-    
-    // More natural headline generation using templates
-    const style1 = selectedStyles[0]?.toLowerCase() || 'premium';
-    const style2 = selectedStyles[1]?.toLowerCase();
-    
-    // Normalization of concepts for better readability
-    const conceptsMap: Record<string, string> = {
-      'delicada e detalhista': 'foco em detalhes e delicadeza',
-      'rápida e eficiente': 'agilidade com alta qualidade',
-      'premium e sofisticada': 'acabamento sofisticado',
-      'técnica e precisa': 'técnica precisa',
-      'espontânea e criativa': 'design criativo',
-      'minimalista': 'estilo minimalista',
-      'moderna': 'visão moderna',
-      'atenciosa': 'atendimento humanizado',
-      'inovadora': 'técnicas inovadoras'
-    };
+      console.log('[BioAI] Prompt:', prompt);
 
-    const normalize = (text: string) => conceptsMap[text.toLowerCase()] || text;
-    
-    const trait1 = normalize(selectedStyles[0] || 'Premium');
-    const trait2 = normalize(selectedStyles[1] || 'Exclusivo');
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              headline: { type: Type.STRING },
+              bio: { type: Type.STRING }
+            },
+            required: ["headline", "bio"]
+          }
+        }
+      });
 
-    const headlines = [
-      `${specialty} | ${trait1}${selectedStyles.length > 1 ? ' · ' + trait2 : ''}`,
-      `${specialty} com ${expText} anos de experiência.`,
-      `Design de ${specialty.toLowerCase()} focado em ${trait1}.`,
-      `${specialty}: Excelência e ${trait1}.`
-    ];
-    
-    const bioTemplates = [
-      `${specialty} há ${expText} anos. Meu trabalho busca unir ${trait1} e ${trait2}, sempre priorizando ${diffsStr.toLowerCase()}.`,
-      `Especialista em ${specialty.toLowerCase()} com trajetória de ${expText} anos. Minha assinatura é o ${trait1}. Foco total em ${diffsStr.toLowerCase()}.`,
-      `${expText} anos transformando olhares e autoestimar. Atendimento voltado para ${trait1} com o diferencial de ${diffsStr.toLowerCase()}.`
-    ];
-    
-    const newHeadline = headlines[Math.floor(Math.random() * headlines.length)];
-    const newBio = bioTemplates[Math.floor(Math.random() * bioTemplates.length)];
-    
-    setHeadline(newHeadline);
-    setBio(newBio);
-    setIsGeneratingContent(false);
+      const { headline: aiHeadline, bio: aiBio } = JSON.parse(response.text);
+      console.log('[BioAI] Result:', { aiHeadline, aiBio });
+
+      setHeadline(aiHeadline);
+      setBio(aiBio);
+      toast.success('Sua marca foi personalizada com IA ✨');
+    } catch (error) {
+      console.error('[BioAI] Generation failed:', error);
+      toast.error('O concierge está ocupado agora. Tente novamente em instantes.');
+    } finally {
+      setIsGeneratingContent(false);
+    }
   };
 
   const saveProgress = async (nextStepNum: number) => {
@@ -385,30 +406,58 @@ export default function OnboardingPage() {
   const prevStep = () => setStep(s => s - 1);
 
   const handleFinish = async () => {
+    console.log('[OnboardingSave] handleFinish triggered');
     setFormErrors({});
     if (!user || isFinalizing || profile?.onboardingCompleted) {
+      console.log('[OnboardingSave] handleFinish blocked:', { 
+        noUser: !user, 
+        isFinalizing, 
+        alreadyCompleted: profile?.onboardingCompleted 
+      });
       if (profile?.onboardingCompleted) navigate('/dashboard');
       return;
     }
 
     // 1. Validation
     try {
-      userProfileSchema.parse({
-        name,
-        slug,
-        whatsapp,
-        email: user.email,
-        bio,
-        serviceMode,
-        workingHours: { startTime, endTime, workingDays }
-      });
+      console.log('[OnboardingSave] Validating payload...');
+      const errors: Record<string, string> = {};
       
+      if (!name.trim()) errors.name = 'O nome profissional é obrigatório';
+      if (!specialty.trim()) errors.specialty = 'Sua especialidade é obrigatória';
+      if (!slug.trim()) errors.slug = 'O link da sua vitrine é obrigatório';
+      if (slug.length < 3) errors.slug = 'O link deve ter pelo menos 3 caracteres';
+      if (!whatsapp.trim()) errors.whatsapp = 'O WhatsApp de contato é obrigatório';
+      
+      // Basic WhatsApp validation (at least 10 digits)
+      const digits = whatsapp.replace(/\D/g, '');
+      if (whatsapp.trim() && (digits.length < 10 || digits.length > 11)) {
+        errors.whatsapp = 'Informe um WhatsApp válido com DDD';
+      }
+
       const activeServices = services.filter(s => s.name.trim() !== '');
       if (activeServices.length === 0) {
-        toast.error('Adicione pelo menos uma experiência.');
+        console.warn('[OnboardingSave] Validation failed: No active services');
+        toast.error('Adicione pelo menos um serviço na etapa anterior.');
+        setStep(3); // Go back to services if missing
+        return;
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        toast.error('Revise os campos destacados para publicar sua vitrine.');
+        
+        // Auto-scroll to first error
+        setTimeout(() => {
+          const firstError = document.querySelector('.form-error-message');
+          if (firstError) {
+            firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 150);
         return;
       }
     } catch (err) {
+      console.error('[OnboardingSave] Validation error:', err);
       if (err instanceof z.ZodError) {
         toast.error(err.issues[0].message);
       } else {
@@ -421,6 +470,7 @@ export default function OnboardingPage() {
     setIsFinalizing(true);
 
     try {
+      console.log('[OnboardingSave] Preparing final data...');
       // 2. Prepare Final Data (without setting completed: true yet)
       const finalData: Partial<UserProfile> = {
         name: name.trim(),
@@ -459,10 +509,14 @@ export default function OnboardingPage() {
           differentials: selectedDifferentials,
           attendsAt: serviceMode as any
         } as ProfessionalIdentity,
-        onboardingStep: 5
+        onboardingCompleted: true,
+        onboardingStep: 6
       };
 
+      console.log('[OnboardingSave] Payload:', finalData);
+
       // 3. Save Services
+      console.log('[OnboardingSave] Saving services...');
       const activeServices = services.filter(s => s.name && s.price);
       const servicePromises = activeServices.map(service => {
         return addDoc(collection(db, 'services'), {
@@ -476,12 +530,17 @@ export default function OnboardingPage() {
         });
       });
       await Promise.all(servicePromises);
+      console.log('[OnboardingSave] Services saved successfully.');
 
       // 4. Save Profile
+      console.log('[OnboardingSave] Saving profile...');
       await saveProfilePartial(user.uid, finalData);
+      console.log('[OnboardingSave] Profile saved successfully.');
 
-      setStep(5);
+      setStep(6);
+      setIsFinalizing(false); // Reset to allow the next button click
     } catch (error: any) {
+      console.error('[OnboardingSave] Finalization error:', error);
       if (error instanceof z.ZodError) {
         const errors: Record<string, string> = {};
         error.issues.forEach((issue) => {
@@ -491,9 +550,9 @@ export default function OnboardingPage() {
         });
         setFormErrors(errors);
         toast.error('Verifique os campos da sua vitrine.');
+        setIsFinalizing(false);
         return;
       }
-      console.error('[Onboarding] Finalization error:', error);
       toast.error('Não foi possível concluir agora. Tente novamente.');
       setIsFinalizing(false);
     } finally {
@@ -502,13 +561,20 @@ export default function OnboardingPage() {
   };
 
   const completeOnboarding = async () => {
-    if (!user || isFinalizing) return;
+    console.log('[OnboardingSave] completeOnboarding triggered');
+    if (!user || isFinalizing) {
+      console.log('[OnboardingSave] completeOnboarding blocked:', { noUser: !user, isFinalizing });
+      return;
+    }
     
     setIsFinalizing(true);
     try {
+      console.log('[OnboardingSave] Setting onboardingCompleted = true...');
       await saveProfilePartial(user.uid, { onboardingCompleted: true });
+      console.log('[OnboardingSave] Setting onboardingCompleted = SUCCESS. Navigating...');
       navigate('/dashboard');
     } catch (error) {
+      console.error('[OnboardingSave] completeOnboarding error:', error);
       toast.error('Não foi possível concluir agora. Tente novamente.');
       setIsFinalizing(false);
     }
@@ -751,6 +817,8 @@ export default function OnboardingPage() {
                 setBio={setBio}
                 onGenerateBio={generateIdentityContent}
                 isGeneratingBio={isGeneratingContent}
+                selectedBioStyle={selectedBioStyle}
+                setSelectedBioStyle={setSelectedBioStyle}
                 showLabels={true}
               />
 
@@ -908,6 +976,14 @@ export default function OnboardingPage() {
                 onFileUpload={handleFileUpload}
                 slug={slug}
                 setSlug={setSlug}
+                headline={headline}
+                setHeadline={setHeadline}
+                bio={bio}
+                setBio={setBio}
+                onGenerateBio={generateIdentityContent}
+                isGeneratingBio={isGeneratingContent}
+                selectedBioStyle={selectedBioStyle}
+                setSelectedBioStyle={setSelectedBioStyle}
                 whatsapp={whatsapp}
                 setWhatsapp={setWhatsapp}
                 instagram={instagram}
@@ -938,10 +1014,19 @@ export default function OnboardingPage() {
                 </button>
                 <button 
                   onClick={handleFinish}
-                  disabled={loading || !slug || !whatsapp}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                  disabled={loading || isFinalizing}
+                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  {loading ? 'Refinando sua vitrine...' : 'Publicar minha vitrine'} <CheckCircle2 size={18} />
+                  {isFinalizing ? (
+                    <>
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                        <Sparkles size={18} />
+                      </motion.div>
+                      <span>Publicando...</span>
+                    </>
+                  ) : (
+                    <>Publicar minha vitrine <CheckCircle2 size={18} /></>
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -971,7 +1056,7 @@ export default function OnboardingPage() {
               <div className="space-y-4">
                 <h1 className="text-5xl font-serif font-normal text-brand-ink">Sua vitrine está pronta!</h1>
                 <p className="text-brand-stone text-lg max-w-sm mx-auto font-light">
-                  Agora você tem um sistema profissional para receber agendamentos e valorizar seu tempo.
+                  Seu perfil está pronto para receber clientes ainda hoje. Agora você tem um sistema profissional para valorizar seu tempo.
                 </p>
               </div>
 

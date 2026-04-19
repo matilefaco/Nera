@@ -105,37 +105,37 @@ export default function ClientsPage() {
         </div>
         <nav className="flex-1 space-y-2">
           <Link to="/dashboard" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Calendar size={18} /> Dashboard
+            <Calendar size={18} /> Painel
           </Link>
           <Link to="/agenda" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
             <Calendar size={18} /> Agenda
           </Link>
           <Link to="/clients" className="flex items-center gap-3 px-4 py-3 bg-brand-linen text-brand-ink rounded-xl font-medium text-sm transition-all">
-            <Users size={18} /> Clientes
+            <Users size={18} /> Relacionamentos
           </Link>
           <Link to="/services" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <List size={18} /> Serviços
+            <List size={18} /> Experiências
           </Link>
           <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-brand-stone hover:bg-brand-parchment rounded-xl font-medium text-sm transition-all">
-            <Settings size={18} /> Perfil
+            <Settings size={18} /> Minha Marca
           </Link>
         </nav>
       </aside>
 
       <main className="flex-1 p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="mb-12">
-          <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Suas Clientes</h1>
-          <p className="text-brand-stone font-light">Quem faz o seu negócio crescer todos os dias.</p>
+          <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Seus Relacionamentos</h1>
+          <p className="text-brand-stone font-light">Conexões valiosas para a sua marca.</p>
         </header>
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
           <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-            <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-1">Total Clientes</p>
+            <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-1">Base de Relacionamentos</p>
             <p className="text-3xl font-serif text-brand-ink">{clients.length}</p>
           </div>
           <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-            <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-1">Clientes VIP</p>
+            <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-1">Clientes Fidelizadas</p>
             <p className="text-3xl font-serif text-brand-terracotta">{clients.filter(c => c.totalSpent > 1000).length}</p>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function ClientsPage() {
         {/* Clients List */}
         <div className="space-y-4">
           {loading ? (
-            <AppLoadingScreen fullScreen={false} message="Carregando sua base de clientes..." />
+            <AppLoadingScreen fullScreen={false} message="Preparando suas conexões..." />
           ) : filteredClients.length > 0 ? (
             filteredClients.map((client, idx) => (
               <motion.div 
@@ -207,8 +207,8 @@ export default function ClientsPage() {
           ) : (
             <div className="text-center py-20 md:py-32 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist px-6">
               <Users size={40} className="text-brand-mist mx-auto mb-6 opacity-50" />
-              <p className="text-brand-stone font-serif italic text-lg font-light mb-2">Sua lista está vazia por enquanto.</p>
-              <p className="text-[10px] text-brand-stone uppercase tracking-widest max-w-xs mx-auto">Suas clientes aparecerão aqui conforme você agendar e atender.</p>
+              <p className="text-brand-stone font-serif italic text-lg font-light mb-2">Suas conexões começarão por aqui.</p>
+              <p className="text-[10px] text-brand-stone uppercase tracking-widest max-w-xs mx-auto">Seus relacionamentos aparecerão aqui conforme você agendar e atender.</p>
             </div>
           )}
         </div>

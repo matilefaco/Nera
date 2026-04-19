@@ -36,6 +36,8 @@ export interface FormIdentityProps {
   showLabels?: boolean;
   onGenerateBio?: () => void;
   isGeneratingBio?: boolean;
+  selectedBioStyle?: string;
+  setSelectedBioStyle?: (val: string) => void;
 }
 
 const FormError = ({ message }: { message?: string }) => (
@@ -45,7 +47,7 @@ const FormError = ({ message }: { message?: string }) => (
         initial={{ opacity: 0, height: 0 }}
         animate={{ opacity: 1, height: 'auto' }}
         exit={{ opacity: 0, height: 0 }}
-        className="text-[10px] text-brand-terracotta font-bold uppercase tracking-wider ml-1 mt-1"
+        className="form-error-message text-[10px] text-brand-terracotta font-bold uppercase tracking-wider ml-1 mt-1"
       >
         {message}
       </motion.p>
@@ -82,8 +84,21 @@ export const FormIdentity = ({
   subtitle,
   showLabels = true,
   onGenerateBio,
-  isGeneratingBio
+  isGeneratingBio,
+  selectedBioStyle = 'elegante',
+  setSelectedBioStyle
 }: FormIdentityProps) => {
+  const styles = [
+    { id: 'elegante', label: 'Elegante' },
+    { id: 'delicada', label: 'Delicada' },
+    { id: 'premium', label: 'Premium' },
+    { id: 'minimalista', label: 'Minimalista' },
+    { id: 'acolhedora', label: 'Acolhedora' },
+    { id: 'tecnica', label: 'Técnica' },
+    { id: 'sofisticada', label: 'Sofisticada' },
+    { id: 'autoral', label: 'Autoral' }
+  ];
+
   return (
     <div className="w-full space-y-10">
       {(title || subtitle) && (
@@ -182,24 +197,45 @@ export const FormIdentity = ({
           )}
 
           {(bio !== undefined && setBio) && (
-            <div className="space-y-2">
-              <div className="flex justify-between items-end">
-                {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bio / Descrição Boutique</label>}
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                <div className="space-y-1">
+                  {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bio / Descrição Boutique</label>}
+                  {setSelectedBioStyle && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {styles.map(s => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => setSelectedBioStyle(s.id)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-wider transition-all border",
+                            selectedBioStyle === s.id
+                              ? "bg-brand-ink text-brand-white border-brand-ink"
+                              : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                          )}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {onGenerateBio && (
                   <button 
                     type="button"
                     onClick={onGenerateBio}
                     disabled={isGeneratingBio}
-                    className="flex items-center gap-2 text-[10px] font-medium text-brand-terracotta uppercase tracking-widest hover:text-brand-sienna disabled:opacity-50"
+                    className="flex items-center gap-2 text-[10px] font-medium text-brand-terracotta uppercase tracking-[0.2em] hover:text-brand-sienna disabled:opacity-50 h-fit pb-1"
                   >
-                    <Sparkles size={14} /> {isGeneratingBio ? 'Criando...' : 'Bio com IA'}
+                    <Sparkles size={14} /> {isGeneratingBio ? 'Refinando...' : 'Bio com IA'}
                   </button>
                 )}
               </div>
               <textarea 
                 value={bio} 
                 onChange={(e) => setBio(e.target.value)} 
-                className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-32 resize-none font-light" 
+                className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-32 resize-none font-light italic text-sm leading-relaxed" 
                 placeholder="Conte o diferencial do seu atendimento..." 
               />
             </div>
