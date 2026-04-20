@@ -256,26 +256,19 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
 
   try {
     const bookingId = await runTransaction(db, async (transaction) => {
-      // 1. Conflict check: Move inside transaction and check blocked_slots for confirmed/completed appointments
+      // 1. Verificar conflito DENTRO da transação (atômico)
       const slotSnap = await transaction.get(lockRef);
       if (slotSnap.exists()) {
-        throw new Error('Esse horário já está ocupado por um agendamento confirmado.');
+        throw new Error('Esse horário acabou de ser reservado');
       }
 
-      // 2. Create the appointment. 
-      // We do NOT create a record in blocked_slots yet for 'pending' status.
-      // Clean data
       const cleanedData = removeEmptyFields(appointmentData);
-      
-      // Create appointment ref (new doc)
       const apptRef = doc(collection(db, 'appointments'));
       
-      // Create the appointment
       transaction.set(apptRef, {
         ...cleanedData,
         status: 'pending',
         createdAt: serverTimestamp(),
-        expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
       });
 
       return apptRef.id;

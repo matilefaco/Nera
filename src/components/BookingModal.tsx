@@ -42,29 +42,48 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
   const isHomeService = bookingMode === 'home';
 
-  // Urgency logic copied from PublicProfile for consistency in step 3
-  const urgencyInfo = useMemo(() => {
-    // This is a simplified version of the one in PublicProfile as we don't have totalWeeklySlots here easily
-    // But we can check if slots are few for the selected day
-    if (!selectedDate) return null;
-    return {
-      isSlotsFew: dayAppointments.length > 5 // Simple heuristic
-    };
-  }, [selectedDate, dayAppointments]);
-
-  // Sync initial service when opening
+  // 1. MODAL OPEN/CLOSE SYNC & RESET
   useEffect(() => {
-    if (open && initialService) {
-      setSelectedService(initialService);
-    }
-  }, [open, initialService]);
+    if (open) {
+      // Always honor the initialService prop when opening
+      // If it's null, we allow the "Restore Draft" logic to take over later if no service is selected
+      if (initialService) {
+        setSelectedService(initialService);
+        setShowRestoreDraft(false); // Hide the restore prompt if a specific service was chosen
+      } else if (!selectedService) {
+        // Only reset if we don't have a selection already (to avoid flickering if re-rendering)
+        setSelectedService(null);
+      }
+      
+      // For any opening, ensure we start from the beginning unless a restore happens later
+      if (step === 5) setStep(2); // If they reached success and re-opened, reset step
 
-  // Pre-select booking mode if not hybrid
-  useEffect(() => {
-    if (profile?.serviceMode && profile.serviceMode !== 'hybrid' && !bookingMode) {
-      setBookingMode(profile.serviceMode === 'studio' ? 'studio' : 'home');
+      // Pre-select booking mode if not hybrid for fresh openings
+      if (profile?.serviceMode && profile.serviceMode !== 'hybrid' && !bookingMode) {
+        setBookingMode(profile.serviceMode === 'studio' ? 'studio' : 'home');
+      }
+    } else {
+      // 2. Proactive reset when closed (after animation)
+      const timer = setTimeout(() => {
+        setStep(2);
+        setSelectedService(null);
+        setSelectedDate('');
+        setSelectedTime('');
+        setSelectedArea(null);
+        setBookingAttempted(false);
+        setBookingMode(profile?.serviceMode && profile.serviceMode !== 'hybrid' 
+          ? (profile.serviceMode === 'studio' ? 'studio' : 'home') 
+          : null);
+        setBookingLoading(false);
+        setBookingSuccess(false);
+        setClientName('');
+        setClientPhone('');
+        setClientEmail('');
+        setClientAddress('');
+      }, 400); // Wait for exit animations
+      return () => clearTimeout(timer);
     }
-  }, [profile?.serviceMode, bookingMode]);
+  }, [open, initialService, profile?.serviceMode]);
 
   // Persistence Logic: Saving draft to localStorage
   useEffect(() => {
@@ -159,6 +178,29 @@ export default function BookingModal({ profile, services, onClose, open, initial
     });
   }, [selectedDate, selectedService, profile, dayAppointments, manualBlockedSlots]);
 
+  // Urgency logic based on real availability
+  const urgencyInfo = useMemo(() => {
+    if (!selectedDate || !availableSlots.length) return null;
+    
+    const count = availableSlots.length;
+    
+    if (count >= 1 && count <= 3) {
+      return {
+        message: "Últimos horários disponíveis",
+        isUrgent: true
+      };
+    }
+    
+    if (count >= 4 && count <= 8) {
+      return {
+        message: "Agenda com boa procura",
+        isUrgent: false
+      };
+    }
+    
+    return null;
+  }, [selectedDate, availableSlots]);
+
   useEffect(() => {
     if (selectedDate && profile?.uid && open) {
       const slotsRef = collection(db, 'blocked_slots');
@@ -187,14 +229,17 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const handleBooking = async () => {
     setBookingAttempted(true);
     if (!profile || !selectedService) return;
-    if (!clientName.trim() || !clientPhone.trim() || !clientEmail.trim() || (isHomeService && !clientAddress.trim())) {
+    if (!clientName.trim() || !clientPhone.trim() || (isHomeService && !clientAddress.trim())) {
       toast.error('Por favor, preencha os campos destacados.');
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(clientEmail.trim())) {
-      toast.error('O e-mail informado parece não ser válido.');
-      return;
+
+    if (clientEmail.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(clientEmail.trim())) {
+        toast.error('O e-mail informado parece não ser válido.');
+        return;
+      }
     }
     setBookingLoading(true);
     try {
@@ -353,6 +398,19 @@ export default function BookingModal({ profile, services, onClose, open, initial
                   <div className="space-y-4 mb-24 md:mb-12">
                     <div className="flex items-center justify-between ml-1 mb-1">
                       <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Horários disponíveis</label>
+                      {urgencyInfo && (
+                        <motion.div 
+                          initial={{ opacity: 0, x: 10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          className={cn(
+                            "flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.15em]",
+                            urgencyInfo.isUrgent ? "text-brand-terracotta" : "text-brand-stone/60"
+                          )}
+                        >
+                          {urgencyInfo.isUrgent && <div className="w-1 h-1 rounded-full bg-current animate-pulse" />}
+                          {urgencyInfo.message}
+                        </motion.div>
+                      )}
                     </div>
                     <div className="grid grid-cols-3 gap-3">
                       {selectedDate ? (
@@ -416,9 +474,9 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         {!clientPhone && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>}
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">E-mail <span className="text-brand-terracotta">*</span></label>
-                        <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="seu@e-mail.com" className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm", !clientEmail && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
-                        {!clientEmail && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>}
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">E-mail <span className="opacity-40">(Opcional)</span></label>
+                        <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="Agilize sua reserva (opcional)" className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm border-brand-mist")} />
+                        <p className="text-[8px] text-brand-stone/60 font-medium uppercase tracking-wider ml-2 mt-1">Usaremos seu WhatsApp para a confirmação.</p>
                       </div>
                     </div>
                     {isHomeService && (

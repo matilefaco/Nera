@@ -154,3 +154,57 @@ export function buildWhatsappLink(raw: string, message?: string): string {
   const phone = cleaned.startsWith('55') && cleaned.length > 11 ? cleaned.substring(2) : cleaned;
   return `https://wa.me/55${phone}?text=${encodeURIComponent(message || '')}`;
 }
+
+/**
+ * Premium Bio Logic for Nera:
+ * Splits a bio into a "Hero version" (punchy summary) and an "About version" (the rest).
+ * Ensures no repetition and handles small bios by hiding the 'About' section.
+ */
+export function splitSmartBio(bio: string | undefined, limit: number = 140): { hero: string; about: string | null } {
+  if (!bio) return { hero: '', about: null };
+  const trimmedBio = bio.trim();
+
+  // Condition 3: Short bio (< 140 chars)
+  if (trimmedBio.length < limit) {
+    return { hero: trimmedBio, about: null };
+  }
+
+  // Find a good sentence boundary within the limit
+  // We look for . ! ? followed by space or newline
+  const sentences = trimmedBio.match(/[^\.!\?]+[\.!\?]+(?:\s+|\n|$)/g) || [trimmedBio];
+  
+  let heroText = "";
+  let currentIndex = 0;
+
+  for (const sentence of sentences) {
+    if ((heroText + sentence).length <= limit + 20) { // Slight buffer for natural sentences
+      heroText += sentence;
+      currentIndex += sentence.length;
+    } else {
+      break;
+    }
+  }
+
+  // Fallback if the first sentence is already huge
+  if (!heroText) {
+    heroText = trimmedBio.substring(0, limit);
+    const lastSpace = heroText.lastIndexOf(' ');
+    if (lastSpace > limit / 2) {
+      heroText = heroText.substring(0, lastSpace);
+    }
+    heroText += '...';
+    currentIndex = lastSpace > 0 ? lastSpace : limit;
+  }
+
+  const aboutText = trimmedBio.substring(currentIndex).trim();
+
+  // If the remaining text is too tiny, just keep it all in the hero
+  if (aboutText.length < 50) {
+    return { hero: trimmedBio, about: null };
+  }
+
+  return { 
+    hero: heroText.trim(), 
+    about: aboutText 
+  };
+}

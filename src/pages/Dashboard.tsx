@@ -28,7 +28,6 @@ export default function Dashboard() {
   const [pendingRequests, setPendingRequests] = useState<Appointment[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<Appointment | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [dailyTip, setDailyTip] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
   const [isConfirmRejectOpen, setIsConfirmRejectOpen] = useState(false);
@@ -37,17 +36,15 @@ export default function Dashboard() {
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [recentCompletedClients, setRecentCompletedClients] = useState<any[]>([]);
 
-  const tips = [
-    "Dica: Peça para suas clientes avaliarem o serviço no Nera para subir no ranking!",
-    "Lembrete: Atualize seu portfólio semanalmente com suas melhores fotos.",
-    "Pro: Confirme a taxa de deslocamento logo após aprovar o agendamento.",
-    "Dica: Personalize sua bio com seus principais diferenciais.",
-    "Lembrete: Verifique seus materiais de biossegurança para os atendimentos de amanhã."
-  ];
+  const getContextualTip = () => {
+    if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
+    if (confirmedToday.length === 0) return 'Nenhum atendimento confirmado hoje. Que tal compartilhar sua vitrine?';
+    if (inactiveClients.length > 0) return `${inactiveClients[0].name} não agenda há mais de 30 dias — hora de um recado?`;
+    if (recentCompletedClients.length > 0) return `Envie o link de avaliação para ${recentCompletedClients[0].name}!`;
+    return 'Atualize seu portfólio esta semana para atrair novas clientes.';
+  };
 
-  useEffect(() => {
-    setDailyTip(tips[Math.floor(Math.random() * tips.length)]);
-  }, []);
+  const dailyTip = getContextualTip();
 
   useEffect(() => {
     if (!user) return;
@@ -252,6 +249,12 @@ export default function Dashboard() {
             <TrendingUp size={14} className="text-brand-terracotta" />
             <span className="text-[10px] font-medium uppercase tracking-widest text-brand-ink">
               {formatCurrency(dailyRevenue)} Total hoje
+            </span>
+          </div>
+          <div className="bg-brand-linen border border-brand-mist px-5 py-3 rounded-2xl flex items-center gap-3 shadow-sm">
+            <TrendingUp size={14} className="text-brand-stone" />
+            <span className="text-[10px] font-medium uppercase tracking-widest text-brand-stone">
+              {formatCurrency(potentialRevenue)} em análise
             </span>
           </div>
         </section>
@@ -629,10 +632,16 @@ export default function Dashboard() {
             <section className="bg-brand-linen p-8 rounded-[40px] border border-brand-mist">
               <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-6">Operacional</h3>
               <div className="grid grid-cols-1 gap-3">
-                <button className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all">
+                <button 
+                  onClick={() => toast.info('O bloqueio manual de horários estará disponível em breve.')}
+                  className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all"
+                >
                   <Calendar size={14} className="text-brand-terracotta" /> Bloquear Horário
                 </button>
-                <button className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all">
+                <button 
+                  onClick={() => toast.info('Os lembretes automáticos em massa são uma função da Versão Pro.')}
+                  className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all"
+                >
                   <MessageCircle size={14} className="text-brand-terracotta" /> Lembretes em Massa
                 </button>
                 <Link to="/services" className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all">

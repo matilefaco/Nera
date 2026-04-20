@@ -22,6 +22,7 @@ import { FormServices } from '../components/FormServices';
 import { ProfessionalIdentity, UserProfile, Service } from '../types';
 import { userProfileSchema, serviceSchema } from '../lib/validation';
 import { z } from 'zod';
+import { useProfileForm } from '../hooks/useProfileForm';
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
 
@@ -60,36 +61,41 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isSavingStep, setIsSavingStep] = useState(false);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const portfolioInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
 
-  // Step 1: Identity
-  const [name, setName] = useState('');
-  const [specialty, setSpecialty] = useState('');
-  const [city, setCity] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [avatar, setAvatar] = useState('');
-  const [serviceMode, setServiceMode] = useState<ServiceMode>('studio');
+  const {
+    name, setName,
+    specialty, setSpecialty,
+    bio, setBio,
+    city, setCity,
+    whatsapp, setWhatsapp,
+    instagram, setInstagram,
+    slug, setSlug,
+    avatar, setAvatar,
+    neighborhood, setNeighborhood,
+    headline, setHeadline,
+    serviceMode, setServiceMode,
+    studioAddress, setStudioAddress,
+    serviceAreas, setServiceAreas,
+    pricingStrategy, setPricingStrategy,
+    differentials: selectedDifferentials, setDifferentials: setSelectedDifferentials,
+    workingDays, setWorkingDays,
+    startTime, setStartTime,
+    endTime, setEndTime
+  } = useProfileForm(profile);
 
   // Step 2: Service Mode Details
-  const [studioAddress, setStudioAddress] = useState({
-    street: '',
-    number: '',
-    complement: '',
-    neighborhood: '',
-    city: '',
-    reference: ''
-  });
-  const [serviceAreas, setServiceAreas] = useState<{name: string, fee: number}[]>([]);
   const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>('city_wide');
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   const [neighborhoodSuggestions, setNeighborhoodSuggestions] = useState<string[]>([]);
-  const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>('none');
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [selectedBioStyle, setSelectedBioStyle] = useState('elegante');
 
@@ -98,19 +104,7 @@ export default function OnboardingPage() {
     { name: '', duration: '60', price: '', description: '' }
   ]);
 
-  // Step 4: Schedule
-  const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]); // Mon-Fri
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
-
   const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
-
-  // Step 5: Public Showcase
-  const [slug, setSlug] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [instagram, setInstagram] = useState('');
-  const [bio, setBio] = useState('');
-  const [headline, setHeadline] = useState('');
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [servicesErrors, setServicesErrors] = useState<any[]>([]);
@@ -118,7 +112,6 @@ export default function OnboardingPage() {
   // New Identity State
   const [yearsExperience, setYearsExperience] = useState('3-5');
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
-  const [selectedDifferentials, setSelectedDifferentials] = useState<string[]>([]);
 
   useEffect(() => {
     if (profile) {
@@ -130,62 +123,21 @@ export default function OnboardingPage() {
       });
 
       // 1. If onboarding is already completed on server, App.tsx guard will handle redirect.
-      // We don't need complex local logic here.
       if (profile.onboardingCompleted && !isFinalizing && step !== 5) {
         return;
       }
 
-      // 2. Sync local state with profile
+      // Sync specific onboarding fields not covered by common hook
       if (!loading && !isFinalizing) {
-        if (profile.name) setName(profile.name);
-        if (profile.specialty) setSpecialty(profile.specialty);
-        if (profile.city) setCity(profile.city);
-        if (profile.neighborhood) setNeighborhood(profile.neighborhood);
-        if (profile.avatar) {
-          setAvatar(profile.avatar);
-          setAvatarPreview(profile.avatar);
-        }
-        if (profile.studioAddress) {
-          setStudioAddress(profile.studioAddress);
-        } else if (profile.address) {
-          setStudioAddress(prev => ({ ...prev, street: profile.address }));
-        }
-        if (profile.serviceAreas) setServiceAreas(profile.serviceAreas);
-        if (profile.pricingStrategy) setPricingStrategy(profile.pricingStrategy);
-        if (profile.workingDays) setWorkingDays(profile.workingDays);
-        if (profile.startTime) setStartTime(profile.startTime);
-        if (profile.endTime) setEndTime(profile.endTime);
-        if (profile.slug) {
-          setSlug(profile.slug);
-        } else if (profile.name) {
-          setSlug(generateSlug(profile.name));
-        }
-        if (profile.whatsapp) setWhatsapp(profile.whatsapp);
-        if (profile.instagram) setInstagram(profile.instagram);
-        
-        if (profile.bio) setBio(profile.bio);
-        if (profile.headline) setHeadline(profile.headline);
-
+        if (profile.serviceAreaType) setServiceAreaType(profile.serviceAreaType);
         if (profile.servicesDraft) setServices(profile.servicesDraft);
-
-        if (profile.professionalIdentity) {
-          if (profile.professionalIdentity.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
-          if (profile.professionalIdentity.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
-          if (profile.professionalIdentity.differentials) setSelectedDifferentials(profile.professionalIdentity.differentials);
-        }
-        
-        if (profile.portfolio && profile.portfolio.length > 0) {
-          setPortfolio(profile.portfolio);
-        }
-        
-        if (profile.onboardingStep !== undefined) {
-          // If profile says step 5 (success in old system), it should be 6 now if we really want to be precise, 
-          // but usually success step doesn't need to be persisted as "incomplete"
-          setStep(profile.onboardingStep);
-        }
+        if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
+        if (profile.professionalIdentity?.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
+        if (profile.portfolio && profile.portfolio.length > 0) setPortfolio(profile.portfolio);
+        if (profile.onboardingStep !== undefined) setStep(profile.onboardingStep);
       }
     }
-  }, [profile, isFinalizing, loading, user?.uid]); // Removed 'step' to prevent infinite loop or fighting
+  }, [profile?.uid, isFinalizing, loading]);
 
   const generateIdentityContent = async () => {
     if (!name || !specialty) {
@@ -198,9 +150,7 @@ export default function OnboardingPage() {
     try {
       const response = await fetch('/api/generate-content', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           specialty,
@@ -210,17 +160,9 @@ export default function OnboardingPage() {
           bioStyle: selectedBioStyle
         })
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro na geração');
-      }
-
-      const { headline: aiHeadline, bio: aiBio } = await response.json();
-      console.log('[BioAI] Result:', { aiHeadline, aiBio });
-
-      setHeadline(aiHeadline);
-      setBio(aiBio);
+      const data = await response.json();
+      if (data.bio) setBio(data.bio);
+      if (data.headline) setHeadline(data.headline);
       toast.success('Sua marca foi personalizada com IA ✨');
     } catch (error: any) {
       console.error('[BioAI] Generation failed:', error);
@@ -245,6 +187,11 @@ export default function OnboardingPage() {
       headline,
       serviceMode,
       onboardingStep: nextStepNum,
+      workingHours: {
+        startTime,
+        endTime,
+        workingDays
+      },
       professionalIdentity: {
         mainSpecialty: specialty,
         yearsExperience,
@@ -315,6 +262,7 @@ export default function OnboardingPage() {
   };
 
   const nextStep = async () => {
+    if (isSavingStep) return;
     setFormErrors({});
     
     // Validation per step
@@ -363,9 +311,19 @@ export default function OnboardingPage() {
       }
     }
 
-    const nextStepNum = step + 1;
-    await saveProgress(nextStepNum);
-    setStep(nextStepNum);
+    setIsSavingStep(true);
+    try {
+      const nextStepNum = step + 1;
+      await saveProgress(nextStepNum);
+      setStep(nextStepNum);
+      // Scroll to top on step change for better UX
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      console.error('[Onboarding] Failed to move to next step:', error);
+      toast.error('Não foi possível salvar seu progresso agora.');
+    } finally {
+      setIsSavingStep(false);
+    }
   };
 
   const prevStep = () => setStep(s => s - 1);
@@ -629,17 +587,31 @@ export default function OnboardingPage() {
         const downloadUrl = await uploadImageToStorage(compressedFile, `portfolio/${user.uid}`);
         console.log('[Portfolio] upload finished:', downloadUrl);
         
+        // 3b. AI Categorization
+        let autoCategory = '';
+        try {
+          const catRes = await fetch('/api/analyze-portfolio-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: downloadUrl, specialty })
+          });
+          const catData = await catRes.json();
+          autoCategory = catData.category || '';
+        } catch {
+          // silencioso — categoria fica vazia se falhar
+        }
+
         // 4. Persistence
         console.log('[Portfolio] saving to Firestore');
-        const docId = await savePortfolioItem(user.uid, downloadUrl, specialty || 'Geral');
+        const docId = await savePortfolioItem(user.uid, downloadUrl, autoCategory || specialty || 'Geral');
         console.log('[Portfolio] saved successfully');
         
         // Update local state with real ID
         setPortfolio(prev => prev.map(item => 
-          item.id === tempId ? { id: docId, url: downloadUrl, category: specialty || 'Geral' } : item
+          item.id === tempId ? { id: docId, url: downloadUrl, category: autoCategory || specialty || 'Geral' } : item
         ));
 
-        toast.success('Galeria atualizada com sucesso.');
+        toast.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
       } catch (error: any) {
         console.error('[Portfolio] upload failed:', error);
         toast.error('Não foi possível carregar a imagem.');
@@ -657,6 +629,7 @@ export default function OnboardingPage() {
     // Don't allow removing temp items that are still uploading
     if (id.startsWith('temp-')) return;
 
+    setDeletingId(id);
     try {
       console.log('[Portfolio] Removing item:', id);
       const itemToDelete = portfolio.find(item => item.id === id);
@@ -671,6 +644,8 @@ export default function OnboardingPage() {
     } catch (err) {
       console.error('[Portfolio] Error removing:', err);
       toast.error('Não foi possível remover a imagem.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -722,10 +697,15 @@ export default function OnboardingPage() {
 
               <button 
                 onClick={nextStep}
-                disabled={!name || !specialty || uploadingImage}
+                disabled={!name || !specialty || uploadingImage || isSavingStep}
                 className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
               >
-                {uploadingImage ? 'Processando...' : 'Continuar'} <ArrowRight size={18} />
+                {isSavingStep || uploadingImage ? (
+                  <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                    <Sparkles size={18} />
+                  </motion.div>
+                ) : <ArrowRight size={18} />}
+                {uploadingImage ? 'Processando Foto...' : isSavingStep ? 'Salvando...' : 'Começar Minha Jornada'}
               </button>
             </motion.div>
           )}
@@ -794,6 +774,7 @@ export default function OnboardingPage() {
                 <button 
                   onClick={nextStep}
                   disabled={
+                    isSavingStep ||
                     !city || !neighborhood ||
                     (serviceMode !== 'home' && (!studioAddress.street || !studioAddress.number || !studioAddress.neighborhood)) || 
                     (serviceMode === 'home' && serviceAreaType === 'custom' && serviceAreas.length === 0) ||
@@ -801,7 +782,12 @@ export default function OnboardingPage() {
                   }
                   className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  Próximo passo <ArrowRight size={18} />
+                  {isSavingStep ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                      <Sparkles size={18} />
+                    </motion.div>
+                  ) : <ArrowRight size={18} />}
+                  {isSavingStep ? 'Salvando...' : 'Próximo passo'}
                 </button>
               </div>
             </motion.div>
@@ -829,10 +815,15 @@ export default function OnboardingPage() {
                 </button>
                 <button 
                   onClick={nextStep}
-                  disabled={services.some(s => !s.name || !s.price)}
+                  disabled={isSavingStep || services.some(s => !s.name || !s.price)}
                   className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  Próximo passo <ArrowRight size={18} />
+                  {isSavingStep ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                      <Sparkles size={18} />
+                    </motion.div>
+                  ) : <ArrowRight size={18} />}
+                  {isSavingStep ? 'Salvando...' : 'Próximo passo'}
                 </button>
               </div>
             </motion.div>
@@ -909,10 +900,15 @@ export default function OnboardingPage() {
                 </button>
                 <button 
                   onClick={nextStep}
-                  disabled={workingDays.length === 0}
+                  disabled={isSavingStep || workingDays.length === 0}
                   className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
-                  Próximo passo <ArrowRight size={18} />
+                  {isSavingStep ? (
+                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                      <Sparkles size={18} />
+                    </motion.div>
+                  ) : <ArrowRight size={18} />}
+                  {isSavingStep ? 'Salvando...' : 'Próximo passo'}
                 </button>
               </div>
             </motion.div>

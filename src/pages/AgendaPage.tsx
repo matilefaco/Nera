@@ -9,11 +9,10 @@ import {
   Users, List, Settings, Check, Sparkles
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey } from '../lib/utils';
+import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn } from '../lib/utils';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
-import { cn } from '../lib/utils';
 
 export default function AgendaPage() {
   const { user } = useAuth();
@@ -82,7 +81,10 @@ export default function AgendaPage() {
       <main className="flex-1 p-6 md:p-12 max-w-2xl mx-auto w-full">
         <header className="mb-12 flex items-center justify-between">
           <h1 className="text-4xl font-serif font-normal text-brand-ink">Agenda</h1>
-          <button className="w-14 h-14 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center shadow-xl hover:bg-brand-espresso transition-all">
+          <button 
+            onClick={() => toast.info('O agendamento manual será liberado em breve na versão Pro.')}
+            className="w-14 h-14 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center shadow-xl hover:bg-brand-espresso transition-all"
+          >
             <Plus size={24} />
           </button>
         </header>
@@ -136,9 +138,14 @@ export default function AgendaPage() {
                 </div>
                 
                 <div className="flex items-center gap-3">
-                  <button className="p-4 hover:bg-brand-linen rounded-2xl text-brand-ink transition-all border border-transparent hover:border-brand-mist" title="Enviar WhatsApp">
+                  <a 
+                    href={buildWhatsappLink(app.clientWhatsapp)}
+                    target="_blank"
+                    className="p-4 hover:bg-brand-linen rounded-2xl text-brand-ink transition-all border border-transparent hover:border-brand-mist" 
+                    title="Enviar WhatsApp"
+                  >
                     <MessageCircle size={22} />
-                  </button>
+                  </a>
                   {app.status !== 'completed' && (
                     <button 
                       onClick={() => handleComplete(app)}

@@ -1,17 +1,19 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import cors from "cors";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
-import { rateLimit } from "express-rate-limit";
-import { GoogleGenAI, Type } from "@google/genai";
 import { sendNewBookingEmail } from "./src/services/emailService.ts";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
 dotenv.config();
+
+// Simple In-memory Rate Limiter for AI Generation
+const aiRateLimit = new Map<string, { count: number, lastReset: number }>();
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const MAX_REQUESTS = 10;
 
 // Initialize Firebase Admin
 if (!admin.apps.length) {
@@ -32,85 +34,138 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // Rate limiting for AI generation
-  const aiLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 5, // 5 requests per IP
-    message: { error: "Muitas solicitações. Tente novamente em um minuto." }
-  });
-
   // API Routes
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
-  app.post("/api/generate-content", aiLimiter, async (req, res) => {
+  app.post("/api/generate-content", async (req, res) => {
     const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
     
-    if (!process.env.GEMINI_API_KEY) {
-      console.error("[BioAI] GEMINI_API_KEY is missing in server environment");
+    // Simple rate limit check
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous') as string;
+    const now = Date.now();
+    const rateData = aiRateLimit.get(ip) || { count: 0, lastReset: now };
+    
+    if (now - rateData.lastReset > RATE_LIMIT_WINDOW) {
+      rateData.count = 1;
+      rateData.lastReset = now;
+    } else {
+      rateData.count++;
+    }
+    aiRateLimit.set(ip, rateData);
+
+    if (rateData.count > MAX_REQUESTS) {
+      return res.status(429).json({ error: "Muitas solicitações. Tente novamente em um minuto." });
+    }
+    
+    if (!process.env.NVIDIA_API_KEY) {
+      console.error("[BioAI] NVIDIA_API_KEY is missing in server environment");
       return res.status(500).json({ error: "Configuração de IA ausente." });
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const prompt = `
-        Crie uma Headline (frase curta de impacto) e uma Bio (descrição boutique) para uma profissional de beleza.
-        
-        PERFIL:
-        - Nome: ${name}
-        - Especialidade: ${specialty}
-        - Experiência: ${yearsExperience} anos
-        - Estilo solicitado: ${bioStyle}
-        - Diferenciais: ${(differentials || []).join(', ')}
-        - Vibe desejada: ${(serviceStyle || []).join(', ')}
-        
-        REGRAS CRÍTICAS:
-        1. Tom: Sofisticado, premium e profissional.
-        2. Língua: Português natural do Brasil.
-        3. Headline: Curta (max 60 caracteres).
-        4. Bio: No máximo 2 parágrafos curtos.
-        5. PROIBIDO: 
-           - Clichês ("há X anos transformando vidas", "sonhos em realidade").
-           - Repetições.
-           - Mistura de idiomas.
+      const prompt = `Você é um especialista em branding para profissionais de beleza brasileiras.
+Gere uma bio e um headline para esta profissional:
+Nome: ${name}
+Especialidade: ${specialty}
+Anos de experiência: ${yearsExperience}
+Estilo de atendimento: ${serviceStyle}
+Diferenciais: ${differentials}
+Tom desejado: ${bioStyle} (elegante | natural | direta)
 
-        VARIAÇÃO DE ESTILO (${(bioStyle || 'elegante').toUpperCase()}):
-        - elegante: polido, discreto, clássico.
-        - delicada: suave, detalhista, feminina.
-        - premium: exclusivo, luxuoso.
-        - minimalista: direto ao ponto, clean.
-        - acolhedora: humano, caloroso.
-        - técnica: foco em precisão, ciência.
-        - sofisticada: moderno, alta estética.
-        - autoral: único, assinatura própria.
+Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato:
+{"bio": "texto aqui", "headline": "texto aqui"}`;
 
-        Retorne no formato JSON com as chaves "headline" e "bio".
-      `;
-
-      const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              headline: { type: Type.STRING },
-              bio: { type: Type.STRING }
-            },
-            required: ["headline", "bio"]
-          }
-        }
+      const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.NVIDIA_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "meta/llama-4-maverick-17b-128e-instruct",
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.5,
+          max_tokens: 512,
+          top_p: 0.7
+        })
       });
 
-      const response = JSON.parse(result.text || "{}");
-      res.json(response);
+      if (!response.ok) {
+        throw new Error(`NVIDIA API responded with ${response.status}`);
+      }
+
+      const rawData: any = await response.json();
+      const content = rawData.choices[0].message.content;
+      
+      // Attempt to parse JSON from response string
+      let parsed;
+      try {
+        parsed = JSON.parse(content.replace(/```json|```/g, '').trim());
+      } catch (e) {
+        console.error("[BioAI] JSON parse error from model output:", content);
+        throw new Error("Invalid format from AI model");
+      }
+
+      res.json(parsed);
 
     } catch (error: any) {
       console.error("[BioAI] Generation error:", error.message);
-      res.status(500).json({ error: "Erro ao gerar conteúdo." });
+      res.status(500).json({ error: "Não foi possível gerar o conteúdo." });
+    }
+  });
+
+  app.post("/api/analyze-portfolio-image", async (req, res) => {
+    const { imageUrl, specialty } = req.body;
+    
+    if (!process.env.NVIDIA_API_KEY) {
+      console.error("[PortfolioAI] NVIDIA_API_KEY is missing");
+      return res.json({ category: "Portfólio" });
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.NVIDIA_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "meta/llama-4-maverick-17b-128e-instruct",
+          messages: [
+            { 
+              role: "user", 
+              content: [
+                { type: "image_url", image_url: { url: imageUrl } },
+                { type: "text", text: `Esta é uma foto de portfólio de uma profissional de beleza especializada em ${specialty}. Em no máximo 3 palavras em português, qual procedimento esta foto mostra? Exemplos: 'Design de Sobrancelhas', 'Limpeza de Pele', 'Nail Art', 'Maquiagem', 'Design de Cílios'. Responda APENAS com a categoria, sem pontuação, sem explicação.` }
+              ]
+            }
+          ],
+          temperature: 0.2,
+          max_tokens: 50
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        throw new Error(`NVIDIA API responded with ${response.status}`);
+      }
+
+      const rawData: any = await response.json();
+      const category = rawData.choices[0].message.content.trim();
+      
+      res.json({ category: category || "Portfólio" });
+
+    } catch (error: any) {
+      clearTimeout(timeout);
+      console.error("[PortfolioAI] error:", error.message);
+      res.json({ category: "Portfólio" });
     }
   });
 
@@ -181,7 +236,8 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    const { createServer } = await import("vite");
+    const vite = await createServer({
       server: { middlewareMode: true },
       appType: "spa",
     });

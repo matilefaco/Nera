@@ -59,6 +59,7 @@ export interface UserProfile {
   
   professionalIdentity?: ProfessionalIdentity; // Official structure
   
+  /** @deprecated Use standalone services collection. Do NOT write to this field. */
   services: Service[];
   serviceAreas?: ServiceArea[];
   portfolio?: PortfolioItem[];
@@ -79,9 +80,12 @@ export interface UserProfile {
   updatedAt: string;
 
   // --- LEGACY FIELDS FOR COMPATIBILITY ---
-  startTime?: string; // Legacy field
-  endTime?: string; // Legacy field
-  workingDays?: number[]; // Legacy field
+  /** @deprecated Use workingHours.startTime */
+  startTime?: string;
+  /** @deprecated Use workingHours.endTime */
+  endTime?: string;
+  /** @deprecated Use workingHours.workingDays */
+  workingDays?: number[];
 }
 
 export interface Review {
@@ -104,7 +108,7 @@ export interface Appointment {
   id: string;
   
   clientName: string;
-  clientEmail: string;
+  clientEmail?: string;
   clientWhatsapp: string;
   
   serviceId: string;

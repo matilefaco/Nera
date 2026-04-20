@@ -7,11 +7,11 @@
     "dev": "tsx server.ts",
     "build": "npm run build:frontend && npm run build:server",
     "build:frontend": "vite build",
-    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --external:vite --external:express --external:firebase-admin --external:resend --external:cors --external:dotenv",
+    "build:server": "esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "start": "NODE_ENV=production node dist/server.js"
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

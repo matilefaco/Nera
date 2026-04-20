@@ -51,10 +51,10 @@ service cloud.firestore {
     }
 
     function isValidAppointment(data) {
-      return data.keys().hasAll(['professionalId', 'serviceId', 'clientName', 'clientWhatsapp', 'clientEmail', 'date', 'time', 'status']) &&
+      return data.keys().hasAll(['professionalId', 'serviceId', 'clientName', 'clientWhatsapp', 'date', 'time', 'status']) &&
              data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
              data.clientWhatsapp is string && data.clientWhatsapp.size() >= 10 &&
-             data.clientEmail is string && data.clientEmail.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$") &&
+             (!('clientEmail' in data) || (data.clientEmail is string && data.clientEmail.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"))) &&
              data.date is string && data.time is string &&
              data.status in ['pending', 'confirmed', 'cancelled', 'completed', 'expired'];
     }
@@ -108,9 +108,9 @@ service cloud.firestore {
 
     match /review_stats/{statsId} {
       allow read: if true;
-      // 4. Secured Stats: Only Cloud Functions (or admins) should write.
-      // Removing 'isAuthenticated()' to prevent any logged-in user from manipulating data.
-      allow create, update: if isAdmin();
+      // Writes apenas via Cloud Functions com service account
+      // Enquanto não há Cloud Function, restringir ao admin
+      allow write: if isAdmin();
     }
 
     // Supporting collections

@@ -17,6 +17,7 @@ import AppLayout from '../components/AppLayout';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
 import { FormLocation } from '../components/FormLocation';
+import { useProfileForm } from '../hooks/useProfileForm';
 
 const IDENTITY_DIFFERENTIALS = [
   'Pontualidade',
@@ -36,74 +37,37 @@ export default function ProfilePage() {
   const portfolioInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
   
-  const [name, setName] = useState('');
-  const [specialty, setSpecialty] = useState('');
-  const [bio, setBio] = useState('');
-  const [city, setCity] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [slug, setSlug] = useState('');
-  const [avatar, setAvatar] = useState('');
-  const [neighborhood, setNeighborhood] = useState('');
-  const [headline, setHeadline] = useState('');
-  const [instagram, setInstagram] = useState('');
-  const [differentials, setDifferentials] = useState<string[]>([]);
-  const [serviceMode, setServiceMode] = useState<'home' | 'studio' | 'hybrid'>('studio');
-  const [studioAddress, setStudioAddress] = useState({
-    street: '',
-    number: '',
-    complement: '',
-    neighborhood: '',
-    city: '',
-    reference: ''
-  });
-  const [serviceAreas, setServiceAreas] = useState<any[]>([]);
+  const {
+    name, setName,
+    specialty, setSpecialty,
+    bio, setBio,
+    city, setCity,
+    whatsapp, setWhatsapp,
+    slug, setSlug,
+    avatar, setAvatar,
+    neighborhood, setNeighborhood,
+    headline, setHeadline,
+    instagram, setInstagram,
+    differentials, setDifferentials,
+    serviceMode, setServiceMode,
+    studioAddress, setStudioAddress,
+    serviceAreas, setServiceAreas,
+    pricingStrategy, setPricingStrategy,
+    workingDays, setWorkingDays,
+    startTime, setStartTime,
+    endTime, setEndTime
+  } = useProfileForm(profile);
+
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
-  const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>('none');
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-
-  // Working Hours State
-  const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
 
   useEffect(() => {
     if (profile && user) {
-      setName(profile.name || '');
-      setSpecialty(profile.specialty || profile.professionalIdentity?.mainSpecialty || '');
-      // bio/headline synchronization with migration fallback
-      setBio(profile.bio || (profile.professionalIdentity as any)?.bio || '');
-      setHeadline(profile.headline || (profile.professionalIdentity as any)?.headline || '');
-      setCity(profile.city || profile.studioAddress?.city || profile.location || '');
-      setWhatsapp(profile.whatsapp || '');
-      setInstagram(profile.instagram || '');
-      setSlug(profile.slug || '');
-      setAvatar(profile.avatar || '');
       setAvatarPreview(profile.avatar || '');
-      setNeighborhood(profile.neighborhood || profile.studioAddress?.neighborhood || '');
-      setHeadline(profile.headline || '');
-      setDifferentials(profile.professionalIdentity?.differentials || []);
-      setServiceMode(profile.serviceMode || 'studio');
-      if (profile.studioAddress) {
-        setStudioAddress(profile.studioAddress);
-      } else if (profile.address) {
-        setStudioAddress(prev => ({ ...prev, street: profile.address }));
-      }
-      setServiceAreas(profile.serviceAreas || []);
-      setPricingStrategy(profile.pricingStrategy || 'none');
-
-      // Load working hours with fallback
-      if (profile.workingHours) {
-        setWorkingDays(profile.workingHours.workingDays || [1, 2, 3, 4, 5]);
-        setStartTime(profile.workingHours.startTime || '09:00');
-        setEndTime(profile.workingHours.endTime || '18:00');
-      } else if (profile.startTime) {
-        setStartTime(profile.startTime);
-        setEndTime(profile.endTime || '18:00');
-        setWorkingDays(profile.workingDays || [1, 2, 3, 4, 5]);
-      }
 
       // Load portfolio from profile array (Single Source of Truth)
       if (profile.portfolio) {
@@ -324,18 +288,32 @@ export default function ProfilePage() {
         // 3. Upload
         const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}`);
         console.log('[Portfolio] upload finished:', url);
+
+        // 3b. AI Categorization
+        let autoCategory = '';
+        try {
+          const catRes = await fetch('/api/analyze-portfolio-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imageUrl: url, specialty })
+          });
+          const catData = await catRes.json();
+          autoCategory = catData.category || '';
+        } catch {
+          // silencioso — categoria fica vazia se falhar
+        }
         
         // 4. Persistence
         console.log('[Portfolio] saving to Firestore');
-        const docId = await savePortfolioItem(user.uid, url, specialty || 'Geral');
+        const docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
         console.log('[Portfolio] saved successfully');
         
         // Replace temp item with final item
         setPortfolio(prev => prev.map(item => 
-          item.id === tempId ? { id: docId, url: url, category: specialty || 'Geral' } : item
+          item.id === tempId ? { id: docId, url: url, category: autoCategory || specialty || 'Geral' } : item
         ));
 
-        toast.success('Galeria atualizada.');
+        toast.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
       } catch (err: any) {
         console.error('[Portfolio] upload failed:', err);
         toast.error('Não foi possível carregar a imagem.');
@@ -357,6 +335,7 @@ export default function ProfilePage() {
     const itemToRemove = portfolio.find(item => item.id === id);
     if (!itemToRemove) return;
 
+    setDeletingId(id);
     try {
       console.log('[Portfolio] removing from Firestore');
       await deletePortfolioItem(user.uid, itemToRemove);
@@ -367,6 +346,8 @@ export default function ProfilePage() {
     } catch (err) {
       console.error('[Portfolio] Error removing:', err);
       toast.error('Não foi possível remover a imagem.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -500,9 +481,14 @@ export default function ProfilePage() {
                       <button 
                         type="button"
                         onClick={() => item.id && removePortfolioImage(item.id)}
-                        className="w-8 h-8 bg-brand-white text-brand-terracotta rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                        disabled={deletingId === item.id}
+                        className="w-8 h-8 bg-brand-white text-brand-terracotta rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
                       >
-                        <X size={14} />
+                        {deletingId === item.id ? (
+                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                            <Sparkles size={14} />
+                          </motion.div>
+                        ) : <X size={14} />}
                       </button>
                     </div>
                     {item.isUploading && (
