@@ -60,14 +60,16 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
               ))}
             </div>
 
-            <p className="font-serif italic text-[15px] leading-relaxed text-brand-ink mb-8 relative z-10">
-              {review.comment}
-            </p>
+            {review.comment && (
+              <p className="font-serif italic text-[15px] leading-relaxed text-brand-ink mb-8 relative z-10">
+                {review.comment}
+              </p>
+            )}
 
             <div className="pt-6 border-t border-brand-mist/50 flex items-center justify-between">
               <div>
                 <div className="text-[13px] font-medium text-brand-ink">
-                  {review.publicDisplayMode === 'named' ? review.firstName : 'Cliente'}
+                  {review.publicDisplayMode === 'named' ? (review.firstName || 'Cliente Nera') : 'Cliente Nera'}
                 </div>
                 {review.neighborhood && (
                   <div className="text-[9px] font-semibold uppercase tracking-widest text-brand-stone">

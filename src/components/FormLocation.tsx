@@ -111,7 +111,7 @@ export const FormLocation = ({
                 type="text" 
                 value={city} 
                 onChange={(e) => setCity(e.target.value)} 
-                placeholder="Ex: Fortaleza, CE" 
+                placeholder="Ex: São Paulo, SP" 
                 className={cn(
                   "w-full pl-14 pr-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
                   errors.city ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
@@ -123,14 +123,14 @@ export const FormLocation = ({
           <div className="space-y-2">
             {showLabels && (
               <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                Bairro Base <span className="text-brand-terracotta">*</span>
+                Bairro Base
               </label>
             )}
             <input 
               type="text" 
               value={neighborhood} 
               onChange={(e) => setNeighborhood(e.target.value)} 
-              placeholder="Ex: Aldeota" 
+              placeholder="Ex: Jardins, Meireles, Lourdes..." 
               className={cn(
                 "w-full px-6 py-[15px] bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
                 errors.neighborhood ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
@@ -141,7 +141,7 @@ export const FormLocation = ({
         </div>
 
         <div className="space-y-4">
-          {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento</label>}
+          {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento <span className="text-brand-terracotta">*</span></label>}
           <div className="grid grid-cols-3 gap-3">
             <button 
               type="button"
@@ -348,7 +348,7 @@ export const FormLocation = ({
                           type="text" 
                           value={newAreaName} 
                           onChange={(e) => setNewAreaName(e.target.value)} 
-                          placeholder="Ex: Aldeota" 
+                          placeholder="Ex: Jardins, Meireles..." 
                           className="w-full px-5 py-3 bg-brand-white border border-brand-mist rounded-xl outline-none text-sm font-light focus:ring-1 focus:ring-brand-ink transition-all" 
                         />
                       </div>

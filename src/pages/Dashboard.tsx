@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { formatCurrency, getTodayLocale, buildWhatsappLink } from '../lib/utils';
+import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/utils';
 import Logo from '../components/Logo';
 import { Appointment } from '../types';
 import { AnimatePresence } from 'motion/react';
@@ -35,6 +35,7 @@ export default function Dashboard() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [recentCompletedClients, setRecentCompletedClients] = useState<any[]>([]);
+  const [weekSummary, setWeekSummary] = useState<{date: string, count: number, revenue: number}[]>([]);
 
   const getContextualTip = () => {
     if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
@@ -149,6 +150,22 @@ export default function Dashboard() {
         service: app.serviceName
       }));
       setRecentCompletedClients(completedToday.slice(0, 3));
+
+      // Gerar resumo dos próximos 7 dias
+      const today = getTodayLocale();
+      const summary = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayAppts = appointments.filter(a => a.date === dateStr && a.status === 'confirmed');
+        summary.push({
+          date: dateStr,
+          count: dayAppts.length,
+          revenue: dayAppts.reduce((acc, a) => acc + (a.price || 0) + (a.travelFee || 0), 0)
+        });
+      }
+      setWeekSummary(summary);
     });
 
     return () => {
@@ -258,6 +275,49 @@ export default function Dashboard() {
             </span>
           </div>
         </section>
+
+        {/* Esta Semana Section */}
+        {weekSummary.length > 0 && (
+          <section className="mb-12">
+            <div className="flex items-center gap-4 mb-6">
+              <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Esta Semana</h2>
+              <div className="h-px flex-1 bg-brand-mist" />
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {weekSummary.map((day, i) => {
+                const d = new Date(day.date + 'T12:00:00');
+                const isToday = day.date === getTodayLocale();
+                return (
+                  <Link
+                    key={day.date}
+                    to={`/agenda?date=${day.date}`}
+                    className={cn(
+                      "flex flex-col items-center p-3 rounded-2xl border transition-all hover:scale-105",
+                      isToday
+                        ? "bg-brand-ink text-brand-white border-brand-ink shadow-lg"
+                        : day.count > 0
+                          ? "bg-brand-white border-brand-terracotta/30 text-brand-ink shadow-sm"
+                          : "bg-brand-white border-brand-mist text-brand-stone"
+                    )}
+                  >
+                    <span className="text-[8px] font-bold uppercase tracking-widest mb-1 opacity-60">
+                      {d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}
+                    </span>
+                    <span className="text-lg font-serif leading-none mb-2">{d.getDate()}</span>
+                    {day.count > 0 ? (
+                      <div className="flex flex-col items-center">
+                        <div className={`w-1.5 h-1.5 rounded-full mb-1 ${isToday ? 'bg-brand-terracotta' : 'bg-brand-terracotta'}`} />
+                        <span className="text-[8px] font-bold">{day.count}</span>
+                      </div>
+                    ) : (
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-mist" />
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         {/* 2. PENDING REQUESTS (PRIORITY 1) */}
         {pendingRequests.length > 0 && (
@@ -632,12 +692,12 @@ export default function Dashboard() {
             <section className="bg-brand-linen p-8 rounded-[40px] border border-brand-mist">
               <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-6">Operacional</h3>
               <div className="grid grid-cols-1 gap-3">
-                <button 
-                  onClick={() => toast.info('O bloqueio manual de horários estará disponível em breve.')}
+                <Link
+                  to="/agenda"
                   className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all"
                 >
                   <Calendar size={14} className="text-brand-terracotta" /> Bloquear Horário
-                </button>
+                </Link>
                 <button 
                   onClick={() => toast.info('Os lembretes automáticos em massa são uma função da Versão Pro.')}
                   className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all"

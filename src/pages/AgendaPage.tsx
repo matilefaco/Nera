@@ -2,23 +2,62 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, updateAppointmentStatus, handleBookingError } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
 import { 
   Calendar, Clock, MessageCircle, 
   CheckCircle2, ChevronLeft, ChevronRight, Plus, MapPin,
-  Users, List, Settings, Check, Sparkles
+  Users, List, Settings, Check, Sparkles, X, Lock
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn } from '../lib/utils';
+import { Link, useSearchParams } from 'react-router-dom';
+import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn, cleanWhatsapp } from '../lib/utils';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
+import { AnimatePresence } from 'motion/react';
 
 export default function AgendaPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const [searchParams] = useSearchParams();
+  const dateFromUrl = searchParams.get('date');
+
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [selectedDate, setSelectedDate] = useState(getTodayLocale());
+  const [selectedDate, setSelectedDate] = useState(dateFromUrl || getTodayLocale());
   const [loading, setLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (dateFromUrl && dateFromUrl !== selectedDate) {
+      setSelectedDate(dateFromUrl);
+    }
+  }, [dateFromUrl]);
+
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  const [blockDate, setBlockDate] = useState(selectedDate);
+  const [blockTime, setBlockTime] = useState('');
+  const [blockReason, setBlockReason] = useState('');
+  const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
+  const [isBlocking, setIsBlocking] = useState(false);
+
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [manualClient, setManualClient] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualService, setManualService] = useState('');
+  const [manualPrice, setManualPrice] = useState('');
+  const [manualDate, setManualDate] = useState(selectedDate);
+  const [manualTime, setManualTime] = useState('');
+  const [services, setServices] = useState<any[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'services'),
+      where('professionalId', '==', user.uid),
+      where('active', '==', true)
+    );
+    getDocs(q).then(snap => {
+      setServices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -34,13 +73,96 @@ export default function AgendaPage() {
       setAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => unsubscribe();
+    const blockedRef = collection(db, 'blocked_slots');
+    const blockedQ = query(
+      blockedRef,
+      where('professionalId', '==', user.uid),
+      where('date', '==', selectedDate)
+    );
+    const unsubBlocked = onSnapshot(blockedQ, (snap) => {
+      setBlockedSlots(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubscribe();
+      unsubBlocked();
+    };
   }, [user, selectedDate]);
 
   const changeDate = (days: number) => {
     const date = parseLocalDate(selectedDate);
     date.setDate(date.getDate() + days);
     setSelectedDate(formatDateKey(date));
+  };
+
+  const handleBlockSlot = async () => {
+    if (!user || !blockTime) return;
+    setIsBlocking(true);
+    try {
+      const slotId = `${user.uid}_${blockDate}_${blockTime}`;
+      await setDoc(doc(db, 'blocked_slots', slotId), {
+        professionalId: user.uid,
+        date: blockDate,
+        time: blockTime,
+        reason: blockReason || 'Bloqueado',
+        isPending: false,
+        createdAt: new Date().toISOString()
+      });
+      toast.success(`Horário ${blockTime} bloqueado para ${blockDate.split('-').reverse().join('/')}.`);
+      setBlockTime('');
+      setBlockReason('');
+      setIsBlockModalOpen(false);
+    } catch (err) {
+      toast.error('Não foi possível bloquear o horário. Tente novamente.');
+    } finally {
+      setIsBlocking(false);
+    }
+  };
+
+  const handleUnblockSlot = async (slotId: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'blocked_slots', slotId));
+      toast.success('Bloqueio removido.');
+    } catch {
+      toast.error('Não foi possível remover o bloqueio.');
+    }
+  };
+
+  const handleCreateManual = async () => {
+    if (!user || !manualClient || !manualDate || !manualTime) {
+      toast.error('Preencha nome da cliente, data e horário.');
+      return;
+    }
+    setIsCreating(true);
+    try {
+      const selectedSvc = services.find(s => s.id === manualService);
+      await addDoc(collection(db, 'appointments'), {
+        professionalId: user.uid,
+        clientName: manualClient.trim(),
+        clientWhatsapp: cleanWhatsapp(manualPhone),
+        serviceId: manualService || 'manual',
+        serviceName: selectedSvc?.name || manualService || 'Atendimento Manual',
+        duration: selectedSvc?.duration || 60,
+        price: Number(manualPrice) || selectedSvc?.price || 0,
+        travelFee: 0,
+        totalPrice: Number(manualPrice) || selectedSvc?.price || 0,
+        date: manualDate,
+        time: manualTime,
+        locationType: 'studio',
+        status: 'confirmed',
+        notes: 'Agendamento criado manualmente',
+        createdAt: new Date().toISOString()
+      });
+      toast.success(`Agendamento de ${manualClient} criado para ${manualTime}.`);
+      setManualClient(''); setManualPhone(''); setManualService('');
+      setManualPrice(''); setManualTime('');
+      setIsManualModalOpen(false);
+    } catch {
+      toast.error('Não foi possível criar o agendamento.');
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const handleComplete = async (app: any) => {
@@ -66,8 +188,18 @@ export default function AgendaPage() {
       
       // Copy link to clipboard for the professional to send
       const reviewLink = `${window.location.origin}/review/${token}`;
-      await navigator.clipboard.writeText(reviewLink);
-      toast.success('Link copiado. Pronta para enviar?');
+      try {
+        await navigator.clipboard.writeText(reviewLink);
+        toast.success('Link de avaliação copiado!', {
+          description: 'Cole no WhatsApp da cliente.'
+        });
+      } catch {
+        // Fallback para dispositivos sem Clipboard API
+        toast.success('Avaliação registrada!', {
+          description: `Link: ${reviewLink}`,
+          duration: 8000
+        });
+      }
 
     } catch (err) {
       handleBookingError(err);
@@ -81,12 +213,22 @@ export default function AgendaPage() {
       <main className="flex-1 p-6 md:p-12 max-w-2xl mx-auto w-full">
         <header className="mb-12 flex items-center justify-between">
           <h1 className="text-4xl font-serif font-normal text-brand-ink">Agenda</h1>
-          <button 
-            onClick={() => toast.info('O agendamento manual será liberado em breve na versão Pro.')}
-            className="w-14 h-14 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center shadow-xl hover:bg-brand-espresso transition-all"
-          >
-            <Plus size={24} />
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setBlockDate(selectedDate); setIsBlockModalOpen(true); }}
+              className="px-5 py-3 border border-brand-mist bg-brand-white text-brand-stone rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center gap-2"
+              title="Bloquear horário"
+            >
+              <Lock size={16} /> Bloquear
+            </button>
+            <button
+              onClick={() => { setManualDate(selectedDate); setIsManualModalOpen(true); }}
+              className="w-14 h-14 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center shadow-xl hover:bg-brand-espresso transition-all"
+              title="Novo agendamento manual"
+            >
+              <Plus size={24} />
+            </button>
+          </div>
         </header>
 
         {/* Date Selector */}
@@ -165,14 +307,216 @@ export default function AgendaPage() {
                 </div>
               </motion.div>
             ))
-          ) : (
+          ) : blockedSlots.length === 0 ? (
             <div className="text-center py-24 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist">
               <Calendar size={40} className="text-brand-mist mx-auto mb-6" />
               <p className="text-brand-stone font-serif italic text-lg font-light">Sua agenda está livre para este dia.</p>
             </div>
-          )}
+          ) : null}
+
+          {blockedSlots.map((slot) => (
+            <div key={slot.id} className="bg-brand-linen border border-brand-terracotta/20 p-6 rounded-[32px] flex items-center justify-between opacity-70">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 rounded-[20px] bg-brand-terracotta/10 border border-brand-terracotta/20 flex items-center justify-center font-medium text-lg text-brand-terracotta">
+                  {slot.time}
+                </div>
+                <div>
+                  <p className="font-medium text-brand-stone">Horário bloqueado</p>
+                  <p className="text-[10px] text-brand-stone/60 uppercase tracking-widest">
+                    {slot.reason || 'Indisponível'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => handleUnblockSlot(slot.id)}
+                className="w-10 h-10 flex items-center justify-center bg-brand-white text-brand-stone rounded-full hover:bg-brand-terracotta hover:text-brand-white transition-all border border-brand-mist"
+                title="Remover bloqueio"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
         </div>
       </main>
+
+      <AnimatePresence>
+        {isManualModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsManualModalOpen(false)}
+              className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-brand-white rounded-[32px] p-8 shadow-2xl border border-brand-mist overflow-y-auto max-h-[90vh]"
+            >
+              <button onClick={() => setIsManualModalOpen(false)} className="absolute top-6 right-6 p-2 text-brand-stone hover:text-brand-ink transition-colors">
+                <X size={20} />
+              </button>
+
+              <h3 className="text-2xl font-serif text-brand-ink mb-2">Novo Agendamento</h3>
+              <p className="text-sm text-brand-stone font-light mb-8">
+                Registre agendamentos recebidos manualmente.
+              </p>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Cliente *</label>
+                  <input
+                    type="text"
+                    value={manualClient}
+                    onChange={(e) => setManualClient(e.target.value)}
+                    placeholder="Nome da cliente"
+                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">WhatsApp (opcional)</label>
+                  <input
+                    type="tel"
+                    value={manualPhone}
+                    onChange={(e) => setManualPhone(e.target.value)}
+                    placeholder="(00) 00000-0000"
+                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Serviço</label>
+                  <select
+                    value={manualService}
+                    onChange={(e) => {
+                      const svc = services.find(s => s.id === e.target.value);
+                      setManualService(e.target.value);
+                      if (svc) setManualPrice(svc.price.toString());
+                    }}
+                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all appearance-none"
+                  >
+                    <option value="">Selecione um serviço</option>
+                    {services.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.price)})</option>
+                    ))}
+                    <option value="outro">Outro (Manual)</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Data *</label>
+                    <input
+                      type="date"
+                      value={manualDate}
+                      onChange={(e) => setManualDate(e.target.value)}
+                      className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Horário *</label>
+                    <input
+                      type="time"
+                      value={manualTime}
+                      onChange={(e) => setManualTime(e.target.value)}
+                      className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Valor (R$)</label>
+                  <input
+                    type="number"
+                    value={manualPrice}
+                    onChange={(e) => setManualPrice(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                  />
+                </div>
+
+                <button
+                  onClick={handleCreateManual}
+                  disabled={!manualClient || !manualTime || isCreating}
+                  className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isCreating ? 'Criando...' : 'Confirmar Agendamento'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isBlockModalOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsBlockModalOpen(false)}
+              className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-md bg-brand-white rounded-[32px] p-8 shadow-2xl border border-brand-mist"
+            >
+              <button onClick={() => setIsBlockModalOpen(false)} className="absolute top-6 right-6 p-2 text-brand-stone hover:text-brand-ink transition-colors">
+                <X size={20} />
+              </button>
+
+              <h3 className="text-2xl font-serif text-brand-ink mb-2">Bloquear Horário</h3>
+              <p className="text-sm text-brand-stone font-light mb-8">
+                Bloqueie horários específicos para evitar agendamentos em momentos indisponíveis.
+              </p>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Data</label>
+                  <input
+                    type="date"
+                    value={blockDate}
+                    onChange={(e) => setBlockDate(e.target.value)}
+                    min={getTodayLocale()}
+                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Horário *</label>
+                  <input
+                    type="time"
+                    value={blockTime}
+                    onChange={(e) => setBlockTime(e.target.value)}
+                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Motivo (opcional)</label>
+                  <input
+                    type="text"
+                    value={blockReason}
+                    onChange={(e) => setBlockReason(e.target.value)}
+                    placeholder="Ex: Almoço, Consulta médica, Férias..."
+                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                  />
+                </div>
+
+                <button
+                  onClick={handleBlockSlot}
+                  disabled={!blockTime || isBlocking}
+                  className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isBlocking ? 'Bloqueando...' : 'Confirmar Bloqueio'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       </AppLayout>
   );

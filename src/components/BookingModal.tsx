@@ -320,7 +320,35 @@ export default function BookingModal({ profile, services, onClose, open, initial
               {step === 2 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                   <h3 className="text-2xl font-serif text-brand-ink mb-2">Sua Experiência</h3>
-                  <p className="text-xs text-brand-stone font-light mb-10">Selecione o serviço e onde deseja ser atendida.</p>
+                  <p className="text-xs text-brand-stone font-light mb-8">Selecione o serviço e onde deseja ser atendida.</p>
+                  
+                  {/* Location Context Header */}
+                  <div className="bg-brand-linen/40 border border-brand-mist/50 rounded-3xl p-5 mb-10 flex items-start gap-4">
+                    <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shadow-sm shrink-0">
+                      {bookingMode === 'home' || profile.serviceMode === 'home' ? <Home size={18} /> : <MapPin size={18} />}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
+                        {profile.city}
+                        {bookingMode === 'home' ? ' • Em Domicílio' : ' • No Estúdio'}
+                      </p>
+                      {bookingMode === 'home' && (
+                        <p className="text-[10px] text-brand-stone leading-relaxed">
+                          {profile.serviceAreaType === 'city_wide' 
+                            ? 'Atendimento disponível em toda a cidade.'
+                            : profile.serviceAreas && profile.serviceAreas.length > 0 
+                              ? `Atende nos bairros: ${profile.serviceAreas.slice(0, 4).map(a => a.name).join(', ')}${profile.serviceAreas.length > 4 ? ' e outros.' : '.'}`
+                              : 'Consulte a disponibilidade para seu bairro.'}
+                        </p>
+                      )}
+                      {bookingMode === 'studio' && (
+                        <p className="text-[10px] text-brand-stone leading-relaxed">
+                          Localizado no bairro {profile.neighborhood}.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="space-y-8">
                     {profile.serviceMode === 'hybrid' && (
                       <div className="space-y-4">

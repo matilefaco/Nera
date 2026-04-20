@@ -19,7 +19,8 @@ import { PublicHero } from '../components/public/PublicHero';
 import { ServicesSection } from '../components/public/ServicesSection';
 import { PortfolioSection } from '../components/public/PortfolioSection';
 import { ReviewsSection } from '../components/public/ReviewsSection';
-import { FinalCTA, AboutSection } from '../components/public/AboutSection';
+import { AboutSection } from '../components/public/AboutSection';
+import { FinalCTA } from '../components/public/FinalCTA';
 
 // --- Static Mock Data for Example Profile ---
 const MOCK_PROFILE: UserProfile = {
@@ -211,7 +212,8 @@ export default function PublicProfile() {
           const reviewsQ = query(
             collection(db, 'reviews'), 
             where('professionalId', '==', professionalId),
-            where('publicApproved', '==', true)
+            where('publicApproved', '==', true),
+            where('publicDisplayMode', 'in', ['named', 'anonymous'])
           );
           const reviewsSnapshot = await getDocs(reviewsQ);
           setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review)));
@@ -384,11 +386,17 @@ export default function PublicProfile() {
               </button>
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-8 h-8 rounded-full bg-brand-terracotta flex items-center justify-center text-white"><Sparkles size={16} /></div>
-                  <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Convite Especial</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
+                  <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/60">
+                    Horário disponível
+                  </span>
                 </div>
-                <h3 className="text-xl font-serif mb-2 leading-tight">Quer garantir um horário?</h3>
-                <p className="text-xs text-white/60 font-light mb-8 leading-relaxed">Notei seu interesse! A agenda da {profile?.name.split(' ')[0]} costuma lotar rápido nestes dias.</p>
+                <h3 className="text-xl font-serif mb-2 leading-tight">
+                  Ainda está pensando?
+                </h3>
+                <p className="text-xs text-white/60 font-light mb-8 leading-relaxed">
+                  A agenda da {profile?.name.split(' ')[0]} costuma fechar rápido esta semana.
+                </p>
                 <div className="flex flex-col gap-3">
                   <PremiumButton variant="terracotta" className="w-full py-4 text-[10px]" onClick={() => { setShowInterestPopup(false); setIsBookingModalOpen(true); }}>Reservar agora</PremiumButton>
                   <a href={buildWhatsappLink(profile?.whatsapp)} target="_blank" className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">

@@ -164,20 +164,23 @@ export function splitSmartBio(bio: string | undefined, limit: number = 140): { h
   if (!bio) return { hero: '', about: null };
   const trimmedBio = bio.trim();
 
-  // Condition 3: Short bio (< 140 chars)
+  // If total bio is shorter than the limit, everything goes to hero, about is hidden
   if (trimmedBio.length < limit) {
     return { hero: trimmedBio, about: null };
   }
 
-  // Find a good sentence boundary within the limit
-  // We look for . ! ? followed by space or newline
-  const sentences = trimmedBio.match(/[^\.!\?]+[\.!\?]+(?:\s+|\n|$)/g) || [trimmedBio];
+  // Find a good sentence boundary within a strict target (e.g., 120 chars for a cleaner hero)
+  const targetHeroLength = 120;
+  
+  // Regex to find sentences (ending in . ! or ?)
+  const sentences = trimmedBio.match(/[^.!?]+[.!?]+(?:\s+|\n|$)/g) || [trimmedBio];
   
   let heroText = "";
   let currentIndex = 0;
 
   for (const sentence of sentences) {
-    if ((heroText + sentence).length <= limit + 20) { // Slight buffer for natural sentences
+    // If adding this sentence stays within a reasonable "punchy" range
+    if ((heroText + sentence).length <= targetHeroLength + 20) {
       heroText += sentence;
       currentIndex += sentence.length;
     } else {
@@ -185,21 +188,23 @@ export function splitSmartBio(bio: string | undefined, limit: number = 140): { h
     }
   }
 
-  // Fallback if the first sentence is already huge
-  if (!heroText) {
-    heroText = trimmedBio.substring(0, limit);
+  // Fallback: if the first sentence alone is too long, or we couldn't find good sentences
+  if (!heroText || currentIndex === 0) {
+    // Take up to targetHeroLength characters
+    heroText = trimmedBio.substring(0, targetHeroLength);
     const lastSpace = heroText.lastIndexOf(' ');
-    if (lastSpace > limit / 2) {
+    if (lastSpace > targetHeroLength / 2) {
       heroText = heroText.substring(0, lastSpace);
     }
     heroText += '...';
-    currentIndex = lastSpace > 0 ? lastSpace : limit;
+    currentIndex = lastSpace > 0 ? lastSpace : targetHeroLength;
   }
 
   const aboutText = trimmedBio.substring(currentIndex).trim();
 
-  // If the remaining text is too tiny, just keep it all in the hero
-  if (aboutText.length < 50) {
+  // If the about text is very small (e.g. just a few words left), 
+  // merge it back to hero to avoid a weird "About" section with one line.
+  if (aboutText.length < 80) {
     return { hero: trimmedBio, about: null };
   }
 

@@ -72,7 +72,7 @@ export const PortfolioSection = ({ portfolio, onBookingClick }: PortfolioSection
                 transition={{ duration: 0.5, delay: i * 0.05 }}
                 className={cn(
                   "relative rounded-3xl overflow-hidden group cursor-zoom-in",
-                  i === 0 ? "md:col-span-2 md:row-span-2" : ""
+                  i === 0 && filteredItems.length >= 4 ? "md:col-span-2 md:row-span-2" : ""
                 )}
               >
                  <img

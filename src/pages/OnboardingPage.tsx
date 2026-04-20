@@ -9,16 +9,17 @@ import {
   User, MapPin, Home, Building2, Briefcase, 
   Clock, DollarSign, Instagram, MessageCircle, 
   CheckCircle2, ArrowRight, ArrowLeft, Sparkles,
-  Camera, Plus, X, Globe, Copy, Share2
+  Camera, Plus, X, Globe, Copy, Share2, ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink } from '../lib/utils';
+import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
 import { FormLocation } from '../components/FormLocation';
 import { FormServices } from '../components/FormServices';
+import { OnboardingLivePreview } from '../components/OnboardingLivePreview';
 import { ProfessionalIdentity, UserProfile, Service } from '../types';
 import { userProfileSchema, serviceSchema } from '../lib/validation';
 import { z } from 'zod';
@@ -47,13 +48,6 @@ const EXPERIENCE_OPTIONS = [
   { label: '3-5 anos', value: '3-5' },
   { label: '5+ anos', value: '5+' }
 ];
-
-const FORTALEZA_NEIGHBORHOODS = [
-  'Aldeota', 'Meireles', 'Papicu', 'Cocó', 'Praia de Iracema', 'Dionísio Torres', 
-  'Fátima', 'Centro', 'Parangaba', 'Messejana', 'Cambeba', 'Cidade dos Funcionários', 
-  'Sapiranga', 'Edson Queiroz', 'Passaré', 'Guararapes', 'Joquei Clube', 'Montese',
-  'Praia do Futuro', 'Varjota', 'Mucuripe', 'Benfica', 'Maraponga', 'Mondubim'
-].sort();
 
 export default function OnboardingPage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -88,16 +82,34 @@ export default function OnboardingPage() {
     endTime, setEndTime
   } = useProfileForm(profile);
 
+  const prevNameRef = useRef(name);
+
+  // Auto-generate slug when name changes, but only if slug was empty or matched the previous name
+  useEffect(() => {
+    const currentGenerated = generateSlug(prevNameRef.current);
+    if (!slug || slug === currentGenerated) {
+      setSlug(generateSlug(name));
+    }
+    prevNameRef.current = name;
+  }, [name]);
+
   // Step 2: Service Mode Details
   const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>('city_wide');
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
-  const [neighborhoodSuggestions, setNeighborhoodSuggestions] = useState<string[]>([]);
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [selectedBioStyle, setSelectedBioStyle] = useState('elegante');
+
+  const stepDescriptions = [
+    'Sua identidade profissional',
+    'Onde e quando você atende',
+    'Seus serviços e preços',
+    'Seus horários de trabalho',
+    'Sua vitrine pública'
+  ];
 
   // Step 3: Services
   const [services, setServices] = useState<{name: string, duration: string, price: string, description: string}[]>([
@@ -276,7 +288,11 @@ export default function OnboardingPage() {
         toast.error('Por favor, preencha os campos destacados.');
         return;
       }
-      generateIdentityContent();
+      
+      // Auto-generate only if empty to give a "gift" to those who didn't use the button
+      if (!bio && !headline) {
+        generateIdentityContent();
+      }
     }
 
     if (step === 2) {
@@ -669,6 +685,14 @@ export default function OnboardingPage() {
         />
       </div>
 
+      {step <= 5 && (
+        <div className="fixed top-4 left-0 w-full text-center z-40">
+          <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest mt-2">
+            Passo {step} de 5 · {stepDescriptions[step - 1]}
+          </p>
+        </div>
+      )}
+
       <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full py-20">
         <AnimatePresence mode="wait">
           {step === 1 && (
@@ -679,9 +703,17 @@ export default function OnboardingPage() {
               exit={{ opacity: 0, y: -10 }}
               className="w-full space-y-10"
             >
+              <OnboardingLivePreview 
+                name={name}
+                specialty={specialty}
+                headline={headline}
+                slug={slug}
+                avatar={avatarPreview || avatar}
+              />
+
               <FormIdentity
-                title="Vamos construir sua presença premium"
-                subtitle="Dê o primeiro passo para elevar sua marca profissional."
+                title="Sua Identidade Professional"
+                subtitle="Dê vida à sua marca boutique com IA em segundos."
                 name={name}
                 setName={setName}
                 specialty={specialty}
@@ -692,12 +724,22 @@ export default function OnboardingPage() {
                 onAvatarClick={() => avatarInputRef.current?.click()}
                 inputRef={avatarInputRef}
                 onFileUpload={handleFileUpload}
+                slug={slug}
+                setSlug={setSlug}
+                headline={headline}
+                setHeadline={setHeadline}
+                bio={bio}
+                setBio={setBio}
+                onGenerateBio={generateIdentityContent}
+                isGeneratingBio={isGeneratingContent}
+                selectedBioStyle={selectedBioStyle}
+                setSelectedBioStyle={setSelectedBioStyle}
                 errors={formErrors}
               />
 
               <button 
                 onClick={nextStep}
-                disabled={!name || !specialty || uploadingImage || isSavingStep}
+                disabled={!name || !specialty || !slug || uploadingImage || isSavingStep}
                 className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
               >
                 {isSavingStep || uploadingImage ? (
@@ -705,7 +747,7 @@ export default function OnboardingPage() {
                     <Sparkles size={18} />
                   </motion.div>
                 ) : <ArrowRight size={18} />}
-                {uploadingImage ? 'Processando Foto...' : isSavingStep ? 'Salvando...' : 'Começar Minha Jornada'}
+                {uploadingImage ? 'Processando Foto...' : isSavingStep ? 'Salvando...' : 'Próximo Passo'}
               </button>
             </motion.div>
           )}
@@ -719,8 +761,8 @@ export default function OnboardingPage() {
               className="w-full space-y-12"
             >
               <FormLocation
-                title="Onde seu talento se manifesta?"
-                subtitle="Defina sua área de atuação e como prefere atender."
+                title="Sua vitrine geográfica"
+                subtitle="Defina onde e como suas clientes encontrarão seu talento."
                 city={city}
                 setCity={setCity}
                 neighborhood={neighborhood}
@@ -745,27 +787,44 @@ export default function OnboardingPage() {
                 errors={formErrors}
               />
 
-              <FormIdentity
-                name={name}
-                setName={setName}
-                specialty={specialty}
-                setSpecialty={setSpecialty}
-                avatar={avatar}
-                avatarPreview={avatarPreview}
-                uploadingImage={uploadingImage}
-                onAvatarClick={() => avatarInputRef.current?.click()}
-                inputRef={avatarInputRef}
-                onFileUpload={handleFileUpload}
-                headline={headline}
-                setHeadline={setHeadline}
-                bio={bio}
-                setBio={setBio}
-                onGenerateBio={generateIdentityContent}
-                isGeneratingBio={isGeneratingContent}
-                selectedBioStyle={selectedBioStyle}
-                setSelectedBioStyle={setSelectedBioStyle}
-                showLabels={true}
-              />
+              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
+                <div className="space-y-1">
+                  <h3 className="text-xl font-serif text-brand-ink">Dados de Contato</h3>
+                  <p className="text-xs text-brand-stone font-light">Como as clientes podem te encontrar fora da plataforma.</p>
+                </div>
+                
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                      WhatsApp de Contato <span className="text-brand-terracotta">*</span>
+                    </label>
+                    <input 
+                      type="tel" 
+                      value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 
+                      onChange={(e) => setWhatsapp(cleanWhatsapp(e.target.value))} 
+                      placeholder="(00) 00000-0000" 
+                      className={cn(
+                        "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                        formErrors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                      )}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>
+                    <div className="flex items-center gap-2 bg-brand-parchment p-4 rounded-[20px] border border-brand-mist shadow-sm">
+                      <span className="text-brand-stone text-sm">@</span>
+                      <input 
+                        type="text" 
+                        value={instagram} 
+                        onChange={(e) => setInstagram(e.target.value.replace(/@/g, ''))} 
+                        placeholder="seu.usuario" 
+                        className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-sm" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <div className="flex gap-4">
                 <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
@@ -868,7 +927,7 @@ export default function OnboardingPage() {
 
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início</label>
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início <span className="text-brand-terracotta">*</span></label>
                     <div className="relative">
                       <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                       <input 
@@ -880,7 +939,7 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Fim</label>
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Fim <span className="text-brand-terracotta">*</span></label>
                     <div className="relative">
                       <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                       <input 
@@ -952,6 +1011,18 @@ export default function OnboardingPage() {
                 showLabels={true}
                 errors={formErrors}
               />
+
+              {slug && (
+                <a
+                  href={`/p/${slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-brand-terracotta hover:underline mt-3"
+                >
+                  <ExternalLink size={12} />
+                  Visualizar como vai ficar
+                </a>
+              )}
 
               {/* Mini Preview */}
               <div className="bg-brand-ink p-8 rounded-[40px] text-brand-white flex items-center gap-6 shadow-xl">

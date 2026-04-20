@@ -98,7 +98,7 @@ export const FormServices = ({
                 <FormError message={errors[index]?.name} />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo Previsto (min)</label>
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo Previsto (min) <span className="text-brand-terracotta">*</span></label>
                 <div className="relative">
                   <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
                   <input 

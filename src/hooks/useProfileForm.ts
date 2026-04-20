@@ -57,9 +57,16 @@ export function useProfileForm(profile: UserProfile | null) {
       setDifferentials(profile.professionalIdentity?.differentials || []);
       
       const wh = profile.workingHours;
-      setWorkingDays(wh?.workingDays || profile.workingDays || [1, 2, 3, 4, 5]);
-      setStartTime(wh?.startTime || profile.startTime || '09:00');
-      setEndTime(wh?.endTime || profile.endTime || '18:00');
+      if (wh) {
+        setWorkingDays(wh.workingDays || [1, 2, 3, 4, 5]);
+        setStartTime(wh.startTime || '09:00');
+        setEndTime(wh.endTime || '18:00');
+      } else {
+        // Fallback legado (apenas leitura)
+        setWorkingDays(profile.workingDays || [1, 2, 3, 4, 5]);
+        setStartTime(profile.startTime || '09:00');
+        setEndTime(profile.endTime || '18:00');
+      }
     }
   }, [profile?.uid]);
 

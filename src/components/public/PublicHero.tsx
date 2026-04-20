@@ -40,11 +40,36 @@ export const PublicHero = ({ profile, services, nextSlot, onBookingClick, heroBi
             <em className="font-serif italic text-brand-stone">{lastName}</em>
           </h1>
 
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-px bg-brand-terracotta" />
-            <span className="text-[11px] font-light uppercase tracking-[0.2em] text-brand-stone">
-              {profile.headline || profile.specialty}
-            </span>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-8 h-px bg-brand-terracotta" />
+              <span className="text-[11px] font-light uppercase tracking-[0.2em] text-brand-stone">
+                {profile.headline || profile.specialty}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 text-brand-stone/60">
+              {profile.serviceMode === 'home' ? <Home size={12} className="text-brand-terracotta" /> : <MapPin size={12} className="text-brand-terracotta" />}
+              <span className="text-[10px] font-medium uppercase tracking-[0.18em]">
+                {profile.city} • {profile.serviceMode === 'studio' ? 'Atendimento no Estúdio' : profile.serviceMode === 'home' ? 'Atendimento em Domicílio' : 'Estúdio & Domicílio'}
+                {profile.serviceMode !== 'studio' && profile.serviceAreas && profile.serviceAreas.length > 0 && (
+                  <>
+                    <span className="mx-2 opacity-50">|</span>
+                    {profile.serviceAreas.length <= 2 ? (
+                      `Atende em: ${profile.serviceAreas.map(a => a.name).join(', ')}`
+                    ) : (
+                      `Atende em: ${profile.serviceAreas[0].name}, ${profile.serviceAreas[1].name} e +${profile.serviceAreas.length - 2} bairros`
+                    )}
+                  </>
+                )}
+                {profile.serviceMode !== 'studio' && profile.serviceAreaType === 'city_wide' && (
+                  <>
+                    <span className="mx-2 opacity-50">|</span>
+                    Atende em toda a cidade
+                  </>
+                )}
+              </span>
+            </div>
           </div>
 
           {nextSlot && (
@@ -57,7 +82,7 @@ export const PublicHero = ({ profile, services, nextSlot, onBookingClick, heroBi
           )}
 
           <p className="body-text text-brand-stone max-w-sm">
-            {heroBio || profile.bio || 'Atendimento personalizado com foco em resultados naturais e bem-estar.'}
+            {heroBio || profile.bio || (profile.specialty ? `Especialista em ${profile.specialty} com foco em excelência e bem-estar.` : 'Atendimento personalizado com foco em resultados de alta qualidade.')}
           </p>
 
           <div className="flex flex-wrap items-center gap-6">
