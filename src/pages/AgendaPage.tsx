@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, updateAppointmentStatus, handleBookingError } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
 import { 
   Calendar, Clock, MessageCircle, 
   CheckCircle2, ChevronLeft, ChevronRight, Plus, MapPin,
@@ -19,16 +19,48 @@ export default function AgendaPage() {
   const { user, profile } = useAuth();
   const [searchParams] = useSearchParams();
   const dateFromUrl = searchParams.get('date');
+  const appointmentIdFromUrl = searchParams.get('appointment');
 
   const [appointments, setAppointments] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(dateFromUrl || getTodayLocale());
   const [loading, setLoading] = useState<string | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(appointmentIdFromUrl);
 
+  // Sync date from URL if it changes (e.g. from week summary links)
   useEffect(() => {
     if (dateFromUrl && dateFromUrl !== selectedDate) {
       setSelectedDate(dateFromUrl);
     }
   }, [dateFromUrl]);
+
+  // Handle direct appointment link from email
+  useEffect(() => {
+    if (appointmentIdFromUrl && user) {
+      const fetchAppt = async () => {
+        try {
+          const apptSnap = await getDoc(doc(db, 'appointments', appointmentIdFromUrl));
+          if (apptSnap.exists()) {
+            const data = apptSnap.data();
+            if (data.date !== selectedDate) {
+              setSelectedDate(data.date);
+            }
+            setHighlightedId(appointmentIdFromUrl);
+            
+            // Scroll to it after a short delay to allow list to render
+            setTimeout(() => {
+              const el = document.getElementById(`appt-${appointmentIdFromUrl}`);
+              if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, 1000);
+          }
+        } catch (err) {
+          console.error("Error fetching linked appointment:", err);
+        }
+      };
+      fetchAppt();
+    }
+  }, [appointmentIdFromUrl, user]);
 
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
   const [blockDate, setBlockDate] = useState(selectedDate);
@@ -255,9 +287,19 @@ export default function AgendaPage() {
             appointments.map((app) => (
               <motion.div 
                 key={app.id}
+                id={`appt-${app.id}`}
                 initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-brand-white p-6 rounded-[32px] border border-brand-mist flex items-center justify-between hover:border-brand-stone transition-all shadow-sm group"
+                animate={{ 
+                  opacity: 1, 
+                  y: 0,
+                  scale: highlightedId === app.id ? 1.02 : 1,
+                }}
+                className={cn(
+                  "p-6 rounded-[32px] border flex items-center justify-between transition-all shadow-sm group",
+                  highlightedId === app.id 
+                    ? "bg-brand-linen border-brand-terracotta ring-4 ring-brand-terracotta/5 shadow-xl" 
+                    : "bg-brand-white border-brand-mist hover:border-brand-stone"
+                )}
               >
                 <div className="flex items-center gap-6">
                   <div className={cn(

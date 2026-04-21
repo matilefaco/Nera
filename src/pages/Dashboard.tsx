@@ -231,7 +231,30 @@ export default function Dashboard() {
             </h1>
             <p className="text-brand-stone text-xs md:text-sm font-light italic mt-2">Tudo organizado para você focar no atendimento.</p>
           </div>
-            <div className="flex items-center gap-3">
+          
+          <AnimatePresence>
+            {pendingCount > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-brand-terracotta text-brand-white px-6 py-4 rounded-3xl shadow-lg flex items-center gap-4 border-4 border-brand-white"
+              >
+                <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                <span className="text-[10px] font-bold uppercase tracking-widest leading-none">
+                  {pendingCount} {pendingCount === 1 ? 'novo agendamento aguardando confirmação' : 'novos agendamentos aguardando confirmação'}
+                </span>
+                <Link 
+                  to="/agenda" 
+                  className="bg-white text-brand-terracotta px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all"
+                >
+                  Ver Todos
+                </Link>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex items-center gap-3">
               <button 
                 onClick={() => setIsShareModalOpen(true)}
                 className="flex items-center gap-3 px-6 py-4 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm group"

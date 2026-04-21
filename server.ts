@@ -5,7 +5,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
-import { sendNewBookingEmail } from "./src/services/emailService.ts";
+import { sendNewBookingEmail, sendBookingConfirmationEmail } from "./src/services/emailService.ts";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
 dotenv.config();
@@ -219,6 +219,37 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato:
           success: true, 
           message: "Email notification sent successfully via Resend."
         });
+      }
+
+      if (type === 'BOOKING_CONFIRMED') {
+        const { professionalId, clientName, clientEmail, serviceName, date, time, locationType, neighborhood } = payload;
+        
+        if (!clientEmail) {
+          console.log(`[Confirmation] No client email provided for ${clientName}. Skipping email.`);
+          return res.json({ success: true, message: "No email provided, skipped." });
+        }
+
+        // 1. Fetch professional name from Firestore
+        const userDoc = await db.collection('users').doc(professionalId).get();
+        const professionalName = userDoc.exists ? userDoc.data()?.name : 'Profissional Nera';
+
+        const location = locationType === 'home' ? `Domicílio (${neighborhood})` : 'Estúdio / Local Fixo';
+
+        // 2. Send confirmation email
+        console.log(`[Confirmation] Sending to client: ${clientEmail}`);
+        await sendBookingConfirmationEmail({
+          clientName,
+          serviceName,
+          date,
+          time,
+          location,
+          clientEmail,
+          professionalName,
+          professionalEmail: '', // Not needed for confirmation
+          bookingId: '' // Not needed for confirmation
+        });
+
+        return res.json({ success: true, message: "Confirmation email sent." });
       }
 
       // Fallback for other types (can be implemented later)
