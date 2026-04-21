@@ -1,9 +1,9 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, indexedDBLocalPersistence } from 'firebase/auth';
-import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
-import { UserProfile, Appointment, PortfolioItem } from './types';
+import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
 import { removeEmptyFields } from './lib/utils';
 import { toast } from 'sonner';
 
@@ -255,7 +255,7 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
   const lockRef = doc(db, 'blocked_slots', lockId);
 
   try {
-    const bookingId = await runTransaction(db, async (transaction) => {
+    const result = await runTransaction(db, async (transaction) => {
       // 1. Verificar conflito DENTRO da transação (atômico)
       const slotSnap = await transaction.get(lockRef);
       if (slotSnap.exists()) {
@@ -264,25 +264,37 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
 
       const cleanedData = removeEmptyFields(appointmentData);
       const apptRef = doc(collection(db, 'appointments'));
+      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
       
       transaction.set(apptRef, {
         ...cleanedData,
         status: 'pending',
+        token,
         createdAt: serverTimestamp(),
       });
 
-      return apptRef.id;
+      // 2. Criar trava técnica para evitar overbooking atômico
+      transaction.set(lockRef, {
+        professionalId: appointmentData.professionalId,
+        date: appointmentData.date,
+        time: appointmentData.time,
+        appointmentId: apptRef.id,
+        createdAt: serverTimestamp()
+      });
+
+      return { bookingId: apptRef.id, token };
     });
 
-    console.log('[Booking] Request created:', bookingId);
+    console.log('[Booking] Request created:', result.bookingId);
     
     // Trigger notification
     await notify('NEW_BOOKING_REQUEST', {
-      appointmentId: bookingId,
+      appointmentId: result.bookingId,
+      token: result.token,
       ...appointmentData
     });
     
-    return bookingId;
+    return { bookingId: result.bookingId, token: result.token };
   } catch (error: any) {
     if (error.message === 'Horário indisponível') {
       throw error;
@@ -382,6 +394,11 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
     if (notificationMap[newStatus]) {
       notify(notificationMap[newStatus], result);
     }
+
+    // Trigger waitlist check if cancelled
+    if (newStatus === 'cancelled') {
+      triggerWaitlistCheck(result.professionalId, result.date, result.time);
+    }
     
     return { success: true };
   } catch (error: any) {
@@ -404,4 +421,225 @@ export async function respondToBookingRequest(appointmentId: string, decision: '
  */
 export async function cancelBooking(appointmentId: string) {
   return updateAppointmentStatus(appointmentId, 'cancelled');
+}
+
+/**
+ * High-precision management functions for CLIENTS
+ */
+
+export async function confirmPresenceByClient(appointmentId: string) {
+  console.log(`[Client] Confirming presence for ${appointmentId}`);
+  const apptRef = doc(db, 'appointments', appointmentId);
+  await updateDoc(apptRef, {
+    clientConfirmedAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    lastChangeBy: 'client',
+    changeMessage: 'Cliente confirmou presença'
+  });
+}
+
+export async function cancelBookingByClient(appointmentId: string, reason?: string) {
+  console.log(`[Client] Cancelling booking ${appointmentId}`);
+  try {
+    const data = await runTransaction(db, async (transaction) => {
+      const apptRef = doc(db, 'appointments', appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+      if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
+      
+      const data = apptDoc.data() as Appointment;
+      const slotId = `${data.date}_${data.time}`;
+      const slotRef = doc(db, 'blocked_slots', `${data.professionalId}_${slotId}`);
+
+      // Free the slot
+      transaction.delete(slotRef);
+
+      // Update appointment
+      transaction.update(apptRef, {
+        status: 'cancelled',
+        cancellationReason: reason || 'Cancelado pelo cliente',
+        updatedAt: serverTimestamp(),
+        cancelledAt: serverTimestamp(),
+        lastChangeBy: 'client',
+        changeMessage: 'Cliente cancelou a reserva'
+      });
+
+      return data;
+    });
+
+    // Notify pro about cancellation
+    notify('BOOKING_CANCELLED_BY_CLIENT', { id: appointmentId, ...data });
+
+    // Trigger waitlist check
+    triggerWaitlistCheck(data.professionalId, data.date, data.time);
+  } catch (error) {
+    console.error('[Client Cancel] Failed:', error);
+    throw error;
+  }
+}
+
+export async function getAppointmentByToken(token: string): Promise<Appointment | null> {
+  console.log(`[Firestore] Fetching appointment by token...`);
+  const q = query(collection(db, 'appointments'), where('token', '==', token));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  return { id: snap.docs[0].id, ...snap.docs[0].data() } as Appointment;
+}
+
+export async function rescheduleBookingByClient(appointmentId: string, newDate: string, newTime: string) {
+  console.log(`[Client] Rescheduling ${appointmentId} to ${newDate} ${newTime}`);
+  try {
+    const data = await runTransaction(db, async (transaction) => {
+      const apptRef = doc(db, 'appointments', appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+      if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
+      
+      const data = apptDoc.data() as Appointment;
+      
+      // 1. Verify new slot
+      const newSlotId = `${newDate}_${newTime}`;
+      const newSlotRef = doc(db, 'blocked_slots', `${data.professionalId}_${newSlotId}`);
+      const newSlotSnap = await transaction.get(newSlotRef);
+      
+      if (newSlotSnap.exists()) {
+        throw new Error('Horário indisponível');
+      }
+
+      // 2. Free old slot
+      const oldSlotId = `${data.date}_${data.time}`;
+      const oldSlotRef = doc(db, 'blocked_slots', `${data.professionalId}_${oldSlotId}`);
+      transaction.delete(oldSlotRef);
+
+      // 3. Block new slot
+      transaction.set(newSlotRef, {
+        professionalId: data.professionalId,
+        date: newDate,
+        time: newTime,
+        appointmentId: appointmentId,
+        isPending: data.status === 'pending',
+        updatedAt: serverTimestamp()
+      });
+
+      // 4. Update appointment
+      transaction.update(apptRef, {
+        date: newDate,
+        time: newTime,
+        previousDate: data.date,
+        previousTime: data.time,
+        rescheduledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastChangeBy: 'client',
+        changeMessage: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`
+      });
+
+      return data;
+    });
+
+    // Notify pro about reschedule
+    notify('BOOKING_RESCHEDULED_BY_CLIENT', { id: appointmentId, ...data });
+    
+    // Trigger waitlist check for the OLD slot
+    triggerWaitlistCheck(data.professionalId, data.date, data.time);
+  } catch (error) {
+    console.error('[Client Reschedule] Failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * SMART WAITLIST FUNCTIONS
+ */
+
+export async function addToWaitlist(entry: Partial<WaitlistEntry>) {
+  console.log('[Waitlist] Adding entry...');
+  const cleaned = removeEmptyFields(entry);
+  const waitlistRef = collection(db, 'waitlist');
+  try {
+    await addDoc(waitlistRef, {
+      ...cleaned,
+      status: 'waiting',
+      createdAt: serverTimestamp()
+    });
+    console.log('[Waitlist] Entry added');
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'waitlist');
+  }
+}
+
+/**
+ * Triggered when a slot is freed. Finds the best candidate in the waitlist.
+ */
+export async function triggerWaitlistCheck(professionalId: string, date: string, time: string) {
+  console.log(`[Waitlist] Checking availability for ${date} at ${time}...`);
+  
+  try {
+    const proRef = doc(db, 'users', professionalId);
+    const proSnap = await getDoc(proRef);
+    if (!proSnap.exists()) return;
+    const proSettings = proSnap.data() as UserProfile;
+
+    // 1. Find eligible candidates
+    const waitlistQ = query(
+      collection(db, 'waitlist'),
+      where('professionalId', '==', professionalId),
+      where('requestedDate', '==', date),
+      where('status', '==', 'waiting'),
+      orderBy('createdAt', 'asc')
+    );
+    
+    const snap = await getDocs(waitlistQ);
+    if (snap.empty) {
+      console.log('[Waitlist] No one waiting for this date.');
+      return;
+    }
+
+    const hour = parseInt(time.split(':')[0]);
+    const slotPeriod = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'night';
+
+    // 2. Find first candidate matching the period or 'any'
+    const eligible = snap.docs.find(doc => {
+      const d = doc.data();
+      return d.period === 'any' || d.period === slotPeriod || d.preferredTime === time;
+    });
+
+    if (eligible) {
+      const entryId = eligible.id;
+      const entryData = eligible.data();
+
+      // If pro mode is auto, send invitation
+      if (proSettings.waitlistMode === 'auto') {
+        const expiresAt = new Date(Date.now() + 15 * 60000); // 15 mins
+
+        await updateDoc(doc(db, 'waitlist', entryId), {
+          status: 'invited',
+          invitationSentAt: serverTimestamp(),
+          invitationExpiresAt: expiresAt.toISOString(),
+          assignedTime: time
+        });
+
+        // Send Notification
+        notify('WAITLIST_INVITATION', {
+          id: entryId,
+          ...entryData,
+          assignedTime: time,
+          expiresAt: expiresAt.toISOString(),
+          professionalName: proSettings.name
+        });
+
+        // Set a cleanup task would be ideal, but for now we'll handle expiration during booking attempt
+        console.log(`[Waitlist] Invitation sent to ${entryData.clientName}`);
+      } else {
+        // Manual mode: Alert the professional
+        notify('WAITLIST_SLOT_OPENED', {
+          professionalId,
+          date,
+          time,
+          candidateName: entryData.clientName,
+          candidateId: entryId
+        });
+        console.log('[Waitlist] Professional notified of opened slot (manual mode)');
+      }
+    }
+  } catch (e) {
+    console.error('[Waitlist] Trigger check failed:', e);
+  }
 }

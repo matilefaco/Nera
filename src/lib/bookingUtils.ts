@@ -4,14 +4,14 @@
  * Baseia-se no expediente da profissional, duração do serviço e bloqueios existentes.
  */
 
-import { Appointment, WorkingHours } from '../types';
+import { Appointment, WorkingHours, BlockedSchedule } from '../types';
 
 interface GetAvailableSlotsParams {
   selectedDate: string; // YYYY-MM-DD
   serviceDuration: number; // em minutos
   workingHours: WorkingHours;
   appointments: Appointment[];
-  manualBlockedSlots?: string[]; // HH:mm (opcional)
+  blockedSchedules?: BlockedSchedule[]; // Refatorado para múltiplos tipos de bloqueio
 }
 
 /**
@@ -23,7 +23,7 @@ export function getAvailableSlots({
   serviceDuration,
   workingHours,
   appointments,
-  manualBlockedSlots = []
+  blockedSchedules = []
 }: GetAvailableSlotsParams): string[] {
   // 1. Validação básica de entrada
   if (!selectedDate || !serviceDuration || !workingHours) return [];
@@ -50,7 +50,7 @@ export function getAvailableSlots({
 
   // Adicionar appointments (apenas os que estão confirmados ou concluídos)
   appointments.forEach(appt => {
-    if (['confirmed', 'completed'].includes(appt.status)) {
+    if (['confirmed', 'completed', 'pending'].includes(appt.status)) { // Incluímos pending para evitar overbooking durante confirmação
       const [h, m] = appt.time.split(':').map(Number);
       const start = h * 60 + m;
       const duration = Number(appt.duration) || 60;
@@ -58,11 +58,20 @@ export function getAvailableSlots({
     }
   });
 
-  // Adicionar bloqueios manuais (considerados como janelas de 30min ou pontos de bloqueio)
-  manualBlockedSlots.forEach(timeStr => {
-    const [h, m] = timeStr.split(':').map(Number);
-    const start = h * 60 + m;
-    occupiedSegments.push({ start, end: start + 30 });
+  // Adicionar bloqueios da nova estrutura BlockedSchedule
+  blockedSchedules.forEach(schedule => {
+    // Verificar se o bloqueio se aplica a este dia (recorrência ou data fixa)
+    const isTodayBlock = schedule.date === selectedDate;
+    const isRecurringMatch = schedule.isRecurring && schedule.recurringDays?.includes(dayOfWeek);
+
+    if (isTodayBlock || isRecurringMatch) {
+      const [sh, sm] = schedule.startTime.split(':').map(Number);
+      const [eh, em] = schedule.endTime.split(':').map(Number);
+      occupiedSegments.push({ 
+        start: sh * 60 + sm, 
+        end: eh * 60 + em 
+      });
+    }
   });
 
   const freeSlots: string[] = [];
@@ -71,8 +80,7 @@ export function getAvailableSlots({
   const currentMinutesNow = now.getHours() * 60 + now.getMinutes();
 
   // 5. Gerar slots baseados na duração (step) e validar
-  // A regra solicita que os slots avancem de acordo com a duração (ex: 14:00, 15:00 para 60min)
-  const step = serviceDuration;
+  const step = 30; // Slots começam a cada 30min por padrão para flexibilidade, mas respeitam a duração do serviço
   
   for (let current = startTotalMinutes; current < endTotalMinutes; current += step) {
     const proposedEnd = current + serviceDuration;
@@ -81,7 +89,7 @@ export function getAvailableSlots({
     if (proposedEnd > endTotalMinutes) break;
 
     // REGRA: Não mostrar horários passados se for hoje
-    if (isToday && current <= currentMinutesNow + 30) continue; // +30min de margem para agendamento
+    if (isToday && current <= currentMinutesNow + 40) continue; // +40min de margem para agendamento
 
     // REGRA: O slot não pode sobrepor nenhuma janela ocupada
     const hasOverlap = occupiedSegments.some(seg => {
@@ -97,6 +105,5 @@ export function getAvailableSlots({
     }
   }
 
-  // Garantir unicidade e ordenação (embora o loop já garanta por natureza)
   return Array.from(new Set(freeSlots)).sort();
 }

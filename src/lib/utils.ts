@@ -76,6 +76,14 @@ export function getTodayLocale(): string {
 }
 
 /**
+ * Returns current time in "HH:mm" format relative to local time.
+ */
+export function getTodayLocaleTime(): string {
+  const now = new Date();
+  return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+}
+
+/**
  * Converts a Date object into a "YYYY-MM-DD" string in local time.
  */
 export function formatDateKey(date: Date): string {

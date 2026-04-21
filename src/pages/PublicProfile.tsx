@@ -197,46 +197,68 @@ export default function PublicProfile() {
           const professionalId = snapshot.docs[0].id;
           setProfile({ ...userData, uid: professionalId } as UserProfile);
           
-          const servicesQ = query(collection(db, 'services'), 
-            where('professionalId', '==', professionalId), 
-            where('active', '==', true)
-          );
-          const servicesSnapshot = await getDocs(servicesQ);
-          setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
-
-          const statsDoc = await getDocs(query(collection(db, 'review_stats'), where('professionalId', '==', professionalId)));
-          if (!statsDoc.empty) {
-            setStats(statsDoc.docs[0].data());
+          // Secondary fetches should be silent and independent
+          // 1. Services
+          try {
+            const servicesQ = query(collection(db, 'services'), 
+              where('professionalId', '==', professionalId), 
+              where('active', '==', true)
+            );
+            const servicesSnapshot = await getDocs(servicesQ);
+            setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+          } catch (e) {
+            console.warn("[PublicProfile] Failed to fetch services silently:", e);
           }
 
-          const reviewsQ = query(
-            collection(db, 'reviews'), 
-            where('professionalId', '==', professionalId),
-            where('publicApproved', '==', true),
-            where('publicDisplayMode', 'in', ['named', 'anonymous'])
-          );
-          const reviewsSnapshot = await getDocs(reviewsQ);
-          setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review)));
+          // 2. Stats
+          try {
+            const statsDoc = await getDocs(query(collection(db, 'review_stats'), where('professionalId', '==', professionalId)));
+            if (!statsDoc.empty) {
+              setStats(statsDoc.docs[0].data());
+            }
+          } catch (e) {
+            console.warn("[PublicProfile] Failed to fetch stats silently:", e);
+          }
 
+          // 3. Reviews
+          try {
+            const reviewsQ = query(
+              collection(db, 'reviews'), 
+              where('professionalId', '==', professionalId),
+              where('publicApproved', '==', true),
+              where('publicDisplayMode', 'in', ['named', 'anonymous'])
+            );
+            const reviewsSnapshot = await getDocs(reviewsQ);
+            setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review)));
+          } catch (e) {
+            console.warn("[PublicProfile] Failed to fetch reviews silently:", e);
+          }
+
+          // 4. Portfolio (Legacy subcollection fallback)
           if (!userData.portfolio || userData.portfolio.length === 0) {
-            const portfolioQ = query(collection(db, 'users', professionalId, 'portfolio'), orderBy('createdAt', 'desc'));
-            const portfolioSnapshot = await getDocs(portfolioQ);
-            if (!portfolioSnapshot.empty) {
-              const portfolioItems = portfolioSnapshot.docs.map(doc => ({
-                id: doc.id,
-                url: doc.data().url || doc.data().imageUrl,
-                category: doc.data().category,
-                createdAt: doc.data().createdAt || new Date().toISOString()
-              }));
-              setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
+            try {
+              const portfolioQ = query(collection(db, 'users', professionalId, 'portfolio'), orderBy('createdAt', 'desc'));
+              const portfolioSnapshot = await getDocs(portfolioQ);
+              if (!portfolioSnapshot.empty) {
+                const portfolioItems = portfolioSnapshot.docs.map(doc => ({
+                  id: doc.id,
+                  url: doc.data().url || doc.data().imageUrl,
+                  category: doc.data().category,
+                  createdAt: doc.data().createdAt || new Date().toISOString()
+                }));
+                setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
+              }
+            } catch (e) {
+              console.warn("[PublicProfile] Failed to fetch legacy portfolio silently:", e);
             }
           }
         } else {
           setProfile(null);
         }
       } catch (error) {
-        console.error("Error fetching public profile:", error);
-        toast.error('Não foi possível carregar as informações agora.');
+        console.error("Critical error fetching public profile:", error);
+        // Only show error for critical failure (user not found or total DB failure)
+        toast.error('Não foi possível carregar as informações do perfil.');
       } finally {
         setLoading(false);
       }
@@ -248,39 +270,60 @@ export default function PublicProfile() {
   useEffect(() => {
     const findAvailabilityData = async () => {
       if (!profile?.uid || !profile?.workingHours || services.length === 0) return;
-      const duration = Number(services[0]?.duration) || 60;
-      let totalCount = 0;
-      let firstSlotFound = false;
       
-      for (let i = 0; i < 7; i++) {
-        const date = new Date();
-        date.setDate(date.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
-        
-        const apptsQ = query(
-          collection(db, 'appointments'),
-          where('professionalId', '==', profile.uid),
-          where('date', '==', dateStr),
-          where('status', 'in', ['confirmed', 'completed'])
-        );
-        const snapshot = await getDocs(apptsQ);
-        const appts = snapshot.docs.map(doc => doc.data() as Appointment);
-        
-        const slots = getAvailableSlots({
-          selectedDate: dateStr,
-          serviceDuration: duration,
-          workingHours: profile.workingHours,
-          appointments: appts,
-          manualBlockedSlots: []
-        });
+      try {
+        const duration = Number(services[0]?.duration) || 60;
+        let totalCount = 0;
+        let firstSlotFound = false;
 
-        totalCount += slots.length;
-        if (slots.length > 0 && !firstSlotFound) {
-          setNextSlot({ date: dateStr, time: slots[0] });
-          firstSlotFound = true;
+        // Fetch all blocked schedules for the week once
+        const blockedQ = query(
+          collection(db, 'blocked_schedules'),
+          where('professionalId', '==', profile.uid)
+        );
+        const blockedSnap = await getDocs(blockedQ);
+        const blockedSchedules = blockedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        
+        for (let i = 0; i < 7; i++) {
+          const date = new Date();
+          date.setDate(date.getDate() + i);
+          const dateStr = date.toISOString().split('T')[0];
+          const dayOfWeek = date.getDay();
+          
+          const apptsQ = query(
+            collection(db, 'appointments'),
+            where('professionalId', '==', profile.uid),
+            where('date', '==', dateStr),
+            where('status', 'in', ['pending', 'confirmed', 'completed'])
+          );
+          const snapshot = await getDocs(apptsQ);
+          const appts = snapshot.docs.map(doc => doc.data() as Appointment);
+          
+          // Filter blocked schedules for this specific day
+          const dayBlocked = blockedSchedules.filter(b => {
+             const isToday = b.date === dateStr;
+             const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+             return isToday || isRecurringToday;
+          });
+
+          const slots = getAvailableSlots({
+            selectedDate: dateStr,
+            serviceDuration: duration,
+            workingHours: profile.workingHours,
+            appointments: appts,
+            blockedSchedules: dayBlocked
+          });
+
+          totalCount += slots.length;
+          if (slots.length > 0 && !firstSlotFound) {
+            setNextSlot({ date: dateStr, time: slots[0] });
+            firstSlotFound = true;
+          }
         }
+        setTotalWeeklySlots(totalCount);
+      } catch (e) {
+        console.warn("[PublicProfile] Failed to find availability data silently:", e);
       }
-      setTotalWeeklySlots(totalCount);
     };
     
     if (profile && services.length > 0) {

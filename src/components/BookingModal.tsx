@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Link } from 'react-router-dom';
 import { 
   X, Clock, Calendar as CalendarIcon, Check, 
   ArrowLeft, ArrowRight, ShieldCheck, Zap, 
   MapPin, Home, Building2, MessageCircle, 
-  Share2, Heart, Sparkles, LogOut
+  Share2, Heart, Sparkles, LogOut, Settings
 } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db, createBookingRequest, handleBookingError } from '../firebase';
-import { UserProfile, Service, ServiceArea, Appointment } from '../types';
+import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule } from '../types';
 import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay } from '../lib/utils';
 import { getAvailableSlots } from '../lib/bookingUtils';
 import { toast } from 'sonner';
 import PremiumButton from './PremiumButton';
+import WaitlistModal from './WaitlistModal';
 
 interface BookingModalProps {
   profile: UserProfile;
@@ -33,12 +35,16 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [clientEmail, setClientEmail] = useState('');
   const [clientAddress, setClientAddress] = useState('');
   const [bookingAttempted, setBookingAttempted] = useState(false);
+  const [appointmentId, setAppointmentId] = useState<string | null>(null);
+  const [successDraft, setSuccessDraft] = useState<any>(null);
   const [bookingMode, setBookingMode] = useState<'studio' | 'home' | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
+  const [appointmentToken, setAppointmentToken] = useState<string | null>(null);
   const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
-  const [manualBlockedSlots, setManualBlockedSlots] = useState<string[]>([]);
+  const [blockedSchedules, setBlockedSchedules] = useState<BlockedSchedule[]>([]);
   const [showRestoreDraft, setShowRestoreDraft] = useState(false);
+  const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
 
   const isHomeService = bookingMode === 'home';
 
@@ -128,13 +134,29 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
     try {
       const draft = JSON.parse(savedDraft);
+      
+      // Basic profile check to ensure we don't restore drafts from other professionals
+      if (draft.professionalId !== profile.uid) {
+        localStorage.removeItem('booking_draft');
+        return;
+      }
+
       if (draft.serviceId) {
         const service = services.find(s => s.id === draft.serviceId);
         if (service) setSelectedService(service);
       }
       if (draft.mode) setBookingMode(draft.mode);
-      if (draft.date) setSelectedDate(draft.date);
-      if (draft.time) setSelectedTime(draft.time);
+      if (draft.date) {
+        const today = new Date().toISOString().split('T')[0];
+        if (draft.date < today) {
+          // Date is in the past, don't restore date/time but keep the rest
+          setSelectedDate('');
+          setSelectedTime('');
+        } else {
+          setSelectedDate(draft.date);
+          if (draft.time) setSelectedTime(draft.time);
+        }
+      }
       if (draft.clientName) setClientName(draft.clientName);
       if (draft.clientPhone) setClientPhone(draft.clientPhone);
       if (draft.clientEmail) setClientEmail(draft.clientEmail);
@@ -142,15 +164,59 @@ export default function BookingModal({ profile, services, onClose, open, initial
         const area = profile.serviceAreas.find((a: ServiceArea) => a.name === draft.selectedAreaId);
         if (area) setSelectedArea(area);
       }
-      if (draft.clientName || draft.clientPhone) setStep(4);
-      else if (draft.date && draft.time) setStep(4);
-      else if (draft.date) setStep(3);
-      else setStep(2);
+      
+      // Determine initial step after restore
+      if (draft.clientName || draft.clientPhone) {
+        setStep(4);
+      } else if (draft.date && draft.time) {
+        setStep(4);
+      } else if (draft.date) {
+        setStep(3);
+      } else {
+        setStep(2);
+      }
+      
       setShowRestoreDraft(false);
+      
+      // Set a flag to trigger re-validation once slots are loaded
+      setWasRestored(true);
     } catch (e) {
       localStorage.removeItem('booking_draft');
     }
   };
+
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+
+  const availableSlots = useMemo(() => {
+    if (!profile?.workingHours || !selectedDate) return [];
+    return getAvailableSlots({
+      selectedDate,
+      serviceDuration: Number(selectedService?.duration) || 60,
+      workingHours: profile.workingHours,
+      appointments: dayAppointments,
+      blockedSchedules
+    });
+  }, [selectedDate, selectedService, profile, dayAppointments, blockedSchedules]);
+
+  const [wasRestored, setWasRestored] = useState(false);
+
+  // Re-validation logic for restored slots
+  useEffect(() => {
+    // Only validate if we have a full target to check against AND we finished loading
+    if (wasRestored && selectedDate && selectedTime && !isLoadingSlots && dayAppointments.length >= 0) {
+      const isStillAvailable = availableSlots.includes(selectedTime);
+      
+      if (!isStillAvailable) {
+        setSelectedDate('');
+        setSelectedTime('');
+        setStep(3);
+        toast.error('Este horário não está mais disponível.', {
+          description: 'A profissional pode ter recebido outra reserva ou alterado a agenda. Por favor, escolha um novo horário.'
+        });
+      }
+      setWasRestored(false);
+    }
+  }, [wasRestored, selectedDate, selectedTime, availableSlots, dayAppointments, isLoadingSlots]);
 
   const handleClearDraft = () => {
     localStorage.removeItem('booking_draft');
@@ -166,17 +232,6 @@ export default function BookingModal({ profile, services, onClose, open, initial
     setStep(2);
     setShowRestoreDraft(false);
   };
-
-  const availableSlots = useMemo(() => {
-    if (!profile?.workingHours || !selectedDate) return [];
-    return getAvailableSlots({
-      selectedDate,
-      serviceDuration: Number(selectedService?.duration) || 60,
-      workingHours: profile.workingHours,
-      appointments: dayAppointments,
-      manualBlockedSlots
-    });
-  }, [selectedDate, selectedService, profile, dayAppointments, manualBlockedSlots]);
 
   // Urgency logic based on real availability
   const urgencyInfo = useMemo(() => {
@@ -203,19 +258,31 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
   useEffect(() => {
     if (selectedDate && profile?.uid && open) {
-      const slotsRef = collection(db, 'blocked_slots');
-      const slotsQ = query(slotsRef, where('professionalId', '==', profile.uid), where('date', '==', selectedDate));
-      const unsubscribeSlots = onSnapshot(slotsQ, (snapshot) => {
-        setManualBlockedSlots(snapshot.docs.map(doc => doc.data().time));
+      setIsLoadingSlots(true);
+      
+      const blockedRef = collection(db, 'blocked_schedules');
+      const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
+      
+      const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', profile.uid)), (snap) => {
+        const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        const dayBlocked = allBlocked.filter(b => {
+          const isToday = b.date === selectedDate;
+          const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+          return isToday || isRecurringToday;
+        });
+        setBlockedSchedules(dayBlocked);
       });
+
       const apptsRef = collection(db, 'appointments');
-      const apptsQ = query(apptsRef, where('professionalId', '==', profile.uid), where('date', '==', selectedDate), where('status', 'in', ['confirmed', 'completed']));
-      const unsubscribeAppts = onSnapshot(apptsQ, (snapshot) => {
+      const apptsQ = query(apptsRef, where('professionalId', '==', profile.uid), where('date', '==', selectedDate), where('status', 'in', ['pending', 'confirmed', 'completed']));
+      const unsubAppts = onSnapshot(apptsQ, (snapshot) => {
         setDayAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment)));
+        setIsLoadingSlots(false);
       });
+
       return () => {
-        unsubscribeSlots();
-        unsubscribeAppts();
+        unsubBlocked();
+        unsubAppts();
       };
     }
   }, [selectedDate, profile?.uid, open]);
@@ -244,7 +311,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
     setBookingLoading(true);
     try {
       const totalPrice = calculateTotalPrice();
-      await createBookingRequest({
+      const { bookingId, token } = await createBookingRequest({
         professionalId: profile.uid,
         professionalName: profile.name,
         serviceId: selectedService.id,
@@ -262,6 +329,8 @@ export default function BookingModal({ profile, services, onClose, open, initial
         date: selectedDate,
         time: selectedTime,
       });
+      setAppointmentId(bookingId);
+      setAppointmentToken(token);
       setBookingSuccess(true);
       localStorage.removeItem('booking_draft');
       setTimeout(() => {
@@ -306,8 +375,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
       <AnimatePresence>
         {open && step >= 2 && step <= 4 && (
-          <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-0 md:p-6">
-            <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 25, stiffness: 200 }} className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[90vh] overflow-y-auto no-scrollbar">
+          <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-0 md:p-6 overflow-hidden">
+            <motion.div 
+              initial={{ y: "100%" }} 
+              animate={{ y: 0 }} 
+              exit={{ y: "100%" }} 
+              transition={{ type: "spring", damping: 25, stiffness: 200 }} 
+              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[90vh] overflow-y-auto no-scrollbar pb-32 md:pb-12"
+            >
               <button onClick={onClose} className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors">
                 <X size={24} />
               </button>
@@ -450,9 +525,16 @@ export default function BookingModal({ profile, services, onClose, open, initial
                             </button>
                           ))
                         ) : (
-                          <div className="col-span-3 py-16 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist">
-                            <p className="text-sm text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura nos próximos dias</p>
-                            <p className="text-xs text-brand-stone font-light italic">Tente outra data ou solicite um encaixe via WhatsApp</p>
+                          <div className="col-span-3 py-16 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                            <p className="text-sm text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura neste dia</p>
+                            <p className="text-xs text-brand-stone font-light mb-8">Todos os horários estão reservados. Quer ser avisado de desistências?</p>
+                            <button 
+                              onClick={() => setIsWaitlistOpen(true)}
+                              className="flex items-center gap-3 bg-brand-ink text-brand-white px-7 py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] shadow-xl hover:bg-brand-terracotta transition-all mx-auto active:scale-95"
+                            >
+                              <Zap size={14} className="fill-brand-terracotta text-brand-terracotta" />
+                              Entrar na lista prioritária
+                            </button>
                           </div>
                         )
                       ) : (
@@ -479,8 +561,16 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       <div className="flex-1">
                         <span className="text-[9px] font-bold uppercase tracking-widest text-brand-blush/40 block mb-2">{selectedService?.name}</span>
                         <div className="flex items-center gap-4 text-xs font-light text-brand-blush/80">
-                          <span className="flex items-center gap-1.5"><CalendarIcon size={12} /> {new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
-                          <span className="flex items-center gap-1.5"><Clock size={12} /> {selectedTime}</span>
+                          <span className="flex items-center gap-1.5">
+                            <CalendarIcon size={12} /> 
+                            {selectedDate ? (
+                              (() => {
+                                const [year, month, day] = selectedDate.split('-').map(Number);
+                                return new Date(year, month - 1, day).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                              })()
+                            ) : '--/--'}
+                          </span>
+                          <span className="flex items-center gap-1.5"><Clock size={12} /> {selectedTime || '--:--'}</span>
                         </div>
                       </div>
                       <div className="text-right">
@@ -502,9 +592,17 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         {!clientPhone && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>}
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">E-mail <span className="opacity-40">(Opcional)</span></label>
-                        <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="Agilize sua reserva (opcional)" className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm border-brand-mist")} />
-                        <p className="text-[8px] text-brand-stone/60 font-medium uppercase tracking-wider ml-2 mt-1">Usaremos seu WhatsApp para a confirmação.</p>
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">E-mail para receber confirmação (opcional)</label>
+                        <input 
+                          type="email" 
+                          inputMode="email"
+                          autoComplete="email"
+                          value={clientEmail} 
+                          onChange={(e) => setClientEmail(e.target.value)} 
+                          placeholder="Ex: seu@email.com" 
+                          className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm border-brand-mist")} 
+                        />
+                        <p className="text-[8px] text-brand-stone/60 font-medium uppercase tracking-wider ml-2 mt-1">Confirmação também enviada via WhatsApp.</p>
                       </div>
                     </div>
                     {isHomeService && (
@@ -516,7 +614,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     )}
                   </div>
                   <div className="hidden md:block">
-                    <PremiumButton variant="terracotta" className="w-full py-7" disabled={!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)} onClick={handleBooking} loading={bookingLoading} loadingText="Finalizando solicitação...">Confirmar reserva <Check size={18} className="ml-1" /></PremiumButton>
+                    <PremiumButton variant="terracotta" className="w-full py-7" disabled={!clientName || !clientPhone || (isHomeService && !clientAddress)} onClick={handleBooking} loading={bookingLoading} loadingText="Finalizando solicitação...">Confirmar reserva <Check size={18} className="ml-1" /></PremiumButton>
                   </div>
                 </motion.div>
               )}
@@ -527,21 +625,32 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
       <AnimatePresence>
         {open && step >= 2 && step <= 4 && (
-          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-0 left-0 right-0 z-[250] md:hidden p-6 bg-gradient-to-t from-brand-white via-brand-white to-transparent pt-12">
-            <PremiumButton variant="terracotta" className="w-full py-7" disabled={(step === 2 && (!selectedService || (isHomeService && profile?.serviceAreaType === 'custom' && !selectedArea))) || (step === 3 && (!selectedDate || !selectedTime)) || (step === 4 && (!clientName || !clientPhone || !clientEmail || (isHomeService && !clientAddress)))} loading={step === 4 && bookingLoading} onClick={() => { if (step === 2) setStep(3); else if (step === 3) setStep(4); else if (step === 4) handleBooking(); }}>
-              {step === 2 && (selectedService ? `Reservar ${selectedService.name.split(' ')[0]}` : 'Escolher Experiência')}
-              {step === 3 && (selectedTime ? `Confirmar para ${selectedTime}` : 'Escolher Horário')}
-              {step === 4 && 'Confirmar reserva'}
-              <ArrowRight size={18} className="ml-1" />
-            </PremiumButton>
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            exit={{ y: 100, opacity: 0 }} 
+            className="fixed bottom-0 left-0 right-0 z-[250] md:hidden p-6 bg-gradient-to-t from-brand-white via-brand-white to-transparent pt-16 pointer-events-none"
+          >
+            <div className="pointer-events-auto">
+              <PremiumButton variant="terracotta" className="w-full py-7" disabled={(step === 2 && (!selectedService || (isHomeService && profile?.serviceAreaType === 'custom' && !selectedArea))) || (step === 3 && (!selectedDate || !selectedTime)) || (step === 4 && (!clientName || !clientPhone || (isHomeService && !clientAddress)))} loading={step === 4 && bookingLoading} onClick={() => { if (step === 2) setStep(3); else if (step === 3) setStep(4); else if (step === 4) handleBooking(); }}>
+                {step === 2 && (selectedService ? `Reservar ${selectedService.name.split(' ')[0]}` : 'Escolher Experiência')}
+                {step === 3 && (selectedTime ? `Confirmar para ${selectedTime}` : 'Escolher Horário')}
+                {step === 4 && 'Confirmar reserva'}
+                <ArrowRight size={18} className="ml-1" />
+              </PremiumButton>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {step === 5 && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center justify-center p-8 text-center">
-            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", damping: 15 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8"><Check size={48} /></motion.div>
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center p-8 text-center overflow-y-auto no-scrollbar pt-16 pb-32 md:justify-center md:pt-8 md:pb-8"
+          >
+            <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", damping: 15 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"><Check size={48} /></motion.div>
             <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">{profile?.name.split(' ')[0]} recebeu sua reserva</h2>
             <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">Você receberá a confirmação por WhatsApp em breve.</p>
             {selectedService && (
@@ -550,7 +659,17 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 <div className="space-y-4">
                   <div><span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Serviço</span><span className="font-serif text-brand-ink">{selectedService.name}</span></div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div><span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Data</span><span className="text-sm font-medium text-brand-ink">{new Date(selectedDate + 'T12:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })}</span></div>
+                    <div>
+                      <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Data</span>
+                      <span className="text-sm font-medium text-brand-ink">
+                        {selectedDate ? (
+                          (() => {
+                            const [year, month, day] = selectedDate.split('-').map(Number);
+                            return new Date(year, month - 1, day).toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' });
+                          })()
+                        ) : '---'}
+                      </span>
+                    </div>
                     <div><span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Horário</span><span className="text-sm font-medium text-brand-ink">{selectedTime}</span></div>
                   </div>
                 </div>
@@ -558,12 +677,35 @@ export default function BookingModal({ profile, services, onClose, open, initial
             )}
             <div className="w-full max-w-sm space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <PremiumButton variant="secondary" className="w-full py-4 !text-[9px]" onClick={() => { const start = new Date(selectedDate + 'T' + selectedTime); const end = new Date(start.getTime() + (Number(selectedService?.duration) || 60) * 60000); const formatTemplate = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'; const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Reserva: ' + selectedService?.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent('Agendamento realizado via Nera.')}&location=${encodeURIComponent(profile?.city || '')}`; window.open(url, '_blank'); }}>
+                <PremiumButton 
+                  variant="secondary" 
+                  className="w-full py-4 !text-[9px]" 
+                  onClick={() => { 
+                    if (!selectedDate || !selectedTime) return;
+                    const [year, month, day] = selectedDate.split('-').map(Number);
+                    const [hours, minutes] = selectedTime.split(':').map(Number);
+                    const start = new Date(year, month - 1, day, hours, minutes);
+                    const end = new Date(start.getTime() + (Number(selectedService?.duration) || 60) * 60000); 
+                    const formatTemplate = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'; 
+                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Reserva: ' + selectedService?.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent('Agendamento realizado via Nera.')}&location=${encodeURIComponent(profile?.city || '')}`; 
+                    window.open(url, '_blank'); 
+                  }}
+                >
                   <CalendarIcon size={14} /> Adicionar calendário
                 </PremiumButton>
-                <a href={buildWhatsappLink(profile?.whatsapp || '', 'Olá! Acabei de solicitar um horário para ' + selectedService?.name + ' pelo Nera e gostaria de confirmar os detalhes.')} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist"><MessageCircle size={14} /> Falar com a profissional</a>
+                
+                {appointmentToken && (
+                  <Link 
+                    to={`/r/${appointmentToken}`}
+                    className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all border border-brand-ink shadow-lg shadow-brand-ink/10"
+                  >
+                    <Settings size={14} className="animate-spin-slow" /> Gerenciar reserva
+                  </Link>
+                )}
+
+                <a href={buildWhatsappLink(profile?.whatsapp || '', 'Olá! Acabei de solicitar um horário para ' + selectedService?.name + ' pelo Nera e gostaria de confirmar os detalhes.')} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist sm:col-span-2"><MessageCircle size={14} /> Falar com a profissional</a>
               </div>
-              <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-8 mt-12 text-center">
+              <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-6 md:p-8 mt-8 md:mt-12 text-center w-full">
                 <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm"><Heart size={24} className="fill-brand-terracotta/10" /></div>
                 <h4 className="text-lg font-serif text-brand-ink mb-2">Gostou da experiência? Indique uma amiga.</h4>
                 <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">Compartilhe sua descoberta com quem você ama</p>
@@ -574,6 +716,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
           </motion.div>
         )}
       </AnimatePresence>
+       <WaitlistModal 
+        profile={profile} 
+        services={services} 
+        open={isWaitlistOpen} 
+        onClose={() => setIsWaitlistOpen(false)} 
+        initialDate={selectedDate}
+        initialService={selectedService}
+      />
     </>
   );
 }

@@ -2,18 +2,22 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, auth, updateAppointmentStatus, handleBookingError } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { 
+  collection, query, where, onSnapshot, orderBy, doc, updateDoc, 
+  addDoc, deleteDoc, serverTimestamp 
+} from 'firebase/firestore';
 import { 
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp, Heart,
-  ChevronRight, Sparkles, Home, X, Instagram, Copy
+  ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
+  AlertCircle, ShieldCheck
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/utils';
 import Logo from '../components/Logo';
-import { Appointment } from '../types';
+import { Appointment, WaitlistEntry } from '../types';
 import { AnimatePresence } from 'motion/react';
 import AppLayout from '../components/AppLayout';
 
@@ -33,9 +37,33 @@ export default function Dashboard() {
   const [isConfirmRejectOpen, setIsConfirmRejectOpen] = useState(false);
   const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [recentCompletedClients, setRecentCompletedClients] = useState<any[]>([]);
   const [weekSummary, setWeekSummary] = useState<{date: string, count: number, revenue: number}[]>([]);
+  const [recentChanges, setRecentChanges] = useState<Appointment[]>([]);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [waitlistStats, setWaitlistStats] = useState<any>({ recoveredSlots: 0, savedRevenue: 0 });
+  const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
+  const [isUnavailableToday, setIsUnavailableToday] = useState(false);
+  const [todayBlockId, setTodayBlockId] = useState<string | null>(null);
+  const [agendaHealth, setAgendaHealth] = useState({
+    confirmedTomorrow: 0,
+    pendingClientConfirmation: 0,
+    openSlotsToday: 0,
+    attendanceRate: 100
+  });
+
+  const getClientScore = (whatsapp: string) => {
+    const clientAppts = appointments.filter(a => a.clientWhatsapp === whatsapp);
+    const completed = clientAppts.filter(a => a.status === 'completed').length;
+    const noShow = clientAppts.filter(a => a.status === 'cancelled' && a.cancellationReason?.toLowerCase().includes('no-show')).length;
+    
+    if (noShow >= 2) return 'risk';
+    if (noShow === 1) return 'attention';
+    if (completed >= 2) return 'reliable';
+    return null;
+  };
 
   const getContextualTip = () => {
     if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
@@ -152,7 +180,6 @@ export default function Dashboard() {
       setRecentCompletedClients(completedToday.slice(0, 3));
 
       // Gerar resumo dos próximos 7 dias
-      const today = getTodayLocale();
       const summary = [];
       for (let i = 0; i < 7; i++) {
         const d = new Date();
@@ -166,6 +193,89 @@ export default function Dashboard() {
         });
       }
       setWeekSummary(summary);
+
+      // --- CALCULATE AGENDA HEALTH ---
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      const confirmedTom = appointments.filter(a => a.date === tomorrowStr && a.status === 'confirmed').length;
+      const pendingClientConf = appointments.filter(a => 
+        (a.date === todayStr || a.date === tomorrowStr) && 
+        a.status === 'confirmed' && 
+        !a.clientConfirmedAt
+      ).length;
+      
+      const completed = appointments.filter(a => a.status === 'completed').length;
+      const noShow = appointments.filter(a => a.status === 'cancelled' && a.cancellationReason?.toLowerCase().includes('no-show')).length;
+      const totalRelevant = completed + noShow;
+      const rate = totalRelevant > 0 ? Math.round((completed / totalRelevant) * 100) : 100;
+
+      // Estimate open slots (mock for now based on total day)
+      // Real would use getAvailableSlots for today
+      const busySlots = appointments.filter(a => a.date === todayStr && (a.status === 'confirmed' || a.status === 'pending')).length;
+      const estimatedTotalDaySlots = 10; // Avg slots per day
+      const openToday = Math.max(0, estimatedTotalDaySlots - busySlots);
+
+      setAgendaHealth({
+        confirmedTomorrow: confirmedTom,
+        pendingClientConfirmation: pendingClientConf,
+        openSlotsToday: openToday,
+        attendanceRate: rate
+      });
+    });
+
+    // Query: Recent changes by clients
+    const qChanges = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', user.uid),
+      where('lastChangeBy', '==', 'client'),
+      orderBy('updatedAt', 'desc')
+    );
+
+    const unsubChanges = onSnapshot(qChanges, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+      setRecentChanges(docs.slice(0, 5)); // Show last 5 changes
+    });
+
+    // Sync Profile Settings
+    if (profile) {
+      setWaitlistMode(profile.waitlistMode || 'manual');
+    }
+
+    // Query: Waitlist
+    const qWaitlist = query(
+      collection(db, 'waitlist'),
+      where('professionalId', '==', user.uid),
+      where('status', 'in', ['waiting', 'invited']),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
+      setWaitlist(docs);
+    });
+
+    // Check availability for today (Indisponível hoje toggle)
+    const blockedRef = collection(db, 'blocked_schedules');
+    const unsubTodayBlock = onSnapshot(
+      query(blockedRef, where('professionalId', '==', user.uid), where('date', '==', today), where('type', '==', 'full_day')),
+      (snap) => {
+        setIsUnavailableToday(!snap.empty);
+        setTodayBlockId(!snap.empty ? snap.docs[0].id : null);
+      }
+    );
+
+    // Query: Waitlist Stats
+    const qStats = query(
+      collection(db, 'waitlist_stats'),
+      where('professionalId', '==', user.uid)
+    );
+
+    const unsubStats = onSnapshot(qStats, (snapshot) => {
+      if (!snapshot.empty) {
+        setWaitlistStats(snapshot.docs[0].data());
+      }
     });
 
     return () => {
@@ -173,8 +283,11 @@ export default function Dashboard() {
       unsubPending();
       unsubNext();
       unsubAll();
+      unsubChanges();
+      unsubWaitlist();
+      unsubStats();
     };
-  }, [user]);
+  }, [user, profile]);
 
   const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled') => {
     setProcessingId(id);
@@ -201,6 +314,49 @@ export default function Dashboard() {
     } finally {
       setProcessingId(null);
       setConfirmedId(null);
+    }
+  };
+
+  const handleToggleUnavailableToday = async () => {
+    if (!user || !profile) return;
+    
+    setProcessingId('today-toggle');
+    try {
+      if (isUnavailableToday && todayBlockId) {
+        await deleteDoc(doc(db, 'blocked_schedules', todayBlockId));
+        toast.success('Agenda liberada para hoje!');
+      } else {
+        await addDoc(collection(db, 'blocked_schedules'), {
+          professionalId: user.uid,
+          date: getTodayLocale(),
+          startTime: profile.workingHours?.startTime || '09:00',
+          endTime: profile.workingHours?.endTime || '18:00',
+          reason: 'pessoal',
+          type: 'full_day',
+          isRecurring: false,
+          createdAt: serverTimestamp()
+        });
+        toast.success('Você está indisponível para novos agendamentos hoje.');
+      }
+    } catch (e) {
+      toast.error('Erro ao atualizar disponibilidade.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const toggleWaitlistMode = async () => {
+    if (!user) return;
+    const newMode = waitlistMode === 'auto' ? 'manual' : 'auto';
+    setWaitlistMode(newMode);
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        waitlistMode: newMode,
+        updatedAt: new Date().toISOString()
+      });
+      toast.success(`Lista de espera: modo ${newMode === 'auto' ? 'Automático' : 'Manual'} ativado`);
+    } catch (e) {
+      toast.error('Erro ao atualizar configuração.');
     }
   };
 
@@ -245,7 +401,7 @@ export default function Dashboard() {
                   {pendingCount} {pendingCount === 1 ? 'novo agendamento aguardando confirmação' : 'novos agendamentos aguardando confirmação'}
                 </span>
                 <Link 
-                  to="/agenda" 
+                  to="/pedidos" 
                   className="bg-white text-brand-terracotta px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all"
                 >
                   Ver Todos
@@ -255,6 +411,19 @@ export default function Dashboard() {
           </AnimatePresence>
 
           <div className="flex items-center gap-3">
+              <button 
+                onClick={handleToggleUnavailableToday}
+                disabled={processingId === 'today-toggle'}
+                className={cn(
+                  "flex items-center gap-3 px-6 py-4 rounded-full text-[10px] font-medium uppercase tracking-widest transition-all shadow-sm border",
+                  isUnavailableToday 
+                    ? "bg-brand-linen border-brand-terracotta text-brand-terracotta" 
+                    : "bg-brand-white border-brand-mist text-brand-stone hover:bg-brand-parchment"
+                )}
+              >
+                {isUnavailableToday ? <AlertCircle size={14} /> : <Lock size={14} />}
+                {isUnavailableToday ? 'Indisponível hoje' : 'Disponível hoje'}
+              </button>
               <button 
                 onClick={() => setIsShareModalOpen(true)}
                 className="flex items-center gap-3 px-6 py-4 bg-brand-white border border-brand-mist rounded-full text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm group"
@@ -273,6 +442,83 @@ export default function Dashboard() {
 
         {/* 1. OPERATIONAL SUMMARY BAR */}
         <section className="flex flex-wrap gap-4 mb-12">
+          {recentChanges.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="w-full bg-amber-50 border border-amber-100 p-4 rounded-[28px] mb-4 flex items-center gap-4 shadow-sm"
+            >
+              <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center shrink-0">
+                <AlertCircle size={20} />
+              </div>
+              <div className="flex-1">
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-0.5">Mudanças recentes na agenda</p>
+                <p className="text-[11px] text-amber-700 opacity-80 italic">"{recentChanges[0].changeMessage}"</p>
+              </div>
+              <button 
+                 onClick={() => {
+                   // Clear changes alerts by updating local state or marking as seen (here just hiding for now)
+                   setRecentChanges([]);
+                 }}
+                 className="text-amber-400 hover:text-amber-700 transition-colors"
+               >
+                 <X size={18} />
+               </button>
+            </motion.div>
+          )}
+
+          {/* SAÚDE DA AGENDA - PREMIUM SECTION */}
+          <div className="w-full flex flex-col md:flex-row gap-6 mb-8">
+             <div className="flex-1 bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative overflow-hidden group">
+               <div className="absolute top-0 right-0 w-24 h-24 bg-brand-linen rounded-full -mr-8 -mt-8 blur-2xl group-hover:bg-brand-rose/10 transition-colors" />
+               <div className="relative z-10 flex items-center gap-6">
+                 <div className="w-14 h-14 bg-brand-linen text-brand-ink rounded-[20px] flex items-center justify-center shadow-inner">
+                   <TrendingUp size={28} />
+                 </div>
+                 <div>
+                   <h2 className="text-[10px] font-bold text-brand-stone uppercase tracking-[0.3em] mb-1">Saúde da Agenda</h2>
+                   <p className="text-[11px] text-brand-ink/60 font-light italic">Seus indicadores anti-no-show</p>
+                 </div>
+               </div>
+               
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8">
+                 <div className="space-y-1">
+                   <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest block">Amanhã</span>
+                   <div className="flex items-baseline gap-2">
+                     <span className="text-xl font-serif text-brand-ink">{agendaHealth.confirmedTomorrow}</span>
+                     <span className="text-[9px] text-brand-stone uppercase">confirmadas</span>
+                   </div>
+                 </div>
+                 <div className="space-y-1">
+                   <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest block">Pendentes</span>
+                   <div className="flex items-baseline gap-2">
+                     <span className={cn("text-xl font-serif", agendaHealth.pendingClientConfirmation > 0 ? "text-brand-terracotta" : "text-brand-ink")}>
+                       {agendaHealth.pendingClientConfirmation}
+                     </span>
+                     <span className="text-[9px] text-brand-stone uppercase">respostas</span>
+                   </div>
+                 </div>
+                 <div className="space-y-1">
+                   <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest block">Vagas livres</span>
+                   <div className="flex items-baseline gap-2">
+                     <span className="text-xl font-serif text-brand-ink">{agendaHealth.openSlotsToday}</span>
+                     <span className="text-[9px] text-brand-stone uppercase">hoje</span>
+                   </div>
+                 </div>
+                 <div className="space-y-1">
+                   <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest block">Taxa Presença</span>
+                   <div className="flex items-baseline gap-2">
+                     <span className="text-xl font-serif text-brand-ink">{agendaHealth.attendanceRate}%</span>
+                     <div className={cn(
+                       "w-1.5 h-1.5 rounded-full",
+                       agendaHealth.attendanceRate > 90 ? "bg-green-500" : agendaHealth.attendanceRate > 70 ? "bg-amber-500" : "bg-red-500"
+                     )} />
+                   </div>
+                 </div>
+               </div>
+             </div>
+          </div>
+
           <div className="bg-brand-white border border-brand-mist px-5 py-3 rounded-2xl flex items-center gap-3 shadow-sm">
             <div className={`w-2 h-2 rounded-full ${pendingCount > 0 ? 'bg-brand-terracotta animate-pulse' : 'bg-brand-mist'}`} />
             <span className="text-[10px] font-medium uppercase tracking-widest text-brand-stone">
@@ -543,9 +789,27 @@ export default function Dashboard() {
                           {appt.time}
                         </div>
                         <div>
-                          <p className="font-medium text-brand-ink mb-1">{appt.clientName}</p>
-                          <p className="text-[10px] text-brand-stone uppercase tracking-widest tracking-tighter">{appt.serviceName}</p>
-                        </div>
+                           <div className="flex items-center gap-2 mb-1">
+                             <p className="font-medium text-brand-ink">{appt.clientName}</p>
+                             {getClientScore(appt.clientWhatsapp) && (
+                               <div className={cn(
+                                 "px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-widest",
+                                 getClientScore(appt.clientWhatsapp) === 'reliable' ? "bg-green-100 text-green-700" :
+                                 getClientScore(appt.clientWhatsapp) === 'attention' ? "bg-amber-100 text-amber-700" :
+                                 "bg-red-100 text-red-700"
+                               )}>
+                                 {getClientScore(appt.clientWhatsapp) === 'reliable' ? 'Confiável' :
+                                  getClientScore(appt.clientWhatsapp) === 'attention' ? 'Atenção' : 'Risco'}
+                               </div>
+                             )}
+                             {(appt.date === getTodayLocale() || appt.date === (new Date(Date.now() + 86400000).toISOString().split('T')[0])) && !appt.clientConfirmedAt && (
+                               <div className="px-2 py-0.5 bg-amber-500 text-white rounded-full text-[7px] font-bold uppercase tracking-widest animate-pulse">
+                                 Pendente de Confirmação
+                               </div>
+                             )}
+                           </div>
+                           <p className="text-[10px] text-brand-stone uppercase tracking-widest tracking-tighter">{appt.serviceName}</p>
+                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button 
@@ -715,6 +979,12 @@ export default function Dashboard() {
             <section className="bg-brand-linen p-8 rounded-[40px] border border-brand-mist">
               <h3 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em] mb-6">Operacional</h3>
               <div className="grid grid-cols-1 gap-3">
+                <Link
+                  to="/pedidos"
+                  className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all"
+                >
+                  <Inbox size={14} className="text-brand-terracotta" /> Ver Solicitações
+                </Link>
                 <Link
                   to="/agenda"
                   className="flex items-center gap-3 p-4 bg-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest text-brand-ink hover:translate-x-1 transition-all"
@@ -940,6 +1210,42 @@ export default function Dashboard() {
                     </div>
                   )}
 
+                  {/* ANTI-NO-SHOW: CLIENT SCORE & WAITLIST */}
+                  <div className="pt-6 border-t border-brand-mist grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-5 bg-brand-parchment rounded-[24px] border border-brand-mist">
+                       <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-3">Saúde do Cliente</p>
+                       <div className="flex items-center gap-3">
+                         <div className={cn(
+                           "w-10 h-10 rounded-full flex items-center justify-center",
+                           getClientScore(selectedRequest.clientWhatsapp) === 'reliable' ? "bg-green-100 text-green-600" :
+                           getClientScore(selectedRequest.clientWhatsapp) === 'attention' ? "bg-amber-100 text-amber-600" :
+                           "bg-red-100 text-red-600"
+                         )}>
+                           <ShieldCheck size={20} />
+                         </div>
+                         <div>
+                            <p className="text-xs font-bold text-brand-ink">
+                              {getClientScore(selectedRequest.clientWhatsapp) === 'reliable' ? 'Perfil Confiável' :
+                               getClientScore(selectedRequest.clientWhatsapp) === 'attention' ? 'Em Atenção' : 
+                               getClientScore(selectedRequest.clientWhatsapp) === 'risk' ? 'Alto Risco' : 'Novo Cliente'}
+                            </p>
+                            <p className="text-[9px] text-brand-stone uppercase tracking-wider">Baseado no histórico</p>
+                         </div>
+                       </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setIsWaitlistModalOpen(true)}
+                      className="p-5 bg-brand-linen rounded-[24px] border border-brand-mist flex flex-col items-start gap-2 hover:bg-brand-white transition-all group"
+                    >
+                      <p className="text-[10px] text-brand-terracotta uppercase tracking-widest font-bold">Vaga Presa?</p>
+                      <div className="flex items-center gap-2">
+                         <Users size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                         <span className="text-[10px] text-brand-ink uppercase tracking-widest">Avisar Lista de Espera</span>
+                      </div>
+                    </button>
+                  </div>
+
                   <div className="pt-6 border-t border-brand-mist space-y-3">
                     <p className="text-[10px] text-brand-stone uppercase tracking-widest">Contato</p>
                     <div className="flex flex-col gap-2">
@@ -1026,6 +1332,126 @@ export default function Dashboard() {
                 >
                   Cancelar
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* --- WAITLIST NOTIFICATION MODAL --- */}
+      <AnimatePresence>
+        {isWaitlistModalOpen && (
+          <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[250] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-brand-white w-full max-w-lg rounded-[40px] p-10 shadow-2xl border border-brand-mist relative"
+            >
+              <button 
+                onClick={() => setIsWaitlistModalOpen(false)}
+                className="absolute top-8 right-8 p-2 hover:bg-brand-parchment rounded-full text-brand-stone transition-colors"
+              >
+                <X size={20} />
+              </button>
+ 
+              <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center">
+                    <Users size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-serif text-brand-ink mb-1">Lista de Espera</h3>
+                    <p className="text-[10px] text-brand-stone uppercase tracking-widest font-bold">Agenda Inteligente Nera</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3 bg-brand-parchment p-2 rounded-2xl border border-brand-mist shadow-inner">
+                  <span className={cn("text-[9px] font-bold uppercase tracking-widest px-3", waitlistMode === 'manual' ? "text-brand-ink" : "text-brand-stone opacity-40")}>Manual</span>
+                  <button 
+                    onClick={toggleWaitlistMode}
+                    className={cn(
+                      "w-12 h-6 rounded-full relative transition-all duration-300",
+                      waitlistMode === 'auto' ? "bg-brand-terracotta" : "bg-brand-mist"
+                    )}
+                  >
+                    <div className={cn(
+                      "absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm",
+                      waitlistMode === 'auto' ? "left-7" : "left-1"
+                    )} />
+                  </button>
+                  <span className={cn("text-[9px] font-bold uppercase tracking-widest px-3", waitlistMode === 'auto' ? "text-brand-terracotta" : "text-brand-stone opacity-40")}>Automático</span>
+                </div>
+              </div>
+
+              {/* STATS AREA */}
+              <div className="grid grid-cols-2 gap-4 mb-10">
+                <div className="p-6 bg-brand-parchment rounded-[28px] border border-brand-mist/50">
+                  <p className="text-[9px] text-brand-stone uppercase tracking-widest mb-2">Vagas Recuperadas</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-serif text-brand-ink">{waitlistStats.recoveredSlots || 0}</span>
+                    <Sparkles size={16} className="text-brand-terracotta" />
+                  </div>
+                </div>
+                <div className="p-6 bg-brand-parchment rounded-[28px] border border-brand-mist/50">
+                  <p className="text-[9px] text-brand-stone uppercase tracking-widest mb-2">Receita Salva</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-serif text-brand-terracotta">{formatCurrency(waitlistStats.savedRevenue || 0)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                {waitlist.length > 0 ? (
+                  waitlist.map((entry) => (
+                    <div key={entry.id} className="p-6 bg-brand-parchment rounded-[28px] border border-brand-mist/50 flex items-center justify-between group hover:bg-brand-white hover:shadow-md transition-all">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-sm font-bold text-brand-ink">{entry.clientName}</p>
+                          {entry.status === 'invited' && (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-bold uppercase tracking-widest rounded-full animate-pulse">
+                              Convidada
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-brand-stone text-[10px] uppercase tracking-widest font-medium">
+                          <span>{entry.requestedDate.split('-').reverse().join('/')}</span>
+                          <span>•</span>
+                          <span>{entry.period === 'any' ? 'Qualquer horário' : entry.period}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a 
+                          href={buildWhatsappLink(entry.clientWhatsapp)}
+                          target="_blank"
+                          className="w-10 h-10 flex items-center justify-center bg-brand-white text-brand-stone border border-brand-mist rounded-xl hover:text-brand-terracotta transition-all"
+                        >
+                          <MessageCircle size={18} />
+                        </a>
+                        <button 
+                          onClick={() => {
+                            const msg = `Oi ${entry.clientName.split(' ')[0]}! Acabou de vagar um horário ${entry.requestedDate === getTodayLocale() ? 'hoje' : 'para o dia ' + entry.requestedDate.split('-').reverse().join('/')}. Tem interesse? ✨`;
+                            window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
+                          }}
+                          className="px-6 py-3 bg-brand-ink text-brand-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-terracotta transition-all shadow-sm"
+                        >
+                          Convidar
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 bg-brand-parchment/30 rounded-[32px] border border-dashed border-brand-mist">
+                    <p className="text-brand-stone text-xs italic">Ninguém aguardando por enquanto.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-10 p-6 bg-brand-ink text-brand-white rounded-[32px] border border-white/10 relative overflow-hidden">
+                <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl opacity-50" />
+                <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] mb-3 relative z-10">Eficiência Automática</p>
+                <p className="text-[11px] text-white/70 leading-relaxed italic relative z-10">
+                  No modo <strong>Automático</strong>, o Nera envia um convite por WhatsApp assim que uma vaga compatível surge. A primeira a aceitar fica com o horário — sem você precisar mover um dedo.
+                </p>
               </div>
             </motion.div>
           </div>

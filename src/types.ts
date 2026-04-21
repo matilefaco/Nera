@@ -76,6 +76,8 @@ export interface UserProfile {
   onboardingCompleted?: boolean;
   onboardingStep?: number;
   
+  waitlistMode?: 'auto' | 'manual';
+  
   createdAt: string;
   updatedAt: string;
 
@@ -129,9 +131,60 @@ export interface Appointment {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   notes?: string;
   
+  clientConfirmedAt?: any; // When client hits "confirm presence"
+  cancellationReason?: string; // Why it was cancelled
+  rescheduledAt?: any; // When it was last rescheduled (client or pro)
+  previousDate?: string; 
+  previousTime?: string;
+  lastChangeBy?: 'professional' | 'client' | 'system';
+  changeMessage?: string; // Summary of change for alerts
+  
+  // Anti-No-Show System
+  clientScore?: 'reliable' | 'attention' | 'risk';
+  reminder24hSentAt?: any;
+  reminder6hSentAt?: any;
+  waitlistNotifiedAt?: any;
+  token: string;
+
   professionalId: string;
   professionalName?: string;
   
-  createdAt: string;
-  updatedAt?: string;
+  createdAt: any;
+  updatedAt?: any;
+}
+
+export interface BlockedSchedule {
+  id: string;
+  professionalId: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  reason?: 'compromisso' | 'descanso' | 'curso' | 'pessoal' | 'outro';
+  customReason?: string;
+  type: 'manual' | 'automatic' | 'full_day';
+  isRecurring?: boolean;
+  recurringDays?: number[]; // 0-6
+  createdAt: any;
+}
+
+export interface WaitlistEntry {
+  id: string;
+  professionalId: string;
+  clientName: string;
+  clientWhatsapp: string;
+  requestedDate: string; // YYYY-MM-DD
+  serviceId: string;
+  serviceName: string;
+  period: 'morning' | 'afternoon' | 'night' | 'any';
+  preferredTime?: string; // HH:mm
+  status: 'waiting' | 'invited' | 'expired' | 'booked';
+  invitationSentAt?: any;
+  invitationExpiresAt?: any;
+  createdAt: any;
+}
+
+export interface WaitlistStats {
+  recoveredSlots: number;
+  savedRevenue: number;
+  totalEntries: number;
 }

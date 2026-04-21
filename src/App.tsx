@@ -23,6 +23,8 @@ import PublicProfile from './pages/PublicProfile';
 import OnboardingPage from './pages/OnboardingPage';
 import ReviewPage from './pages/ReviewPage';
 import BookingResponsePage from './pages/BookingResponsePage';
+import PendingRequestsPage from './pages/PendingRequestsPage';
+import ManageBookingPage from './pages/ManageBookingPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -71,6 +73,8 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/p/:slug" element={<PublicProfile />} />
+            <Route path="/reserva/:id/gerenciar" element={<ManageBookingPage />} />
+            <Route path="/r/:token" element={<ManageBookingPage />} />
             <Route path="/review/:token" element={<ReviewPage />} />
             <Route path="/booking-request/:appointmentId/respond" element={<BookingResponsePage />} />
             <Route path="/onboarding" element={
@@ -87,6 +91,11 @@ export default function App() {
             <Route path="/agenda" element={
               <PrivateRoute>
                 <AgendaPage />
+              </PrivateRoute>
+            } />
+            <Route path="/pedidos" element={
+              <PrivateRoute>
+                <PendingRequestsPage />
               </PrivateRoute>
             } />
             <Route path="/clients" element={

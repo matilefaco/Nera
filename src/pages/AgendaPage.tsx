@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, 
 import { 
   Calendar, Clock, MessageCircle, 
   CheckCircle2, ChevronLeft, ChevronRight, Plus, MapPin,
-  Users, List, Settings, Check, Sparkles, X, Lock
+  Users, List, Settings, Check, Sparkles, X, Lock, RefreshCw
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn, cleanWhatsapp } from '../lib/utils';
@@ -14,6 +14,8 @@ import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
 import { AnimatePresence } from 'motion/react';
+
+import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 
 export default function AgendaPage() {
   const { user, profile } = useAuth();
@@ -26,14 +28,17 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(appointmentIdFromUrl);
 
-  // Sync date from URL if it changes (e.g. from week summary links)
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
+
+  // Sync date from URL if it changes
   useEffect(() => {
     if (dateFromUrl && dateFromUrl !== selectedDate) {
       setSelectedDate(dateFromUrl);
     }
   }, [dateFromUrl]);
 
-  // Handle direct appointment link from email
+  // Handle direct appointment link
   useEffect(() => {
     if (appointmentIdFromUrl && user) {
       const fetchAppt = async () => {
@@ -41,18 +46,8 @@ export default function AgendaPage() {
           const apptSnap = await getDoc(doc(db, 'appointments', appointmentIdFromUrl));
           if (apptSnap.exists()) {
             const data = apptSnap.data();
-            if (data.date !== selectedDate) {
-              setSelectedDate(data.date);
-            }
+            if (data.date !== selectedDate) setSelectedDate(data.date);
             setHighlightedId(appointmentIdFromUrl);
-            
-            // Scroll to it after a short delay to allow list to render
-            setTimeout(() => {
-              const el = document.getElementById(`appt-${appointmentIdFromUrl}`);
-              if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-            }, 1000);
           }
         } catch (err) {
           console.error("Error fetching linked appointment:", err);
@@ -61,13 +56,6 @@ export default function AgendaPage() {
       fetchAppt();
     }
   }, [appointmentIdFromUrl, user]);
-
-  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
-  const [blockDate, setBlockDate] = useState(selectedDate);
-  const [blockTime, setBlockTime] = useState('');
-  const [blockReason, setBlockReason] = useState('');
-  const [blockedSlots, setBlockedSlots] = useState<any[]>([]);
-  const [isBlocking, setIsBlocking] = useState(false);
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [manualClient, setManualClient] = useState('');
@@ -105,14 +93,20 @@ export default function AgendaPage() {
       setAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    const blockedRef = collection(db, 'blocked_slots');
-    const blockedQ = query(
-      blockedRef,
-      where('professionalId', '==', user.uid),
-      where('date', '==', selectedDate)
-    );
-    const unsubBlocked = onSnapshot(blockedQ, (snap) => {
-      setBlockedSlots(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    const blockedRef = collection(db, 'blocked_schedules');
+    const dayOfWeek = parseLocalDate(selectedDate).getDay();
+
+    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', user.uid)), (snap) => {
+      const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      
+      // Filtrar para hoje (data fixa OU recorrente no dia certo)
+      const dayBlocked = allBlocked.filter(b => {
+        const isToday = b.date === selectedDate;
+        const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+        return isToday || isRecurringToday;
+      });
+
+      setBlockedSchedules(dayBlocked);
     });
 
     return () => {
@@ -127,34 +121,10 @@ export default function AgendaPage() {
     setSelectedDate(formatDateKey(date));
   };
 
-  const handleBlockSlot = async () => {
-    if (!user || !blockTime) return;
-    setIsBlocking(true);
-    try {
-      const slotId = `${user.uid}_${blockDate}_${blockTime}`;
-      await setDoc(doc(db, 'blocked_slots', slotId), {
-        professionalId: user.uid,
-        date: blockDate,
-        time: blockTime,
-        reason: blockReason || 'Bloqueado',
-        isPending: false,
-        createdAt: new Date().toISOString()
-      });
-      toast.success(`Horário ${blockTime} bloqueado para ${blockDate.split('-').reverse().join('/')}.`);
-      setBlockTime('');
-      setBlockReason('');
-      setIsBlockModalOpen(false);
-    } catch (err) {
-      toast.error('Não foi possível bloquear o horário. Tente novamente.');
-    } finally {
-      setIsBlocking(false);
-    }
-  };
-
-  const handleUnblockSlot = async (slotId: string) => {
+  const handleUnblockSchedule = async (id: string) => {
     if (!user) return;
     try {
-      await deleteDoc(doc(db, 'blocked_slots', slotId));
+      await deleteDoc(doc(db, 'blocked_schedules', id));
       toast.success('Bloqueio removido.');
     } catch {
       toast.error('Não foi possível remover o bloqueio.');
@@ -247,7 +217,7 @@ export default function AgendaPage() {
           <h1 className="text-4xl font-serif font-normal text-brand-ink">Agenda</h1>
           <div className="flex gap-2">
             <button
-              onClick={() => { setBlockDate(selectedDate); setIsBlockModalOpen(true); }}
+              onClick={() => setIsBlockModalOpen(true)}
               className="px-5 py-3 border border-brand-mist bg-brand-white text-brand-stone rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center gap-2"
               title="Bloquear horário"
             >
@@ -349,29 +319,44 @@ export default function AgendaPage() {
                 </div>
               </motion.div>
             ))
-          ) : blockedSlots.length === 0 ? (
+          ) : blockedSchedules.length === 0 ? (
             <div className="text-center py-24 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist">
               <Calendar size={40} className="text-brand-mist mx-auto mb-6" />
               <p className="text-brand-stone font-serif italic text-lg font-light">Sua agenda está livre para este dia.</p>
             </div>
           ) : null}
 
-          {blockedSlots.map((slot) => (
-            <div key={slot.id} className="bg-brand-linen border border-brand-terracotta/20 p-6 rounded-[32px] flex items-center justify-between opacity-70">
+          {blockedSchedules.map((schedule) => (
+            <div key={schedule.id} className="bg-brand-linen/60 border border-brand-mist p-6 rounded-[32px] flex items-center justify-between group overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-brand-stone/20 group-hover:bg-brand-terracotta transition-colors" />
               <div className="flex items-center gap-6">
-                <div className="w-16 h-16 rounded-[20px] bg-brand-terracotta/10 border border-brand-terracotta/20 flex items-center justify-center font-medium text-lg text-brand-terracotta">
-                  {slot.time}
+                <div className="w-16 h-16 rounded-[20px] bg-brand-white border border-brand-mist flex flex-col items-center justify-center">
+                  <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">{schedule.startTime}</span>
+                  <div className="w-4 h-0.5 bg-brand-mist my-1" />
+                  <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">{schedule.endTime}</span>
                 </div>
                 <div>
-                  <p className="font-medium text-brand-stone">Horário bloqueado</p>
-                  <p className="text-[10px] text-brand-stone/60 uppercase tracking-widest">
-                    {slot.reason || 'Indisponível'}
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-serif text-lg text-brand-ink">Horário Bloqueado</p>
+                    {schedule.isRecurring && (
+                      <RefreshCw size={12} className="text-brand-terracotta animate-spin-slow" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-brand-stone uppercase tracking-widest font-medium opacity-60">
+                      {schedule.reason || 'Indisponível'}
+                    </span>
+                    {schedule.customReason && (
+                      <span className="text-[10px] text-brand-stone font-light italic">
+                         • {schedule.customReason}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <button
-                onClick={() => handleUnblockSlot(slot.id)}
-                className="w-10 h-10 flex items-center justify-center bg-brand-white text-brand-stone rounded-full hover:bg-brand-terracotta hover:text-brand-white transition-all border border-brand-mist"
+                onClick={() => handleUnblockSchedule(schedule.id)}
+                className="w-10 h-10 flex items-center justify-center bg-brand-white text-brand-stone rounded-full hover:bg-brand-terracotta hover:text-brand-white transition-all border border-brand-mist shadow-sm"
                 title="Remover bloqueio"
               >
                 <X size={16} />
@@ -380,6 +365,15 @@ export default function AgendaPage() {
           ))}
         </div>
       </main>
+
+      <BlockAvailabilityModal 
+        open={isBlockModalOpen}
+        onClose={() => setIsBlockModalOpen(false)}
+        selectedDate={selectedDate}
+        professionalId={user?.uid || ''}
+        appointments={appointments}
+        workingHours={profile?.workingHours || {}}
+      />
 
       <AnimatePresence>
         {isManualModalOpen && (
@@ -484,75 +478,6 @@ export default function AgendaPage() {
                   className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {isCreating ? 'Criando...' : 'Confirmar Agendamento'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {isBlockModalOpen && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsBlockModalOpen(false)}
-              className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-brand-white rounded-[32px] p-8 shadow-2xl border border-brand-mist"
-            >
-              <button onClick={() => setIsBlockModalOpen(false)} className="absolute top-6 right-6 p-2 text-brand-stone hover:text-brand-ink transition-colors">
-                <X size={20} />
-              </button>
-
-              <h3 className="text-2xl font-serif text-brand-ink mb-2">Bloquear Horário</h3>
-              <p className="text-sm text-brand-stone font-light mb-8">
-                Bloqueie horários específicos para evitar agendamentos em momentos indisponíveis.
-              </p>
-
-              <div className="space-y-5">
-                <div>
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Data</label>
-                  <input
-                    type="date"
-                    value={blockDate}
-                    onChange={(e) => setBlockDate(e.target.value)}
-                    min={getTodayLocale()}
-                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Horário *</label>
-                  <input
-                    type="time"
-                    value={blockTime}
-                    onChange={(e) => setBlockTime(e.target.value)}
-                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">Motivo (opcional)</label>
-                  <input
-                    type="text"
-                    value={blockReason}
-                    onChange={(e) => setBlockReason(e.target.value)}
-                    placeholder="Ex: Almoço, Consulta médica, Férias..."
-                    className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
-                  />
-                </div>
-
-                <button
-                  onClick={handleBlockSlot}
-                  disabled={!blockTime || isBlocking}
-                  className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {isBlocking ? 'Bloqueando...' : 'Confirmar Bloqueio'}
                 </button>
               </div>
             </motion.div>
