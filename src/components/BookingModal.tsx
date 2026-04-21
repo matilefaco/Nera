@@ -8,9 +8,9 @@ import {
   Share2, Heart, Sparkles, LogOut, Settings
 } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db, createBookingRequest, handleBookingError } from '../firebase';
-import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule } from '../types';
-import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay } from '../lib/utils';
+import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } from '../firebase';
+import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, WaitlistEntry } from '../types';
+import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage } from '../lib/utils';
 import { getAvailableSlots } from '../lib/bookingUtils';
 import { toast } from 'sonner';
 import PremiumButton from './PremiumButton';
@@ -22,9 +22,10 @@ interface BookingModalProps {
   onClose: () => void;
   open: boolean;
   initialService?: Service | null;
+  waitlistEntry?: WaitlistEntry | null;
 }
 
-export default function BookingModal({ profile, services, onClose, open, initialService }: BookingModalProps) {
+export default function BookingModal({ profile, services, onClose, open, initialService, waitlistEntry }: BookingModalProps) {
   const [step, setStep] = useState(2);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -42,7 +43,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [appointmentToken, setAppointmentToken] = useState<string | null>(null);
   const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
-  const [blockedSchedules, setBlockedSchedules] = useState<BlockedSchedule[]>([]);
+  const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [showRestoreDraft, setShowRestoreDraft] = useState(false);
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
 
@@ -55,7 +56,17 @@ export default function BookingModal({ profile, services, onClose, open, initial
       // If it's null, we allow the "Restore Draft" logic to take over later if no service is selected
       if (initialService) {
         setSelectedService(initialService);
-        setShowRestoreDraft(false); // Hide the restore prompt if a specific service was chosen
+        setShowRestoreDraft(false); 
+      } else if (waitlistEntry) {
+        const service = services.find(s => s.id === waitlistEntry.serviceId);
+        if (service) setSelectedService(service);
+        setSelectedDate(waitlistEntry.requestedDate);
+        if (waitlistEntry.preferredTime) setSelectedTime(waitlistEntry.preferredTime);
+        if (waitlistEntry.assignedTime) setSelectedTime(waitlistEntry.assignedTime);
+        setClientName(waitlistEntry.clientName);
+        setClientPhone(waitlistEntry.clientWhatsapp);
+        setShowRestoreDraft(false);
+        setStep(4); // Pre-filled, let's go straight to confirmation
       } else if (!selectedService) {
         // Only reset if we don't have a selection already (to avoid flickering if re-rendering)
         setSelectedService(null);
@@ -257,34 +268,46 @@ export default function BookingModal({ profile, services, onClose, open, initial
   }, [selectedDate, availableSlots]);
 
   useEffect(() => {
-    if (selectedDate && profile?.uid && open) {
-      setIsLoadingSlots(true);
-      
-      const blockedRef = collection(db, 'blocked_schedules');
-      const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
-      
-      const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', profile.uid)), (snap) => {
+    if (!selectedDate || !profile?.uid || !open) return;
+
+    setIsLoadingSlots(true);
+
+    // Listener de bloqueios novos (blocked_schedules)
+    const blockedRef = collection(db, 'blocked_schedules');
+    const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
+
+    const unsubBlocked = onSnapshot(
+      query(blockedRef, where('professionalId', '==', profile.uid)),
+      (snap) => {
         const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        // Filtrar bloqueios aplicáveis para esta data
         const dayBlocked = allBlocked.filter(b => {
           const isToday = b.date === selectedDate;
-          const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-          return isToday || isRecurringToday;
+          const isRecurring = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+          return isToday || isRecurring;
         });
         setBlockedSchedules(dayBlocked);
-      });
+      }
+    );
 
-      const apptsRef = collection(db, 'appointments');
-      const apptsQ = query(apptsRef, where('professionalId', '==', profile.uid), where('date', '==', selectedDate), where('status', 'in', ['pending', 'confirmed', 'completed']));
-      const unsubAppts = onSnapshot(apptsQ, (snapshot) => {
-        setDayAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment)));
-        setIsLoadingSlots(false);
-      });
+    // Listener de agendamentos para excluir slots ocupados
+    const apptsRef = collection(db, 'appointments');
+    const apptsQ = query(
+      apptsRef, 
+      where('professionalId', '==', profile.uid), 
+      where('date', '==', selectedDate), 
+      where('status', 'in', ['pending', 'confirmed', 'completed'])
+    );
+    
+    const unsubAppts = onSnapshot(apptsQ, (snapshot) => {
+      setDayAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment)));
+      setIsLoadingSlots(false);
+    });
 
-      return () => {
-        unsubBlocked();
-        unsubAppts();
-      };
-    }
+    return () => {
+      unsubBlocked();
+      unsubAppts();
+    };
   }, [selectedDate, profile?.uid, open]);
 
   const calculateTotalPrice = () => {
@@ -314,6 +337,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       const { bookingId, token } = await createBookingRequest({
         professionalId: profile.uid,
         professionalName: profile.name,
+        professionalWhatsapp: profile.whatsapp,
         serviceId: selectedService.id,
         serviceName: selectedService.name,
         duration: selectedService.duration,
@@ -332,6 +356,12 @@ export default function BookingModal({ profile, services, onClose, open, initial
       setAppointmentId(bookingId);
       setAppointmentToken(token);
       setBookingSuccess(true);
+      
+      // If booking from waitlist, mark it as booked
+      if (waitlistEntry?.id) {
+        await markWaitlistAsBooked(waitlistEntry.id);
+      }
+
       localStorage.removeItem('booking_draft');
       setTimeout(() => {
         setStep(5);
@@ -703,7 +733,21 @@ export default function BookingModal({ profile, services, onClose, open, initial
                   </Link>
                 )}
 
-                <a href={buildWhatsappLink(profile?.whatsapp || '', 'Olá! Acabei de solicitar um horário para ' + selectedService?.name + ' pelo Nera e gostaria de confirmar os detalhes.')} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist sm:col-span-2"><MessageCircle size={14} /> Falar com a profissional</a>
+                <a 
+                  href={buildWhatsappLink(
+                    profile?.whatsapp || '', 
+                    generateBookingConfirmationMessage(
+                      selectedService?.name || '',
+                      selectedDate,
+                      selectedTime
+                    )
+                  )} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist sm:col-span-2"
+                >
+                  <MessageCircle size={14} /> Falar com a profissional
+                </a>
               </div>
               <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-6 md:p-8 mt-8 md:mt-12 text-center w-full">
                 <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm"><Heart size={24} className="fill-brand-terracotta/10" /></div>

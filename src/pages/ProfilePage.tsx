@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, storage, auth, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem, deletePortfolioItem } from '../firebase';
@@ -32,6 +32,24 @@ const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+
+  const profileCompleteness = useMemo(() => {
+    if (!profile) return 0;
+    const fields = [
+      !!profile.avatar,           // 15 pts — foto
+      !!profile.bio,              // 15 pts — bio
+      !!profile.headline,         // 10 pts — headline
+      !!profile.instagram,        // 10 pts — instagram
+      (profile.portfolio?.length || 0) >= 3,  // 20 pts — portfolio com 3+ fotos
+      (profile.professionalIdentity?.differentials?.length || 0) >= 2, // 10 pts
+      !!profile.professionalIdentity?.yearsExperience, // 10 pts
+      !!profile.studioAddress?.street || (profile.serviceAreas?.length || 0) > 0, // 10 pts
+    ];
+    const pts = [15,15,10,10,20,10,10,10];
+    let total = 0;
+    fields.forEach((f, i) => { if (f) total += pts[i]; });
+    return total;
+  }, [profile]);
   
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const portfolioInputRef = useRef<HTMLInputElement>(null);
@@ -376,47 +394,29 @@ export default function ProfilePage() {
           </Link>
         </header>
 
-        {/* Profile Completion Guidance (Internal Only) */}
-        {profile && (
-          <div className="mb-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-            {!profile.bio && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-brand-linen/50 border border-brand-mist p-6 rounded-[32px] flex items-start gap-4">
-                <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm">
-                  <Sparkles size={18} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-serif text-brand-ink mb-1">Bio ausente</h4>
-                  <p className="text-[10px] text-brand-stone leading-relaxed">Perfis com biografia convertem até 40% mais. Conte sua história!</p>
-                </div>
-              </motion.div>
-            )}
-            {(!portfolio || portfolio.length < 3) && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-brand-linen/50 border border-brand-mist p-6 rounded-[32px] flex items-start gap-4">
-                <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm">
-                  <Camera size={18} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-serif text-brand-ink mb-1">
-                    {!portfolio || portfolio.length === 0 ? 'Portfólio vazio' : 'Portfólio incompleto'}
-                  </h4>
-                  <p className="text-[10px] text-brand-stone leading-relaxed">
-                    {!portfolio || portfolio.length === 0 
-                      ? 'Adicione fotos do seu trabalho para passar confiança.' 
-                      : `Você tem ${portfolio.length} foto(s). Recomendamos pelo menos 3.`}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-            {(!profile.professionalIdentity?.differentials || profile.professionalIdentity.differentials.length === 0) && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-brand-linen/50 border border-brand-mist p-6 rounded-[32px] flex items-start gap-4">
-                <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm">
-                  <ShieldCheck size={18} />
-                </div>
-                <div>
-                  <h4 className="text-sm font-serif text-brand-ink mb-1">Diferenciais</h4>
-                  <p className="text-[10px] text-brand-stone leading-relaxed">Destaque o que torna seu atendimento único e premium.</p>
-                </div>
-              </motion.div>
+        {profileCompleteness < 100 && (
+          <div className="mb-12 p-8 bg-brand-white border border-brand-mist rounded-[40px] shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone">
+                Completude do Seu Perfil
+              </span>
+              <span className="text-[12px] font-bold text-brand-terracotta">{profileCompleteness}%</span>
+            </div>
+            <div className="w-full h-2 bg-brand-mist rounded-full overflow-hidden mb-4">
+              <div 
+                className="h-full bg-brand-terracotta rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${profileCompleteness}%` }}
+              />
+            </div>
+            {profileCompleteness < 100 && (
+              <p className="text-[10px] text-brand-stone font-light leading-relaxed max-w-lg">
+                Para atrair mais clientes, seu perfil precisa estar completo: {' '}
+                {!profile?.avatar ? <span className="font-medium text-brand-terracotta">Adicione uma foto. </span> : ''}
+                {!profile?.bio ? <span className="font-medium text-brand-terracotta">Escreva sua bio. </span> : ''}
+                {(profile?.portfolio?.length || 0) < 3 ? <span className="font-medium text-brand-terracotta">Suba 3 fotos na galeria. </span> : ''}
+                {!profile?.instagram ? <span className="font-medium text-brand-terracotta">Conecte seu Instagram. </span> : ''}
+                {!profile?.professionalIdentity?.yearsExperience ? <span className="font-medium text-brand-terracotta">Informe sua experiência. </span> : ''}
+              </p>
             )}
           </div>
         )}

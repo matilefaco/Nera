@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Zap, Instagram, ChevronRight, MapPin, Home } from 'lucide-react';
+import { ShieldCheck, Zap, Instagram, ChevronRight, MapPin, Home, Users, Star } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import PremiumButton from '../PremiumButton';
 import { UserProfile, Service } from '../../types';
@@ -11,9 +11,21 @@ interface PublicHeroProps {
   nextSlot: { date: string; time: string } | null;
   onBookingClick: (service?: Service) => void;
   heroBio?: string;
+  stats?: { averageRating: number; totalCompletedBookings: number } | null;
+  isAgendaFull?: boolean;
+  onWaitlistClick?: () => void;
 }
 
-export const PublicHero = ({ profile, services, nextSlot, onBookingClick, heroBio }: PublicHeroProps) => {
+export const PublicHero = ({ 
+  profile, 
+  services, 
+  nextSlot, 
+  onBookingClick, 
+  heroBio,
+  stats,
+  isAgendaFull,
+  onWaitlistClick
+}: PublicHeroProps) => {
   const firstName = profile.name.split(' ')[0];
   const lastName = profile.name.split(' ').slice(1).join(' ');
 
@@ -70,6 +82,27 @@ export const PublicHero = ({ profile, services, nextSlot, onBookingClick, heroBi
                 )}
               </span>
             </div>
+
+            {stats && (stats.totalCompletedBookings > 10 || stats.averageRating > 4) && (
+              <div className="flex flex-wrap gap-3">
+                {stats.totalCompletedBookings > 10 && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
+                    <Users size={12} className="text-brand-terracotta" />
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
+                      +{stats.totalCompletedBookings} atendimentos
+                    </span>
+                  </div>
+                )}
+                {stats.averageRating >= 4.5 && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
+                    <Star size={12} className="text-brand-terracotta fill-brand-terracotta" />
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
+                      {stats.averageRating.toFixed(1)} avaliação
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {nextSlot && (
@@ -87,11 +120,11 @@ export const PublicHero = ({ profile, services, nextSlot, onBookingClick, heroBi
 
           <div className="flex flex-wrap items-center gap-6">
             <PremiumButton
-              onClick={() => onBookingClick(services[0])}
+              onClick={() => isAgendaFull ? onWaitlistClick?.() : onBookingClick(services[0])}
               variant="terracotta"
               className="px-10 py-5 text-[10px] tracking-[0.22em] shadow-xl"
             >
-              Reservar agora
+              {isAgendaFull ? 'Entrar na lista de espera' : 'Reservar agora'}
               <ChevronRight size={14} className="ml-2" />
             </PremiumButton>
 

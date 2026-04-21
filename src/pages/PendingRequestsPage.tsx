@@ -16,6 +16,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/utils';
+import { getClientScore } from '../lib/clientUtils';
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
 
@@ -23,6 +24,7 @@ export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [truePending, setTruePending] = useState<Appointment[]>([]);
+  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [localRequests, setLocalRequests] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -83,7 +85,20 @@ export default function PendingRequestsPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const qAll = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', user.uid)
+    );
+
+    const unsubAll = onSnapshot(qAll, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+      setAllAppointments(docs);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubAll();
+    };
   }, [user]);
 
   // Sync localRequests to include items being confirmed/handling WhatsApp
@@ -108,6 +123,34 @@ export default function PendingRequestsPage() {
       });
     });
   }, [truePending, confirmedId]);
+
+  // Internal notification listener for waitlist alerts
+  useEffect(() => {
+    if (loading || localRequests.length === 0) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const token = params.get('token');
+    const action = params.get('action');
+
+    if (id && token) {
+      const target = localRequests.find(r => r.id === id);
+      if (target && target.token === token) {
+        // Clear params from URL to prevent re-triggering
+        window.history.replaceState({}, '', window.location.pathname);
+
+        if (action === 'confirm') {
+          handleRespond(id, 'confirmed');
+        } else if (action === 'reject') {
+          setRequestToReject(target);
+          setIsConfirmRejectOpen(true);
+        } else {
+          setSelectedRequest(target);
+          setIsModalOpen(true);
+        }
+      }
+    }
+  }, [loading, localRequests]);
 
   const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled') => {
     setProcessingId(id);
@@ -232,7 +275,24 @@ export default function PendingRequestsPage() {
 
                     <div className="flex justify-between items-start mb-6">
                       <div>
-                        <h3 className="text-2xl md:text-3xl font-serif text-brand-ink mb-1">{request.clientName}</h3>
+                        <div className="flex flex-wrap items-center gap-3 mb-1">
+                          <h3 className="text-2xl md:text-3xl font-serif text-brand-ink">{request.clientName}</h3>
+                          {(() => {
+                            const score = getClientScore(allAppointments, request.clientWhatsapp);
+                            if (!score) return null;
+                            const config = {
+                              reliable: { label: 'Cliente Fiel', className: 'bg-green-50 text-green-700 border-green-200' },
+                              attention: { label: 'Atenção', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+                              risk: { label: 'Histórico de Faltas', className: 'bg-red-50 text-red-600 border-red-200' }
+                            };
+                            const c = config[score];
+                            return (
+                              <span className={`text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${c.className}`}>
+                                {c.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
                         <span className="text-[10px] text-brand-terracotta uppercase tracking-[0.2em] font-bold">
                           {request.serviceName}
                         </span>

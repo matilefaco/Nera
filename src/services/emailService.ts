@@ -146,3 +146,66 @@ export async function sendBookingConfirmationEmail(data: BookingEmailData) {
     throw err;
   }
 }
+
+/**
+ * Sends a 24h reminder email to the professional.
+ */
+export async function send24hReminderEmail(data: BookingEmailData) {
+  const { 
+    clientName, 
+    serviceName, 
+    date, 
+    time, 
+    location, 
+    professionalEmail,
+    professionalName,
+    bookingId
+  } = data;
+
+  const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const agendaUrl = `${process.env.APP_URL || 'http://localhost:3000'}/agenda?appointment=${bookingId}`;
+
+  try {
+    const { data: resendData, error } = await resend.emails.send({
+      from: 'Nera <agendamentos@nerabeauty.com.br>',
+      to: [professionalEmail],
+      subject: `Lembrete: Agendamento amanhã (${clientName})`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1a1a1a;">
+          <h1 style="color: #2D2424; font-size: 24px; margin-bottom: 24px;">Lembrete de Agendamento 🔔</h1>
+          
+          <p>Olá, ${professionalName}! Passando para lembrar que você tem um agendamento amanhã.</p>
+          
+          <div style="background-color: #F9F7F5; border-radius: 12px; padding: 24px; margin: 24px 0;">
+            <p style="margin: 0 0 12px 0;"><strong>Cliente:</strong> ${clientName}</p>
+            <p style="margin: 0 0 12px 0;"><strong>Serviço:</strong> ${serviceName}</p>
+            <p style="margin: 0 0 12px 0;"><strong>Data:</strong> ${formattedDate}</p>
+            <p style="margin: 0 0 12px 0;"><strong>Horário:</strong> ${time}</p>
+            <p style="margin: 0 0 12px 0;"><strong>Local:</strong> ${location}</p>
+          </div>
+          
+          <p style="margin-bottom: 32px;">Considere enviar uma mensagem de confirmação para sua cliente hoje para garantir o comparecimento.</p>
+          
+          <a href="${agendaUrl}" style="background-color: #2D2424; color: #ffffff; padding: 16px 32px; border-radius: 100px; text-decoration: none; font-weight: bold; display: inline-block;">
+            Ver na minha Agenda
+          </a>
+          
+          <p style="margin-top: 48px; font-size: 12px; color: #999;">
+            Este é um e-mail automático enviado pelo sistema Nera.
+          </p>
+        </div>
+      `,
+    });
+
+    if (error) throw error;
+    return { success: true, id: resendData?.id };
+  } catch (err) {
+    console.error('[EmailService] Reminder email failed:', err);
+    throw err;
+  }
+}

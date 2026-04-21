@@ -154,6 +154,47 @@ export function formatWhatsappDisplay(raw: string): string {
 }
 
 /**
+ * Generates a premium WhatsApp invitation message for the waitlist.
+ */
+export function generateWaitlistInviteMessage(
+  clientName: string, 
+  date: string, 
+  time: string, 
+  slug: string, 
+  entryId: string,
+  proName: string = 'Nera'
+): string {
+  const firstName = clientName.split(' ')[0];
+  const isToday = date === getTodayLocale();
+  const dateFormatted = isToday ? 'hoje' : formatLocalDate(date, { day: 'numeric', month: 'long' });
+  const baseUrl = window.location.origin;
+
+  return `Olá, ${firstName}! ✨ Notícia especial: uma vaga acabou de abrir na agenda de ${proName} para ${dateFormatted}, às ${time}.
+
+Como você está na nossa lista prioritária, reservamos este horário exclusivamente para você pelos próximos 15 minutos. 
+
+Deseja aproveitar? Garanta sua reserva aqui: ${baseUrl}/p/${slug}?w=${entryId}`;
+}
+
+/**
+ * Generates a premium WhatsApp confirmation message for bookings.
+ */
+export function generateBookingConfirmationMessage(
+  serviceName: string,
+  date: string,
+  time: string
+): string {
+  const dateFormatted = formatLocalDate(date, { day: 'numeric', month: 'long' });
+  
+  return `Oi! Acabei de realizar uma reserva para o serviço *${serviceName}* pelo seu perfil no Nera. ✨ 
+
+🗓️ Data: ${dateFormatted}
+⏰ Horário: ${time}
+
+Poderia me confirmar se está tudo certo?`;
+}
+
+/**
  * Builds a standard WhatsApp chat link.
  */
 export function buildWhatsappLink(raw: string, message?: string): string {

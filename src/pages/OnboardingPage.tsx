@@ -366,12 +366,11 @@ export default function OnboardingPage() {
       if (!specialty.trim()) errors.specialty = 'Sua especialidade é obrigatória';
       if (!slug.trim()) errors.slug = 'O link da sua vitrine é obrigatório';
       if (slug.length < 3) errors.slug = 'O link deve ter pelo menos 3 caracteres';
-      if (!whatsapp.trim()) errors.whatsapp = 'O WhatsApp de contato é obrigatório';
       
-      // Basic WhatsApp validation (at least 10 digits)
-      const digits = cleanWhatsapp(whatsapp);
-      if (whatsapp.trim() && (digits.length < 10 || digits.length > 11)) {
-        errors.whatsapp = 'Informe um WhatsApp válido com DDD';
+      // WhatsApp validation
+      if (!whatsapp || cleanWhatsapp(whatsapp).length < 10) {
+        toast.error('Informe seu WhatsApp — você receberá os agendamentos por lá.');
+        return;
       }
 
       const activeServices = services.filter(s => s.name.trim() !== '');

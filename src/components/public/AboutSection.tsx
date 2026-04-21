@@ -21,14 +21,14 @@ export const AboutSection = ({ profile, aboutBio }: AboutSectionProps) => {
           className="relative"
         >
           <img
-            src={profile.avatar}
-            alt="Profissional"
+            src={profile.portfolio?.[0]?.url || profile.avatar}
+            alt="Trabalho"
             className="w-full aspect-[4/5] object-cover rounded-[48px] filter saturate-[0.8] grayscale-[0.2]"
             referrerPolicy="no-referrer"
           />
           <img
-            src={profile.portfolio?.[0]?.url || profile.avatar}
-            alt="Trabalho"
+            src={profile.avatar || profile.portfolio?.[0]?.url}
+            alt="Profissional"
             className="absolute -bottom-8 -right-8 w-1/2 aspect-square object-cover rounded-[32px] border-8 border-brand-parchment shadow-2xl hidden md:block"
             referrerPolicy="no-referrer"
           />

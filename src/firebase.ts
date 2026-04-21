@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, indexedDBLocalPersistence } from 'firebase/auth';
-import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
@@ -250,6 +250,13 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
     throw new Error('Dados de agendamento incompletos');
   }
 
+  // Gerar token único para o link permanente da reserva
+  const generateToken = () => {
+    return Math.random().toString(36).substring(2, 9) + 
+           Math.random().toString(36).substring(2, 9) + 
+           Date.now().toString(36);
+  };
+
   const slotId = `${appointmentData.date}_${appointmentData.time}`;
   const lockId = `${appointmentData.professionalId}_${slotId}`;
   const lockRef = doc(db, 'blocked_slots', lockId);
@@ -264,7 +271,7 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
 
       const cleanedData = removeEmptyFields(appointmentData);
       const apptRef = doc(collection(db, 'appointments'));
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const token = generateToken();
       
       transaction.set(apptRef, {
         ...cleanedData,
@@ -291,7 +298,8 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
     await notify('NEW_BOOKING_REQUEST', {
       appointmentId: result.bookingId,
       token: result.token,
-      ...appointmentData
+      ...appointmentData,
+      professionalWhatsapp: appointmentData.professionalWhatsapp || ''
     });
     
     return { bookingId: result.bookingId, token: result.token };
@@ -392,7 +400,10 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
     };
 
     if (notificationMap[newStatus]) {
-      notify(notificationMap[newStatus], result);
+      notify(notificationMap[newStatus], {
+        ...result,
+        professionalWhatsapp: result.professionalWhatsapp || ''
+      });
     }
 
     // Trigger waitlist check if cancelled
@@ -479,7 +490,11 @@ export async function cancelBookingByClient(appointmentId: string, reason?: stri
 
 export async function getAppointmentByToken(token: string): Promise<Appointment | null> {
   console.log(`[Firestore] Fetching appointment by token...`);
-  const q = query(collection(db, 'appointments'), where('token', '==', token));
+  const q = query(
+    collection(db, 'appointments'), 
+    where('token', '==', token),
+    limit(1)
+  );
   const snap = await getDocs(q);
   if (snap.empty) return null;
   return { id: snap.docs[0].id, ...snap.docs[0].data() } as Appointment;
@@ -642,4 +657,27 @@ export async function triggerWaitlistCheck(professionalId: string, date: string,
   } catch (e) {
     console.error('[Waitlist] Trigger check failed:', e);
   }
+}
+
+/**
+ * Manually invites a person from the waitlist
+ */
+export async function inviteFromWaitlist(entryId: string, time: string) {
+  const expiresAt = new Date(Date.now() + 15 * 60000); // 15 mins
+  await updateDoc(doc(db, 'waitlist', entryId), {
+    status: 'invited',
+    invitationSentAt: serverTimestamp(),
+    invitationExpiresAt: expiresAt.toISOString(),
+    assignedTime: time
+  });
+}
+
+/**
+ * Marks a waitlist entry as booked
+ */
+export async function markWaitlistAsBooked(entryId: string) {
+  await updateDoc(doc(db, 'waitlist', entryId), {
+    status: 'booked',
+    bookedAt: serverTimestamp()
+  });
 }

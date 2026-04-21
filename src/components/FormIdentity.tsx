@@ -274,9 +274,12 @@ export const FormIdentity = ({
             <div className="space-y-2">
               {showLabels && (
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                  WhatsApp de Contato <span className="text-brand-terracotta">*</span>
+                  WhatsApp da Profissional <span className="text-brand-terracotta">*</span>
                 </label>
               )}
+              <p className="text-[10px] text-brand-stone font-light mt-1 ml-1">
+                Você receberá novos agendamentos por aqui. Essencial para o funcionamento.
+              </p>
               <input 
                 type="tel" 
                 value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 

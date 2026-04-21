@@ -1,21 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, auth, updateAppointmentStatus, handleBookingError } from '../firebase';
+import { db, auth, updateAppointmentStatus, handleBookingError, inviteFromWaitlist } from '../firebase';
 import { 
   collection, query, where, onSnapshot, orderBy, doc, updateDoc, 
-  addDoc, deleteDoc, serverTimestamp 
+  addDoc, deleteDoc, serverTimestamp, limit 
 } from 'firebase/firestore';
 import { 
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp, Heart,
   ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
-  AlertCircle, ShieldCheck
+  AlertCircle, ShieldCheck, Lock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/utils';
+import { formatCurrency, getTodayLocale, buildWhatsappLink, generateWaitlistInviteMessage, cn, formatDateKey } from '../lib/utils';
+import { getClientScore } from '../lib/clientUtils';
 import Logo from '../components/Logo';
 import { Appointment, WaitlistEntry } from '../types';
 import { AnimatePresence } from 'motion/react';
@@ -47,23 +48,13 @@ export default function Dashboard() {
   const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
   const [isUnavailableToday, setIsUnavailableToday] = useState(false);
   const [todayBlockId, setTodayBlockId] = useState<string | null>(null);
+  const [recoveryOpportunities, setRecoveryOpportunities] = useState<any[]>([]);
   const [agendaHealth, setAgendaHealth] = useState({
     confirmedTomorrow: 0,
     pendingClientConfirmation: 0,
     openSlotsToday: 0,
     attendanceRate: 100
   });
-
-  const getClientScore = (whatsapp: string) => {
-    const clientAppts = appointments.filter(a => a.clientWhatsapp === whatsapp);
-    const completed = clientAppts.filter(a => a.status === 'completed').length;
-    const noShow = clientAppts.filter(a => a.status === 'cancelled' && a.cancellationReason?.toLowerCase().includes('no-show')).length;
-    
-    if (noShow >= 2) return 'risk';
-    if (noShow === 1) return 'attention';
-    if (completed >= 2) return 'reliable';
-    return null;
-  };
 
   const getContextualTip = () => {
     if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
@@ -74,6 +65,33 @@ export default function Dashboard() {
   };
 
   const dailyTip = getContextualTip();
+
+  const recoveryOps = useMemo(() => {
+    if (recentChanges.length === 0 || waitlist.length === 0) return [];
+    
+    // Filter only cancellations within recentChanges
+    const cancellations = recentChanges.filter(c => c.status === 'cancelled');
+    
+    const ops: any[] = [];
+    cancellations.forEach(appt => {
+      const hour = parseInt(appt.time.split(':')[0]);
+      const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'night';
+      
+      const luckyCandidates = waitlist.filter(w => 
+        w.requestedDate === appt.date && 
+        (w.period === 'any' || w.period === period || w.preferredTime === appt.time)
+      );
+
+      if (luckyCandidates.length > 0) {
+        ops.push({
+          appointment: appt,
+          candidates: luckyCandidates
+        });
+      }
+    });
+
+    return ops;
+  }, [recentChanges, waitlist]);
 
   useEffect(() => {
     if (!user) return;
@@ -195,33 +213,34 @@ export default function Dashboard() {
       setWeekSummary(summary);
 
       // --- CALCULATE AGENDA HEALTH ---
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-      
-      const confirmedTom = appointments.filter(a => a.date === tomorrowStr && a.status === 'confirmed').length;
-      const pendingClientConf = appointments.filter(a => 
-        (a.date === todayStr || a.date === tomorrowStr) && 
-        a.status === 'confirmed' && 
-        !a.clientConfirmedAt
-      ).length;
-      
-      const completed = appointments.filter(a => a.status === 'completed').length;
-      const noShow = appointments.filter(a => a.status === 'cancelled' && a.cancellationReason?.toLowerCase().includes('no-show')).length;
-      const totalRelevant = completed + noShow;
-      const rate = totalRelevant > 0 ? Math.round((completed / totalRelevant) * 100) : 100;
+      const tomorrowDate = new Date();
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
 
-      // Estimate open slots (mock for now based on total day)
-      // Real would use getAvailableSlots for today
-      const busySlots = appointments.filter(a => a.date === todayStr && (a.status === 'confirmed' || a.status === 'pending')).length;
-      const estimatedTotalDaySlots = 10; // Avg slots per day
-      const openToday = Math.max(0, estimatedTotalDaySlots - busySlots);
+      const confirmedTomorrowAppts = appointments.filter(a => 
+        a.date === tomorrowStr && a.status === 'confirmed'
+      );
+
+      const pendingPresenceAppts = appointments.filter(a => 
+        a.status === 'confirmed' && 
+        !a.clientConfirmedAt &&
+        a.date >= todayStr
+      );
+
+      const completedAll = appointments.filter(a => a.status === 'completed').length;
+      const cancelledNoShow = appointments.filter(a => 
+        a.status === 'cancelled' && 
+        a.cancellationReason?.toLowerCase().includes('no-show')
+      ).length;
+      const attendanceRateCalc = completedAll > 0 
+        ? Math.round((completedAll / (completedAll + cancelledNoShow)) * 100) 
+        : 100;
 
       setAgendaHealth({
-        confirmedTomorrow: confirmedTom,
-        pendingClientConfirmation: pendingClientConf,
-        openSlotsToday: openToday,
-        attendanceRate: rate
+        confirmedTomorrow: confirmedTomorrowAppts.length,
+        pendingClientConfirmation: pendingPresenceAppts.length,
+        openSlotsToday: 0, // Calculado separadamente se necessário
+        attendanceRate: Math.min(100, attendanceRateCalc)
       });
     });
 
@@ -278,6 +297,19 @@ export default function Dashboard() {
       }
     });
 
+    // Internal notification listener for waitlist alerts
+    const unsubInvitedAlert = onSnapshot(query(qWaitlist, where('status', '==', 'invited')), (snap) => {
+      snap.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const data = change.doc.data();
+          toast.info(`Convite enviado para ${data.clientName}! ✨ Vaga sendo preenchida.`, { 
+            icon: <Sparkles size={16} className="text-brand-terracotta" />,
+            duration: 5000 
+          });
+        }
+      });
+    });
+
     return () => {
       unsubToday();
       unsubPending();
@@ -286,8 +318,101 @@ export default function Dashboard() {
       unsubChanges();
       unsubWaitlist();
       unsubStats();
+      unsubTodayBlock();
+      unsubInvitedAlert();
     };
   }, [user, profile]);
+
+  // 5. Pendências urgentes:
+  const urgentTasks = useMemo(() => {
+    const tasks = [];
+    const today = getTodayLocale();
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = formatDateKey(tomorrow);
+    
+    // - clientes sem confirmar (Hoje e amanhã)
+    const unconfirmed = appointments.filter(a => 
+      a.status === 'confirmed' && 
+      !a.clientConfirmedAt && 
+      (a.date === today || a.date === tomorrowStr)
+    );
+    if (unconfirmed.length > 0) {
+      tasks.push({ 
+        id: 'unconfirmed', 
+        type: 'attention', 
+        label: `${unconfirmed.length} cliente${unconfirmed.length > 1 ? 's' : ''} sem confirmar presença`,
+        icon: <Clock size={14} />,
+        color: 'text-amber-600',
+        link: '/agenda'
+      });
+    }
+
+    // - novo pedido (pendentes)
+    if (pendingCount > 0) {
+      tasks.push({
+        id: 'new-requests',
+        type: 'new',
+        label: `${pendingCount} novo${pendingCount > 1 ? 's' : ''} pedido${pendingCount > 1 ? 's' : ''} pendente${pendingCount > 1 ? 's' : ''}`,
+        icon: <Inbox size={14} />,
+        color: 'text-brand-terracotta',
+        link: '/pedidos'
+      });
+    }
+
+    // - cancelamentos recentes (últimas 24h)
+    const now = new Date();
+    const cancelledRecent = appointments.filter(a => {
+      if (a.status !== 'cancelled' || a.lastChangeBy !== 'client') return false;
+      const updatedAt = a.updatedAt ? new Date(
+        typeof a.updatedAt === 'string' ? a.updatedAt : (a.updatedAt as any).toDate?.() || a.updatedAt
+      ) : null;
+      return updatedAt && (now.getTime() - updatedAt.getTime() < 24 * 60 * 60 * 1000);
+    });
+
+    if (cancelledRecent.length > 0) {
+      tasks.push({
+        id: 'recent-cancellations',
+        type: 'cancelled',
+        label: `${cancelledRecent.length} cancelamento${cancelledRecent.length > 1 ? 's' : ''} recente${cancelledRecent.length > 1 ? 's' : ''}`,
+        icon: <AlertCircle size={14} />,
+        color: 'text-red-500',
+        link: '/agenda'
+      });
+    }
+
+    return tasks;
+  }, [appointments, pendingCount]);
+
+  const freeSlotsToday = useMemo(() => {
+    if (!profile?.workingHours) return 0;
+    const startHour = parseInt(profile.workingHours.startTime.split(':')[0]);
+    const endHour = parseInt(profile.workingHours.endTime.split(':')[0]);
+    
+    const today = getTodayLocale();
+    const currentHour = new Date().getHours();
+    
+    // Consider slots from max(startHour, now) to endHour
+    const possibleStart = Math.max(startHour, currentHour);
+    if (possibleStart >= endHour) return 0;
+    
+    const occupiedSlots = new Set(appointments.filter(a => a.date === today && a.status !== 'cancelled').map(a => parseInt(a.time.split(':')[0])));
+    
+    let free = 0;
+    for (let h = possibleStart; h < endHour; h++) {
+      if (!occupiedSlots.has(h)) free++;
+    }
+    return free;
+  }, [profile, appointments]);
+
+  const remainingApptsTodayCount = useMemo(() => {
+    const today = getTodayLocale();
+    const nowHour = new Date().getHours();
+    const nowMin = new Date().getMinutes();
+    const currentTimeStr = `${String(nowHour).padStart(2, '0')}:${String(nowMin).padStart(2, '0')}`;
+    
+    return confirmedToday.filter(a => a.time >= currentTimeStr).length;
+  }, [confirmedToday]);
 
   const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled') => {
     setProcessingId(id);
@@ -345,6 +470,40 @@ export default function Dashboard() {
     }
   };
 
+  const handleInviteFirst = async (op: any) => {
+    const candidate = op.candidates[0];
+    setProcessingId(`invite-${candidate.id}`);
+    try {
+      await inviteFromWaitlist(candidate.id, op.appointment.time);
+      toast.success(`Convite enviado para ${candidate.clientName}!`);
+    } catch (e) {
+      toast.error('Erro ao enviar convite.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleStayBlocked = async (op: any) => {
+    if (!user) return;
+    setProcessingId(`block-${op.appointment.id}`);
+    try {
+      await addDoc(collection(db, 'blocked_schedules'), {
+        professionalId: user.uid,
+        date: op.appointment.date,
+        startTime: op.appointment.time,
+        endTime: op.appointment.time,
+        type: 'manual',
+        reason: 'Manter bloqueado (Recuperação)',
+        createdAt: serverTimestamp()
+      });
+      toast.success('Horário bloqueado manualmente.');
+    } catch (e) {
+      toast.error('Erro ao bloquear horário.');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const toggleWaitlistMode = async () => {
     if (!user) return;
     const newMode = waitlistMode === 'auto' ? 'manual' : 'auto';
@@ -357,6 +516,30 @@ export default function Dashboard() {
       toast.success(`Lista de espera: modo ${newMode === 'auto' ? 'Automático' : 'Manual'} ativado`);
     } catch (e) {
       toast.error('Erro ao atualizar configuração.');
+    }
+  };
+
+  const handleInvite = async (entry: WaitlistEntry) => {
+    setProcessingId(entry.id);
+    try {
+      const time = entry.preferredTime || '15:00'; 
+      await inviteFromWaitlist(entry.id, time);
+      
+      const msg = generateWaitlistInviteMessage(
+        entry.clientName,
+        entry.requestedDate,
+        time,
+        profile?.slug || '',
+        entry.id,
+        profile?.name
+      );
+      
+      window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
+      toast.success('Convite enviado!');
+    } catch (e) {
+      toast.error('Erro ao enviar convite.');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -440,6 +623,128 @@ export default function Dashboard() {
             </div>
         </header>
 
+        {/* AT-A-GLANCE: SEU DIA */}
+        <section className="mb-12">
+          <div className="flex items-center gap-4 mb-6">
+            <h2 className="text-[10px] font-bold text-brand-stone uppercase tracking-[0.3em]">Seu Dia</h2>
+            <div className="h-px flex-1 bg-brand-mist" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6">
+            {/* NEXT BIG CARD */}
+            <div className="md:col-span-2 bg-brand-ink rounded-[40px] p-8 text-white relative overflow-hidden group shadow-xl">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-brand-terracotta/30 transition-colors" />
+              
+              <div className="relative z-10 flex flex-col h-full justify-between gap-6">
+                <div>
+                  <span className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest block mb-4">Próximo Atendimento</span>
+                  {nextAppointment && nextAppointment.date === getTodayLocale() ? (
+                    <div>
+                      <h3 className="text-3xl font-serif mb-2">{nextAppointment.clientName}</h3>
+                      <div className="flex items-center gap-4 opacity-70">
+                        <span className="flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                          <Clock size={12} className="text-brand-terracotta" />
+                          {nextAppointment.time}
+                        </span>
+                        <span className="flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                          <MapPin size={12} className="text-brand-terracotta" />
+                          {nextAppointment.locationType === 'home' ? (nextAppointment.neighborhood || 'Domicílio') : 'Estúdio'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-4">
+                      <p className="text-lg font-serif italic text-brand-linen opacity-60">Nenhum atendimento imediato.</p>
+                      <p className="text-[10px] uppercase tracking-widest mt-2">{confirmedToday.length === 0 ? 'Que tal um café?' : 'Aproveite o intervalo.'}</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex items-center justify-between border-t border-white/10 pt-6">
+                  <div className="flex -space-x-2">
+                    {confirmedToday.slice(0, 3).map((a, i) => (
+                      <div key={a.id} className="w-8 h-8 rounded-full bg-brand-terracotta border-2 border-brand-ink flex items-center justify-center text-[10px] font-bold">
+                        {a.clientName.charAt(0)}
+                      </div>
+                    ))}
+                    {confirmedToday.length > 3 && (
+                      <div className="w-8 h-8 rounded-full bg-brand-stone/40 border-2 border-brand-ink flex items-center justify-center text-[10px] font-bold">
+                        +{confirmedToday.length - 3}
+                      </div>
+                    )}
+                  </div>
+                  <Link to="/agenda" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                    {remainingApptsTodayCount} restantes hoje <ChevronRight size={14} />
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* REVENUE & SLOTS GAUGE */}
+            <div className="space-y-4 lg:space-y-6">
+              <div className="bg-brand-white rounded-[40px] p-8 border border-brand-mist shadow-sm h-full group hover:bg-brand-linen transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Ganhos de Hoje</span>
+                  <div className="p-2 bg-green-50 text-green-600 rounded-xl">
+                    <TrendingUp size={16} />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-2xl font-serif text-brand-ink">{formatCurrency(dailyRevenue)}</h4>
+                  <p className="text-[10px] text-brand-stone mt-1">{confirmedToday.length} atendimentos previstos</p>
+                </div>
+              </div>
+              <div className="bg-brand-white rounded-[40px] p-8 border border-brand-mist shadow-sm h-full group hover:bg-brand-white transition-colors">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Vagas Livres</span>
+                  <div className="p-2 bg-brand-linen text-brand-terracotta rounded-xl">
+                    <Sparkles size={16} />
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className={cn("text-2xl font-serif", freeSlotsToday > 0 ? "text-brand-ink" : "text-brand-stone opacity-40")}>
+                    {freeSlotsToday} {freeSlotsToday === 1 ? 'horário' : 'horários'}
+                  </h4>
+                  <p className="text-[10px] text-brand-stone mt-1">disponíveis para hoje</p>
+                </div>
+              </div>
+            </div>
+
+            {/* PENDENCIES URGENTES */}
+            <div className="bg-brand-rose/5 rounded-[40px] p-8 border border-brand-terracotta/10 shadow-sm flex flex-col h-full overflow-hidden">
+               <div className="flex items-center gap-2 mb-6">
+                 <div className="w-2 h-2 rounded-full bg-brand-terracotta animate-pulse" />
+                 <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Pendências Urgentes</span>
+               </div>
+               
+               <div className="flex-1 space-y-4">
+                 {urgentTasks.length > 0 ? (
+                   urgentTasks.map(task => (
+                    <Link 
+                      key={task.id}
+                      to={task.link}
+                      className="flex items-start gap-4 p-4 bg-white/50 rounded-2xl border border-brand-terracotta/5 hover:bg-white transition-colors group"
+                    >
+                      <div className={cn("w-8 h-8 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0", task.color)}>
+                        {task.icon}
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[11px] font-medium text-brand-ink leading-tight">{task.label}</p>
+                        <span className="text-[9px] text-brand-terracotta uppercase font-bold tracking-tighter group-hover:underline">Resolver →</span>
+                      </div>
+                    </Link>
+                   ))
+                 ) : (
+                   <div className="h-full flex flex-col items-center justify-center text-center py-6 opacity-40">
+                     <CheckCircle2 size={32} className="text-brand-stone mb-2" />
+                     <p className="text-[11px] font-medium text-brand-stone">Zero pendências</p>
+                   </div>
+                 )}
+               </div>
+            </div>
+          </div>
+        </section>
+
         {/* 1. OPERATIONAL SUMMARY BAR */}
         <section className="flex flex-wrap gap-4 mb-12">
           {recentChanges.length > 0 && (
@@ -466,6 +771,62 @@ export default function Dashboard() {
                </button>
             </motion.div>
           )}
+          
+          {/* REAL MONETIZATION: RECOVERY OPPORTUNITIES */}
+          <AnimatePresence>
+            {recoveryOps.map((op, idx) => (
+              <motion.div 
+                key={`recovery-${op.appointment.id}-${idx}`}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="w-full bg-brand-linen border-2 border-brand-terracotta p-6 rounded-[32px] mb-8 shadow-xl flex flex-col md:flex-row items-center gap-6 relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/5 rounded-full blur-3xl -mr-16 -mt-16" />
+                
+                <div className="w-14 h-14 bg-brand-white text-brand-terracotta rounded-full flex items-center justify-center shrink-0 shadow-sm border border-brand-mist">
+                  <TrendingUp size={28} />
+                </div>
+                
+                <div className="flex-1 text-center md:text-left">
+                  <span className="text-[9px] font-bold text-brand-terracotta uppercase tracking-[0.2em] mb-1 block">Oportunidade de Monetização</span>
+                  <p className="text-sm font-serif text-brand-ink mb-1">
+                    Horário de <span className="font-bold">{op.appointment.time}</span> ({op.appointment.date.split('-').reverse().join('/')}) ficou livre.
+                  </p>
+                  <p className="text-[11px] text-brand-stone italic">
+                    Há {op.candidates.length} interessada{op.candidates.length > 1 ? 's' : ''} esperando uma vaga.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button 
+                    onClick={() => handleInviteFirst(op)}
+                    disabled={processingId === `invite-${op.candidates[0].id}`}
+                    className="bg-brand-ink text-brand-white px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md disabled:opacity-50"
+                  >
+                    {processingId === `invite-${op.candidates[0].id}` ? 'Enviando...' : `Chamar ${op.candidates[0].clientName.split(' ')[0]}`}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // Just remove the alert locally
+                      setRecentChanges(prev => prev.filter(c => c.id !== op.appointment.id));
+                      toast.success('Horário liberado para o público.');
+                    }}
+                    className="bg-brand-white border border-brand-mist text-brand-ink px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm"
+                  >
+                    Liberar Público
+                  </button>
+                  <button 
+                    onClick={() => handleStayBlocked(op)}
+                    disabled={processingId === `block-${op.appointment.id}`}
+                    className="bg-brand-white border border-brand-mist text-brand-stone px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-rose/10 hover:text-brand-terracotta transition-all shadow-sm disabled:opacity-50"
+                  >
+                    Manter Bloqueado
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
           {/* SAÚDE DA AGENDA - PREMIUM SECTION */}
           <div className="w-full flex flex-col md:flex-row gap-6 mb-8">
@@ -630,7 +991,24 @@ export default function Dashboard() {
 
                     <div className="flex justify-between items-start mb-6">
                     <div>
-                      <h3 className="text-xl font-serif text-brand-ink mb-1">{request.clientName}</h3>
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="text-xl font-serif text-brand-ink">{request.clientName}</h3>
+                        {(() => {
+                          const score = getClientScore(appointments, request.clientWhatsapp);
+                          if (!score) return null;
+                          const config = {
+                            reliable: { label: 'Cliente Fiel', className: 'bg-green-50 text-green-700 border-green-200' },
+                            attention: { label: 'Atenção', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+                            risk: { label: 'Histórico de Faltas', className: 'bg-red-50 text-red-600 border-red-200' }
+                          };
+                          const c = config[score];
+                          return (
+                            <span className={`text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${c.className}`}>
+                              {c.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <p className="text-[10px] text-brand-terracotta uppercase tracking-widest font-bold tracking-tighter bg-brand-terracotta/5 px-2 py-0.5 rounded inline-block">
                         {request.serviceName}
                       </p>
@@ -692,59 +1070,46 @@ export default function Dashboard() {
             {/* 3. NEXT APPOINTMENT (PRIORITY 2) */}
             <section>
               <div className="flex items-center gap-4 mb-8">
-                <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Próxima Experiência</h2>
+                <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">Agenda de Hoje</h2>
                 <div className="h-px flex-1 bg-brand-mist" />
               </div>
               
-              {nextAppointment ? (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="bg-brand-ink p-10 rounded-[40px] text-brand-white relative overflow-hidden shadow-2xl group"
-                >
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-brand-terracotta/20 rounded-full -mr-32 -mt-32 blur-3xl" />
-                  <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
-                    <div className="flex items-center gap-8">
-                      <div className="w-24 h-24 rounded-[32px] bg-brand-white/10 flex flex-col items-center justify-center border border-white/10 backdrop-blur-md">
-                        <span className="text-[9px] uppercase tracking-[0.2em] text-brand-terracotta font-bold mb-1">
-                          {nextAppointment.date === getTodayLocale() ? 'Agenda de Hoje' : nextAppointment.date.split('-').reverse().slice(0, 2).join('/')}
-                        </span>
-                        <span className="text-3xl font-serif">{nextAppointment.time}</span>
-                      </div>
-                      <div>
-                        <h3 className="text-3xl font-serif mb-2">{nextAppointment.clientName}</h3>
-                        <div className="flex flex-wrap items-center gap-4 opacity-70">
-                          <span className="text-[10px] uppercase tracking-widest font-medium border border-white/20 px-2 py-0.5 rounded">{nextAppointment.serviceName}</span>
-                          <span className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest leading-none">
-                            <MapPin size={10} className="text-brand-terracotta"/> 
-                            <span className="truncate max-w-[120px]">
-                              {nextAppointment.locationType === 'home' ? (nextAppointment.neighborhood || 'Domicílio') : 'Estúdio'}
-                            </span>
-                          </span>
+              {confirmedToday.length > 0 ? (
+                <div className="space-y-4">
+                  {/* Reuse existing list or logic here, but with requested empty state if empty */}
+                  {confirmedToday.map(appt => (
+                    <div 
+                      key={appt.id}
+                      className="bg-white p-6 rounded-[32px] border border-brand-mist flex items-center justify-between group hover:border-brand-terracotta transition-colors shadow-sm"
+                    >
+                      <div className="flex items-center gap-6">
+                        <div className="text-center shrink-0">
+                          <span className="text-xl font-serif text-brand-ink block">{appt.time}</span>
+                          <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest">Início</span>
+                        </div>
+                        <div className="h-10 w-px bg-brand-mist" />
+                        <div>
+                          <h4 className="text-xl font-serif text-brand-ink leading-none mb-1">{appt.clientName}</h4>
+                          <p className="text-[10px] text-brand-terracotta font-bold uppercase tracking-tighter">{appt.serviceName}</p>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <a 
-                        href={buildWhatsappLink(nextAppointment.clientWhatsapp)}
-                        target="_blank"
-                        className="p-4 bg-brand-white/10 rounded-2xl hover:bg-brand-white/20 transition-all border border-white/5"
+                      <Link 
+                        to="/agenda" 
+                        className="w-10 h-10 rounded-full bg-brand-linen flex items-center justify-center text-brand-ink hover:bg-brand-ink hover:text-white transition-all shadow-sm"
                       >
-                        <MessageCircle size={20} />
-                      </a>
-                      <button 
-                        onClick={() => { setSelectedRequest(nextAppointment); setIsModalOpen(true); }}
-                        className="px-8 py-4 bg-brand-terracotta text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg"
-                      >
-                        Ver Detalhes
-                      </button>
+                        <ChevronRight size={20} />
+                      </Link>
                     </div>
-                  </div>
-                </motion.div>
+                  ))}
+                </div>
               ) : (
-                <div className="bg-brand-white border border-brand-mist border-dashed p-12 rounded-[40px] text-center">
-                  <p className="text-brand-stone font-serif italic text-lg">Sua agenda está leve hoje.</p>
-                  <Link to="/agenda" className="text-[10px] font-medium uppercase tracking-widest text-brand-terracotta mt-4 inline-block hover:underline">Abrir Agenda Completa</Link>
+                <div className="bg-brand-white border border-brand-mist border-dashed p-12 rounded-[40px] text-center shadow-inner">
+                  <div className="w-16 h-16 bg-brand-linen rounded-full flex items-center justify-center mx-auto mb-4 text-brand-terracotta">
+                    <Heart size={28} />
+                  </div>
+                  <h3 className="text-xl font-serif text-brand-ink mb-2">Hoje está leve.</h3>
+                  <p className="text-xs text-brand-stone font-light italic max-w-xs mx-auto">Excelente dia para focar em você ou abrir horários extras para suas clientes fiéis.</p>
+                  <Link to="/agenda" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta mt-6 inline-block hover:underline border-b border-brand-terracotta pb-0.5">Abrir Agenda Completa</Link>
                 </div>
               )}
             </section>
@@ -791,17 +1156,21 @@ export default function Dashboard() {
                         <div>
                            <div className="flex items-center gap-2 mb-1">
                              <p className="font-medium text-brand-ink">{appt.clientName}</p>
-                             {getClientScore(appt.clientWhatsapp) && (
-                               <div className={cn(
-                                 "px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-widest",
-                                 getClientScore(appt.clientWhatsapp) === 'reliable' ? "bg-green-100 text-green-700" :
-                                 getClientScore(appt.clientWhatsapp) === 'attention' ? "bg-amber-100 text-amber-700" :
-                                 "bg-red-100 text-red-700"
-                               )}>
-                                 {getClientScore(appt.clientWhatsapp) === 'reliable' ? 'Confiável' :
-                                  getClientScore(appt.clientWhatsapp) === 'attention' ? 'Atenção' : 'Risco'}
-                               </div>
-                             )}
+                             {(() => {
+                                 const score = getClientScore(appointments, appt.clientWhatsapp);
+                                 if (!score) return null;
+                                 return (
+                                   <div className={cn(
+                                     "px-2 py-0.5 rounded-full text-[7px] font-bold uppercase tracking-widest",
+                                     score === 'reliable' ? "bg-green-100 text-green-700" :
+                                     score === 'attention' ? "bg-amber-100 text-amber-700" :
+                                     "bg-red-100 text-red-700"
+                                   )}>
+                                     {score === 'reliable' ? 'Confiável' :
+                                      score === 'attention' ? 'Atenção' : 'Risco'}
+                                   </div>
+                                 );
+                               })()}
                              {(appt.date === getTodayLocale() || appt.date === (new Date(Date.now() + 86400000).toISOString().split('T')[0])) && !appt.clientConfirmedAt && (
                                <div className="px-2 py-0.5 bg-amber-500 text-white rounded-full text-[7px] font-bold uppercase tracking-widest animate-pulse">
                                  Pendente de Confirmação
@@ -1215,22 +1584,29 @@ export default function Dashboard() {
                     <div className="p-5 bg-brand-parchment rounded-[24px] border border-brand-mist">
                        <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-3">Saúde do Cliente</p>
                        <div className="flex items-center gap-3">
-                         <div className={cn(
-                           "w-10 h-10 rounded-full flex items-center justify-center",
-                           getClientScore(selectedRequest.clientWhatsapp) === 'reliable' ? "bg-green-100 text-green-600" :
-                           getClientScore(selectedRequest.clientWhatsapp) === 'attention' ? "bg-amber-100 text-amber-600" :
-                           "bg-red-100 text-red-600"
-                         )}>
-                           <ShieldCheck size={20} />
-                         </div>
-                         <div>
-                            <p className="text-xs font-bold text-brand-ink">
-                              {getClientScore(selectedRequest.clientWhatsapp) === 'reliable' ? 'Perfil Confiável' :
-                               getClientScore(selectedRequest.clientWhatsapp) === 'attention' ? 'Em Atenção' : 
-                               getClientScore(selectedRequest.clientWhatsapp) === 'risk' ? 'Alto Risco' : 'Novo Cliente'}
-                            </p>
-                            <p className="text-[9px] text-brand-stone uppercase tracking-wider">Baseado no histórico</p>
-                         </div>
+                         {(() => {
+                           const score = getClientScore(appointments, selectedRequest.clientWhatsapp);
+                           return (
+                             <>
+                               <div className={cn(
+                                 "w-10 h-10 rounded-full flex items-center justify-center",
+                                 score === 'reliable' ? "bg-green-100 text-green-600" :
+                                 score === 'attention' ? "bg-amber-100 text-amber-600" :
+                                 score === 'risk' ? "bg-red-100 text-red-600" : "bg-brand-linen text-brand-stone"
+                               )}>
+                                 <ShieldCheck size={20} />
+                               </div>
+                               <div>
+                                  <p className="text-xs font-bold text-brand-ink">
+                                    {score === 'reliable' ? 'Perfil Confiável' :
+                                     score === 'attention' ? 'Em Atenção' : 
+                                     score === 'risk' ? 'Alto Risco' : 'Novo Cliente'}
+                                  </p>
+                                  <p className="text-[9px] text-brand-stone uppercase tracking-wider">Baseado no histórico</p>
+                               </div>
+                             </>
+                           );
+                         })()}
                        </div>
                     </div>
                     
@@ -1428,13 +1804,11 @@ export default function Dashboard() {
                           <MessageCircle size={18} />
                         </a>
                         <button 
-                          onClick={() => {
-                            const msg = `Oi ${entry.clientName.split(' ')[0]}! Acabou de vagar um horário ${entry.requestedDate === getTodayLocale() ? 'hoje' : 'para o dia ' + entry.requestedDate.split('-').reverse().join('/')}. Tem interesse? ✨`;
-                            window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
-                          }}
-                          className="px-6 py-3 bg-brand-ink text-brand-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-terracotta transition-all shadow-sm"
+                          onClick={() => handleInvite(entry)}
+                          disabled={processingId === entry.id}
+                          className="px-6 py-3 bg-brand-ink text-brand-white rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-terracotta transition-all shadow-sm disabled:opacity-50 flex items-center justify-center min-w-[100px]"
                         >
-                          Convidar
+                          {processingId === entry.id ? 'Avisando...' : 'Convidar'}
                         </button>
                       </div>
                     </div>

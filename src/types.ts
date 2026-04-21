@@ -77,6 +77,9 @@ export interface UserProfile {
   onboardingStep?: number;
   
   waitlistMode?: 'auto' | 'manual';
+  callmebotApiKey?: string;
+  callmebotPhone?: string;
+  whatsappNotificationsEnabled?: boolean;
   
   createdAt: string;
   updatedAt: string;
@@ -143,11 +146,14 @@ export interface Appointment {
   clientScore?: 'reliable' | 'attention' | 'risk';
   reminder24hSentAt?: any;
   reminder6hSentAt?: any;
+  reviewRequestedAt?: any;
+  reviewedAt?: any;
   waitlistNotifiedAt?: any;
   token: string;
 
   professionalId: string;
   professionalName?: string;
+  professionalWhatsapp?: string;
   
   createdAt: any;
   updatedAt?: any;
@@ -177,7 +183,8 @@ export interface WaitlistEntry {
   serviceName: string;
   period: 'morning' | 'afternoon' | 'night' | 'any';
   preferredTime?: string; // HH:mm
-  status: 'waiting' | 'invited' | 'expired' | 'booked';
+  assignedTime?: string; // HH:mm assigned by system or pro
+  status: 'waiting' | 'invited' | 'expired' | 'booked' | 'cancelled';
   invitationSentAt?: any;
   invitationExpiresAt?: any;
   createdAt: any;

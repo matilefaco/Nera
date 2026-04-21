@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { db, createBookingRequest, handleBookingError } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import PremiumButton from '../components/PremiumButton';
 import BookingModal from '../components/BookingModal';
+import WaitlistModal from '../components/WaitlistModal';
 import { UserProfile, Service, Review, Appointment } from '../types';
 
 import { getAvailableSlots } from '../lib/bookingUtils';
@@ -127,6 +128,9 @@ const PublicProfileSkeleton = () => (
 
 export default function PublicProfile() {
   const { slug } = useParams();
+  const [searchParams] = useSearchParams();
+  const waitlistToken = searchParams.get('w');
+  
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -136,12 +140,14 @@ export default function PublicProfile() {
   const [scrolled, setScrolled] = useState(false);
   
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
   const [preSelectedService, setPreSelectedService] = useState<Service | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showInterestPopup, setShowInterestPopup] = useState(false);
   const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
   const [nextSlot, setNextSlot] = useState<{ date: string, time: string } | null>(null);
   const [totalWeeklySlots, setTotalWeeklySlots] = useState<number | null>(null);
+  const [activeWaitlistEntry, setActiveWaitlistEntry] = useState<any>(null);
 
   const { heroBio, aboutBio } = React.useMemo(() => {
     return splitSmartBio(profile?.bio);
@@ -267,6 +273,34 @@ export default function PublicProfile() {
     fetchData();
   }, [slug]);
 
+  // Handle Waitlist Invitation
+  useEffect(() => {
+    async function checkWaitlist() {
+      if (!waitlistToken || !profile) return;
+      try {
+        const snap = await getDocs(query(collection(db, 'waitlist'), where('__name__', '==', waitlistToken)));
+        if (!snap.empty) {
+          const entry = snap.docs[0].data();
+          // Check expiration
+          if (entry.status === 'invited' && entry.invitationExpiresAt) {
+            const expiry = new Date(entry.invitationExpiresAt);
+            if (expiry > new Date()) {
+              setActiveWaitlistEntry({ id: snap.docs[0].id, ...entry });
+              setPreSelectedService(services.find(s => s.id === entry.serviceId) || null);
+              setIsBookingModalOpen(true);
+              toast.success('Sua vaga reservada está te esperando! ✨');
+            } else {
+              toast.error('Este convite de espera expirou.');
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Waitlist check failed", e);
+      }
+    }
+    checkWaitlist();
+  }, [waitlistToken, profile, services]);
+
   useEffect(() => {
     const findAvailabilityData = async () => {
       if (!profile?.uid || !profile?.workingHours || services.length === 0) return;
@@ -367,9 +401,19 @@ export default function PublicProfile() {
       <AnimatePresence>
         {scrolled && !isBookingModalOpen && !loading && (
           <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[150] md:hidden">
-            <button onClick={() => setIsBookingModalOpen(true)} className="flex items-center gap-3 bg-brand-ink text-brand-white px-7 py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] shadow-2xl hover:bg-brand-terracotta transition-all whitespace-nowrap active:scale-95">
+            <button 
+              onClick={() => {
+                if (urgencyInfo?.isAgendaFull) {
+                  setIsWaitlistOpen(true);
+                } else {
+                  if (services.length > 0) setPreSelectedService(services[0]);
+                  setIsBookingModalOpen(true);
+                }
+              }} 
+              className="flex items-center gap-3 bg-brand-ink text-brand-white px-7 py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] shadow-2xl hover:bg-brand-terracotta transition-all whitespace-nowrap active:scale-95"
+            >
               <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
-              Reservar horário
+              {urgencyInfo?.isAgendaFull ? 'Entrar em lista de espera' : 'Reservar horário'}
               <ArrowRight size={14} />
             </button>
           </motion.div>
@@ -377,22 +421,88 @@ export default function PublicProfile() {
       </AnimatePresence>
 
       <PublicHero 
-        profile={profile} services={services} nextSlot={nextSlot} 
+        profile={profile} 
+        services={services} 
+        nextSlot={nextSlot} 
         heroBio={heroBio}
-        onBookingClick={(s) => { if(s) setPreSelectedService(s); setIsBookingModalOpen(true); }} 
+        stats={stats}
+        isAgendaFull={urgencyInfo?.isAgendaFull}
+        onWaitlistClick={() => setIsWaitlistOpen(true)}
+        onBookingClick={(s) => { 
+          if (urgencyInfo?.isAgendaFull) {
+            setIsWaitlistOpen(true);
+          } else {
+            if(s) setPreSelectedService(s); 
+            setIsBookingModalOpen(true); 
+          }
+        }} 
       />
 
       <div ref={servicesRef}>
         <ServicesSection 
           services={services} 
-          onSelectService={(s) => { setPreSelectedService(s); setIsBookingModalOpen(true); }} 
+          onSelectService={(s) => { 
+            if (urgencyInfo?.isAgendaFull) {
+              setIsWaitlistOpen(true);
+            } else {
+              setPreSelectedService(s); 
+              setIsBookingModalOpen(true); 
+            }
+          }} 
         />
       </div>
 
-      <PortfolioSection portfolio={profile.portfolio || []} onBookingClick={() => setIsBookingModalOpen(true)} />
+      <PortfolioSection 
+        portfolio={profile.portfolio || []} 
+        onBookingClick={() => {
+          if (urgencyInfo?.isAgendaFull) {
+            setIsWaitlistOpen(true);
+          } else {
+            setIsBookingModalOpen(true);
+          }
+        }} 
+      />
       <AboutSection profile={profile} aboutBio={aboutBio} />
       <ReviewsSection reviews={reviews} stats={stats} />
-      <FinalCTA onBookingClick={() => setIsBookingModalOpen(true)} completedBookings={stats?.totalCompletedBookings} />
+      <FinalCTA 
+        onBookingClick={() => {
+          if (urgencyInfo?.isAgendaFull) {
+            setIsWaitlistOpen(true);
+          } else {
+            setIsBookingModalOpen(true);
+          }
+        }} 
+        completedBookings={stats?.totalCompletedBookings} 
+      />
+
+      {urgencyInfo?.isAgendaFull && (
+        <section className="px-6 pb-20 -mt-10">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="max-w-xl mx-auto bg-brand-ink text-brand-white p-10 rounded-[50px] text-center relative overflow-hidden shadow-2xl border border-white/5"
+          >
+            <div className="absolute top-0 right-0 w-40 h-40 bg-brand-terracotta/20 rounded-full -mr-20 -mt-20 blur-3xl opacity-50" />
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-brand-linen/10 rounded-full flex items-center justify-center mx-auto mb-6 text-brand-terracotta">
+                <Users size={32} />
+              </div>
+              <h3 className="text-3xl font-serif mb-4 leading-tight">Agenda lotada?</h3>
+              <p className="text-sm text-brand-stone/80 font-light mb-10 leading-relaxed max-w-xs mx-auto italic">
+                Não se preocupe. Entre na nossa lista de prioridade e seja avisada assim que surgir uma desistência.
+              </p>
+              <PremiumButton 
+                variant="terracotta" 
+                className="w-full py-5"
+                onClick={() => setIsWaitlistOpen(true)}
+              >
+                Entrar na lista de espera
+              </PremiumButton>
+            </div>
+          </motion.div>
+        </section>
+      )}
 
       <footer className="bg-brand-white border-t border-brand-mist py-14 px-6 text-center">
         <div className="max-w-7xl mx-auto flex flex-col items-center gap-7">
@@ -417,7 +527,21 @@ export default function PublicProfile() {
         </div>
       </footer>
 
-      <BookingModal profile={profile} services={services} open={isBookingModalOpen} onClose={() => setIsBookingModalOpen(false)} initialService={preSelectedService} />
+      <BookingModal 
+        profile={profile} 
+        services={services} 
+        open={isBookingModalOpen} 
+        onClose={() => setIsBookingModalOpen(false)} 
+        initialService={preSelectedService} 
+        waitlistEntry={activeWaitlistEntry}
+      />
+      
+      <WaitlistModal 
+        profile={profile} 
+        services={services} 
+        open={isWaitlistOpen} 
+        onClose={() => setIsWaitlistOpen(false)} 
+      />
 
       <AnimatePresence>
         {showInterestPopup && !isBookingModalOpen && (
@@ -441,7 +565,20 @@ export default function PublicProfile() {
                   A agenda da {profile?.name.split(' ')[0]} costuma fechar rápido esta semana.
                 </p>
                 <div className="flex flex-col gap-3">
-                  <PremiumButton variant="terracotta" className="w-full py-4 text-[10px]" onClick={() => { setShowInterestPopup(false); setIsBookingModalOpen(true); }}>Reservar agora</PremiumButton>
+                  <PremiumButton 
+                    variant="terracotta" 
+                    className="w-full py-4 text-[10px]" 
+                    onClick={() => { 
+                      setShowInterestPopup(false); 
+                      if (urgencyInfo?.isAgendaFull) {
+                        setIsWaitlistOpen(true);
+                      } else {
+                        setIsBookingModalOpen(true); 
+                      }
+                    }}
+                  >
+                    {urgencyInfo?.isAgendaFull ? 'Entrar na lista de espera' : 'Reservar agora'}
+                  </PremiumButton>
                   <a href={buildWhatsappLink(profile?.whatsapp)} target="_blank" className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">
                     <MessageCircle size={14} /> Falar no WhatsApp
                   </a>

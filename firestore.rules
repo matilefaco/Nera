@@ -59,6 +59,31 @@ service cloud.firestore {
              data.status in ['pending', 'confirmed', 'cancelled', 'completed', 'expired'];
     }
 
+    function isValidBlockedSchedule(data) {
+      return data.keys().hasAll(['professionalId', 'date', 'type']) &&
+             data.professionalId is string && data.professionalId.size() > 0 &&
+             data.date is string && data.type in ['manual', 'automatic', 'full_day'] &&
+             (!('startTime' in data) || data.startTime is string) &&
+             (!('endTime' in data) || data.endTime is string);
+    }
+
+    function isValidWaitlistEntry(data) {
+      return data.keys().hasAll(['professionalId', 'clientName', 'clientWhatsapp', 'requestedDate', 'serviceId', 'status']) &&
+             data.professionalId is string && data.professionalId.size() > 0 &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.clientWhatsapp is string && data.clientWhatsapp.size() >= 10 &&
+             data.requestedDate is string &&
+             data.status in ['waiting', 'invited', 'expired', 'booked', 'cancelled'];
+    }
+
+    function isValidWaitlistStats(data) {
+      return data.keys().hasAll(['professionalId', 'recoveredSlots', 'savedRevenue', 'totalEntries']) &&
+             data.professionalId is string && 
+             data.recoveredSlots is number &&
+             data.savedRevenue is number &&
+             data.totalEntries is number;
+    }
+
     // Profile Rules
     match /users/{userId} {
       allow read: if true; 
@@ -125,6 +150,28 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
       allow update: if true;
+    }
+
+    match /blocked_schedules/{scheduleId} {
+      // Profissional autenticada pode criar seus próprios bloqueios
+      allow read: if true; // Necessário para BookingModal verificar slots
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid && isValidBlockedSchedule(incoming());
+      allow update: if isSignedIn() && existing().professionalId == request.auth.uid && isValidBlockedSchedule(incoming());
+      allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+    }
+
+    match /waitlist/{entryId} {
+      // Clientes podem criar entradas (sem auth), profissional pode gerenciar as suas
+      allow read: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+      allow create: if isValidWaitlistEntry(incoming()); // Público — cliente entra na lista sem login
+      allow update: if (isSignedIn() && (existing().professionalId == request.auth.uid || isAdmin())) && isValidWaitlistEntry(incoming());
+      allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+    }
+
+    match /waitlist_stats/{statsId} {
+      allow read: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+      // Atualizado via Dashboard ou trigger
+      allow write: if (isSignedIn() && (incoming().professionalId == request.auth.uid || existing().professionalId == request.auth.uid)) || isAdmin();
     }
   }
 }

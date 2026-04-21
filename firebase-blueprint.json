@@ -75,7 +75,8 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "confirmedAt": { "type": "string", "format": "date-time" },
         "declinedAt": { "type": "string", "format": "date-time" },
-        "expiresAt": { "type": "string", "format": "date-time" }
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "reviewRequestedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["professionalId", "serviceId", "clientName", "clientWhatsapp", "clientEmail", "date", "time", "status"]
     },
@@ -161,6 +162,57 @@
         "appointmentId": { "type": "string" }
       },
       "required": ["professionalId", "date", "time"]
+    },
+    "BlockedSchedule": {
+      "title": "Blocked Schedule",
+      "description": "Intervalo ou dia bloqueado na agenda",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "reason": { "type": "string" },
+        "customReason": { "type": "string" },
+        "type": { "type": "string", "enum": ["manual", "automatic", "full_day"] },
+        "isRecurring": { "type": "boolean" },
+        "recurringDays": { "type": "array", "items": { "type": "number" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "date", "type"]
+    },
+    "WaitlistEntry": {
+      "title": "Waitlist Entry",
+      "description": "Entrada na lista de espera prioritária",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientWhatsapp": { "type": "string" },
+        "requestedDate": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "period": { "type": "string", "enum": ["morning", "afternoon", "night", "any"] },
+        "preferredTime": { "type": "string" },
+        "assignedTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "invited", "expired", "booked", "cancelled"] },
+        "invitationSentAt": { "type": "string", "format": "date-time" },
+        "invitationExpiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "clientName", "clientWhatsapp", "requestedDate", "serviceId", "status"]
+    },
+    "WaitlistStats": {
+      "title": "Waitlist Stats",
+      "description": "Estatísticas da lista de espera",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "recoveredSlots": { "type": "number" },
+        "savedRevenue": { "type": "number" },
+        "totalEntries": { "type": "number" }
+      },
+      "required": ["professionalId"]
     }
   },
   "firestore": {
@@ -188,17 +240,29 @@
       "schema": "BlockedSlot",
       "description": "Horários bloqueados"
     },
+    "/blocked_schedules/{scheduleId}": {
+      "schema": "BlockedSchedule",
+      "description": "Bloqueios de agenda inteligentes"
+    },
+    "/waitlist/{entryId}": {
+      "schema": "WaitlistEntry",
+      "description": "Entradas da lista de espera"
+    },
+    "/waitlist_stats/{statsId}": {
+      "schema": "WaitlistStats",
+      "description": "Estatísticas de recuperação da lista"
+    },
     "/review_requests/{requestId}": {
       "schema": "ReviewRequest",
-      "description": "Solicitações de avaliação"
+      "description": "Controle de solicitações de avaliação"
     },
     "/reviews/{reviewId}": {
       "schema": "Review",
-      "description": "Avaliações recebidas"
+      "description": "Avaliação oficial das clientes"
     },
-    "/review_stats/{statsId}": {
+    "/review_stats/{professionalId}": {
       "schema": "ReviewStats",
-      "description": "Estatísticas de avaliações"
+      "description": "Consolidado de reputação da profissional"
     }
   }
 }

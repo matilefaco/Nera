@@ -1,229 +1,277 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  X, Clock, Calendar as CalendarIcon, Check, 
-  Sparkles, MessageCircle, Heart, BellRing,
-  Sunrise, Sun, Moon, Zap
+  X, Calendar as CalendarIcon, Clock, Users, 
+  Check, Sunrise, Sun, Moon, Zap, MessageCircle,
+  ChevronRight, Sparkles
 } from 'lucide-react';
-import { UserProfile, Service, WaitlistEntry } from '../types';
-import { cn, formatWhatsappDisplay, cleanWhatsapp, buildWhatsappLink } from '../lib/utils';
 import { addToWaitlist } from '../firebase';
-import { toast } from 'sonner';
+import { UserProfile, Service, WaitlistEntry } from '../types';
+import { cn, formatDateKey, getTodayLocale, formatLocalDate } from '../lib/utils';
 import PremiumButton from './PremiumButton';
+import { toast } from 'sonner';
 
 interface WaitlistModalProps {
-  profile: UserProfile;
-  services: Service[];
   open: boolean;
   onClose: () => void;
+  profile: UserProfile;
+  services: Service[];
   initialDate?: string;
   initialService?: Service | null;
 }
 
-export default function WaitlistModal({ 
-  profile, 
-  services, 
-  open, 
-  onClose,
-  initialDate,
-  initialService 
-}: WaitlistModalProps) {
-  const [step, setStep] = useState(1);
-  const [clientName, setClientName] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
-  const [selectedService, setSelectedService] = useState<Service | null>(initialService || null);
-  const [selectedDate, setSelectedDate] = useState(initialDate || '');
-  const [period, setPeriod] = useState<WaitlistEntry['period']>('any');
+type Step = 'date' | 'time' | 'contact' | 'success';
+
+export default function WaitlistModal({ open, onClose, profile, services, initialDate, initialService }: WaitlistModalProps) {
+  const [step, setStep] = useState<Step>('date');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    requestedDate: initialDate || getTodayLocale(),
+    period: 'any' as WaitlistEntry['period'],
+    preferredTime: '',
+    clientName: '',
+    clientWhatsapp: '',
+    serviceId: initialService?.id || services[0]?.id || '',
+    serviceName: initialService?.name || services[0]?.name || ''
+  });
+
+  // Re-sync if props change while modal is open (unlikely but safe)
+  React.useEffect(() => {
+    if (open) {
+      if (initialDate) setFormData(prev => ({ ...prev, requestedDate: initialDate }));
+      if (initialService) setFormData(prev => ({ ...prev, serviceId: initialService.id, serviceName: initialService.name }));
+    }
+  }, [open, initialDate, initialService]);
 
   const periods = [
-    { id: 'morning', label: 'Manhã', icon: Sunrise, desc: 'Antes das 12:00' },
-    { id: 'afternoon', label: 'Tarde', icon: Sun, desc: '12:00 às 18:00' },
-    { id: 'night', label: 'Noite', icon: Moon, desc: 'Após às 18:00' },
-    { id: 'any', label: 'Qualquer horário', icon: Zap, desc: 'Preencher primeira vaga' },
+    { id: 'any', label: 'Qualquer horário', icon: Zap },
+    { id: 'morning', label: 'Manhã', icon: Sunrise },
+    { id: 'afternoon', label: 'Tarde', icon: Sun },
+    { id: 'night', label: 'Noite', icon: Moon },
   ];
 
-  const handleSubmit = async () => {
-    if (!clientName || !clientPhone || !selectedService || !selectedDate) {
-      toast.error('Preencha todos os campos obrigatórios.');
+  const handleJoin = async () => {
+    if (!formData.clientName || !formData.clientWhatsapp) {
+      toast.error('Preencha seu nome e WhatsApp.');
       return;
     }
-
+    
     setLoading(true);
     try {
       await addToWaitlist({
         professionalId: profile.uid,
-        clientName,
-        clientWhatsapp: clientPhone.replace(/\D/g, ''),
-        requestedDate: selectedDate,
-        serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        period,
+        ...formData,
         status: 'waiting'
       });
-      setSuccess(true);
-      setStep(3);
+      setStep('success');
     } catch (e) {
-      toast.error('Não foi possível entrar na lista agora. Tente novamente.');
+      toast.error('Erro ao entrar na lista. Tente novamente.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const nextDay = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return formatDateKey(d);
   };
 
   if (!open) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 bg-brand-ink/60 backdrop-blur-md z-[500] flex items-end md:items-center justify-center p-0 md:p-6 overflow-hidden">
+      <div className="fixed inset-0 z-[300] flex items-end md:items-center justify-center p-0 md:p-6 overflow-hidden">
         <motion.div 
-          initial={{ y: "100%" }} 
-          animate={{ y: 0 }} 
-          exit={{ y: "100%" }} 
-          className="bg-brand-white w-full max-w-xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[85vh] overflow-y-auto no-scrollbar"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-brand-ink/40 backdrop-blur-sm"
+        />
+        
+        <motion.div
+          initial={{ y: "100%" }}
+          animate={{ y: 0 }}
+          exit={{ y: "100%" }}
+          className="relative w-full max-w-lg bg-brand-white rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl overflow-y-auto max-h-[92dvh] no-scrollbar"
         >
           <button onClick={onClose} className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors">
             <X size={24} />
           </button>
 
-          {step === 1 && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          {step === 'date' && (
+            <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center shadow-sm">
-                  <Sparkles size={20} />
+                <div className="w-10 h-10 bg-brand-linen text-brand-ink rounded-xl flex items-center justify-center shadow-sm">
+                  <Users size={20} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta">Lista Prioritária</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-ink">Lista Prioritária</span>
               </div>
-              <h3 className="text-3xl font-serif text-brand-ink mb-2 leading-tight">Quer ser a primeira a saber se surgir uma vaga?</h3>
-              <p className="text-sm text-brand-stone font-light mb-10 leading-relaxed">
-                Nossa agenda está cheia, mas desistências acontecem. Entre na fila inteligente e receba um convite prioritário.
-              </p>
+              <h3 className="text-3xl font-serif text-brand-ink mb-2">Lista de Espera</h3>
+              <p className="text-sm text-brand-stone font-light mb-10">Quando surgir uma desistência, você será a primeira a saber.</p>
 
-              <div className="space-y-8">
-                <div className="space-y-4">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Para qual serviço?</label>
-                  <div className="space-y-3">
-                    {services.map(s => (
-                      <button 
-                        key={s.id} 
-                        onClick={() => setSelectedService(s)}
-                        className={cn(
-                          "w-full p-5 text-left rounded-2xl border transition-all flex justify-between items-center",
-                          selectedService?.id === s.id ? "bg-brand-ink border-brand-ink text-brand-white" : "bg-brand-parchment border-brand-mist hover:border-brand-ink"
-                        )}
-                      >
-                        <span className="text-sm font-medium">{s.name}</span>
-                        {selectedService?.id === s.id && <Check size={16} className="text-brand-terracotta" />}
-                      </button>
-                    ))}
+              <div className="space-y-4 mb-10">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-2">Qual dia você prefere?</p>
+                <div className="grid grid-cols-1 gap-3">
+                  <button 
+                    onClick={() => { setFormData({...formData, requestedDate: getTodayLocale()}); setStep('time'); }}
+                    className="p-5 bg-brand-parchment rounded-2xl border border-brand-mist hover:border-brand-ink flex items-center justify-between group transition-all"
+                  >
+                    <div className="flex items-center gap-4">
+                      <CalendarIcon size={20} className="text-brand-terracotta" />
+                      <span className="text-sm font-medium">Hoje, {formatLocalDate(getTodayLocale(), { day: '2-digit', month: 'long' })}</span>
+                    </div>
+                    <ChevronRight size={18} className="text-brand-mist group-hover:translate-x-1 transition-transform" />
+                  </button>
+                  <button 
+                    onClick={() => { setFormData({...formData, requestedDate: nextDay()}); setStep('time'); }}
+                    className="p-5 bg-brand-parchment rounded-2xl border border-brand-mist hover:border-brand-ink flex items-center justify-between group transition-all"
+                  >
+                    <div className="flex items-center gap-4">
+                      <CalendarIcon size={20} className="text-brand-terracotta" />
+                      <span className="text-sm font-medium">Amanhã, {formatLocalDate(nextDay(), { day: '2-digit', month: 'long' })}</span>
+                    </div>
+                    <ChevronRight size={18} className="text-brand-mist group-hover:translate-x-1 transition-transform" />
+                  </button>
+                  <div className="relative">
+                    <input 
+                      type="date"
+                      min={getTodayLocale()}
+                      className="w-full p-5 bg-brand-parchment rounded-2xl border border-brand-mist outline-none focus:border-brand-ink text-sm font-medium"
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setFormData({...formData, requestedDate: e.target.value});
+                          setStep('time');
+                        }
+                      }}
+                    />
+                    <span className="absolute inset-y-0 right-5 flex items-center pointer-events-none text-brand-stone">
+                      <CalendarIcon size={18} />
+                    </span>
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">E qual o melhor período para você?</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {periods.map(p => (
-                      <button 
-                        key={p.id}
-                        onClick={() => setPeriod(p.id as any)}
-                        className={cn(
-                          "p-5 rounded-2xl border transition-all text-left flex flex-col gap-2 relative overflow-hidden group",
-                          period === p.id ? "bg-brand-ink border-brand-ink text-brand-white" : "bg-brand-white border-brand-mist hover:border-brand-ink"
-                        )}
-                      >
-                        <p.icon size={20} className={period === p.id ? "text-brand-terracotta" : "text-brand-mist group-hover:text-brand-terracotta transition-colors"} />
-                        <div>
-                          <p className="text-[10px] font-bold uppercase tracking-widest leading-none mb-1">{p.label}</p>
-                          <p className="text-[9px] opacity-60 font-light">{p.desc}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <PremiumButton variant="terracotta" className="w-full py-6" onClick={() => setStep(2)} disabled={!selectedService}>
-                  Continuar Cadastro
-                </PremiumButton>
               </div>
             </motion.div>
           )}
 
-          {step === 2 && (
+          {step === 'time' && (
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-              <button onClick={() => setStep(1)} className="text-brand-stone hover:text-brand-ink mb-6 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
-                <X size={16} className="rotate-90" /> Voltar
+              <button 
+                onClick={() => setStep('date')}
+                className="mb-8 text-brand-stone hover:text-brand-ink flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+              >
+                <ChevronRight size={16} className="rotate-180" /> Escolher Dia
               </button>
+
+              <h3 className="text-3xl font-serif text-brand-ink mb-6">Preferência de Horário</h3>
               
-              <h3 className="text-3xl font-serif text-brand-ink mb-2">Seus dados de contato</h3>
-              <p className="text-sm text-brand-stone font-light mb-10 leading-relaxed">
-                Avisaremos você por WhatsApp assim que uma vaga compatível for aberta.
-              </p>
-
-              <div className="space-y-6">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Seu Nome</label>
-                  <input 
-                    type="text" 
-                    value={clientName} 
-                    onChange={(e) => setClientName(e.target.value)} 
-                    placeholder="Como prefere ser chamada?" 
-                    className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-2xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">WhatsApp</label>
-                  <input 
-                    type="tel" 
-                    value={formatWhatsappDisplay(clientPhone)} 
-                    onChange={(e) => setClientPhone(cleanWhatsapp(e.target.value))} 
-                    placeholder="(00) 00000-0000" 
-                    className="w-full px-6 py-5 bg-brand-parchment border border-brand-mist rounded-2xl outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm" 
-                  />
-                </div>
-
-                <div className="pt-6">
-                   <PremiumButton 
-                    variant="terracotta" 
-                    className="w-full py-6" 
-                    onClick={handleSubmit} 
-                    loading={loading}
-                    disabled={!clientName || !clientPhone}
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                {periods.map(p => (
+                  <button 
+                    key={p.id}
+                    onClick={() => setFormData({...formData, period: p.id as any, preferredTime: ''})}
+                    className={cn(
+                      "p-6 rounded-[32px] border transition-all flex flex-col gap-3 text-left group",
+                      formData.period === p.id && !formData.preferredTime
+                        ? "bg-brand-ink border-brand-ink text-brand-white shadow-xl"
+                        : "bg-brand-parchment border-brand-mist hover:border-brand-ink text-brand-stone"
+                    )}
                   >
-                    Entrar na Lista Prioritária
-                  </PremiumButton>
-                  <p className="text-[9px] text-brand-stone text-center mt-4 uppercase tracking-widest opacity-60">
-                    O convite expira em 15 minutos após o envio.
-                  </p>
-                </div>
+                    <p.icon size={20} className={cn("transition-transform group-hover:scale-110", formData.period === p.id ? "text-brand-terracotta" : "text-brand-stone")} />
+                    <span className="text-[10px] font-bold uppercase tracking-widest">{p.label}</span>
+                  </button>
+                ))}
               </div>
+
+              <div className="space-y-4 mb-10">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-2">Ou horário exato:</p>
+                <input 
+                  type="time"
+                  value={formData.preferredTime}
+                  onChange={(e) => setFormData({...formData, preferredTime: e.target.value, period: 'any'})}
+                  className="w-full p-5 bg-brand-white border border-brand-mist rounded-2xl outline-none focus:border-brand-ink font-medium"
+                />
+              </div>
+
+              <PremiumButton variant="ink" className="w-full py-5" onClick={() => setStep('contact')}>
+                Continuar
+              </PremiumButton>
             </motion.div>
           )}
 
-          {step === 3 && (
-            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="py-12 text-center">
-              <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
-                <BellRing size={40} className="animate-bounce" />
-              </div>
-              <h3 className="text-3xl font-serif text-brand-ink mb-3 leading-tight">Você está na fila, {clientName.split(' ')[0]}! ✨</h3>
-              <p className="text-sm text-brand-stone font-light mb-12 max-w-xs mx-auto leading-relaxed">
-                Fique atenta ao seu WhatsApp. Se uma vaga de <span className="font-medium text-brand-ink">{selectedService?.name}</span> surgir para o dia <span className="font-medium text-brand-ink">{selectedDate.split('-').reverse().join('/')}</span>, você será notificada imediatamente.
-              </p>
-              
-              <div className="space-y-4">
-                <PremiumButton variant="terracotta" className="w-full py-5" onClick={onClose}>
-                  Entendi, obrigada!
-                </PremiumButton>
-                <div className="pt-6 border-t border-brand-mist mt-8">
-                  <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-4">Dúvidas?</p>
-                  <a 
-                    href={buildWhatsappLink(profile.whatsapp, `Oi! Entrei na lista prioritária para o dia ${selectedDate.split('-').reverse().join('/')} mas gostaria de tirar uma dúvida.`)} 
-                    target="_blank" 
-                    className="flex items-center justify-center gap-2 text-xs font-bold uppercase tracking-widest text-brand-ink hover:text-brand-terracotta transition-colors"
+          {step === 'contact' && (
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+              <button 
+                onClick={() => setStep('time')}
+                className="mb-8 text-brand-stone hover:text-brand-ink flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+              >
+                <ChevronRight size={16} className="rotate-180" /> Horário
+              </button>
+
+              <h3 className="text-3xl font-serif text-brand-ink mb-2">Seus Contatos</h3>
+              <p className="text-sm text-brand-stone font-light mb-10">Como devemos te avisar quando a vaga abrir?</p>
+
+              <div className="space-y-6 mb-10">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">Seu Nome</label>
+                  <input 
+                    type="text"
+                    value={formData.clientName}
+                    onChange={(e) => setFormData({...formData, clientName: e.target.value})}
+                    placeholder="Como prefere ser chamada"
+                    className="w-full p-5 bg-brand-parchment rounded-2xl border border-brand-mist outline-none focus:border-brand-ink"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">WhatsApp</label>
+                  <input 
+                    type="tel"
+                    value={formData.clientWhatsapp}
+                    onChange={(e) => setFormData({...formData, clientWhatsapp: e.target.value})}
+                    placeholder="(00) 00000-0000"
+                    className="w-full p-5 bg-brand-parchment rounded-2xl border border-brand-mist outline-none focus:border-brand-ink"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">Serviço Desejado</label>
+                  <select 
+                    value={formData.serviceId}
+                    onChange={(e) => {
+                      const s = services.find(sv => sv.id === e.target.value);
+                      setFormData({...formData, serviceId: e.target.value, serviceName: s?.name || ''});
+                    }}
+                    className="w-full p-5 bg-brand-parchment rounded-2xl border border-brand-mist outline-none focus:border-brand-ink appearance-none"
                   >
-                    <MessageCircle size={16} /> Falar com {profile.name.split(' ')[0]}
-                  </a>
+                    {services.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
               </div>
+
+              <PremiumButton 
+                variant="terracotta" 
+                className="w-full py-6" 
+                loading={loading}
+                onClick={handleJoin}
+              >
+                Entrar na Lista
+              </PremiumButton>
+            </motion.div>
+          )}
+
+          {step === 'success' && (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center py-10">
+              <div className="w-20 h-20 bg-brand-linen rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
+                <Check size={40} className="text-brand-terracotta" />
+              </div>
+              <h3 className="text-3xl font-serif text-brand-ink mb-4">Você está na lista!</h3>
+              <p className="text-brand-stone font-light italic leading-relaxed mb-10 max-w-xs mx-auto">
+                Fique atenta ao seu WhatsApp. Se um horário abrir para <br/> 
+                <strong>{formatLocalDate(formData.requestedDate, { day: '2-digit', month: 'long' })}</strong>, <br/>
+                enviaremos um convite prioritário para você.
+              </p>
+              <PremiumButton variant="ink" className="w-full py-5" onClick={onClose}>
+                Entendido
+              </PremiumButton>
             </motion.div>
           )}
         </motion.div>
