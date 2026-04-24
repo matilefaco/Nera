@@ -156,7 +156,7 @@ export const FormIdentity = ({
               onChange={(e) => setName(e.target.value)} 
               placeholder="Ex: Bruna Designer" 
               className={cn(
-                "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                 errors.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
               )}
             />
@@ -174,7 +174,7 @@ export const FormIdentity = ({
               onChange={(e) => setSpecialty(e.target.value)} 
               placeholder="Ex: Nail Designer" 
               className={cn(
-                "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                 errors.specialty ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
               )}
             />
@@ -184,14 +184,14 @@ export const FormIdentity = ({
           {(headline !== undefined && setHeadline) && (
             <div className="space-y-2">
               <div className="flex justify-between items-end">
-                {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua Headline (Frase de impacto)</label>}
+                {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Frase principal do seu perfil</label>}
               </div>
               <input 
                 type="text" 
                 value={headline} 
                 onChange={(e) => setHeadline(e.target.value)} 
                 placeholder="Ex: Especialista em beleza natural"
-                className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                className="w-full px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm"
               />
             </div>
           )}
@@ -200,7 +200,7 @@ export const FormIdentity = ({
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div className="space-y-1">
-                  {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Bio / Descrição Boutique</label>}
+                  {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua bio profissional</label>}
                   {setSelectedBioStyle && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {styles.map(s => (
@@ -228,7 +228,7 @@ export const FormIdentity = ({
                     disabled={isGeneratingBio}
                     className="flex items-center gap-2 text-[10px] font-medium text-brand-terracotta uppercase tracking-[0.2em] hover:text-brand-sienna disabled:opacity-50 h-fit pb-1"
                   >
-                    <Sparkles size={14} /> {isGeneratingBio ? 'Refinando...' : 'Bio com IA'}
+                    <Sparkles size={14} /> {isGeneratingBio ? 'Refinando...' : 'Bio sugerida com IA'}
                   </button>
                 )}
               </div>
@@ -236,8 +236,11 @@ export const FormIdentity = ({
                 value={bio} 
                 onChange={(e) => setBio(e.target.value)} 
                 className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-32 resize-none font-light italic text-sm leading-relaxed" 
-                placeholder="Conte o diferencial do seu atendimento..." 
+                placeholder="Conte um pouco sobre seu trabalho e diferenciais..." 
               />
+              <p className="text-[10px] text-brand-stone/60 font-light ml-1">
+                A IA cria uma primeira versão da sua headline e da sua bio para facilitar. Depois você pode ajustar tudo para ficar com a sua cara.
+              </p>
             </div>
           )}
 
@@ -286,7 +289,7 @@ export const FormIdentity = ({
                 onChange={(e) => setWhatsapp?.(cleanWhatsapp(e.target.value))} 
                 placeholder="(00) 00000-0000" 
                 className={cn(
-                  "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                  "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                   errors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
                 )}
               />
@@ -297,14 +300,14 @@ export const FormIdentity = ({
           {(instagram !== undefined && setInstagram) && (
             <div className="space-y-2">
               {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>}
-              <div className="flex items-center gap-2 bg-brand-parchment p-4 rounded-[20px] border border-brand-mist shadow-sm">
-                <span className="text-brand-stone text-sm">@</span>
+              <div className="flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border border-brand-mist shadow-sm">
+                <span className="text-brand-stone text-xs ml-1">@</span>
                 <input 
                   type="text" 
                   value={instagram} 
                   onChange={(e) => setInstagram(e.target.value.replace(/@/g, ''))} 
                   placeholder="seu.usuario" 
-                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-sm" 
+                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs" 
                 />
               </div>
             </div>
@@ -318,16 +321,16 @@ export const FormIdentity = ({
                 </label>
               )}
               <div className={cn(
-                "flex items-center gap-2 bg-brand-parchment p-4 rounded-[20px] border transition-all",
+                "flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border transition-all",
                 errors.slug ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
               )}>
-                <span className="text-brand-stone text-sm">nera.app/p/</span>
+                <span className="text-brand-stone text-xs ml-1">nera.app/p/</span>
                 <input 
                   type="text" 
                   value={slug} 
                   onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} 
                   placeholder="seu-nome"
-                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-sm"
+                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs"
                 />
               </div>
               <FormError message={errors.slug} />

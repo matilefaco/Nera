@@ -19,9 +19,12 @@ export function useProfileForm(profile: UserProfile | null) {
     complement: '',
     neighborhood: '',
     city: '',
-    reference: ''
+    reference: '',
+    googleMapsLink: '',
+    privacyMode: 'reveal_after_booking'
   });
   const [serviceAreas, setServiceAreas] = useState<any[]>(profile?.serviceAreas || []);
+  const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'specific_neighborhoods'>(profile?.serviceAreaType || 'city_wide');
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>(profile?.pricingStrategy || 'none');
   const [differentials, setDifferentials] = useState<string[]>(profile?.professionalIdentity?.differentials || []);
   
@@ -50,9 +53,12 @@ export function useProfileForm(profile: UserProfile | null) {
         complement: '',
         neighborhood: '',
         city: '',
-        reference: ''
+        reference: '',
+        googleMapsLink: '',
+        privacyMode: 'reveal_after_booking'
       });
       setServiceAreas(profile.serviceAreas || []);
+      setServiceAreaType(profile.serviceAreaType || 'city_wide');
       setPricingStrategy(profile.pricingStrategy || 'none');
       setDifferentials(profile.professionalIdentity?.differentials || []);
       
@@ -84,6 +90,7 @@ export function useProfileForm(profile: UserProfile | null) {
     serviceMode, setServiceMode,
     studioAddress, setStudioAddress,
     serviceAreas, setServiceAreas,
+    serviceAreaType, setServiceAreaType,
     pricingStrategy, setPricingStrategy,
     differentials, setDifferentials,
     workingDays, setWorkingDays,

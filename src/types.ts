@@ -70,7 +70,17 @@ export interface UserProfile {
     complement: string;
     neighborhood: string;
     city: string;
+    state?: string;
     reference: string;
+    
+    // Complementary info
+    hasParking?: boolean;
+    parkingInfo?: string;
+    hasAccessibility?: boolean;
+    accessibilityInfo?: string;
+    isSafeLocation?: boolean;
+    locationNotes?: string;
+    privacyMode?: 'public_full' | 'neighborhood_only';
   };
   
   onboardingCompleted?: boolean;
@@ -113,8 +123,9 @@ export interface Appointment {
   id: string;
   
   clientName: string;
-  clientEmail?: string;
+  clientEmail: string; // Mandatory
   clientWhatsapp: string;
+  clientMessage?: string;
   
   serviceId: string;
   serviceName: string;
@@ -129,9 +140,16 @@ export interface Appointment {
   locationType: 'studio' | 'home';
   locationDetail?: string; // neighborhood or address
   neighborhood?: string;
-  address?: string;
+  address?: string | {
+    street: string;
+    number: string;
+    complement?: string;
+    neighborhood: string;
+    city: string;
+    reference?: string;
+  };
   
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
+  status: 'pending' | 'accepted' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'cancelled_by_professional' | 'completed' | 'expired';
   notes?: string;
   
   clientConfirmedAt?: any; // When client hits "confirm presence"
@@ -150,6 +168,10 @@ export interface Appointment {
   reviewedAt?: any;
   waitlistNotifiedAt?: any;
   token: string;
+  publicToken?: string;
+  manageToken?: string;
+  reservationCode?: string;
+  manageSlug?: string;
 
   professionalId: string;
   professionalName?: string;

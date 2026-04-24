@@ -99,33 +99,70 @@ export function formatDateKey(date: Date): string {
 export function getHumanError(error: any): string {
   if (!error) return "Algo deu errado. Tente novamente.";
 
-  const code = error.code || (typeof error === 'string' ? error : '');
+  // Handle errors that were stringified by handleFirestoreError or are plain objects
+  let code = '';
   
+  if (error.code) {
+    code = error.code;
+  } else if (typeof error === 'string') {
+    code = error;
+  } else if (error.message) {
+    // Check if message is the JSON string from handleFirestoreError
+    try {
+      if (error.message.startsWith('{') && error.message.includes('error')) {
+        const parsed = JSON.parse(error.message);
+        code = parsed.error || error.message;
+      } else {
+        code = error.message;
+      }
+    } catch {
+      code = error.message;
+    }
+  }
+
   const errorMap: Record<string, string> = {
-    'permission-denied': "Você não tem permissão para realizar esta ação.",
-    'firestore/permission-denied': "Você não tem permissão para realizar esta ação.",
+    'auth/email-already-in-use': "Este e-mail já está cadastrado",
+    'auth/weak-password': "Senha muito fraca (use pelo menos 6 caracteres)",
+    'auth/network-request-failed': "Erro de conexão. Verifique sua internet.",
+    'auth/popup-closed-by-user': "A janela foi fechada antes de concluir.",
+    'auth/operation-not-allowed': "Este método de login não está ativo.",
+    'auth/user-not-found': "Usuário não encontrado.",
+    'auth/wrong-password': "E-mail ou senha incorretos.",
+    'auth/invalid-email': "E-mail inválido.",
+    'auth/invalid-credential': "Credenciais inválidas. Verifique seu e-mail e senha.",
+    'auth/too-many-requests': "Muitas tentativas. Tente novamente mais tarde.",
+    'auth/invalid-api-key': "Configuração do Firebase inválida (API Key).",
+    'auth/app-deleted': "Ocorreu um erro crítico na configuração do app.",
+    'auth/configuration-not-found': "Configuração de login não encontrada.",
+    'auth/unauthorized-domain': "Este domínio não está autorizado no Firebase.",
+    'permission-denied': "Erro interno de permissão. Tente relogar.",
+    'firestore/permission-denied': "Erro interno de permissão. Tente relogar.",
     'unavailable': "O serviço está temporariamente indisponível. Tente novamente em instantes.",
     'firestore/unavailable': "O serviço está temporariamente indisponível. Tente novamente em instantes.",
     'not-found': "Não conseguimos encontrar essa informação.",
     'firestore/not-found': "Não conseguimos encontrar essa informação.",
     'already-exists': "Isso já foi cadastrado no nosso sistema.",
     'firestore/already-exists': "Isso já foi cadastrado no nosso sistema.",
-    'unauthenticated': "Sua sessão expirou. Por favor, entre na sua conta novamente.",
     'auth/unauthenticated': "Sua sessão expirou. Por favor, entre na sua conta novamente.",
-    'auth/user-not-found': "Usuário não encontrado.",
-    'auth/wrong-password': "E-mail ou senha incorretos.",
-    'auth/invalid-email': "E-mail inválido.",
-    'auth/email-already-in-use': "Este e-mail já está em uso.",
-    'auth/weak-password': "A senha é muito fraca.",
-    'auth/popup-blocked': "O navegador bloqueou a janela de login. Por favor, permita popups.",
+    'unauthenticated': "Sua sessão expirou. Por favor, entre na sua conta novamente.",
+    'auth/popup-blocked': "O navegador bloqueou a janela. Por favor, permita popups.",
+    'unauthorized-domain': "Domínio não autorizado nas configurações do Firebase.",
   };
 
-  // Check for partial matches or specific codes
+  // Check for exact matches first
+  if (errorMap[code]) return errorMap[code];
+
+  // Check for partial matches or specific codes in the string
   for (const [key, message] of Object.entries(errorMap)) {
-    if (code.includes(key)) return message;
+    if (code.toLowerCase().includes(key.toLowerCase())) return message;
   }
 
-  return "Algo deu errado. Tente novamente.";
+  // Common network strings
+  if (code.includes('network-error') || code.includes('failed to fetch') || code.includes('offline')) {
+    return "Erro de conexão. Verifique sua internet.";
+  }
+
+  return "Não foi possível concluir agora. Tente novamente.";
 }
 
 /**

@@ -11,7 +11,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } from '../firebase';
 import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, WaitlistEntry } from '../types';
 import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage } from '../lib/utils';
-import { getAvailableSlots } from '../lib/bookingUtils';
+import { getAvailableSlots, canBookSlot } from '../lib/bookingUtils';
 import { toast } from 'sonner';
 import PremiumButton from './PremiumButton';
 import WaitlistModal from './WaitlistModal';
@@ -35,6 +35,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientAddress, setClientAddress] = useState('');
+  const [addressStreet, setAddressStreet] = useState('');
+  const [addressNumber, setAddressNumber] = useState('');
+  const [addressComplement, setAddressComplement] = useState('');
+  const [addressNeighborhood, setAddressNeighborhood] = useState('');
+  const [addressCity, setAddressCity] = useState(profile?.city || '');
+  const [addressReference, setAddressReference] = useState('');
+  
   const [bookingAttempted, setBookingAttempted] = useState(false);
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [successDraft, setSuccessDraft] = useState<any>(null);
@@ -42,6 +49,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [appointmentToken, setAppointmentToken] = useState<string | null>(null);
+  const [reservationCode, setReservationCode] = useState<string | null>(null);
   const [dayAppointments, setDayAppointments] = useState<Appointment[]>([]);
   const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [showRestoreDraft, setShowRestoreDraft] = useState(false);
@@ -52,7 +60,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
   // 1. MODAL OPEN/CLOSE SYNC & RESET
   useEffect(() => {
     if (open) {
-      // Always honor the initialService prop when opening
+      if (profile?.city && !addressCity) {
+        setAddressCity(profile.city);
+      }
+      
       // If it's null, we allow the "Restore Draft" logic to take over later if no service is selected
       if (initialService) {
         setSelectedService(initialService);
@@ -119,9 +130,28 @@ export default function BookingModal({ profile, services, onClose, open, initial
     };
     
     if (selectedService || selectedDate || clientName || clientPhone) {
+      const draft = {
+        professionalId: profile.uid,
+        serviceId: selectedService?.id,
+        mode: bookingMode,
+        date: selectedDate,
+        time: selectedTime,
+        clientName,
+        clientPhone,
+        clientEmail,
+        selectedAreaId: selectedArea?.name,
+        address: {
+          street: addressStreet,
+          number: addressNumber,
+          complement: addressComplement,
+          neighborhood: addressNeighborhood || selectedArea?.name,
+          city: addressCity || profile?.city,
+          reference: addressReference
+        }
+      };
       localStorage.setItem('booking_draft', JSON.stringify(draft));
     }
-  }, [selectedService, bookingMode, selectedDate, selectedTime, clientName, clientPhone, clientEmail, selectedArea, profile?.uid, open]);
+  }, [selectedService, bookingMode, selectedDate, selectedTime, clientName, clientPhone, clientEmail, selectedArea, profile?.uid, open, addressStreet, addressNumber, addressComplement, addressNeighborhood, addressCity, addressReference]);
 
   // Persistence Logic: Checking for existing draft
   useEffect(() => {
@@ -171,6 +201,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
       if (draft.clientName) setClientName(draft.clientName);
       if (draft.clientPhone) setClientPhone(draft.clientPhone);
       if (draft.clientEmail) setClientEmail(draft.clientEmail);
+      if (draft.address) {
+        if (draft.address.street) setAddressStreet(draft.address.street);
+        if (draft.address.number) setAddressNumber(draft.address.number);
+        if (draft.address.complement) setAddressComplement(draft.address.complement);
+        if (draft.address.neighborhood) setAddressNeighborhood(draft.address.neighborhood);
+        if (draft.address.city) setAddressCity(draft.address.city);
+        if (draft.address.reference) setAddressReference(draft.address.reference);
+      }
       if (draft.selectedAreaId && profile?.serviceAreas) {
         const area = profile.serviceAreas.find((a: ServiceArea) => a.name === draft.selectedAreaId);
         if (area) setSelectedArea(area);
@@ -238,6 +276,12 @@ export default function BookingModal({ profile, services, onClose, open, initial
     setClientPhone('');
     setClientEmail('');
     setClientAddress('');
+    setAddressStreet('');
+    setAddressNumber('');
+    setAddressComplement('');
+    setAddressNeighborhood('');
+    setAddressCity(profile?.city || '');
+    setAddressReference('');
     setSelectedArea(null);
     setBookingMode(null);
     setStep(2);
@@ -319,22 +363,59 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const handleBooking = async () => {
     setBookingAttempted(true);
     if (!profile || !selectedService) return;
-    if (!clientName.trim() || !clientPhone.trim() || (isHomeService && !clientAddress.trim())) {
-      toast.error('Por favor, preencha os campos destacados.');
+    
+    // Core validations
+    const isBaseValid = clientName.trim().length >= 2 && clientPhone.trim() && clientEmail.trim();
+    let isAddressValid = true;
+    
+    if (isHomeService) {
+      isAddressValid = !!(addressStreet.trim() && addressNumber.trim() && (addressNeighborhood.trim() || selectedArea?.name) && (addressCity.trim() || profile?.city));
+    }
+
+    if (!isBaseValid || !isAddressValid) {
+      toast.error('Por favor, preencha todos os campos obrigatórios corretamente.');
       return;
     }
 
-    if (clientEmail.trim()) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(clientEmail.trim())) {
-        toast.error('O e-mail informado parece não ser válido.');
-        return;
-      }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(clientEmail.trim())) {
+      toast.error('O e-mail informado parece não ser válido.');
+      return;
     }
+
     setBookingLoading(true);
     try {
+      // Final availability check before submitting
+      const availabilityCheck = canBookSlot({
+        date: selectedDate,
+        time: selectedTime,
+        workingHours: profile.workingHours,
+        appointments: dayAppointments,
+        blockedSchedules,
+        serviceDuration: Number(selectedService.duration) || 60
+      });
+
+      if (!availabilityCheck.canBook) {
+        toast.error('Este horário não está mais disponível.', {
+          description: availabilityCheck.reason || 'Por favor, escolha outro horário.'
+        });
+        setStep(3);
+        setBookingLoading(false);
+        return;
+      }
+
       const totalPrice = calculateTotalPrice();
-      const { bookingId, token } = await createBookingRequest({
+      
+      const structuredAddress = isHomeService ? {
+        street: addressStreet.trim(),
+        number: addressNumber.trim(),
+        complement: addressComplement.trim(),
+        neighborhood: addressNeighborhood.trim() || selectedArea?.name || '',
+        city: addressCity.trim() || profile?.city || '',
+        reference: addressReference.trim()
+      } : undefined;
+
+      const { bookingId, token, reservationCode: resCode } = await createBookingRequest({
         professionalId: profile.uid,
         professionalName: profile.name,
         professionalWhatsapp: profile.whatsapp,
@@ -345,17 +426,51 @@ export default function BookingModal({ profile, services, onClose, open, initial
         travelFee: selectedArea?.fee || 0,
         totalPrice: totalPrice,
         locationType: isHomeService ? 'home' : 'studio',
-        neighborhood: selectedArea?.name || '',
-        address: clientAddress.trim(),
+        neighborhood: (isHomeService ? (addressNeighborhood.trim() || selectedArea?.name) : profile.neighborhood) || '',
+        address: structuredAddress,
         clientName: clientName.trim(),
         clientWhatsapp: clientPhone.replace(/\D/g, ''),
         clientEmail: clientEmail.trim().toLowerCase(),
         date: selectedDate,
         time: selectedTime,
       });
+
+      // LOGS OBRIGATÓRIOS DO USUÁRIO
+      console.log(`[RESERVATION CREATE] appointmentId: ${bookingId}`);
+      console.log(`[RESERVATION CREATE] token: ${token}`);
+      console.log(`[RESERVATION CREATE] reservationCode: ${resCode}`);
+      console.log(`[RESERVATION CREATE] manageUrl: ${window.location.origin}/r/${token}`);
+
       setAppointmentId(bookingId);
       setAppointmentToken(token);
+      setReservationCode(resCode || null);
       setBookingSuccess(true);
+
+      // --- SEND PENDING NOTIFICATION TO CLIENT ---
+      if (clientEmail.trim()) {
+        fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'BOOKING_PENDING_CLIENT',
+            payload: {
+              clientEmail: clientEmail.trim().toLowerCase(),
+              clientName: clientName.trim(),
+              professionalName: profile.name,
+              professionalWhatsapp: profile.whatsapp,
+              serviceName: selectedService.name,
+              date: selectedDate,
+              time: selectedTime,
+              price: formatCurrency(totalPrice),
+              reservationCode: resCode,
+              manageUrl: `${window.location.origin}/r/${token}`
+            }
+          })
+        })
+        .then(res => res.json())
+        .then(data => console.log('[EMAIL_PENDING] Result:', data))
+        .catch(err => console.error('[EMAIL_PENDING_ERROR] Notification failed:', err));
+      }
       
       // If booking from waitlist, mark it as booked
       if (waitlistEntry?.id) {
@@ -424,8 +539,8 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
               {step === 2 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                  <h3 className="text-2xl font-serif text-brand-ink mb-2">Sua Experiência</h3>
-                  <p className="text-xs text-brand-stone font-light mb-8">Selecione o serviço e onde deseja ser atendida.</p>
+                  <h3 className="text-2xl font-serif text-brand-ink mb-2">Escolha o serviço</h3>
+                  <p className="text-xs text-brand-stone font-light mb-8">Selecione o serviço e onde você prefere o atendimento.</p>
                   
                   {/* Location Context Header */}
                   <div className="bg-brand-linen/40 border border-brand-mist/50 rounded-3xl p-5 mb-10 flex items-start gap-4">
@@ -447,9 +562,27 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         </p>
                       )}
                       {bookingMode === 'studio' && (
-                        <p className="text-[10px] text-brand-stone leading-relaxed">
-                          Localizado no bairro {profile.neighborhood}.
-                        </p>
+                        <div className="space-y-1">
+                          <p className="text-[10px] text-brand-ink font-bold flex items-center gap-1.5 uppercase tracking-widest">
+                            <Building2 size={10} className="text-brand-terracotta" />
+                            Atendimento no estúdio
+                          </p>
+                          <p className="text-[10px] text-brand-stone leading-relaxed uppercase tracking-widest">
+                            {profile.studioAddress ? (
+                              <>
+                                <span className="block">{profile.studioAddress.street}, {profile.studioAddress.number}</span>
+                                <span className="block">{profile.studioAddress.neighborhood}, {profile.studioAddress.city}</span>
+                              </>
+                            ) : (
+                              <>{profile.studioAddress?.neighborhood || profile.neighborhood || profile.city}</>
+                            )}
+                            {profile.studioAddress?.reference && (
+                              <span className="block opacity-60 text-[9px] lowercase italic first-letter:uppercase">
+                                • Próximo {profile.studioAddress.reference.toLowerCase().startsWith('à') || profile.studioAddress.reference.toLowerCase().startsWith('a ') ? '' : 'à '}{profile.studioAddress.reference}
+                              </span>
+                            )}
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -458,14 +591,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     {profile.serviceMode === 'hybrid' && (
                       <div className="space-y-4">
                         <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Onde prefere o atendimento?</label>
-                        <div className="grid grid-cols-2 gap-4">
-                          <button onClick={() => setBookingMode('studio')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all", bookingMode === 'studio' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink")}>
+                        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4">
+                          <button onClick={() => setBookingMode('studio')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all min-w-0", bookingMode === 'studio' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink")}>
                             <Building2 size={20} className={bookingMode === 'studio' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-xs font-medium uppercase tracking-widest">No Estúdio</span>
+                            <span className="text-xs font-medium uppercase tracking-widest truncate">No Estúdio</span>
                           </button>
-                          <button onClick={() => setBookingMode('home')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all", bookingMode === 'home' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink")}>
+                          <button onClick={() => setBookingMode('home')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all min-w-0", bookingMode === 'home' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink")}>
                             <Home size={20} className={bookingMode === 'home' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-xs font-medium uppercase tracking-widest">Em Casa</span>
+                            <span className="text-xs font-medium uppercase tracking-widest truncate">Em Casa</span>
                           </button>
                         </div>
                       </div>
@@ -483,7 +616,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       </div>
                     )}
                     <div className="space-y-4">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Qual experiência deseja viver hoje?</label>
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Para qual serviço deseja agendar?</label>
                       <div className="space-y-3">
                         {services.map((service) => (
                           <button key={service.id} onClick={() => { setSelectedService(service); }} className={cn("w-full p-6 text-left rounded-[24px] border transition-all flex justify-between items-center group relative overflow-hidden", selectedService?.id === service.id ? "bg-brand-ink border-brand-ink text-brand-white" : "bg-brand-parchment border-brand-mist hover:border-brand-ink")}>
@@ -507,11 +640,17 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
               {step === 3 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                  <div className="flex items-center gap-4 mb-2">
-                    <button onClick={() => setStep(2)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                    <h3 className="text-2xl font-serif text-brand-ink">Selecione o melhor dia para você</h3>
-                  </div>
-                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Escolha a data ideal para sua experiência.</p>
+                    <div className="flex items-center gap-4 mb-2">
+                      <button onClick={() => setStep(2)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
+                      <h3 className="text-2xl font-serif text-brand-ink">Escolha a data e horário</h3>
+                    </div>
+                    {/* DEBUG INFO - MODO DESENVOLVIMENTO */}
+                    <div className="ml-9 mb-4">
+                      <p className="text-[10px] text-brand-terracotta/60 font-mono">
+                        DEBUG slots reais do dia: {availableSlots.length} | Data: {selectedDate}
+                      </p>
+                    </div>
+                    <p className="text-xs text-brand-stone font-light mb-10 ml-9">Selecione o melhor momento para você.</p>
                   <div className="flex overflow-x-auto gap-3 pb-4 mb-10 no-scrollbar -mx-2 px-2">
                     {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(offset => {
                       const date = new Date();
@@ -545,12 +684,12 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         </motion.div>
                       )}
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
                       {selectedDate ? (
                         availableSlots.length > 0 ? (
                           availableSlots.map(time => (
-                            <button key={time} onClick={() => setSelectedTime(time)} className={cn("py-5 rounded-2xl border transition-all text-sm font-medium flex items-center justify-center gap-2", selectedTime === time ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-ink")}>
-                              <Clock size={14} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist"} />
+                            <button key={time} onClick={() => setSelectedTime(time)} className={cn("py-3.5 rounded-xl border transition-all text-[11px] font-bold flex items-center justify-center gap-1.5", selectedTime === time ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-stone")}>
+                              <Clock size={12} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist/40"} />
                               {time}
                             </button>
                           ))
@@ -582,70 +721,138 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                   <div className="flex items-center gap-4 mb-2">
                     <button onClick={() => setStep(3)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                    <h3 className="text-2xl font-serif text-brand-ink">Só falta confirmar seus dados</h3>
+                    <h3 className="text-2xl font-serif text-brand-ink">Confirme seus dados</h3>
                   </div>
-                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Quase lá! Revise as informações da sua reserva.</p>
-                  <div className="bg-brand-ink text-brand-white rounded-[32px] p-8 mb-8 space-y-6 shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/20 rounded-full -mr-16 -mt-16 blur-3xl opacity-50" />
-                    <div className="flex justify-between items-start pb-6 border-b border-brand-white/10 relative z-10">
-                      <div className="flex-1">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-brand-blush/40 block mb-2">{selectedService?.name}</span>
-                        <div className="flex items-center gap-4 text-xs font-light text-brand-blush/80">
-                          <span className="flex items-center gap-1.5">
-                            <CalendarIcon size={12} /> 
-                            {selectedDate ? (
-                              (() => {
-                                const [year, month, day] = selectedDate.split('-').map(Number);
-                                return new Date(year, month - 1, day).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                              })()
-                            ) : '--/--'}
-                          </span>
-                          <span className="flex items-center gap-1.5"><Clock size={12} /> {selectedTime || '--:--'}</span>
+                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Revise as informações para solicitar seu agendamento.</p>
+                  <div className="bg-brand-ink text-brand-white rounded-[40px] p-8 mb-10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-brand-terracotta/10 rounded-full -mr-32 -mt-32 blur-3xl opacity-40 group-hover:opacity-60 transition-opacity" />
+                    <div className="flex flex-col relative z-10">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-4">Resumo do Agendamento</span>
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <h4 className="text-2xl font-serif text-brand-linen">{selectedService?.name}</h4>
+                          <div className="flex items-center gap-4 text-xs font-light text-brand-linen/60">
+                            <span className="flex items-center gap-2">
+                              <CalendarIcon size={14} className="text-brand-terracotta/60" /> 
+                              {selectedDate ? (
+                                (() => {
+                                  const [year, month, day] = selectedDate.split('-').map(Number);
+                                  return new Date(year, month - 1, day).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                                })()
+                              ) : '--/--'}
+                            </span>
+                            <span className="w-px h-3 bg-brand-white/10" />
+                            <span className="flex items-center gap-2"><Clock size={14} className="text-brand-terracotta/60" /> {selectedTime || '--:--'}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[8px] font-bold uppercase tracking-widest text-brand-linen/40 block mb-1">Total</span>
+                          <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(calculateTotalPrice())}</span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-brand-blush/40 block mb-2">Total</span>
-                        <h4 className="text-2xl font-serif text-brand-terracotta leading-none">{formatCurrency(calculateTotalPrice())}</h4>
-                      </div>
                     </div>
                   </div>
-                  <div className="space-y-4 mb-8">
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Seu Nome <span className="text-brand-terracotta">*</span></label>
-                      <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome completo" className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm", !clientName && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
-                      {!clientName && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>}
+                    <div className="space-y-4 mb-8">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Seu Nome <span className="text-brand-terracotta">*</span></label>
+                        <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome completo" className={cn("w-full px-5 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs", clientName.trim().length < 2 && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
+                        {clientName.trim().length < 2 && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Digite seu nome completo</p>}
+                      </div>
+                      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 md:gap-4">
+                        <div className="space-y-1.5 min-w-0">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">WhatsApp <span className="text-brand-terracotta">*</span></label>
+                          <input type="tel" value={formatWhatsappDisplay(clientPhone)} onChange={(e) => setClientPhone(cleanWhatsapp(e.target.value))} placeholder="(85) 99999-9999" className={cn("w-full px-5 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs min-w-0", !clientPhone && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
+                          {!clientPhone && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">WhatsApp obrigatório</p>}
+                        </div>
+                        <div className="space-y-1.5 min-w-0">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1 truncate">E-mail <span className="text-brand-terracotta">*</span></label>
+                          <input 
+                            type="email" 
+                            inputMode="email"
+                            autoComplete="email"
+                            value={clientEmail} 
+                            onChange={(e) => setClientEmail(e.target.value)} 
+                            placeholder="Ex: seu@email.com" 
+                            className={cn("w-full px-5 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs min-w-0", !clientEmail && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} 
+                          />
+                          {!clientEmail && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">E-mail obrigatório</p>}
+                        </div>
+                      </div>
+                      
+                      {isHomeService && (
+                        <div className="space-y-6 pt-4 mt-4 border-t border-brand-mist/30">
+                          <div className="flex items-center gap-2 mb-2">
+                             <Home size={14} className="text-brand-terracotta" />
+                             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">Endereço do Atendimento</span>
+                          </div>
+                          
+                          <div className="grid grid-cols-4 gap-4">
+                            <div className="col-span-3 space-y-1.5">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Rua <span className="text-brand-terracotta">*</span></label>
+                              <input 
+                                type="text" placeholder="Nome da rua" 
+                                value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)}
+                                className={cn("w-full px-4 py-3 bg-brand-parchment border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressStreet && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
+                              />
+                            </div>
+                            <div className="col-span-1 space-y-1.5">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Nº <span className="text-brand-terracotta">*</span></label>
+                              <input 
+                                type="text" placeholder="123" 
+                                value={addressNumber} onChange={(e) => setAddressNumber(e.target.value)}
+                                className={cn("w-full px-2 py-3 bg-brand-parchment border rounded-xl text-xs text-center outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressNumber && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Complemento</label>
+                            <input 
+                              type="text" placeholder="Apto, Bloco, etc." 
+                              value={addressComplement} onChange={(e) => setAddressComplement(e.target.value)}
+                              className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Bairro <span className="text-brand-terracotta">*</span></label>
+                              <input 
+                                type="text" placeholder="Sua vizinhança" 
+                                value={addressNeighborhood || (selectedArea?.name || '')} onChange={(e) => setAddressNeighborhood(e.target.value)}
+                                className={cn("w-full px-4 py-3 bg-brand-parchment border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressNeighborhood && !selectedArea?.name && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Cidade <span className="text-brand-terracotta">*</span></label>
+                              <input 
+                                type="text" placeholder="Cidade" 
+                                value={addressCity || (profile?.city || '')} onChange={(e) => setAddressCity(e.target.value)}
+                                className={cn("w-full px-4 py-3 bg-brand-parchment border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressCity && !profile?.city && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 gap-4">
+                            <div className="space-y-1.5">
+                              <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Ponto de Referência</label>
+                              <input 
+                                type="text" placeholder="Perto de onde?" 
+                                value={addressReference} onChange={(e) => setAddressReference(e.target.value)}
+                                className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <p className="text-[9px] text-brand-stone/70 font-medium uppercase tracking-wider ml-2 mt-4 leading-relaxed italic">
+                        Você receberá a confirmação e atualizações do agendamento por e-mail.
+                      </p>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">WhatsApp <span className="text-brand-terracotta">*</span></label>
-                        <input type="tel" value={formatWhatsappDisplay(clientPhone)} onChange={(e) => setClientPhone(cleanWhatsapp(e.target.value))} placeholder="(85) 99999-9999" className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm", !clientPhone && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
-                        {!clientPhone && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>}
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">E-mail para receber confirmação (opcional)</label>
-                        <input 
-                          type="email" 
-                          inputMode="email"
-                          autoComplete="email"
-                          value={clientEmail} 
-                          onChange={(e) => setClientEmail(e.target.value)} 
-                          placeholder="Ex: seu@email.com" 
-                          className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm border-brand-mist")} 
-                        />
-                        <p className="text-[8px] text-brand-stone/60 font-medium uppercase tracking-wider ml-2 mt-1">Confirmação também enviada via WhatsApp.</p>
-                      </div>
-                    </div>
-                    {isHomeService && (
-                      <div className="space-y-1">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Endereço de Atendimento <span className="text-brand-terracotta">*</span></label>
-                        <textarea value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} placeholder="Rua, número, bairro e qualquer ponto de referência" className={cn("w-full px-6 py-5 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-sm resize-none h-28", !clientAddress && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
-                        {!clientAddress && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Este campo é obrigatório</p>}
-                      </div>
-                    )}
-                  </div>
-                  <div className="hidden md:block">
-                    <PremiumButton variant="terracotta" className="w-full py-7" disabled={!clientName || !clientPhone || (isHomeService && !clientAddress)} onClick={handleBooking} loading={bookingLoading} loadingText="Finalizando solicitação...">Confirmar reserva <Check size={18} className="ml-1" /></PremiumButton>
-                  </div>
+<div className="hidden md:block">
+  <PremiumButton variant="terracotta" className="w-full py-7" disabled={!clientName.trim() || clientName.trim().length < 2 || !clientPhone || !clientEmail || (isHomeService && (!addressStreet.trim() || !addressNumber.trim()))} onClick={handleBooking} loading={bookingLoading} loadingText="Enviando pedido...">Confirmar agendamento <Check size={18} className="ml-1" /></PremiumButton>
+</div>
                 </motion.div>
               )}
             </motion.div>
@@ -662,10 +869,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
             className="fixed bottom-0 left-0 right-0 z-[250] md:hidden p-6 bg-gradient-to-t from-brand-white via-brand-white to-transparent pt-16 pointer-events-none"
           >
             <div className="pointer-events-auto">
-              <PremiumButton variant="terracotta" className="w-full py-7" disabled={(step === 2 && (!selectedService || (isHomeService && profile?.serviceAreaType === 'custom' && !selectedArea))) || (step === 3 && (!selectedDate || !selectedTime)) || (step === 4 && (!clientName || !clientPhone || (isHomeService && !clientAddress)))} loading={step === 4 && bookingLoading} onClick={() => { if (step === 2) setStep(3); else if (step === 3) setStep(4); else if (step === 4) handleBooking(); }}>
-                {step === 2 && (selectedService ? `Reservar ${selectedService.name.split(' ')[0]}` : 'Escolher Experiência')}
-                {step === 3 && (selectedTime ? `Confirmar para ${selectedTime}` : 'Escolher Horário')}
-                {step === 4 && 'Confirmar reserva'}
+              <PremiumButton variant="terracotta" className="w-full py-7" disabled={(step === 2 && (!selectedService || (isHomeService && profile?.serviceAreaType === 'custom' && !selectedArea))) || (step === 3 && (!selectedDate || !selectedTime)) || (step === 4 && (!clientName.trim() || clientName.trim().length < 2 || !clientPhone || !clientEmail || (isHomeService && (!addressStreet.trim() || !addressNumber.trim()))))} loading={step === 4 && bookingLoading} onClick={() => { if (step === 2) setStep(3); else if (step === 3) setStep(4); else if (step === 4) handleBooking(); }}>
+                {step === 2 && (selectedService ? `Agendar ${selectedService.name.split(' ')[0]}` : 'Escolher serviço')}
+                {step === 3 && (selectedTime ? `Confirmar para ${selectedTime}` : 'Escolher horário')}
+                {step === 4 && 'Confirmar agendamento'}
                 <ArrowRight size={18} className="ml-1" />
               </PremiumButton>
             </div>
@@ -681,13 +888,29 @@ export default function BookingModal({ profile, services, onClose, open, initial
             className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center p-8 text-center overflow-y-auto no-scrollbar pt-16 pb-32 md:justify-center md:pt-8 md:pb-8"
           >
             <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", damping: 15 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"><Check size={48} /></motion.div>
-            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">{profile?.name.split(' ')[0]} recebeu sua reserva</h2>
-            <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">Você receberá a confirmação por WhatsApp em breve.</p>
+            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">{profile?.name.split(' ')[0]} recebeu seu pedido</h2>
+            <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
+              Você receberá a confirmação e atualizações do agendamento por e-mail.
+              <span className="block mt-2 text-[10px] text-brand-stone italic">
+                Verifique sua caixa de entrada e spam ✨
+              </span>
+            </p>
             {selectedService && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-brand-parchment rounded-3xl border border-brand-mist p-8 w-full max-w-sm mb-12 text-left shadow-sm">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-4 border-b border-brand-mist/50 pb-2">Resumo da solicitação</span>
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-brand-parchment rounded-3xl border border-brand-mist p-8 w-full max-w-md mb-12 text-left shadow-sm">
+                <div className="flex justify-between items-center mb-6 border-b border-brand-mist/50 pb-4">
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block">Resumo da solicitação</span>
+                  {reservationCode && (
+                    <div className="text-right">
+                      <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-0.5">Código</span>
+                      <span className="text-[10px] font-mono font-bold text-brand-terracotta">{reservationCode}</span>
+                    </div>
+                  )}
+                </div>
                 <div className="space-y-4">
-                  <div><span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Serviço</span><span className="font-serif text-brand-ink">{selectedService.name}</span></div>
+                  <div>
+                    <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Serviço</span>
+                    <span className="font-serif text-brand-ink">{selectedService.name}</span>
+                  </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Data</span>
@@ -700,8 +923,19 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         ) : '---'}
                       </span>
                     </div>
-                    <div><span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Horário</span><span className="text-sm font-medium text-brand-ink">{selectedTime}</span></div>
+                    <div>
+                      <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Horário</span>
+                      <span className="text-sm font-medium text-brand-ink">{selectedTime}</span>
+                    </div>
                   </div>
+                  
+                  {/* Link de Gerenciamento - Temporário conforme pedido */}
+                  {appointmentToken && (
+                    <div className="mt-4 pt-4 border-t border-brand-mist/30">
+                      <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-1">Link de Gerenciamento</span>
+                      <p className="text-[8px] font-mono text-brand-ink/60 break-all">{window.location.origin}/r/{appointmentToken}</p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -725,12 +959,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 </PremiumButton>
                 
                 {appointmentToken && (
-                  <Link 
-                    to={`/r/${appointmentToken}`}
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all border border-brand-ink shadow-lg shadow-brand-ink/10"
-                  >
-                    <Settings size={14} className="animate-spin-slow" /> Gerenciar reserva
-                  </Link>
+                  <div className="space-y-3">
+                    <button 
+                      onClick={() => { window.location.href = `/r/${appointmentToken}`; }}
+                      className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all border border-brand-ink shadow-lg shadow-brand-ink/10"
+                    >
+                      <Settings size={14} className="animate-spin-slow" /> Gerenciar reserva
+                    </button>
+                  </div>
                 )}
 
                 <a 

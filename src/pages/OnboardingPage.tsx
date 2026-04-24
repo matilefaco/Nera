@@ -19,6 +19,7 @@ import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
 import { FormLocation } from '../components/FormLocation';
 import { FormServices } from '../components/FormServices';
+import { analyzePortfolio } from '../services/aiService';
 import { OnboardingLivePreview } from '../components/OnboardingLivePreview';
 import { ProfessionalIdentity, UserProfile, Service } from '../types';
 import { userProfileSchema, serviceSchema } from '../lib/validation';
@@ -104,11 +105,11 @@ export default function OnboardingPage() {
   const [selectedBioStyle, setSelectedBioStyle] = useState('elegante');
 
   const stepDescriptions = [
-    'Sua identidade profissional',
-    'Onde e quando você atende',
-    'Seus serviços e preços',
-    'Seus horários de trabalho',
-    'Sua vitrine pública'
+    'Identidade',
+    'Localização',
+    'Serviços',
+    'Agenda',
+    'Revisão'
   ];
 
   // Step 3: Services
@@ -399,16 +400,17 @@ export default function OnboardingPage() {
       if (err instanceof z.ZodError) {
         toast.error(err.issues[0].message);
       } else {
-        toast.error('Não foi possível concluir agora. Tente novamente.');
+        toast.error(getHumanError(err));
       }
       return;
     }
     
     setLoading(true);
     setIsFinalizing(true);
+    console.log('[ONBOARDING] starting finalization');
 
     try {
-      console.log('[OnboardingSave] Preparing final data...');
+      console.log('[ONBOARDING] Preparing final data...');
       // 2. Prepare Final Data (without setting completed: true yet)
       const finalData: Partial<UserProfile> = {
         name: name.trim(),
@@ -451,10 +453,10 @@ export default function OnboardingPage() {
         onboardingStep: 6
       };
 
-      console.log('[OnboardingSave] Payload:', finalData);
+      console.log('[ONBOARDING] Payload prepared');
 
       // 3. Save Services
-      console.log('[OnboardingSave] Saving services...');
+      console.log('[ONBOARDING] Saving services...');
       const activeServices = services.filter(s => s.name && s.price);
       const servicePromises = activeServices.map(service => {
         return addDoc(collection(db, 'services'), {
@@ -468,17 +470,18 @@ export default function OnboardingPage() {
         });
       });
       await Promise.all(servicePromises);
-      console.log('[OnboardingSave] Services saved successfully.');
+      console.log('[ONBOARDING] Services saved');
 
       // 4. Save Profile
-      console.log('[OnboardingSave] Saving profile...');
+      console.log('[ONBOARDING] Saving profile...');
       await saveProfilePartial(user.uid, finalData);
-      console.log('[OnboardingSave] Profile saved successfully.');
+      console.log('[ONBOARDING] Profile saved');
 
+      console.log('[ONBOARDING] completed successfully');
       setStep(6);
-      setIsFinalizing(false); // Reset to allow the next button click
+      setIsFinalizing(false); 
     } catch (error: any) {
-      console.error('[OnboardingSave] Finalization error:', error);
+      console.error('[ONBOARDING ERROR] Finalization failed:', error);
       if (error instanceof z.ZodError) {
         const errors: Record<string, string> = {};
         error.issues.forEach((issue) => {
@@ -491,7 +494,7 @@ export default function OnboardingPage() {
         setIsFinalizing(false);
         return;
       }
-      toast.error('Não foi possível concluir agora. Tente novamente.');
+      toast.error(getHumanError(error));
       setIsFinalizing(false);
     } finally {
       setLoading(false);
@@ -499,21 +502,20 @@ export default function OnboardingPage() {
   };
 
   const completeOnboarding = async () => {
-    console.log('[OnboardingSave] completeOnboarding triggered');
+    console.log('[ONBOARDING] completeOnboarding triggered');
     if (!user || isFinalizing) {
-      console.log('[OnboardingSave] completeOnboarding blocked:', { noUser: !user, isFinalizing });
       return;
     }
     
     setIsFinalizing(true);
     try {
-      console.log('[OnboardingSave] Setting onboardingCompleted = true...');
+      console.log('[ONBOARDING] Final step: setting onboardingCompleted = true');
       await saveProfilePartial(user.uid, { onboardingCompleted: true });
-      console.log('[OnboardingSave] Setting onboardingCompleted = SUCCESS. Navigating...');
+      console.log('[ONBOARDING] Success. Navigating to dashboard');
       navigate('/dashboard');
     } catch (error) {
-      console.error('[OnboardingSave] completeOnboarding error:', error);
-      toast.error('Não foi possível concluir agora. Tente novamente.');
+      console.error('[ONBOARDING ERROR] final step failed:', error);
+      toast.error(getHumanError(error));
       setIsFinalizing(false);
     }
   };
@@ -605,13 +607,7 @@ export default function OnboardingPage() {
         // 3b. AI Categorization
         let autoCategory = '';
         try {
-          const catRes = await fetch('/api/analyze-portfolio-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl: downloadUrl, specialty })
-          });
-          const catData = await catRes.json();
-          autoCategory = catData.category || '';
+          autoCategory = await analyzePortfolio({ imageUrl: downloadUrl, specialty });
         } catch {
           // silencioso — categoria fica vazia se falhar
         }
@@ -674,23 +670,23 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col">
-      {/* Progress Bar */}
-      <div className="fixed top-0 left-0 w-full h-1 bg-brand-mist z-50">
-        <motion.div 
-          className="h-full bg-brand-ink"
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.5 }}
-        />
-      </div>
-
-      {step <= 5 && (
-        <div className="fixed top-4 left-0 w-full text-center z-40">
-          <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest mt-2">
-            Passo {step} de 5 · {stepDescriptions[step - 1]}
-          </p>
+      <div className="fixed top-0 left-0 w-full bg-brand-parchment/95 backdrop-blur-sm border-b border-brand-mist/50 z-50">
+        <div className="w-full h-1 bg-brand-mist/30">
+          <motion.div 
+            className="h-full bg-brand-ink"
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.5 }}
+          />
         </div>
-      )}
+        {step <= 5 && (
+          <div className="py-3 px-6 flex justify-center items-center">
+            <p className="text-[10px] text-brand-stone font-semibold uppercase tracking-[0.2em]">
+              Passo {step} de 5 <span className="mx-2 text-brand-mist">•</span> {stepDescriptions[step - 1]}
+            </p>
+          </div>
+        )}
+      </div>
 
       <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full py-20">
         <AnimatePresence mode="wait">
@@ -711,8 +707,8 @@ export default function OnboardingPage() {
               />
 
               <FormIdentity
-                title="Sua Identidade Professional"
-                subtitle="Dê vida à sua marca boutique com IA em segundos."
+                title="Sua identidade profissional"
+                subtitle="Monte seu perfil com ajuda da IA. Depois você poderá ajustar tudo do seu jeito."
                 name={name}
                 setName={setName}
                 specialty={specialty}
@@ -760,8 +756,8 @@ export default function OnboardingPage() {
               className="w-full space-y-12"
             >
               <FormLocation
-                title="Sua vitrine geográfica"
-                subtitle="Defina onde e como suas clientes encontrarão seu talento."
+                title="Onde você atende"
+                subtitle="Informe sua cidade, bairro e forma de atendimento para suas clientes saberem como te encontrar."
                 city={city}
                 setCity={setCity}
                 neighborhood={neighborhood}
@@ -860,8 +856,8 @@ export default function OnboardingPage() {
               className="w-full space-y-10"
             >
               <FormServices
-                title="Monte seu menu de experiências"
-                subtitle="Quais rituais de beleza você oferecerá ao mundo?"
+                title="Seus serviços e preços"
+                subtitle="Cadastre os serviços que você oferece com duração e valor."
                 services={services}
                 setServices={setServices}
                 errors={servicesErrors}
@@ -899,20 +895,20 @@ export default function OnboardingPage() {
                 <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   <Clock size={32} />
                 </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">O tempo é o seu luxo</h1>
-                <p className="text-brand-stone font-light text-center">Defina seus momentos de disponibilidade e dedicação.</p>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seus horários de atendimento</h1>
+                <p className="text-brand-stone font-light text-center">Defina sua disponibilidade inicial. Depois você poderá ajustar dias e horários quando quiser.</p>
               </div>
 
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
+              <div className="bg-brand-white p-6 md:p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
                 <div className="space-y-4">
                   <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Atendimento</label>
-                  <div className="flex justify-between gap-2">
+                  <div className="flex justify-between gap-1 sm:gap-2">
                     {WEEKDAYS.map((day, idx) => (
                       <button
                         key={idx}
                         onClick={() => toggleDay(idx)}
                         className={cn(
-                          "w-10 h-10 md:w-12 md:h-12 rounded-full text-[10px] font-bold transition-all border flex items-center justify-center",
+                          "w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full text-[9px] sm:text-[10px] font-bold transition-all border flex items-center justify-center",
                           workingDays.includes(idx)
                             ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
                             : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
@@ -924,28 +920,28 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início <span className="text-brand-terracotta">*</span></label>
-                    <div className="relative">
-                      <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-2 min-w-0">
+                    <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início <span className="text-brand-terracotta">*</span></label>
+                    <div className="relative w-full">
+                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
                       <input 
                         type="time" 
                         value={startTime} 
                         onChange={(e) => setStartTime(e.target.value)} 
-                        className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Fim <span className="text-brand-terracotta">*</span></label>
-                    <div className="relative">
-                      <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
+                  <div className="space-y-2 min-w-0">
+                    <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim <span className="text-brand-terracotta">*</span></label>
+                    <div className="relative w-full">
+                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
                       <input 
                         type="time" 
                         value={endTime} 
                         onChange={(e) => setEndTime(e.target.value)} 
-                        className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                        className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                       />
                     </div>
                   </div>
@@ -981,8 +977,8 @@ export default function OnboardingPage() {
               className="w-full space-y-10"
             >
               <FormIdentity
-                title="O que torna seu trabalho especial?"
-                subtitle="Personalize os toques finais da sua vitrine digital."
+                title="Seu perfil está pronto"
+                subtitle="Revise suas informações e publique sua página profissional."
                 name={name}
                 setName={setName}
                 specialty={specialty}
@@ -1056,7 +1052,7 @@ export default function OnboardingPage() {
                       <span>Publicando...</span>
                     </>
                   ) : (
-                    <>Publicar minha vitrine <CheckCircle2 size={18} /></>
+                    <>Publicar meu perfil <CheckCircle2 size={18} /></>
                   )}
                 </button>
               </div>
@@ -1085,15 +1081,15 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-4">
-                <h1 className="text-5xl font-serif font-normal text-brand-ink">Sua vitrine está pronta!</h1>
+                <h1 className="text-5xl font-serif font-normal text-brand-ink">Seu perfil está no ar!</h1>
                 <p className="text-brand-stone text-lg max-w-sm mx-auto font-light">
-                  Seu perfil está pronto para receber clientes ainda hoje. Agora você tem um sistema profissional para valorizar seu tempo.
+                  Sua página profissional está pronta para receber agendamentos.
                 </p>
               </div>
 
               <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
                 <div className="p-8 bg-brand-parchment rounded-[32px] border border-brand-mist">
-                  <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-2">Seu link da bio</p>
+                  <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-2">Seu link profissional</p>
                   <p className="text-2xl font-serif italic text-brand-terracotta break-all">nera.app/p/{slug}</p>
                 </div>
 

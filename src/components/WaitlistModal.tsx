@@ -165,20 +165,20 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
 
               <h3 className="text-3xl font-serif text-brand-ink mb-6">Preferência de Horário</h3>
               
-              <div className="grid grid-cols-2 gap-4 mb-8">
+              <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4 mb-8">
                 {periods.map(p => (
                   <button 
                     key={p.id}
                     onClick={() => setFormData({...formData, period: p.id as any, preferredTime: ''})}
                     className={cn(
-                      "p-6 rounded-[32px] border transition-all flex flex-col gap-3 text-left group",
+                      "p-6 rounded-[32px] border transition-all flex flex-col gap-3 text-left group min-w-0",
                       formData.period === p.id && !formData.preferredTime
                         ? "bg-brand-ink border-brand-ink text-brand-white shadow-xl"
                         : "bg-brand-parchment border-brand-mist hover:border-brand-ink text-brand-stone"
                     )}
                   >
                     <p.icon size={20} className={cn("transition-transform group-hover:scale-110", formData.period === p.id ? "text-brand-terracotta" : "text-brand-stone")} />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{p.label}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-widest truncate">{p.label}</span>
                   </button>
                 ))}
               </div>
@@ -189,7 +189,7 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
                   type="time"
                   value={formData.preferredTime}
                   onChange={(e) => setFormData({...formData, preferredTime: e.target.value, period: 'any'})}
-                  className="w-full p-5 bg-brand-white border border-brand-mist rounded-2xl outline-none focus:border-brand-ink font-medium"
+                  className="w-full px-5 py-3.5 bg-brand-white border border-brand-mist rounded-2xl outline-none focus:border-brand-ink font-medium"
                 />
               </div>
 

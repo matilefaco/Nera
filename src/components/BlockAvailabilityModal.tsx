@@ -20,6 +20,8 @@ interface BlockAvailabilityModalProps {
   professionalId: string;
   appointments: Appointment[];
   workingHours: WorkingHours;
+  initialStartTime?: string;
+  initialEndTime?: string;
 }
 
 export default function BlockAvailabilityModal({
@@ -28,11 +30,24 @@ export default function BlockAvailabilityModal({
   selectedDate,
   professionalId,
   appointments,
-  workingHours
+  workingHours,
+  initialStartTime,
+  initialEndTime
 }: BlockAvailabilityModalProps) {
   const [step, setStep] = useState<'options' | 'custom' | 'conflicts'>('options');
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime, setEndTime] = useState('18:00');
+  const [date, setDate] = useState(selectedDate);
+  const [startTime, setStartTime] = useState(initialStartTime || '09:00');
+  const [endTime, setEndTime] = useState(initialEndTime || '18:00');
+
+  // Sync initial times when modal opens with predefined values
+  React.useEffect(() => {
+    if (open) {
+      setDate(selectedDate);
+      if (initialStartTime) setStartTime(initialStartTime);
+      if (initialEndTime) setEndTime(initialEndTime);
+      setStep('options');
+    }
+  }, [open, selectedDate, initialStartTime, initialEndTime]);
   const [reason, setReason] = useState<BlockedSchedule['reason']>('pessoal');
   const [isRecurring, setIsRecurring] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -60,6 +75,8 @@ export default function BlockAvailabilityModal({
     const eMinutes = timeToMinutes(end);
 
     const conflicting = appointments.filter(appt => {
+      // Filter by date if it matches
+      if (appt.date !== date) return false;
       if (appt.status === 'cancelled') return false;
       const apptStart = timeToMinutes(appt.time);
       const apptEnd = apptStart + (appt.duration || 60);
@@ -93,12 +110,38 @@ export default function BlockAvailabilityModal({
     setStartTime(start);
     setEndTime(end);
     
+    // Quick options are always for the selected date
     const conflicting = checkConflicts(start, end);
     if (conflicting.length > 0) {
       setConflicts(conflicting);
       setStep('conflicts');
     } else {
-      setStep('custom');
+      handleSaveSilent(start, end);
+    }
+  };
+
+  const handleSaveSilent = async (start: string, end: string) => {
+    setLoading(true);
+    try {
+      const blockData: Omit<BlockedSchedule, 'id'> = {
+        professionalId,
+        date: date,
+        startTime: start,
+        endTime: end,
+        reason,
+        type: start === workingHours.startTime && end === workingHours.endTime ? 'full_day' : 'manual',
+        isRecurring,
+        recurringDays: isRecurring ? [new Date(date + 'T12:00:00').getDay()] : [],
+        createdAt: serverTimestamp()
+      };
+
+      await addDoc(collection(db, 'blocked_schedules'), blockData);
+      toast.success('Horário bloqueado com sucesso.');
+      onClose();
+    } catch (e) {
+      toast.error('Erro ao bloquear horário.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -107,13 +150,13 @@ export default function BlockAvailabilityModal({
     try {
       const blockData: Omit<BlockedSchedule, 'id'> = {
         professionalId,
-        date: selectedDate,
+        date: date,
         startTime,
         endTime,
         reason,
         type: startTime === workingHours.startTime && endTime === workingHours.endTime ? 'full_day' : 'manual',
         isRecurring,
-        recurringDays: isRecurring ? [new Date(selectedDate + 'T12:00:00').getDay()] : [],
+        recurringDays: isRecurring ? [new Date(date + 'T12:00:00').getDay()] : [],
         createdAt: serverTimestamp()
       };
 
@@ -212,23 +255,36 @@ export default function BlockAvailabilityModal({
               <p className="text-sm text-brand-stone font-light mb-10">Defina os detalhes da sua indisponibilidade.</p>
 
               <div className="space-y-8">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">Data do bloqueio</label>
+                  <div className="relative">
+                    <input 
+                      type="date" 
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className="w-full p-5 bg-brand-parchment rounded-[24px] border border-brand-mist outline-none focus:border-brand-ink transition-all font-medium appearance-none"
+                    />
+                    <CalendarIcon size={16} className="absolute right-6 top-1/2 -translate-y-1/2 text-brand-stone pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4 min-[400px]:gap-6">
+                  <div className="space-y-2 min-w-0">
                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">Início</label>
                     <input 
                       type="time" 
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
-                      className="w-full p-5 bg-brand-parchment rounded-[24px] border border-brand-mist outline-none focus:border-brand-ink transition-all font-medium"
+                      className="w-full p-5 bg-brand-parchment rounded-[24px] border border-brand-mist outline-none focus:border-brand-ink transition-all font-medium min-w-0"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 min-w-0">
                     <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">Fim</label>
                     <input 
                       type="time"
                       value={endTime}
                       onChange={(e) => setEndTime(e.target.value)}
-                      className="w-full p-5 bg-brand-parchment rounded-[24px] border border-brand-mist outline-none focus:border-brand-ink transition-all font-medium"
+                      className="w-full p-5 bg-brand-parchment rounded-[24px] border border-brand-mist outline-none focus:border-brand-ink transition-all font-medium min-w-0"
                     />
                   </div>
                 </div>

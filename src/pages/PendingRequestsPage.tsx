@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../AuthContext';
-import { db, updateAppointmentStatus, handleBookingError } from '../firebase';
+import { db, confirmAppointmentAtomic, declineAppointmentAtomic, handleBookingError, checkAndExpireAppointments } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { 
   Calendar, Clock, Users, LogOut, 
@@ -67,6 +67,9 @@ export default function PendingRequestsPage() {
 
   useEffect(() => {
     if (!user) return;
+    
+    // Check for expired requests on load
+    checkAndExpireAppointments(user.uid);
 
     const qPending = query(
       collection(db, 'appointments'),
@@ -140,7 +143,7 @@ export default function PendingRequestsPage() {
         window.history.replaceState({}, '', window.location.pathname);
 
         if (action === 'confirm') {
-          handleRespond(id, 'confirmed');
+          handleRespond(id, 'confirmed', target);
         } else if (action === 'reject') {
           setRequestToReject(target);
           setIsConfirmRejectOpen(true);
@@ -152,19 +155,35 @@ export default function PendingRequestsPage() {
     }
   }, [loading, localRequests]);
 
-  const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled') => {
+  const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled_by_professional', appointment?: any) => {
     setProcessingId(id);
+    console.log(`[CONFIRM APPOINTMENT] initiating handleRespond for ${id} in PendingRequestsPage`);
+    
+    if (appointment) {
+      console.log(`[CONFIRM PRECHECK]`, {
+        appointmentId: id,
+        professionalId: appointment.professionalId,
+        serviceId: appointment.serviceId,
+        date: appointment.date || appointment.appointmentDate || appointment.selectedDate || appointment.scheduledDate,
+        time: appointment.time || appointment.appointmentTime || appointment.selectedTime || appointment.startTime,
+        status: appointment.status,
+        clientName: appointment.clientName
+      });
+    }
+
     try {
-      await updateAppointmentStatus(id, decision);
-      
       if (decision === 'confirmed') {
+        if (!user?.uid) throw new Error("auth-error");
+        await confirmAppointmentAtomic(id, user.uid);
         setConfirmedId(id);
-        toast.success('Reserva confirmada com sucesso!');
+        console.log(`[CONFIRM FLOW] SUCCESS: Booking ${id} confirmed.`);
+        toast.success(`Reserva confirmada! ID: ${id}`);
         // Transition to WhatsApp CTA after the check animation
         setTimeout(() => {
           setWhatsappCtaId(id);
         }, 1200);
       } else {
+        await declineAppointmentAtomic(id, user?.uid || '');
         toast.success('Reserva marcada como indisponível.');
         setIsConfirmRejectOpen(false);
         setRequestToReject(null);
@@ -174,6 +193,11 @@ export default function PendingRequestsPage() {
         setIsModalOpen(false);
       }
     } catch (error: any) {
+      console.error(`[CONFIRM ERROR RAW]`, {
+        message: error.message,
+        appointmentId: id,
+        stack: error.stack
+      });
       handleBookingError(error);
       setConfirmedId(null);
       setWhatsappCtaId(null);
@@ -184,7 +208,7 @@ export default function PendingRequestsPage() {
 
   return (
     <AppLayout activeRoute="dashboard">
-      <main className="flex-1 p-4 md:p-16 max-w-5xl mx-auto w-full pb-32">
+      <div className="p-4 md:p-16 max-w-5xl mx-auto w-full">
         <header className="mb-10 md:mb-16 pt-4">
           <button 
             onClick={() => navigate('/dashboard')}
@@ -204,11 +228,11 @@ export default function PendingRequestsPage() {
                 )}
               </div>
               <h1 className="text-[34px] md:text-5xl font-serif font-normal text-brand-ink leading-tight">
-                Central de Decisões
+                Pedidos de agendamento
               </h1>
               <p className="text-brand-stone text-xs md:text-sm font-light italic mt-2 max-w-xl">
                 {truePending.length > 0 
-                  ? `${truePending.length} ${truePending.length === 1 ? 'cliente aguardando sua resposta' : 'clientes aguardando sua resposta'}.`
+                  ? `${truePending.length} ${truePending.length === 1 ? 'cliente aguardando sua confirmação' : 'clientes aguardando sua confirmação'}.`
                   : 'Sua agenda está em dia.'}
               </p>
             </div>
@@ -225,9 +249,9 @@ export default function PendingRequestsPage() {
             <div className="w-24 h-24 bg-brand-linen rounded-[32px] flex items-center justify-center text-brand-stone/40 mb-8 rotate-3">
               <Inbox size={48} strokeWidth={1} />
             </div>
-            <h2 className="text-2xl font-serif text-brand-ink mb-4 text-balance">Agenda livre de pendências</h2>
+            <h2 className="text-2xl font-serif text-brand-ink mb-4 text-balance">Agenda livre de pedidos</h2>
             <p className="text-sm text-brand-stone font-light italic mb-10 leading-relaxed px-4">
-              Quando novas clientes agendarem pela sua vitrine, as solicitações aparecerão aqui para sua confirmação.
+              Quando novas clientes agendarem pelo seu link profissional, as solicitações aparecerão aqui para sua confirmação.
             </p>
             <Link to="/dashboard" className="px-10 py-5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all premium-shadow">Voltar ao Início</Link>
           </div>
@@ -299,23 +323,23 @@ export default function PendingRequestsPage() {
                       </div>
                       <div className="text-right">
                         <p className="text-xl md:text-2xl font-bold text-brand-ink">{formatCurrency((request.price || 0) + (request.travelFee || 0))}</p>
-                        <p className="text-[8px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Total</p>
+                        <p className="text-[8px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Valor</p>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/30 flex items-center gap-3">
-                        <Calendar size={14} className="text-brand-terracotta/60" />
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left">Data</span>
-                          <span className="text-[13px] font-bold text-brand-ink">{request.date.split('-').reverse().join('/')}</span>
+                    <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4 mb-6">
+                      <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/30 flex items-center gap-3 min-w-0">
+                        <Calendar size={14} className="text-brand-terracotta/60 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left truncate">Data</span>
+                          <span className="text-[13px] font-bold text-brand-ink truncate">{request.date.split('-').reverse().join('/')}</span>
                         </div>
                       </div>
-                      <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/30 flex items-center gap-3">
-                        <Clock size={14} className="text-brand-terracotta/60" />
-                        <div className="flex flex-col">
-                          <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left">Horário</span>
-                          <span className="text-[13px] font-bold text-brand-ink">{request.time}</span>
+                      <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/30 flex items-center gap-3 min-w-0">
+                        <Clock size={14} className="text-brand-terracotta/60 shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left truncate">Horário</span>
+                          <span className="text-[13px] font-bold text-brand-ink truncate">{request.time}</span>
                         </div>
                       </div>
                     </div>
@@ -327,7 +351,11 @@ export default function PendingRequestsPage() {
                           {request.locationType === 'home' ? 'Domicílio' : 'Estúdio'}
                         </span>
                         <span className="text-[12px] font-medium text-brand-ink truncate">
-                          {request.locationType === 'home' ? (request.address || request.neighborhood || 'Endereço não informado') : 'Endereço cadastrado'}
+                          {request.locationType === 'home' 
+                            ? (typeof request.address === 'object' ? `${request.address.street}, ${request.address.number}${request.address.neighborhood ? ` - ${request.address.neighborhood}` : ''}` : (request.address || request.neighborhood || 'Endereço não informado')) 
+                            : profile?.studioAddress 
+                              ? `${profile.studioAddress.street}, ${profile.studioAddress.number} - ${profile.studioAddress.neighborhood}`
+                              : 'No estúdio'}
                         </span>
                       </div>
                     </div>
@@ -344,7 +372,7 @@ export default function PendingRequestsPage() {
                     <div className="flex flex-col gap-3 mt-auto pt-4">
                       <div className="flex gap-3">
                         <button 
-                          onClick={() => handleRespond(request.id, 'confirmed')}
+                          onClick={() => handleRespond(request.id, 'confirmed', request)}
                           disabled={!!processingId}
                           className="flex-[3] py-5 bg-brand-ink text-brand-white rounded-[24px] text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                         >
@@ -380,7 +408,7 @@ export default function PendingRequestsPage() {
                           disabled={!!processingId}
                           className="flex-1 py-4 text-brand-stone/40 hover:text-brand-terracotta text-[9px] font-bold uppercase tracking-widest transition-colors"
                         >
-                          Recusar
+                          Cancelar
                         </button>
                       </div>
                     </div>
@@ -403,7 +431,7 @@ export default function PendingRequestsPage() {
                               >
                                 <Check size={40} className="text-brand-terracotta" />
                               </motion.div>
-                              <p className="text-[12px] font-bold uppercase tracking-[0.3em]">Reserva Confirmada</p>
+                              <p className="text-[12px] font-bold uppercase tracking-[0.3em]">Confirmado</p>
                               <p className="text-[10px] opacity-40 mt-2">Personalizando sua agenda...</p>
                             </>
                           ) : (
@@ -453,7 +481,7 @@ export default function PendingRequestsPage() {
             </AnimatePresence>
           </div>
         )}
-      </main>
+      </div>
 
       {/* Details Modal (Reuse logic from Dashboard or keep it here for independence) */}
       <AnimatePresence>
@@ -475,7 +503,7 @@ export default function PendingRequestsPage() {
               <div className="p-8 md:p-14">
                 <div className="flex justify-between items-start mb-10">
                   <div>
-                    <span className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] mb-4 block">Dossiê da Reserva</span>
+                    <span className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] mb-4 block">Detalhes do Pedido</span>
                     <h2 className="text-3xl md:text-5xl font-serif text-brand-ink leading-tight">{selectedRequest.clientName}</h2>
                   </div>
                   <button onClick={() => setIsModalOpen(false)} className="p-4 bg-brand-linen text-brand-stone hover:text-brand-ink rounded-[24px] transition-colors">
@@ -497,14 +525,14 @@ export default function PendingRequestsPage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="space-y-2">
+                    <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-6">
+                      <div className="space-y-2 min-w-0">
                         <p className="text-[9px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Data Escolhida</p>
-                        <p className="text-brand-ink font-serif text-xl">{selectedRequest.date.split('-').reverse().join('/')}</p>
+                        <p className="text-brand-ink font-serif text-xl truncate">{selectedRequest.date.split('-').reverse().join('/')}</p>
                       </div>
-                      <div className="space-y-2">
+                      <div className="space-y-2 min-w-0">
                         <p className="text-[9px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Horário Alvo</p>
-                        <p className="text-brand-ink font-serif text-xl">{selectedRequest.time}</p>
+                        <p className="text-brand-ink font-serif text-xl truncate">{selectedRequest.time}</p>
                       </div>
                     </div>
 
@@ -518,9 +546,55 @@ export default function PendingRequestsPage() {
                           <p className="text-[11px] font-bold text-brand-ink uppercase tracking-widest mb-1">{selectedRequest.locationType === 'home' ? 'Seu Atendimento em Domicílio' : 'Seu Estúdio Próprio'}</p>
                           <p className="text-[13px] text-brand-stone font-light leading-relaxed">
                             {selectedRequest.locationType === 'home' 
-                              ? (selectedRequest.address || selectedRequest.neighborhood || 'Endereço a combinar') 
+                              ? (typeof selectedRequest.address === 'object' 
+                                  ? (
+                                      <>
+                                        {selectedRequest.address.street}, {selectedRequest.address.number}{selectedRequest.address.complement ? ` - ${selectedRequest.address.complement}` : ''} - {selectedRequest.address.neighborhood}, {selectedRequest.address.city}
+                                        {selectedRequest.address.reference && (
+                                          <div className="text-[10px] text-brand-terracotta mt-1 leading-tight">Ref: {selectedRequest.address.reference}</div>
+                                        )}
+                                        <button 
+                                          onClick={() => {
+                                            const addr = `${selectedRequest.address.street}, ${selectedRequest.address.number}, ${selectedRequest.address.neighborhood}, ${selectedRequest.address.city}`;
+                                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
+                                          }}
+                                          className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
+                                        >
+                                          <MapPin size={12} /> Abrir no Maps
+                                        </button>
+                                      </>
+                                    )
+                                  : (
+                                      <>
+                                        {selectedRequest.address || selectedRequest.neighborhood || 'Endereço a combinar'}
+                                        {(selectedRequest.address || selectedRequest.neighborhood) && (
+                                          <button 
+                                            onClick={() => {
+                                              const addr = selectedRequest.address || selectedRequest.neighborhood;
+                                              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
+                                            }}
+                                            className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
+                                          >
+                                            <MapPin size={12} /> Abrir no Maps
+                                          </button>
+                                        )}
+                                      </>
+                                    )) 
                               : profile?.studioAddress 
-                                ? `${profile.studioAddress.street}, ${profile.studioAddress.number} - ${profile.studioAddress.neighborhood}`
+                                ? (
+                                    <>
+                                      {profile.studioAddress.street}, {profile.studioAddress.number} {profile.studioAddress.complement ? `- ${profile.studioAddress.complement}` : ''} - {profile.studioAddress.neighborhood}, {profile.studioAddress.city}
+                                      <button 
+                                        onClick={() => {
+                                          const addr = `${profile.studioAddress.street}, ${profile.studioAddress.number}, ${profile.studioAddress.neighborhood}, ${profile.studioAddress.city}`;
+                                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
+                                        }}
+                                        className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
+                                      >
+                                        <MapPin size={12} /> Abrir no Maps
+                                      </button>
+                                    </>
+                                  )
                                 : 'Atendimento no endereço cadastrado'}
                           </p>
                         </div>
@@ -579,7 +653,7 @@ export default function PendingRequestsPage() {
 
                 <div className="mt-16 pt-10 border-t border-brand-mist/60 flex flex-col sm:flex-row gap-5">
                   <button 
-                    onClick={() => handleRespond(selectedRequest.id, 'confirmed')}
+                    onClick={() => handleRespond(selectedRequest.id, 'confirmed', selectedRequest)}
                     disabled={!!processingId}
                     className="flex-[2] py-6 bg-brand-ink text-brand-white rounded-full text-[12px] font-bold uppercase tracking-[0.2em] hover:bg-brand-espresso transition-all shadow-2xl shadow-brand-ink/20 disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
                   >
@@ -629,17 +703,17 @@ export default function PendingRequestsPage() {
               <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-3xl flex items-center justify-center mx-auto mb-8 rotate-12">
                 <AlertCircle size={40} />
               </div>
-              <h3 className="text-2xl font-serif text-brand-ink mb-4">Recusar reserva?</h3>
+              <h3 className="text-2xl font-serif text-brand-ink mb-4">Cancelar pedido?</h3>
               <p className="text-sm text-brand-stone font-light italic mb-10 leading-relaxed px-4">
-                Ao marcar como indisponível, a cliente será notificada que você não poderá atendê-la neste horário.
+                Ao cancelar, a cliente será notificada que você não poderá atendê-la neste horário.
               </p>
               <div className="flex flex-col gap-3">
                 <button 
-                  onClick={() => handleRespond(requestToReject.id, 'cancelled')}
+                  onClick={() => handleRespond(requestToReject.id, 'cancelled_by_professional', requestToReject)}
                   disabled={!!processingId}
                   className="w-full py-5 bg-brand-terracotta text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg shadow-brand-terracotta/20"
                 >
-                  Confirmar Indisponibilidade
+                  Confirmar Cancelamento
                 </button>
                 <button 
                   onClick={() => { setIsConfirmRejectOpen(false); setRequestToReject(null); }}

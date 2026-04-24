@@ -3,17 +3,20 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight } from 'lucide-react';
 import { PortfolioItem } from '../../types';
 import PremiumButton from '../PremiumButton';
+import { getProfileHeroCopy } from '../../lib/copy';
 
 interface PortfolioSectionProps {
   portfolio: PortfolioItem[];
   onBookingClick: () => void;
+  specialty?: string;
 }
 
-export const PortfolioSection = ({ portfolio, onBookingClick }: PortfolioSectionProps) => {
+export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: PortfolioSectionProps) => {
   const [activeCategory, setActiveCategory] = useState('all');
 
   if (portfolio.length === 0) return null;
 
+  const tagline = getProfileHeroCopy(specialty);
   const categories = ['all', ...Array.from(new Set(portfolio.map(item => item.category).filter(Boolean)))];
   const filteredItems = activeCategory === 'all' 
     ? portfolio 
@@ -29,8 +32,8 @@ export const PortfolioSection = ({ portfolio, onBookingClick }: PortfolioSection
               <div className="w-12 h-px bg-brand-mist" />
             </div>
             <h2 className="heading-section text-brand-ink">
-              O olhar em<br />
-              <em className="font-serif italic text-brand-stone">detalhes</em>
+              {tagline.main}<br />
+              <em className="font-serif italic text-brand-stone">{tagline.accent}</em>
             </h2>
           </div>
 

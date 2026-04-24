@@ -24,7 +24,7 @@ export const OnboardingLivePreview = ({
     <div className="w-full">
       <div className="flex items-center gap-2 mb-4 text-brand-stone/40">
         <Sparkles size={14} />
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Prévia da sua Vitrine</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Prévia do seu Perfil</span>
       </div>
       
       <motion.div 

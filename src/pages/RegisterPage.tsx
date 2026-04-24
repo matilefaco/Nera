@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { User, Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
 import { generateSlug, getHumanError } from '../lib/utils';
@@ -20,7 +20,8 @@ export default function RegisterPage() {
 
   const handleGoogleRegister = async () => {
     setLoading(true);
-    console.log('>>> [DEBUG] [Register] Início do cadastro com Google');
+    console.log('[SIGNUP FLOW] Starting with Google');
+    let createdUser: User | null = null;
     try {
       if (auth.currentUser) {
         await signOut(auth);
@@ -29,6 +30,8 @@ export default function RegisterPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
+      createdUser = user;
+      console.log('[SIGNUP FLOW] Auth success (Google):', user.uid);
       
       const slug = generateSlug(user.displayName || 'profissional');
       
@@ -46,20 +49,22 @@ export default function RegisterPage() {
           onboardingCompleted: false,
           createdAt: new Date().toISOString()
         }, { merge: true });
-      } catch (firestoreError) {
+        console.log('[SIGNUP FLOW] Profile creation success (Google)');
+      } catch (firestoreError: any) {
+        console.error('[SIGNUP FLOW] Firestore profile creation failed:', firestoreError);
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      toast.success('Que prazer ter você conosco! Bem-vinda à Nera.');
+      console.log('[SIGNUP FLOW] Completed (Google)');
+      toast.success('Que prazer ter você conosco! Bem-vinda à Nera.', {
+        icon: <Sparkles className="text-brand-terracotta" size={18} />
+      });
       setTimeout(() => navigate('/onboarding'), 500);
 
     } catch (error: any) {
-      console.error('>>> [DEBUG] [Register] Erro no cadastro Google:', error);
-      if (error.code === 'auth/popup-blocked') {
-        toast.error('O acesso foi bloqueado pelo navegador. Por favor, permita popups.');
-      } else {
-        toast.error('Não foi possível realizar o cadastro agora. Tente novamente.');
-      }
+      console.error('[SIGNUP FLOW] Fatal error:', error);
+      console.error('[SIGNUP FLOW] Error Code:', error.code);
+      toast.error(`${getHumanError(error)} (${error.code || 'unknown'})`);
     } finally {
       setLoading(false);
     }
@@ -70,7 +75,8 @@ export default function RegisterPage() {
     if (loading) return;
     
     setLoading(true);
-    console.log('>>> [DEBUG] [Register] Início do processo de cadastro manual');
+    console.log('[SIGNUP FLOW] Starting manual flow for:', email);
+    let createdUser: User | null = null;
     
     try {
       if (auth.currentUser) {
@@ -79,11 +85,13 @@ export default function RegisterPage() {
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
+      createdUser = user;
+      console.log('[SIGNUP FLOW] Auth success:', user.uid);
       
       try {
         await updateProfile(user, { displayName: name });
       } catch (updateError) {
-        console.warn('>>> [DEBUG] [Register] Erro ao atualizar displayName:', updateError);
+        console.warn('[SIGNUP FLOW] Warning updating displayName:', updateError);
       }
       
       const slug = generateSlug(name);
@@ -102,16 +110,32 @@ export default function RegisterPage() {
           onboardingCompleted: false,
           createdAt: new Date().toISOString()
         });
+        console.log('[SIGNUP FLOW] Firestore profile creation success');
       } catch (firestoreError) {
+        console.error('[SIGNUP FLOW] Firestore creation failed:', firestoreError);
+        if (createdUser) {
+          try {
+            console.log('[SIGNUP FLOW] Rolling back auth user...');
+            await createdUser.delete();
+            console.log('[SIGNUP FLOW] Rollback success');
+          } catch (deleteError) {
+            console.error('[SIGNUP FLOW] Rollback failed:', deleteError);
+          }
+        }
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      toast.success('Perfil criado com sucesso. Vamos começar?');
+      console.log('[SIGNUP FLOW] Completed manual registration');
+      
+      toast.success('Perfil criado com sucesso. Vamos começar?', {
+        icon: <Sparkles className="text-brand-terracotta" size={18} />
+      });
       setTimeout(() => navigate('/onboarding'), 500);
 
     } catch (error: any) {
-      console.error('>>> [DEBUG] [Register] ERRO NO CADASTRO:', error);
-      toast.error('Não foi possível concluir agora. Tente novamente.');
+      console.error('[SIGNUP FLOW] Manual registration error:', error);
+      console.error('[SIGNUP FLOW] Error Code:', error.code);
+      toast.error(`${getHumanError(error)} (${error.code || 'unknown'})`);
     } finally {
       setLoading(false);
     }
@@ -166,15 +190,15 @@ export default function RegisterPage() {
         )}
 
         <div className="text-center mb-10">
-          <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Sua nova era</h2>
-          <p className="text-brand-stone text-sm font-light">Inicie sua presença premium agora.</p>
+          <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Crie sua presença profissional</h2>
+          <p className="text-brand-stone text-sm font-light">Comece sua página de agendamento em minutos.</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-5 mb-10">
           <div className="space-y-2">
             <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seu Nome</label>
             <div className="relative">
-              <User className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
+              <UserIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
               <input 
                 type="text" 
                 value={name}
@@ -222,7 +246,7 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full bg-brand-terracotta text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
           >
-            {loading ? 'Preparando sua experiência...' : 'Iniciar Minha Marca'} <ArrowRight size={18} />
+            {loading ? 'Preparando seu perfil...' : 'Criar meu perfil'} <ArrowRight size={18} />
           </button>
         </form>
 
@@ -240,7 +264,7 @@ export default function RegisterPage() {
           className="w-full bg-brand-white border border-brand-mist text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-4"
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-          Google Account
+          Continuar com Google
         </button>
 
         <p className="text-center mt-10 text-sm text-brand-stone font-light">

@@ -18,14 +18,23 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
+    console.log('[LOGIN FLOW] Starting Google login');
+    console.log('[LOGIN FLOW] Domain:', window.location.hostname);
+    console.log('[LOGIN FLOW] Origin:', window.location.origin);
+    
     try {
       const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
+      const result = await signInWithPopup(auth, provider);
+      console.log('[LOGIN FLOW] Google success for user:', result.user.email);
       toast.success('Que bom ter você de volta!');
       navigate('/dashboard');
     } catch (error: any) {
-      console.error('[Login] Erro no login Google:', error);
-      toast.error('Não foi possível realizar o acesso. Verifique seus dados.');
+      console.error('[LOGIN FLOW] Google login error:', error);
+      console.error('[LOGIN FLOW] Error Code:', error.code);
+      console.error('[LOGIN FLOW] Error Message:', error.message);
+      
+      const humanMessage = getHumanError(error);
+      toast.error(`${humanMessage} (${error.code || 'unknown'})`);
     } finally {
       setLoading(false);
     }
@@ -36,13 +45,19 @@ export default function LoginPage() {
     if (loading) return;
     
     setLoading(true);
+    console.log('[LOGIN FLOW] Starting manual login for:', email);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      console.log('[LOGIN FLOW] Manual success for user:', result.user.email);
       toast.success('Que bom ter você de volta!');
       navigate('/dashboard');
     } catch (error: any) {
-      console.error('[Login] Erro no login manual:', error);
-      toast.error('Não foi possível realizar o acesso. Verifique seus dados.');
+      console.error('[LOGIN FLOW] Manual login error:', error);
+      console.error('[LOGIN FLOW] Error Code:', error.code);
+      console.error('[LOGIN FLOW] Error Message:', error.message);
+
+      const humanMessage = getHumanError(error);
+      toast.error(`${humanMessage} (${error.code || 'unknown'})`);
     } finally {
       setLoading(false);
     }
@@ -98,7 +113,7 @@ export default function LoginPage() {
 
         <div className="text-center mb-10">
           <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Bem-vinda de volta</h2>
-          <p className="text-brand-stone text-sm font-light">Sua marca premium espera por você.</p>
+          <p className="text-brand-stone text-sm font-light">Sua presença profissional espera por você.</p>
         </div>
 
         <form onSubmit={handleEmailLogin} className="space-y-6 mb-10">
@@ -137,7 +152,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-brand-ink text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            {loading ? 'Preparando seu acesso...' : 'Acessar Meu Painel'} <ArrowRight size={18} />
+            {loading ? 'Acessando...' : 'Acessar Meu Painel'} <ArrowRight size={18} />
           </button>
         </form>
 
@@ -155,11 +170,11 @@ export default function LoginPage() {
           className="w-full bg-brand-white border border-brand-mist text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-4"
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-          Google Account
+          Continuar com Google
         </button>
 
         <p className="text-center mt-10 text-sm text-brand-stone font-light">
-          Ainda não tem sua vitrine? <Link to="/register" className="text-brand-terracotta font-medium hover:underline">Criar agora</Link>
+          Ainda não tem seu perfil? <Link to="/register" className="text-brand-terracotta font-medium hover:underline">Criar agora</Link>
         </p>
       </motion.div>
     </div>

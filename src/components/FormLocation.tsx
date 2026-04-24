@@ -18,7 +18,15 @@ export interface FormLocationProps {
     complement: string;
     neighborhood: string;
     city: string;
+    state?: string;
     reference: string;
+    googleMapsLink?: string;
+    hasParking?: boolean;
+    parkingInfo?: string;
+    hasAccessibility?: boolean;
+    accessibilityInfo?: string;
+    isSafeLocation?: boolean;
+    locationNotes?: string;
   };
   setStudioAddress?: (val: any) => void;
   
@@ -102,18 +110,18 @@ export const FormLocation = ({
           <div className="space-y-2">
             {showLabels && (
               <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                Cidade Base <span className="text-brand-terracotta">*</span>
+                Cidade <span className="text-brand-terracotta">*</span>
               </label>
             )}
             <div className="relative">
-              <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={16} />
               <input 
                 type="text" 
                 value={city} 
                 onChange={(e) => setCity(e.target.value)} 
                 placeholder="Ex: São Paulo, SP" 
                 className={cn(
-                  "w-full pl-14 pr-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                  "w-full pl-11 pr-4 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                   errors.city ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
                 )}
               />
@@ -123,7 +131,7 @@ export const FormLocation = ({
           <div className="space-y-2">
             {showLabels && (
               <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                Bairro Base
+                Bairro
               </label>
             )}
             <input 
@@ -132,7 +140,7 @@ export const FormLocation = ({
               onChange={(e) => setNeighborhood(e.target.value)} 
               placeholder="Ex: Jardins, Meireles, Lourdes..." 
               className={cn(
-                "w-full px-6 py-[15px] bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                "w-full px-5 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                 errors.neighborhood ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
               )}
             />
@@ -141,7 +149,7 @@ export const FormLocation = ({
         </div>
 
         <div className="space-y-4">
-          {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Estilo de Atendimento <span className="text-brand-terracotta">*</span></label>}
+          {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Forma de Atendimento <span className="text-brand-terracotta">*</span></label>}
           <div className="grid grid-cols-3 gap-3">
             <button 
               type="button"
@@ -249,7 +257,7 @@ export const FormLocation = ({
                 />
               </div>
               
-              <div className="space-y-2 md:col-span-2">
+              <div className="space-y-2">
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Ponto de Referência</label>
                 <input 
                   type="text"
@@ -258,6 +266,80 @@ export const FormLocation = ({
                   placeholder="Ex: Próximo ao Shopping Del Paseo" 
                   className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
                 />
+              </div>
+
+              <div className="md:col-span-2 space-y-6 bg-brand-parchment/30 p-8 rounded-[32px] border border-brand-mist/50">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">Estrutura e Diferenciais do Local</h4>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className="relative flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          checked={studioAddress.hasParking}
+                          onChange={(e) => setStudioAddress({...studioAddress, hasParking: e.target.checked})}
+                          className="w-5 h-5 rounded-md border-brand-mist text-brand-terracotta focus:ring-brand-terracotta cursor-pointer"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink group-hover:text-brand-terracotta transition-colors">Estacionamento</span>
+                        <p className="text-[10px] text-brand-stone font-light leading-snug italic">Possui local para parar no estúdio ou rua?</p>
+                      </div>
+                    </label>
+                    {studioAddress.hasParking && (
+                      <input 
+                        type="text"
+                        value={studioAddress.parkingInfo || ''}
+                        onChange={(e) => setStudioAddress({...studioAddress, parkingInfo: e.target.value})}
+                        placeholder="Ex: No prédio / zona azul na porta"
+                        className="w-full px-4 py-2.5 bg-brand-white border border-brand-mist rounded-xl text-[11px] font-light outline-none"
+                      />
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className="relative flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          checked={studioAddress.hasAccessibility}
+                          onChange={(e) => setStudioAddress({...studioAddress, hasAccessibility: e.target.checked})}
+                          className="w-5 h-5 rounded-md border-brand-mist text-brand-terracotta focus:ring-brand-terracotta cursor-pointer"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink group-hover:text-brand-terracotta transition-colors">Acessível</span>
+                        <p className="text-[10px] text-brand-stone font-light leading-snug italic">Rampas, elevadores, térreo?</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="space-y-4 md:col-span-2">
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className="relative flex items-center h-5">
+                        <input
+                          type="checkbox"
+                          checked={studioAddress.isSafeLocation}
+                          onChange={(e) => setStudioAddress({...studioAddress, isSafeLocation: e.target.checked})}
+                          className="w-5 h-5 rounded-md border-brand-mist text-brand-terracotta focus:ring-brand-terracotta cursor-pointer"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink group-hover:text-brand-terracotta transition-colors">Localização Segura</span>
+                        <p className="text-[10px] text-brand-stone font-light leading-snug italic">Prédio comercial, portaria 24h?</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 md:col-span-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Privacidade do Endereço (Sempre Público)</label>
+                <div className="p-5 rounded-[24px] border border-brand-ink bg-brand-linen text-brand-ink">
+                   <p className="text-[10px] font-bold uppercase tracking-widest">Público Total</p>
+                   <p className="text-[9px] font-light leading-tight opacity-60">Seu endereço completo aparecerá no seu perfil para facilitar a reserva.</p>
+                </div>
               </div>
             </div>
           </div>

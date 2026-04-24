@@ -7,16 +7,28 @@ import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types'
 import { removeEmptyFields } from './lib/utils';
 import { toast } from 'sonner';
 
+console.log('[FIREBASE CONFIG] Verifying configuration...');
+console.log('[FIREBASE CONFIG] apiKey present:', !!firebaseConfig.apiKey);
+console.log('[FIREBASE CONFIG] authDomain:', firebaseConfig.authDomain || 'MISSING');
+console.log('[FIREBASE CONFIG] projectId:', firebaseConfig.projectId || 'MISSING');
+console.log('[FIREBASE CONFIG] appId:', firebaseConfig.appId || 'MISSING');
+
+if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
+  console.error('[FIREBASE CONFIG] CRITICAL: Essential Firebase configuration keys are missing!');
+}
+
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const storage = getStorage(app);
 console.log('[Firebase] Storage initialized with bucket:', storage.app.options.storageBucket);
 
-// Initialize Auth with explicit persistence to handle Safari/ITP issues in iframes
+// Initialize Auth with browserLocalPersistence for maximum compatibility in iframes (Safari/iPhone)
+console.log('[Firebase] Initializing Auth with browserLocalPersistence...');
 export const auth = initializeAuth(app, {
-  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  persistence: browserLocalPersistence,
   popupRedirectResolver: browserPopupRedirectResolver,
 });
+console.log('[Firebase] Auth initialized.');
 
 export enum OperationType {
   CREATE = 'create',
@@ -50,14 +62,39 @@ export interface FirestoreErrorInfo {
  * Centrally handles booking-related errors and shows clear feedback to the user.
  */
 export function handleBookingError(error: any) {
+  console.log('[DEBUG] error object:', JSON.stringify(error));
   console.error('[Booking Error Handler]:', error);
+
+  // If the error message is specific and from our API, use it
+  if (error.message && error.message.length < 100 && !error.code) {
+    toast.error(`Erro: ${error.message}`);
+    return error.message;
+  }
 
   let message = 'Não foi possível concluir agora. Tente novamente.';
 
   // 1. Specific Business Logic Errors
-  if (error.message === 'Esse horário acabou de ser reservado' || error.message === 'Horário indisponível') {
-    message = 'Este horário acaba de ficar indisponível. Por favor, escolha outro momento.';
+  const businessErrors = [
+    'Este horário acabou de ser ocupado.',
+    'Horário indisponível',
+    'Este horário já foi preenchido por outra confirmação.',
+    'Este horário já está ocupado na agenda.',
+    'Reserva não encontrada.',
+    'Você não tem permissão para confirmar esta reserva.',
+    'Esta reserva já está confirmada.',
+    'Este horário acabou de ser ocupado por outra cliente.',
+    'Dados de data ou hora ausentes na reserva.'
+  ];
+
+  if (error.message === 'slot-taken' || error.message === 'Este horário já foi preenchido por outra confirmação.') {
+    message = 'Esse horário já possui uma reserva confirmada. Recuse este pedido ou escolha outro horário.';
+  }
+  else if (businessErrors.includes(error.message)) {
+    message = error.message;
   } 
+  else if (error.message === 'Dados incompletos' || error.message === 'Dados de agendamento incompletos' || error.message === 'missing-data') {
+    message = 'Dados da reserva incompletos. Verifique as informações.';
+  }
   // 2. Status Transition errors
   else if (error.message?.includes('não permitida')) {
     message = 'Esta reserva já foi finalizada e não pode mais ser alterada.';
@@ -68,10 +105,14 @@ export function handleBookingError(error: any) {
   }
   // 4. Data/Permission Errors
   else if (error.code === 'permission-denied' || error.message?.includes('insufficient permissions')) {
-    message = 'Ops! Verifique as informações e tente novamente.';
+    message = 'Permissão negada. Verifique as configurações de acesso.';
   }
-  // 5. Not Found
-  else if (error.message === 'Agendamento não encontrado') {
+  // 5. Auth Errors
+  else if (error.message === 'auth-error' || error.message?.includes('estar logado')) {
+    message = 'Profissional não autenticada ou logada.';
+  }
+  // 6. Not Found
+  else if (error.message === 'Agendamento não encontrado' || error.message === 'not-found') {
     message = 'A reserva solicitada não foi encontrada.';
   }
 
@@ -241,74 +282,412 @@ export async function notify(type: string, payload: any) {
 
 /**
  * Creates a booking request and notifies the professional.
- * Uses a transaction to ensure no two appointments can be created for the same slot.
+ * Regra Oficial: Pedido pendente NÃO bloqueia horário.
  */
 export async function createBookingRequest(appointmentData: Partial<Appointment>) {
-  console.log('[Booking] Creating request...');
+  console.log('[BOOKING_FLOW] createBookingRequest initiated');
+  console.log('[BOOKING_FLOW] Payload details:', {
+    pro: appointmentData.professionalId,
+    date: appointmentData.date,
+    time: appointmentData.time,
+    service: appointmentData.serviceName
+  });
   
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
+    console.error('[BOOKING_FLOW] ERROR: Missing required fields');
     throw new Error('Dados de agendamento incompletos');
   }
 
-  // Gerar token único para o link permanente da reserva
-  const generateToken = () => {
-    return Math.random().toString(36).substring(2, 9) + 
-           Math.random().toString(36).substring(2, 9) + 
-           Date.now().toString(36);
+  // Gerar tokens e códigos únicos
+  const generateRandomSuffix = (length: number = 4) => {
+    return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
   };
 
-  const slotId = `${appointmentData.date}_${appointmentData.time}`;
-  const lockId = `${appointmentData.professionalId}_${slotId}`;
-  const lockRef = doc(db, 'blocked_slots', lockId);
+  const generateReservationCode = (date: string) => {
+    const formattedDate = date.replace(/-/g, '');
+    return `NR-${formattedDate}-${generateRandomSuffix()}`;
+  };
 
   try {
-    const result = await runTransaction(db, async (transaction) => {
-      // 1. Verificar conflito DENTRO da transação (atômico)
-      const slotSnap = await transaction.get(lockRef);
-      if (slotSnap.exists()) {
-        throw new Error('Esse horário acabou de ser reservado');
-      }
+    const cleanedData = removeEmptyFields(appointmentData);
+    const apptRef = doc(collection(db, 'appointments'));
+    
+    // Novas chaves de segurança e consulta
+    const reservationCode = generateReservationCode(appointmentData.date);
+    const manageSlug = reservationCode.toLowerCase();
+    
+    console.log(`[BOOKING_FLOW] Generated reservationCode: ${reservationCode}`);
+    console.log(`[BOOKING_FLOW] Generated manageSlug: ${manageSlug}`);
+    
+    const finalData = {
+      ...cleanedData,
+      status: 'pending',
+      token: manageSlug,
+      publicToken: manageSlug,
+      manageToken: manageSlug,
+      reservationCode,
+      manageSlug,
+      createdAt: serverTimestamp(),
+    };
 
-      const cleanedData = removeEmptyFields(appointmentData);
-      const apptRef = doc(collection(db, 'appointments'));
-      const token = generateToken();
-      
-      transaction.set(apptRef, {
-        ...cleanedData,
-        status: 'pending',
-        token,
-        createdAt: serverTimestamp(),
-      });
+    await setDoc(apptRef, finalData);
 
-      // 2. Criar trava técnica para evitar overbooking atômico
-      transaction.set(lockRef, {
-        professionalId: appointmentData.professionalId,
-        date: appointmentData.date,
-        time: appointmentData.time,
+    // CRITICAL: Create reservation_links for instant backend lookup
+    try {
+      await setDoc(doc(db, 'reservation_links', manageSlug), {
         appointmentId: apptRef.id,
+        manageSlug,
+        reservationCode,
+        professionalId: appointmentData.professionalId,
+        clientEmail: appointmentData.clientEmail,
         createdAt: serverTimestamp()
       });
-
-      return { bookingId: apptRef.id, token };
-    });
-
-    console.log('[Booking] Request created:', result.bookingId);
-    
-    // Trigger notification
-    await notify('NEW_BOOKING_REQUEST', {
-      appointmentId: result.bookingId,
-      token: result.token,
-      ...appointmentData,
-      professionalWhatsapp: appointmentData.professionalWhatsapp || ''
-    });
-    
-    return { bookingId: result.bookingId, token: result.token };
-  } catch (error: any) {
-    if (error.message === 'Horário indisponível') {
-      throw error;
+      console.log(`[BOOKING_FLOW] reservation_links document created for: ${manageSlug}`);
+    } catch (linkErr) {
+      console.error('[BOOKING_FLOW] Error creating reservation_link fallback:', linkErr);
     }
-    console.error('[Booking] Failed to create request:', error);
+
+    console.log(`[BOOKING_FLOW] Document saved with ID: ${apptRef.id}`);
+    
+    // Garantir leitura oficial do banco
+    const verifySnap = await getDoc(apptRef);
+    const savedData = verifySnap.data() as any;
+    const finalToken = savedData?.manageSlug || manageSlug;
+    
+    console.log(`[BOOKING_FLOW] Verified slug from Firestore: ${finalToken}`);
+    console.log(`[BOOKING_FLOW] manageUrl: ${window.location.origin}/r/${finalToken}`);
+    
+    // Diagnostic Logs
+    console.log(`[EMAIL FLOW] client email candidate: ${appointmentData.clientEmail || 'MISSING'}`);
+    console.log(`[EMAIL FLOW] token candidate: ${finalToken || 'MISSING'}`);
+
+    // Trigger notification
+    console.log('[EMAIL FLOW] calling notify(NEW_BOOKING_REQUEST)...');
+    
+    // Explicit payload to ensure no collisions with 'id' or 'appointmentId' fields in data
+    const notifyPayload = {
+      ...appointmentData,
+      appointmentId: apptRef.id,
+      token: finalToken,
+      professionalWhatsapp: appointmentData.professionalWhatsapp || ''
+    };
+
+    try {
+      const res = await notify('NEW_BOOKING_REQUEST', notifyPayload);
+      console.log('[BOOKING FLOW] NEW_BOOKING_REQUEST notification success:', res);
+    } catch (err) {
+      console.error('[BOOKING FLOW] NEW_BOOKING_REQUEST notification failed:', err);
+    }
+    
+    return { 
+      bookingId: apptRef.id, 
+      token: finalToken,
+      reservationCode: savedData?.reservationCode || reservationCode
+    };
+  } catch (error: any) {
+    console.error('[Booking] CRITICAL ERROR creating request:', error);
     handleFirestoreError(error, OperationType.CREATE, 'appointments');
+    throw error;
+  }
+}
+
+/**
+ * Automaticaly cancels pending requests that conflict with a confirmed one.
+ */
+async function cancelConflictingRequests(confirmedId: string, professionalId: string, date: string, time: string) {
+  console.log(`[Cleanup] Checking for conflicts with ${confirmedId} at ${date} ${time}...`);
+  try {
+    const q = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', professionalId),
+      where('date', '==', date),
+      where('time', '==', time),
+      where('status', '==', 'pending')
+    );
+
+    const snap = await getDocs(q);
+    const conflicts = snap.docs.filter(doc => doc.id !== confirmedId);
+
+    if (conflicts.length === 0) return;
+
+    console.log(`[Cleanup] Found ${conflicts.length} conflicting pending requests. Cancelling...`);
+    
+    for (const conflict of conflicts) {
+      await updateDoc(conflict.ref, {
+        status: 'expired', // or cancelled_by_professional
+        cancellationReason: 'Horário preenchido por outra reserva',
+        updatedAt: serverTimestamp(),
+        lastChangeBy: 'system',
+        changeMessage: 'Cancelado automaticamente devido a conflito de horário'
+      });
+    }
+  } catch (e) {
+    console.error('[Cleanup] Failed to cancel conflicts:', e);
+  }
+}
+
+/**
+ * Checks for expired bookings based on Nera Official Rules:
+ * - Today's requests expire after 2 hours.
+ * - Future requests expire after 24 hours.
+ */
+export async function checkAndExpireAppointments(professionalId: string) {
+  console.log(`[GC] Checking for expired appointments for pro ${professionalId}...`);
+  try {
+    const q = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', professionalId),
+      where('status', '==', 'pending')
+    );
+
+    const snap = await getDocs(q);
+    const now = Date.now();
+
+    for (const d of snap.docs) {
+      const appt = d.data() as Appointment;
+      const createdAt = appt.createdAt?.toDate?.()?.getTime() || now;
+      const isToday = appt.date === new Date().toISOString().split('T')[0];
+      
+      const expireTime = isToday ? 2 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+      
+      if (now - createdAt > expireTime) {
+        console.log(`[GC] Expiring appointment ${d.id}`);
+        await updateDoc(d.ref, {
+          status: 'expired',
+          updatedAt: serverTimestamp(),
+          changeMessage: 'Expirado por falta de confirmação no prazo'
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[GC] Error:', e);
+  }
+}
+
+/**
+ * Atomic confirmation using Firestore Transactions.
+ * Guarantees that two appointments cannot occupy the same slot (professional + date + time).
+ */
+/**
+ * Updates an appointment's status simply.
+ */
+export async function updateAppointmentStatus(appointmentId: string, status: string) {
+  try {
+    const ref = doc(db, 'appointments', appointmentId);
+    await updateDoc(ref, {
+      status,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error updating appointment status:', error);
+    throw error;
+  }
+}
+
+export async function confirmAppointmentAtomic(appointmentId: string, professionalId: string) {
+  console.log(`[CONFIRM START] Starting atomic confirmation for ${appointmentId}...`);
+  console.log(`[CONFIRM PRECHECK]`, { appointmentId, professionalId, timestamp: new Date().toISOString() });
+  
+  if (!professionalId) {
+    const currentUid = auth.currentUser?.uid;
+    console.warn("[CONFIRM PRECHECK] professionalId not provided, using current user:", currentUid);
+    professionalId = currentUid || "";
+  }
+
+  if (!professionalId) {
+    console.error("[CONFIRM ERROR] Auth missing: No professionalId available");
+    throw new Error("auth-error");
+  }
+
+  // Ensure user is truly authenticated and matches the ID
+  if (auth.currentUser?.uid !== professionalId) {
+    console.error("[CONFIRM ERROR] UID mismatch or not logged in", { authUid: auth.currentUser?.uid, professionalId });
+    throw new Error("auth-error");
+  }
+
+  try {
+    return await runTransaction(db, async (transaction) => {
+      console.log(`[CONFIRM TX START] Accessing Firestore for appt: ${appointmentId}`);
+      const apptRef = doc(db, 'appointments', appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists()) {
+        console.error(`[CONFIRM ERROR] apptDoc not found: ${appointmentId}`);
+        throw new Error("not-found");
+      }
+
+      const data = apptDoc.data() as Appointment;
+      console.log(`[CONFIRM APPOINTMENT DOC] Current data:`, {
+        status: data.status,
+        date: data.date,
+        time: data.time,
+        proId: data.professionalId
+      });
+      
+      // Permission check
+      if (data.professionalId !== professionalId) {
+        console.error(`[CONFIRM ERROR] Permission mismatch: Pro ${professionalId} vs Owner ${data.professionalId}`);
+        throw new Error("permission-denied");
+      }
+
+      const currentStatus = data.status;
+      if (currentStatus !== 'pending') {
+        throw new Error("already-confirmed");
+      }
+
+      // Extract date and time with fallbacks
+      const dAny = data as any;
+      const dateVal = data.date || dAny.appointmentDate || dAny.selectedDate || dAny.scheduledDate;
+      const timeVal = data.time || dAny.appointmentTime || dAny.selectedTime || dAny.startTime;
+
+      if (!dateVal || !timeVal) {
+        console.error(`[CONFIRM ERROR] Missing date/time in data:`, { dateVal, timeVal });
+        throw new Error("missing-data");
+      }
+
+      const cleanTime = timeVal.replace(':', '');
+      const lockId = `${data.professionalId}_${dateVal}_${cleanTime}`;
+      const lockRef = doc(db, 'booking_locks', lockId);
+      
+      console.log(`[CONFIRM LOCK CHECK] Looking for lock: ${lockId}`);
+      const lockDoc = await transaction.get(lockRef);
+
+      const blockingStatuses = ['confirmed', 'accepted', 'completed'];
+      if (lockDoc.exists()) {
+        const lockData = lockDoc.data();
+        if (lockData && lockData.appointmentId !== appointmentId && blockingStatuses.includes(lockData.status)) {
+          console.error(`[CONFIRM ERROR] Slot already taken by appt: ${lockData.appointmentId}`);
+          throw new Error("slot-taken");
+        }
+      }
+
+      // Update Appointment
+      console.log(`[CONFIRM TX] Updating appointment status to confirmed`);
+      transaction.update(apptRef, {
+        status: "confirmed",
+        confirmedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastChangeBy: 'professional_atomic',
+        changeMessage: 'Reserva confirmada atomicamente'
+      });
+
+      // Create/Update Lock
+      console.log(`[CONFIRM TX] Creating slot lock: ${lockId}`);
+      transaction.set(lockRef, {
+        professionalId: data.professionalId,
+        appointmentId: appointmentId,
+        date: dateVal,
+        time: timeVal,
+        status: "confirmed",
+        serviceId: data.serviceId || 'unknown',
+        serviceName: data.serviceName || 'Serviço',
+        clientName: data.clientName || 'Cliente',
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+
+      console.log(`[CONFIRM SUCCESS] Appointment ${appointmentId} confirmed atomicly`);
+      return { success: true };
+    });
+  } catch (error: any) {
+    console.error('[CONFIRM ERROR RAW]', error);
+    throw error;
+  }
+}
+
+/**
+ * Atomic decline for PENDING requests.
+ * Ensures the status transition is safe and no locks are created.
+ */
+export async function declineAppointmentAtomic(appointmentId: string, professionalId: string) {
+  console.log(`[DECLINE START] Starting atomic decline for ${appointmentId}...`);
+  
+  if (!professionalId) throw new Error("auth-error");
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const apptRef = doc(db, 'appointments', appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists()) throw new Error("not-found");
+      const data = apptDoc.data() as Appointment;
+
+      if (data.professionalId !== professionalId) throw new Error("permission-denied");
+      
+      // Only pending can be declined via this atomic flow
+      if (data.status !== 'pending') {
+        throw new Error(`Transição de ${data.status} para recusada não permitida.`);
+      }
+
+      transaction.update(apptRef, {
+        status: "cancelled_by_professional",
+        declinedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastChangeBy: 'professional_declined_atomic',
+        changeMessage: 'Pedido recusado pela profissional'
+      });
+    });
+    console.log(`[DECLINE SUCCESS] Appointment ${appointmentId} declined.`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('[DECLINE ERROR RAW]', error);
+    throw error;
+  }
+}
+
+/**
+ * Atomic cancellation for already CONFIRMED appointments.
+ * Frees the slot lock and updates the appointment status.
+ */
+export async function cancelConfirmedAppointmentAtomic(appointmentId: string, professionalId: string) {
+  console.log(`[CANCEL START] Starting atomic cancellation for confirmed ${appointmentId}...`);
+  
+  if (!professionalId) throw new Error("auth-error");
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const apptRef = doc(db, 'appointments', appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists()) throw new Error("not-found");
+      const data = apptDoc.data() as Appointment;
+
+      if (data.professionalId !== professionalId) throw new Error("permission-denied");
+      
+      if (data.status !== 'confirmed' && data.status !== 'accepted') {
+        throw new Error(`Apenas agendamentos confirmados podem ser cancelados por este fluxo. Status atual: ${data.status}`);
+      }
+
+      // Identify the lock
+      const dAny = data as any;
+      const dateVal = data.date || dAny.appointmentDate || dAny.selectedDate || dAny.scheduledDate;
+      const timeVal = data.time || dAny.appointmentTime || dAny.selectedTime || dAny.startTime;
+
+      if (dateVal && timeVal) {
+        const cleanTime = timeVal.replace(':', '');
+        const lockId = `${professionalId}_${dateVal}_${cleanTime}`;
+        const lockRef = doc(db, 'booking_locks', lockId);
+        
+        // Always try to delete the lock if it points to this appointment
+        const lockDoc = await transaction.get(lockRef);
+        if (lockDoc.exists() && lockDoc.data().appointmentId === appointmentId) {
+          transaction.delete(lockRef);
+          console.log(`[CANCEL TX] Slot lock ${lockId} deleted.`);
+        }
+      }
+
+      transaction.update(apptRef, {
+        status: "cancelled_by_professional",
+        cancelledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastChangeBy: 'professional_cancelled_atomic',
+        changeMessage: 'Agendamento confirmado foi cancelado pela profissional'
+      });
+    });
+    
+    console.log(`[CANCEL SUCCESS] Appointment ${appointmentId} cancelled and slot freed.`);
+    return { success: true };
+  } catch (error: any) {
+    console.error('[CANCEL ERROR RAW]', error);
     throw error;
   }
 }
@@ -320,6 +699,29 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
 export async function updateAppointmentStatus(appointmentId: string, newStatus: Appointment['status']) {
   console.log(`[Status] Transitioning ${appointmentId} to ${newStatus}...`);
   
+  const currentUid = auth.currentUser?.uid;
+  if (!currentUid) {
+    throw new Error('Você precisa estar logado para realizar esta ação.');
+  }
+
+  // ATOMIC FLOWS
+  if (newStatus === 'confirmed') {
+    return await confirmAppointmentAtomic(appointmentId, currentUid);
+  }
+
+  if (newStatus === 'cancelled_by_professional') {
+    // Determine if it was pending or confirmed
+    const apptSnap = await getDoc(doc(db, 'appointments', appointmentId));
+    if (apptSnap.exists()) {
+      const data = apptSnap.data() as Appointment;
+      if (data.status === 'pending') {
+        return await declineAppointmentAtomic(appointmentId, currentUid);
+      } else if (data.status === 'confirmed' || data.status === 'accepted') {
+        return await cancelConfirmedAppointmentAtomic(appointmentId, currentUid);
+      }
+    }
+  }
+
   try {
     const result = await runTransaction(db, async (transaction) => {
       const apptRef = doc(db, 'appointments', appointmentId);
@@ -332,88 +734,82 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
 
       // 1. Validate Transitions
       const allowedTransitions: Record<string, string[]> = {
-        'pending': ['confirmed', 'cancelled'],
-        'confirmed': ['completed', 'cancelled'],
+        'pending': ['confirmed', 'cancelled', 'cancelled_by_professional', 'expired'],
+        'confirmed': ['completed', 'cancelled', 'cancelled_by_professional'],
         'completed': [],
-        'cancelled': []
+        'cancelled': [],
+        'cancelled_by_client': [],
+        'cancelled_by_professional': [],
+        'expired': []
       };
 
       if (!allowedTransitions[currentStatus]?.includes(newStatus)) {
         throw new Error(`Transição de ${currentStatus} para ${newStatus} não permitida`);
       }
 
-      // 2. Logic for Blocked Slots
-      const slotId = `${data.date}_${data.time}`;
-      const slotRef = doc(db, 'blocked_slots', `${data.professionalId}_${slotId}`);
+      // 2. Logic for Atomic Locks
+      const dAny = data as any;
+      const dateVal = data.date || dAny.appointmentDate || dAny.selectedDate || dAny.scheduledDate;
+      const timeVal = data.time || dAny.appointmentTime || dAny.selectedTime || dAny.startTime;
 
-      if (newStatus === 'confirmed') {
-        // Before confirming, check if the slot was already blocked by another confirmed appointment
-        const slotSnap = await transaction.get(slotRef);
-        if (slotSnap.exists()) {
-          throw new Error('Este horário já foi preenchido por outra confirmação.');
+      if (dateVal && timeVal) {
+        const cleanTime = timeVal.replace(':', '');
+        const lockId = `${data.professionalId}_${dateVal}_${cleanTime}`;
+        const lockRef = doc(db, 'booking_locks', lockId);
+
+        const blockingStatuses = ['confirmed', 'accepted', 'completed'];
+        const freeingStatuses = ['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'rejected'];
+
+        if (blockingStatuses.includes(newStatus)) {
+          // Handle completed/accepted etc (confirmed uses confirmAppointmentAtomic)
+          const lockSnap = await transaction.get(lockRef);
+          if (lockSnap.exists() && lockSnap.data().appointmentId !== appointmentId && blockingStatuses.includes(lockSnap.data().status)) {
+            throw new Error('Este horário já está ocupado.');
+          }
+
+          transaction.set(lockRef, {
+            professionalId: data.professionalId,
+            date: dateVal,
+            time: timeVal,
+            appointmentId: appointmentId,
+            status: newStatus,
+            updatedAt: serverTimestamp()
+          }, { merge: true });
+
+        } else if (freeingStatuses.includes(newStatus) && blockingStatuses.includes(currentStatus)) {
+          // Release the lock if it belongs to this appointment
+          const lockSnap = await transaction.get(lockRef);
+          if (lockSnap.exists() && lockSnap.data().appointmentId === appointmentId) {
+            transaction.delete(lockRef);
+          }
         }
-
-        // Create permanent lock
-        transaction.set(slotRef, {
-          professionalId: data.professionalId,
-          date: data.date,
-          time: data.time,
-          appointmentId: appointmentId,
-          isPending: false,
-          updatedAt: serverTimestamp()
-        });
-      } else if (newStatus === 'cancelled') {
-        // Free the slot
-        transaction.delete(slotRef);
-      } else if (newStatus === 'completed') {
-        // Ensure the slot remains blocked even after completion 
-        // to maintain its "occupied" state for that specific date/time.
-        transaction.set(slotRef, { 
-          isPending: false,
-          status: 'completed',
-          updatedAt: serverTimestamp() 
-        }, { merge: true });
       }
 
-      // 3. Update Appointment
-      const updateData: any = {
+      // 3. Perform the update
+      const updatePayload: any = {
         status: newStatus,
         updatedAt: serverTimestamp()
       };
 
-      if (newStatus === 'confirmed') updateData.confirmedAt = serverTimestamp();
-      if (newStatus === 'cancelled') updateData.cancelledAt = serverTimestamp();
-      if (newStatus === 'completed') updateData.completedAt = serverTimestamp();
+      if (['cancelled', 'cancelled_by_professional'].includes(newStatus)) updatePayload.cancelledAt = serverTimestamp();
+      if (newStatus === 'completed') updatePayload.completedAt = serverTimestamp();
 
-      transaction.update(apptRef, updateData);
+      transaction.update(apptRef, updatePayload);
       
-      return data; // Return original data for notifications
+      return data;
     });
 
     console.log(`[Status] Successfully updated to ${newStatus}`);
-    
-    // 4. Notifications
-    const notificationMap: Record<string, string> = {
-      'confirmed': 'BOOKING_CONFIRMED',
-      'cancelled': 'BOOKING_CANCELLED',
-      'completed': 'BOOKING_COMPLETED'
-    };
-
-    if (notificationMap[newStatus]) {
-      notify(notificationMap[newStatus], {
-        ...result,
-        professionalWhatsapp: result.professionalWhatsapp || ''
-      });
-    }
 
     // Trigger waitlist check if cancelled
-    if (newStatus === 'cancelled') {
+    const freeingStatuses = ['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'rejected'];
+    if (freeingStatuses.includes(newStatus)) {
       triggerWaitlistCheck(result.professionalId, result.date, result.time);
     }
     
     return { success: true };
   } catch (error: any) {
-    console.error('[Status] Update failed:', error);
+    console.error(`[Status] Update failed for ${appointmentId}:`, error);
     throw error;
   }
 }
@@ -428,10 +824,59 @@ export async function respondToBookingRequest(appointmentId: string, decision: '
 }
 
 /**
- * DEPRECATED: Use updateAppointmentStatus instead.
+ * Creates a manual appointment with atomic lock.
  */
-export async function cancelBooking(appointmentId: string) {
-  return updateAppointmentStatus(appointmentId, 'cancelled');
+export async function createManualAppointment(data: Partial<Appointment>) {
+  console.log(`[Manual Booking] Creating for ${data.date} ${data.time}`);
+  
+  if (!data.professionalId || !data.date || !data.time) {
+    throw new Error('Dados incompletos');
+  }
+
+  try {
+    await runTransaction(db, async (transaction) => {
+      const apptRef = doc(collection(db, 'appointments'));
+      const cleanTime = data.time.replace(':', '');
+      const lockId = `${data.professionalId}_${data.date}_${cleanTime}`;
+      const lockRef = doc(db, 'booking_locks', lockId);
+
+      // Verify lock
+      const lockSnap = await transaction.get(lockRef);
+      const blockingStatuses = ['confirmed', 'accepted', 'completed'];
+
+      if (lockSnap.exists() && blockingStatuses.includes(lockSnap.data().status)) {
+        throw new Error('Este horário já está ocupado na agenda.');
+      }
+
+      // Create appointment
+      transaction.set(apptRef, {
+        ...data,
+        status: 'confirmed',
+        confirmedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+        lastChangeBy: 'manual_pro'
+      });
+
+      // Create lock
+      transaction.set(lockRef, {
+        professionalId: data.professionalId,
+        date: data.date,
+        time: data.time,
+        appointmentId: apptRef.id,
+        serviceId: data.serviceId || 'manual',
+        status: 'confirmed',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    });
+
+    console.log('[Manual Booking] Created successfully');
+    return true;
+  } catch (error: any) {
+    console.error('[Manual Booking] Failed:', error);
+    throw error;
+  }
 }
 
 /**
@@ -458,11 +903,16 @@ export async function cancelBookingByClient(appointmentId: string, reason?: stri
       if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
       
       const data = apptDoc.data() as Appointment;
-      const slotId = `${data.date}_${data.time}`;
-      const slotRef = doc(db, 'blocked_slots', `${data.professionalId}_${slotId}`);
+      const cleanTime = data.time.replace(':', '');
+      const lockId = `${data.professionalId}_${data.date}_${cleanTime}`;
+      const lockRef = doc(db, 'booking_locks', lockId);
 
-      // Free the slot
-      transaction.delete(slotRef);
+      // Free the lock if it belongs to this appointment
+      const lockSnap = await transaction.get(lockRef);
+      if (lockSnap.exists() && lockSnap.data().appointmentId === appointmentId) {
+        console.log(`[BOOKING LOCK] released by client: ${lockId}`);
+        transaction.delete(lockRef);
+      }
 
       // Update appointment
       transaction.update(apptRef, {
@@ -478,7 +928,16 @@ export async function cancelBookingByClient(appointmentId: string, reason?: stri
     });
 
     // Notify pro about cancellation
-    notify('BOOKING_CANCELLED_BY_CLIENT', { id: appointmentId, ...data });
+    console.log(`[Client Cancel] Triggering notification for ${appointmentId}`);
+    notify('BOOKING_CANCELLED_BY_CLIENT', { 
+      appointmentId, // Use consistent naming
+      id: appointmentId, 
+      ...data 
+    }).then(res => {
+      console.log(`[Client Cancel] Notification sent for ${appointmentId}:`, res);
+    }).catch(err => {
+      console.warn(`[Client Cancel] Notification FAILED for ${appointmentId}:`, err);
+    });
 
     // Trigger waitlist check
     triggerWaitlistCheck(data.professionalId, data.date, data.time);
@@ -489,15 +948,38 @@ export async function cancelBookingByClient(appointmentId: string, reason?: stri
 }
 
 export async function getAppointmentByToken(token: string): Promise<Appointment | null> {
-  console.log(`[Firestore] Fetching appointment by token...`);
-  const q = query(
-    collection(db, 'appointments'), 
-    where('token', '==', token),
-    limit(1)
-  );
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  return { id: snap.docs[0].id, ...snap.docs[0].data() } as Appointment;
+  console.log(`[BOOKING_MANAGEMENT] Multi-Strategy Search for: ${token}`);
+  
+  const strategies = [
+    { field: 'manageSlug', value: token },
+    { field: 'reservationCode', value: token.toUpperCase() },
+    { field: 'token', value: token },
+    { field: 'publicToken', value: token },
+    { field: 'manageToken', value: token }
+  ];
+
+  for (const strategy of strategies) {
+    const q = query(collection(db, 'appointments'), where(strategy.field, '==', strategy.value), limit(1));
+    const snap = await getDocs(q);
+    if (!snap.empty) {
+      const appt = { id: snap.docs[0].id, ...snap.docs[0].data() } as Appointment;
+      console.log(`[BOOKING_MANAGEMENT] Found by ${strategy.field}: ${appt.id}`);
+      return appt;
+    }
+  }
+  
+  // Fallback: ID
+  if (token.length >= 20) {
+    const docRef = doc(db, 'appointments', token);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      console.log(`[BOOKING_MANAGEMENT] Found by Document ID: ${docSnap.id}`);
+      return { id: docSnap.id, ...docSnap.data() } as Appointment;
+    }
+  }
+
+  console.warn(`[BOOKING_MANAGEMENT] No appointment found for: ${token}`);
+  return null;
 }
 
 export async function rescheduleBookingByClient(appointmentId: string, newDate: string, newTime: string) {
@@ -510,29 +992,45 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
       
       const data = apptDoc.data() as Appointment;
       
-      // 1. Verify new slot
-      const newSlotId = `${newDate}_${newTime}`;
-      const newSlotRef = doc(db, 'blocked_slots', `${data.professionalId}_${newSlotId}`);
-      const newSlotSnap = await transaction.get(newSlotRef);
+      // 1. Verify new slot lock
+      const cleanNewTime = newTime.replace(':', '');
+      const lockId = `${data.professionalId}_${newDate}_${cleanNewTime}`;
+      const lockRef = doc(db, 'booking_locks', lockId);
+      const lockSnap = await transaction.get(lockRef);
       
-      if (newSlotSnap.exists()) {
-        throw new Error('Horário indisponível');
+      const blockingStatuses = ['confirmed', 'accepted', 'completed'];
+
+      if (lockSnap.exists() && blockingStatuses.includes(lockSnap.data().status)) {
+        if (lockSnap.data().appointmentId !== appointmentId) {
+          console.error(`[BOOKING LOCK] reschedule conflict at ${lockId}`);
+          throw new Error('Horário indisponível');
+        }
       }
 
-      // 2. Free old slot
-      const oldSlotId = `${data.date}_${data.time}`;
-      const oldSlotRef = doc(db, 'blocked_slots', `${data.professionalId}_${oldSlotId}`);
-      transaction.delete(oldSlotRef);
+      // 2. Free old lock
+      const cleanOldTime = data.time.replace(':', '');
+      const oldLockId = `${data.professionalId}_${data.date}_${cleanOldTime}`;
+      const oldLockRef = doc(db, 'booking_locks', oldLockId);
+      const oldLockSnap = await transaction.get(oldLockRef);
+      if (oldLockSnap.exists() && oldLockSnap.data().appointmentId === appointmentId) {
+        console.log(`[BOOKING LOCK] releasing old lock: ${oldLockId}`);
+        transaction.delete(oldLockRef);
+      }
 
-      // 3. Block new slot
-      transaction.set(newSlotRef, {
-        professionalId: data.professionalId,
-        date: newDate,
-        time: newTime,
-        appointmentId: appointmentId,
-        isPending: data.status === 'pending',
-        updatedAt: serverTimestamp()
-      });
+      // 3. Block new lock if already confirmed
+      if (blockingStatuses.includes(data.status)) {
+        console.log(`[BOOKING LOCK] creating new lock (rescheduled): ${lockId}`);
+        transaction.set(lockRef, {
+          professionalId: data.professionalId,
+          date: newDate,
+          time: newTime,
+          appointmentId: appointmentId,
+          serviceId: data.serviceId || 'unknown',
+          status: data.status,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
 
       // 4. Update appointment
       transaction.update(apptRef, {

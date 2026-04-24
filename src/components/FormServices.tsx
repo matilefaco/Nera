@@ -83,7 +83,7 @@ export const FormServices = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2 space-y-2">
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                  Nome da Experiência <span className="text-brand-terracotta">*</span>
+                  Nome do serviço <span className="text-brand-terracotta">*</span>
                 </label>
                 <input 
                   type="text" 
@@ -91,52 +91,51 @@ export const FormServices = ({
                   onChange={(e) => updateService(index, 'name', e.target.value)} 
                   placeholder="Ex: Consultoria de Imagem" 
                   className={cn(
-                    "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
+                    "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                     errors[index]?.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
                   )}
                 />
                 <FormError message={errors[index]?.name} />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Tempo Previsto (min) <span className="text-brand-terracotta">*</span></label>
-                <div className="relative">
-                  <Clock className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
-                  <input 
-                    type="number" 
-                    value={service.duration} 
-                    onChange={(e) => updateService(index, 'duration', e.target.value)} 
-                    placeholder="60" 
-                    className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 min-w-0">
+                  <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Duração (min)</label>
+                  <div className="relative">
+                    <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
+                    <input 
+                      type="number" 
+                      value={service.duration} 
+                      onChange={(e) => updateService(index, 'duration', e.target.value)} 
+                      placeholder="60" 
+                      className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm min-w-0"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                  Valor (R$) <span className="text-brand-terracotta">*</span>
-                </label>
-                <div className="relative">
-                  <DollarSign className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
-                  <input 
-                    type="number" 
-                    value={service.price} 
-                    onChange={(e) => updateService(index, 'price', e.target.value)} 
-                    placeholder="0,00" 
-                    className={cn(
-                      "w-full pl-14 pr-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
-                      errors[index]?.price ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
-                    )}
-                  />
+                <div className="space-y-2 min-w-0">
+                  <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Valor (R$)</label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
+                    <input 
+                      type="number" 
+                      value={service.price} 
+                      onChange={(e) => updateService(index, 'price', e.target.value)} 
+                      placeholder="0,00" 
+                      className={cn(
+                        "w-full pl-11 pr-4 py-3 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm min-w-0",
+                        errors[index]?.price ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                      )}
+                    />
+                  </div>
                 </div>
-                <FormError message={errors[index]?.price} />
               </div>
               <div className="md:col-span-2 space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sutilezas e Detalhes (Opcional)</label>
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Descrição do serviço (Opcional)</label>
                 <input 
                   type="text" 
                   value={service.description} 
                   onChange={(e) => updateService(index, 'description', e.target.value)} 
                   placeholder="Ex: Realçando sua beleza com naturalidade..." 
-                  className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light"
+                  className="w-full px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm"
                 />
               </div>
             </div>
@@ -148,7 +147,7 @@ export const FormServices = ({
           onClick={addService}
           className="w-full py-6 border border-dashed border-brand-mist rounded-3xl text-brand-stone hover:text-brand-ink hover:border-brand-ink transition-all flex items-center justify-center gap-3 font-medium text-sm"
         >
-          <Plus size={18} /> Propor nova experiência
+          <Plus size={18} /> Adicionar outro serviço
         </button>
       </div>
     </div>

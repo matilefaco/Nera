@@ -15,8 +15,9 @@ import {
   rescheduleBookingByClient,
   getAppointmentByToken
 } from '../firebase';
-import { doc, getDoc, collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, onSnapshot, getDocs, limit } from 'firebase/firestore';
 import { Appointment, UserProfile, Service } from '../types';
+import PremiumButton from '../components/PremiumButton';
 import { formatCurrency, formatLocalDate, buildWhatsappLink, cn } from '../lib/utils';
 import { getAvailableSlots } from '../lib/bookingUtils';
 import { toast } from 'sonner';
@@ -41,29 +42,55 @@ export default function ManageBookingPage() {
   const [errorOccurred, setErrorOccurred] = useState(false);
   const [reviewToken, setReviewToken] = useState<string | null>(null);
 
+  const [diagnosticResults, setDiagnosticResults] = useState<any>(null);
+  
   useEffect(() => {
     if (!id && !token) return;
 
     const fetchBooking = async () => {
+      const lookupKey = token || id;
+      if (!lookupKey) return;
+
+      console.log(`[BOOKING_MANAGEMENT] Fetching via API for: ${lookupKey}`);
       try {
-        let apptData: Appointment | null = null;
-
-        if (token) {
-          apptData = await getAppointmentByToken(token);
-        } else if (id) {
-          const apptSnap = await getDoc(doc(db, 'appointments', id));
-          if (apptSnap.exists()) {
-            apptData = { id: apptSnap.id, ...apptSnap.data() } as Appointment;
-          }
-        }
-
-        if (!apptData) {
+        const response = await fetch(`/api/reservation/${lookupKey}`);
+        
+        if (!response.ok) {
+          console.error('[BOOKING_MANAGEMENT] API fetch failed');
+          setDiagnosticResults({
+            token: lookupKey,
+            apiStatus: response.status,
+            apiStatusText: response.statusText,
+            searchTime: new Date().toLocaleTimeString()
+          });
           setErrorOccurred(true);
           setLoading(false);
           return;
         }
 
+        const result = await response.json();
+        
+        if (!result.found || !result.appointment) {
+          console.error('[BOOKING_MANAGEMENT] API returned found: false');
+          setErrorOccurred(true);
+          setLoading(false);
+          return;
+        }
+
+        const apptData = result.appointment;
         setAppointment(apptData);
+
+        // Professional data is already included in the API response
+        if (apptData.professional) {
+          setProfessional(apptData.professional);
+          console.log(`[BOOKING_MANAGEMENT] Professional from API: ${apptData.professional.name}`);
+        } else {
+          // Fallback fetch if professional not in API for some reason
+          const proSnap = await getDoc(doc(db, 'users', apptData.professionalId));
+          if (proSnap.exists()) {
+            setProfessional(proSnap.data() as UserProfile);
+          }
+        }
 
         // Fetch review token if completed
         if (apptData.status === 'completed') {
@@ -74,15 +101,9 @@ export default function ManageBookingPage() {
           }
         }
 
-        // Fetch pro
-        const proSnap = await getDoc(doc(db, 'users', apptData.professionalId));
-        if (proSnap.exists()) {
-          setProfessional(proSnap.data() as UserProfile);
-        }
-        
         setLoading(false);
       } catch (error) {
-        console.error('[ManageBooking] Error:', error);
+        console.error('[BOOKING_MANAGEMENT] API fetch error:', error);
         setErrorOccurred(true);
         setLoading(false);
       }
@@ -198,13 +219,28 @@ export default function ManageBookingPage() {
         </div>
         <h2 className="text-2xl font-serif text-brand-ink mb-2">Ops! Reserva não encontrada</h2>
         <p className="text-sm text-brand-stone font-light italic mb-8">O link pode ter expirado ou a reserva foi removida.</p>
+        
+        {diagnosticResults && (
+          <div className="w-full max-w-md bg-brand-linen/60 border border-brand-mist/50 p-6 rounded-[32px] mb-8 text-left space-y-4 overflow-hidden shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone border-b border-brand-mist pb-2">Diagnostic Data (Admin/Dev)</p>
+            <p className="text-[9px] font-mono text-brand-stone break-all">Slug tried: <span className="text-brand-terracotta">{diagnosticResults.token}</span></p>
+            <p className="text-[9px] font-mono text-brand-stone">API Status: <span className="text-brand-terracotta">{diagnosticResults.apiStatus} ({diagnosticResults.apiStatusText})</span></p>
+            
+            <p className="text-[9px] text-brand-stone/60 italic pt-2 leading-relaxed">
+              * O link foi consultado via backend /api/reservation/:slug. Se retornou 404, o manageSlug não está indexado ou o documento na coleção 'reservation_links' ainda não foi criado.
+            </p>
+          </div>
+        )}
+
         <button onClick={() => navigate('/')} className="px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest">Ir para o Início</button>
       </div>
     );
   }
 
-  const isCancelled = appointment.status === 'cancelled';
+  const isCancelled = ['cancelled', 'cancelled_by_professional', 'cancelled_by_client', 'expired', 'rejected'].includes(appointment.status);
   const isCompleted = appointment.status === 'completed';
+  const isPending = appointment.status === 'pending';
+  const isConfirmed = appointment.status === 'confirmed' || appointment.status === 'accepted';
   const isPast = new Date(appointment.date) < new Date(new Date().toISOString().split('T')[0]);
 
   const handleCalendarAdd = () => {
@@ -232,7 +268,7 @@ export default function ManageBookingPage() {
           </div>
           <div>
             <h1 className="text-sm font-serif text-brand-ink leading-tight">{professional.name}</h1>
-            <p className="text-[8px] text-brand-terracotta uppercase tracking-widest font-bold">Reserva no Nera</p>
+            <p className="text-[8px] text-brand-terracotta uppercase tracking-widest font-bold">Gestão de Reserva</p>
           </div>
         </div>
         <button onClick={() => navigate(`/p/${professional.slug}`)} className="text-brand-stone hover:text-brand-ink transition-colors">
@@ -252,38 +288,73 @@ export default function ManageBookingPage() {
             >
               {/* Status Banner */}
               <div className={cn(
-                "p-6 rounded-[32px] flex items-center justify-between shadow-sm",
-                isCancelled ? "bg-red-50 border border-red-100" : 
-                isCompleted ? "bg-brand-linen border border-brand-terracotta/20" :
-                appointment.status === 'confirmed' ? "bg-green-50 border border-green-100" :
-                "bg-brand-white border border-brand-mist"
+                "p-8 rounded-[40px] flex flex-col items-center text-center shadow-xl border relative overflow-hidden",
+                isCancelled ? "bg-red-50 border-red-100" : 
+                isCompleted ? "bg-brand-white border-brand-terracotta/20" :
+                isConfirmed ? "bg-green-50 border-green-100" :
+                "bg-brand-white border-brand-mist"
               )}>
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-12 h-12 rounded-2xl flex items-center justify-center",
-                    isCancelled ? "bg-red-100 text-red-600" : 
-                    isCompleted ? "bg-brand-white text-brand-terracotta" :
-                    appointment.status === 'confirmed' ? "bg-green-100 text-green-600" :
-                    "bg-brand-linen text-brand-stone"
-                  )}>
-                    {isCancelled ? <X size={24} /> : isCompleted ? <Sparkles size={24} /> : appointment.status === 'confirmed' ? <Check size={24} /> : <Clock size={24} />}
-                  </div>
-                  <div>
-                    <span className="text-[9px] font-bold uppercase tracking-widest block opacity-60">Status</span>
-                    <h3 className={cn(
-                      "text-base font-serif",
-                      isCancelled ? "text-red-700" : isCompleted ? "text-brand-terracotta" : appointment.status === 'confirmed' ? "text-green-700" : "text-brand-ink"
-                    )}>
-                      {isCancelled ? 'Reserva Cancelada' : 
-                       isCompleted ? 'Atendimento Concluído' :
-                       appointment.status === 'confirmed' ? 'Confirmada' : 'Aguardando Aprovação'}
-                    </h3>
-                  </div>
+                {/* Background Sparkle for success */}
+                {isConfirmed && <div className="absolute inset-0 bg-gradient-to-br from-green-100/50 to-transparent pointer-events-none" />}
+                
+                <div className={cn(
+                  "w-20 h-20 rounded-3xl flex items-center justify-center mb-6 relative z-10",
+                  isCancelled ? "bg-red-100 text-red-600" : 
+                  isCompleted ? "bg-brand-linen text-brand-terracotta" :
+                  isConfirmed ? "bg-green-100 text-green-600 shadow-lg shadow-green-200/50" :
+                  "bg-brand-linen text-brand-stone"
+                )}>
+                  {isCancelled ? <X size={40} /> : isCompleted ? <Sparkles size={40} /> : isConfirmed ? <Check size={40} /> : <Clock size={40} className="animate-pulse" />}
                 </div>
-                {appointment.clientConfirmedAt && !isCompleted && !isCancelled && (
-                  <div className="flex flex-col items-end text-right">
-                    <span className="text-[8px] font-bold text-green-600 uppercase tracking-widest">Presença</span>
-                    <span className="text-[10px] text-green-600 font-medium whitespace-nowrap">Confirmada p/ Você</span>
+
+                <div className="relative z-10">
+                  <h3 className={cn(
+                    "text-2xl font-serif mb-2",
+                    isCancelled ? "text-red-700" : isCompleted ? "text-brand-terracotta" : isConfirmed ? "text-green-700" : "text-brand-ink"
+                  )}>
+                    {isCancelled ? 'Reserva não ativa' : 
+                     isCompleted ? 'Atendimento concluído' :
+                     isConfirmed ? 'Reserva confirmada' : 'Pedido recebido'}
+                  </h3>
+                  {isPending && (
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone/60 mb-2">
+                      Aguardando confirmação
+                    </p>
+                  )}
+                  {appointment.reservationCode && (
+                    <div className="inline-flex items-center gap-2 bg-brand-linen/60 px-3 py-1 rounded-full border border-brand-mist/30">
+                      <span className="text-[8px] text-brand-stone uppercase tracking-widest font-bold">Reserva:</span>
+                      <span className="text-[9px] font-mono font-bold text-brand-terracotta">{appointment.reservationCode}</span>
+                    </div>
+                  )}
+                </div>
+
+                {isPending && (
+                  <div className="space-y-4 w-full">
+                    <div className="p-6 bg-brand-linen/40 rounded-3xl border border-brand-mist/50">
+                      <p className="text-sm text-brand-ink font-serif mb-2">Pedido recebido</p>
+                      <p className="text-xs text-brand-stone font-light leading-relaxed italic">
+                        A profissional ainda vai confirmar seu horário. Você receberá um aviso quando houver resposta.
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 gap-3">
+                      <a 
+                        href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Acabei de fazer um pedido de reserva no valor de ${formatCurrency(appointment.totalPrice || appointment.price)} para o dia ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}. Código: ${appointment.reservationCode || '-'}. Pode me confirmar se está tudo ok?`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2"
+                      >
+                        <MessageCircle size={18} /> Falar com a profissional
+                      </a>
+                      
+                      <button 
+                        onClick={() => setView('cancel')}
+                        className="w-full py-5 bg-brand-white text-brand-stone border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-widest shadow-sm hover:text-red-600 hover:border-red-600 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Trash2 size={16} /> Cancelar Pedido
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -293,39 +364,43 @@ export default function ManageBookingPage() {
                 {/* 1. UPCOMING ACTIONS (Not completed, not cancelled) */}
                 {!isCompleted && !isCancelled && !isPast && (
                   <>
-                    {/* Add to Calendar (Priority secondary) */}
-                    <button 
-                      onClick={handleCalendarAdd}
-                      className="w-full py-4 bg-brand-white text-brand-ink border border-brand-mist rounded-[24px] text-[10px] font-bold uppercase tracking-[0.2em] shadow-sm hover:border-brand-ink transition-all flex items-center justify-center gap-2"
-                    >
-                      <Calendar size={16} /> Adicionar ao Calendário
-                    </button>
-
-                    {/* Manage Actions */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Add to Calendar (Priority secondary for confirmed) */}
+                    {isConfirmed && (
                       <button 
-                        onClick={() => setView('reschedule')}
-                        className="py-4 bg-brand-white text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm hover:border-brand-ink transition-all flex items-center justify-center gap-2"
+                        onClick={handleCalendarAdd}
+                        className="w-full py-5 bg-brand-white text-brand-ink border border-brand-mist rounded-[28px] text-[10px] font-bold uppercase tracking-[0.2em] shadow-sm hover:border-brand-ink transition-all flex items-center justify-center gap-2 group"
                       >
-                        <Clock size={14} /> Remarcar
+                        <Calendar size={18} className="text-brand-terracotta group-hover:scale-110 transition-transform" /> Adicionar ao Calendário
                       </button>
-                      <button 
-                        onClick={() => setView('cancel')}
-                        className="py-4 bg-brand-white text-brand-stone border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm hover:text-red-600 hover:border-red-600 transition-all flex items-center justify-center gap-2"
-                      >
-                        <X size={14} /> Cancelar
-                      </button>
-                    </div>
+                    )}
 
                     {/* Presence Confirmation (Featured if applicable) */}
-                    {appointment.status === 'confirmed' && !appointment.clientConfirmedAt && (
+                    {isConfirmed && !appointment.clientConfirmedAt && (
                       <button 
                         onClick={handleConfirmPresence}
                         disabled={actionLoading}
-                        className="w-full py-5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-[0.2em] shadow-xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-2 animate-pulse"
+                        className="w-full py-6 bg-brand-ink text-brand-white rounded-full text-[11px] font-extrabold uppercase tracking-[0.25em] shadow-2xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 active:scale-95"
                       >
-                        {actionLoading ? 'Processando...' : <><CalendarCheck size={16} /> Confirmar Minha Presença</>}
+                        {actionLoading ? 'Processando...' : <><CalendarCheck size={20} /> Confirmar Minha Presença</>}
                       </button>
+                    )}
+
+                    {/* Manage Actions */}
+                    {!isPending && (
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <button 
+                          onClick={() => setView('reschedule')}
+                          className="py-4 bg-brand-white text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm hover:border-brand-ink transition-all flex items-center justify-center gap-2"
+                        >
+                          <Clock size={14} /> Remarcar
+                        </button>
+                        <button 
+                          onClick={() => setView('cancel')}
+                          className="py-4 bg-brand-white text-brand-stone border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm hover:text-red-600 hover:border-red-600 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Trash2 size={14} /> Cancelar Reserva
+                        </button>
+                      </div>
                     )}
                   </>
                 )}
@@ -336,89 +411,163 @@ export default function ManageBookingPage() {
                     {reviewToken && (
                       <button 
                         onClick={() => navigate(`/review/${reviewToken}`)}
-                        className="w-full py-6 bg-brand-ink text-brand-white rounded-full text-[11px] font-extrabold uppercase tracking-[0.2em] shadow-2xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-3"
+                        className="w-full py-7 bg-brand-ink text-brand-white rounded-full text-[11px] font-extrabold uppercase tracking-[0.25em] shadow-2xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 animate-bounce-slow"
                       >
-                        <Sparkles size={20} /> Avaliar Atendimento 💛
+                        <Sparkles size={24} className="fill-brand-terracotta text-brand-terracotta" /> Avaliar Atendimento 💛
                       </button>
                     )}
                     
-                    <button 
+                    <PremiumButton 
+                      variant="linen"
+                      className="w-full py-6"
                       onClick={() => navigate(`/p/${professional.slug}`)}
-                      className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-[0.15em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2"
                     >
-                      Ver Perfil e Novos Serviços <ChevronRight size={16} />
-                    </button>
+                      Agendar Novamente <ChevronRight size={18} />
+                    </PremiumButton>
                   </div>
                 )}
 
                 {/* 3. CANCELLED / EXPIRED STATE */}
                 {(isCancelled || (isPast && !isCompleted)) && (
-                   <div className="space-y-4">
-                     <p className="text-[10px] text-brand-stone text-center uppercase tracking-widest py-4">Esta reserva não pode mais ser alterada</p>
-                     <button 
-                      onClick={() => navigate(`/p/${professional.slug}`)}
-                      className="w-full py-5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-[0.2em] shadow-xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-2"
-                    >
-                      Novo Agendamento <CalendarCheck size={16} />
-                    </button>
+                   <div className="space-y-6">
+                      <div className="bg-amber-50 border border-amber-100 rounded-[40px] p-10 text-center">
+                        <RotateCcw size={40} className="mx-auto text-amber-500 mb-6 opacity-40" />
+                        <h4 className="text-xl font-serif text-amber-900 mb-2">Essa reserva não está mais ativa</h4>
+                        <p className="text-[10px] text-amber-700 uppercase tracking-widest font-bold">O horário foi liberado ou expirou</p>
+                      </div>
+                      
+                      <PremiumButton 
+                        variant="terracotta"
+                        className="w-full py-7 !text-[11px] !tracking-[0.2em]"
+                        onClick={() => navigate(`/p/${professional.slug}`)}
+                      >
+                        Fazer nova reserva <CalendarCheck size={20} />
+                      </PremiumButton>
                    </div>
                 )}
 
-                {/* ALWAYS VISIBLE UNTIL CANCELLED/PAST: Talk to Pro */}
-                {!isCancelled && (
+                {/* ALWAYS VISIBLE UNTIL CANCELLED: Talk to Pro (Only for confirmed/completed) */}
+                {!isCancelled && !isPending && (
                   <a 
-                    href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Gostaria de falar sobre minha reserva do dia ${appointment.date.split('-').reverse().join('/')}.`)}
+                    href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Gostaria de falar sobre minha reserva do dia ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}.`)}
                     target="_blank"
-                    className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-[0.2em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2"
+                    rel="noopener noreferrer"
+                    className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2 mt-4"
                   >
-                    <MessageCircle size={16} /> Falar no WhatsApp
+                    <MessageCircle size={18} /> Falar com a profissional
                   </a>
                 )}
               </div>
 
               {/* Reservation Summary Card */}
-              <div className="bg-brand-white rounded-[40px] p-8 shadow-xl border border-brand-mist overflow-hidden relative">
-                <div className="flex justify-between items-start mb-8">
-                  <div>
-                    <h4 className="text-xl md:text-2xl font-serif text-brand-ink mb-1">{appointment.serviceName}</h4>
-                    <span className="text-[10px] text-brand-terracotta uppercase tracking-[0.2em] font-bold">Informações da Reserva</span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-brand-ink">{formatCurrency(appointment.totalPrice || appointment.price)}</p>
-                  </div>
+              <div className="bg-brand-white rounded-[40px] p-10 shadow-2xl border border-brand-mist overflow-hidden relative">
+                <div className="flex flex-col mb-8 relative z-10">
+                  <span className="text-[10px] text-brand-terracotta uppercase tracking-[0.3em] font-bold mb-2">Detalhes do Agendamento</span>
+                  <h4 className="text-3xl font-serif text-brand-ink">{appointment.serviceName}</h4>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/50 flex items-center gap-3">
-                    <Calendar size={14} className="text-brand-terracotta" />
+                  <div className="bg-brand-linen/30 rounded-3xl p-5 border border-brand-mist/30 flex items-center gap-4">
+                    <Calendar size={18} className="text-brand-terracotta opacity-60" />
                     <div>
-                      <span className="text-[9px] text-brand-stone uppercase tracking-widest block">Data</span>
-                      <span className="text-xs font-bold text-brand-ink">{appointment.date.split('-').reverse().join('/')}</span>
+                      <span className="text-[9px] text-brand-stone uppercase tracking-widest block font-bold mb-0.5">Data</span>
+                      <span className="text-sm font-bold text-brand-ink">{appointment.date.split('-').reverse().join('/')}</span>
                     </div>
                   </div>
-                  <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/50 flex items-center gap-3 text-brand-ink">
-                    <Clock size={14} className="text-brand-terracotta" />
+                  <div className="bg-brand-linen/30 rounded-3xl p-5 border border-brand-mist/30 flex items-center gap-4">
+                    <Clock size={18} className="text-brand-terracotta opacity-60" />
                     <div>
-                      <span className="text-[9px] text-brand-stone uppercase tracking-widest block">Horário</span>
-                      <span className="text-xs font-bold text-brand-ink">{appointment.time}</span>
+                      <span className="text-[9px] text-brand-stone uppercase tracking-widest block font-bold mb-0.5">Horário</span>
+                      <span className="text-sm font-bold text-brand-ink">{appointment.time}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-brand-linen/40 rounded-3xl p-5 mb-8 flex items-start gap-3">
-                  <MapPin size={16} className="text-brand-terracotta shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[8px] text-brand-stone uppercase tracking-widest font-bold block mb-1">
-                      Localização
-                    </span>
-                    <p className="text-xs text-brand-ink leading-relaxed">
-                      {appointment.locationType === 'home' ? (appointment.address || appointment.neighborhood) : 'Endereço da profissional disponível no perfil.'}
-                    </p>
+                {appointment.locationType === 'home' && appointment.address && (
+                  <div className="bg-brand-linen/30 rounded-3xl p-6 mb-8 flex items-start gap-4 border border-brand-mist/30">
+                    <MapPin size={20} className="text-brand-terracotta shrink-0 mt-1" />
+                    <div>
+                      <span className="text-[9px] text-brand-stone uppercase tracking-widest font-bold block mb-1">Endereço do Atendimento</span>
+                      <p className="text-xs text-brand-ink leading-relaxed font-medium">
+                        {typeof appointment.address === 'object' 
+                          ? `${appointment.address.street}, ${appointment.address.number}${appointment.address.complement ? ` - ${appointment.address.complement}` : ''}`
+                          : appointment.address}
+                        {(typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood) && (
+                          <span className="block mt-1 opacity-50 text-[10px]">
+                            {typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood}
+                            {typeof appointment.address === 'object' && appointment.address.city && `, ${appointment.address.city}`}
+                          </span>
+                        )}
+                        {typeof appointment.address === 'object' && appointment.address.reference && (
+                          <span className="block mt-2 text-[10px] text-brand-stone italic font-normal">
+                             Ref: {appointment.address.reference}
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
+                )}
+
+                {appointment.locationType === 'studio' && professional.studioAddress && (
+                  <div className="bg-brand-linen/30 rounded-[32px] p-6 mb-8 border border-brand-mist/30 space-y-6">
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shadow-sm shrink-0">
+                        <MapPin size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[9px] text-brand-stone uppercase tracking-widest font-bold block mb-1">Local do Atendimento (Estúdio)</span>
+                        <p className="text-xs text-brand-ink leading-relaxed font-medium">
+                          {professional.studioAddress.street}, {professional.studioAddress.number}
+                          {professional.studioAddress.complement && ` - ${professional.studioAddress.complement}`}
+                          <span className="block opacity-60 text-[10px] mt-0.5">
+                            {professional.studioAddress.neighborhood}, {professional.studioAddress.city}
+                          </span>
+                        </p>
+                        
+                        {professional.studioAddress.reference && (
+                          <div className="mt-2 text-[10px] text-brand-stone italic flex items-center gap-1.5">
+                            <Info size={12} className="text-brand-terracotta/40" />
+                            Ref: {professional.studioAddress.reference}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <button 
+                        onClick={() => {
+                          if (professional.studioAddress?.googleMapsLink) {
+                            window.open(professional.studioAddress.googleMapsLink, '_blank');
+                          } else {
+                            const addr = `${professional.studioAddress?.street}, ${professional.studioAddress?.number}, ${professional.studioAddress?.neighborhood}, ${professional.studioAddress?.city}`;
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
+                          }
+                        }}
+                        className="flex items-center justify-center gap-2 py-3.5 bg-brand-white border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all shadow-sm"
+                      >
+                        <MapPin size={14} className="text-brand-terracotta" /> Abrir no Maps
+                      </button>
+                      <button 
+                        onClick={() => {
+                          const addr = `${professional.studioAddress?.street}, ${professional.studioAddress?.number}, ${professional.studioAddress?.complement ? `${professional.studioAddress.complement}, ` : ''}${professional.studioAddress?.neighborhood}, ${professional.studioAddress?.city}`;
+                          navigator.clipboard.writeText(addr);
+                          toast.success('Endereço copiado!');
+                        }}
+                        className="flex items-center justify-center gap-2 py-3.5 bg-brand-white border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all shadow-sm"
+                      >
+                        <Copy size={14} className="text-brand-stone" /> Copiar Endereço
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="border-t border-brand-mist pt-6 flex justify-between items-center">
+                  <span className="text-[10px] text-brand-stone uppercase tracking-[0.2em] font-bold">Valor Total</span>
+                  <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(appointment.totalPrice || appointment.price)}</span>
                 </div>
 
                 {appointment.rescheduledAt && (
-                  <div className="mb-6 p-4 bg-amber-50 rounded-2xl flex items-center gap-3 border border-amber-100">
+                  <div className="mt-6 p-4 bg-amber-50 rounded-2xl flex items-center gap-3 border border-amber-100">
                     <RotateCcw size={16} className="text-amber-600" />
                     <p className="text-[10px] text-amber-700 leading-tight">
                       Esta reserva foi reagendada. O horário anterior era {appointment.previousDate?.split('-').reverse().join('/')} às {appointment.previousTime}.
@@ -520,7 +669,7 @@ export default function ManageBookingPage() {
                       min={new Date().toISOString().split('T')[0]}
                       value={selectedDate}
                       onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(''); }}
-                      className="w-full px-6 py-5 bg-brand-linen rounded-[24px] outline-none border border-brand-mist focus:border-brand-ink transition-all text-sm font-medium"
+                      className="w-full px-6 py-4 bg-brand-linen rounded-[24px] outline-none border border-brand-mist focus:border-brand-ink transition-all text-sm font-medium"
                     />
                   </div>
 

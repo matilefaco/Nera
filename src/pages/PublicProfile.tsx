@@ -15,7 +15,7 @@ import BookingModal from '../components/BookingModal';
 import WaitlistModal from '../components/WaitlistModal';
 import { UserProfile, Service, Review, Appointment } from '../types';
 
-import { getAvailableSlots } from '../lib/bookingUtils';
+import { getAvailableSlots, getDayAvailability, getNextAvailableSlot, getLocalDateStr } from '../lib/bookingUtils';
 import { PublicHero } from '../components/public/PublicHero';
 import { ServicesSection } from '../components/public/ServicesSection';
 import { PortfolioSection } from '../components/public/PortfolioSection';
@@ -147,6 +147,7 @@ export default function PublicProfile() {
   const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
   const [nextSlot, setNextSlot] = useState<{ date: string, time: string } | null>(null);
   const [totalWeeklySlots, setTotalWeeklySlots] = useState<number | null>(null);
+  const [isAgendaFull, setIsAgendaFull] = useState(false);
   const [activeWaitlistEntry, setActiveWaitlistEntry] = useState<any>(null);
 
   const { heroBio, aboutBio } = React.useMemo(() => {
@@ -305,10 +306,11 @@ export default function PublicProfile() {
     const findAvailabilityData = async () => {
       if (!profile?.uid || !profile?.workingHours || services.length === 0) return;
       
+      console.log(`[NEXT_SLOT] Starting calculation for pro: ${profile.uid}`);
+      
       try {
+        const now = new Date();
         const duration = Number(services[0]?.duration) || 60;
-        let totalCount = 0;
-        let firstSlotFound = false;
 
         // Fetch all blocked schedules for the week once
         const blockedQ = query(
@@ -318,45 +320,62 @@ export default function PublicProfile() {
         const blockedSnap = await getDocs(blockedQ);
         const blockedSchedules = blockedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         
-        for (let i = 0; i < 7; i++) {
-          const date = new Date();
-          date.setDate(date.getDate() + i);
-          const dateStr = date.toISOString().split('T')[0];
-          const dayOfWeek = date.getDay();
-          
-          const apptsQ = query(
-            collection(db, 'appointments'),
-            where('professionalId', '==', profile.uid),
-            where('date', '==', dateStr),
-            where('status', 'in', ['pending', 'confirmed', 'completed'])
-          );
-          const snapshot = await getDocs(apptsQ);
-          const appts = snapshot.docs.map(doc => doc.data() as Appointment);
-          
-          // Filter blocked schedules for this specific day
-          const dayBlocked = blockedSchedules.filter(b => {
-             const isToday = b.date === dateStr;
-             const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-             return isToday || isRecurringToday;
-          });
+        // Fetch all appointments for the next 7 days once to avoid loop queries
+        const todayStr = getLocalDateStr(now);
+        const endGame = new Date();
+        endGame.setDate(endGame.getDate() + 14);
+        const endGameStr = getLocalDateStr(endGame);
 
-          const slots = getAvailableSlots({
-            selectedDate: dateStr,
+        const apptsQ = query(
+          collection(db, 'appointments'),
+          where('professionalId', '==', profile.uid),
+          where('date', '>=', todayStr),
+          where('date', '<=', endGameStr),
+          where('status', 'in', ['pending', 'confirmed', 'completed'])
+        );
+        const snapshot = await getDocs(apptsQ);
+        const allAppts = snapshot.docs.map(doc => doc.data() as Appointment);
+
+        const result = getNextAvailableSlot({
+          workingHours: profile.workingHours,
+          appointments: allAppts,
+          blockedSchedules,
+          serviceDuration: duration,
+          daysToLookAhead: 14 
+        });
+
+        if (result) {
+          // PROVA REAL: Re-verificar se os slots do dia escolhido realmente existem no motor mestre
+          const verificationSlots = getAvailableSlots({
+            selectedDate: result.date,
             serviceDuration: duration,
             workingHours: profile.workingHours,
-            appointments: appts,
-            blockedSchedules: dayBlocked
+            appointments: allAppts.filter(a => a.date === result.date),
+            blockedSchedules
           });
 
-          totalCount += slots.length;
-          if (slots.length > 0 && !firstSlotFound) {
-            setNextSlot({ date: dateStr, time: slots[0] });
-            firstSlotFound = true;
+          console.log(`[BADGE DEBUG] Final Verification for ${result.date}: ${verificationSlots.length} slots found.`);
+          
+          if (verificationSlots.length === 0) {
+            console.error(`[BADGE BUG] Badge attempted to show unavailable slot for ${result.date} ${result.time}. Agenda shows 0 slots.`);
+            setNextSlot(null);
+            setTotalWeeklySlots(0);
+            setIsAgendaFull(true);
+          } else {
+            console.log(`[BADGE DEBUG] Success: Badge showing confirmed slot ${result.time} on ${result.date}`);
+            setNextSlot({ date: result.date, time: result.time });
+            setTotalWeeklySlots(result.totalWeeklySlots);
+            setIsAgendaFull(result.totalWeeklySlots === 0);
           }
+        } else {
+          console.log(`[BADGE DEBUG] No slots found in the next 14 days`);
+          setTotalWeeklySlots(0);
+          setIsAgendaFull(true);
         }
-        setTotalWeeklySlots(totalCount);
+        
+        console.log(`[NEXT_SLOT] Calculation finished.`);
       } catch (e) {
-        console.warn("[PublicProfile] Failed to find availability data silently:", e);
+        console.warn("[NEXT_SLOT] Failed to find availability data:", e);
       }
     };
     
@@ -454,6 +473,7 @@ export default function PublicProfile() {
 
       <PortfolioSection 
         portfolio={profile.portfolio || []} 
+        specialty={profile.professionalIdentity?.mainSpecialty || profile.specialty}
         onBookingClick={() => {
           if (urgencyInfo?.isAgendaFull) {
             setIsWaitlistOpen(true);
@@ -474,6 +494,8 @@ export default function PublicProfile() {
         }} 
         completedBookings={stats?.totalCompletedBookings} 
       />
+
+      <div className="h-32 md:hidden" /> {/* Bottom spacing for mobile CTA */}
 
       {urgencyInfo?.isAgendaFull && (
         <section className="px-6 pb-20 -mt-10">

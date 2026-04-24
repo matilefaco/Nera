@@ -6,7 +6,7 @@ import { doc, updateDoc, collection, query, orderBy, getDocs, deleteDoc, setDoc 
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
-  Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck
+  Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import AppLayout from '../components/AppLayout';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
 import { FormLocation } from '../components/FormLocation';
+import { analyzePortfolio } from '../services/aiService';
 import { useProfileForm } from '../hooks/useProfileForm';
 
 const IDENTITY_DIFFERENTIALS = [
@@ -70,6 +71,7 @@ export default function ProfilePage() {
     serviceMode, setServiceMode,
     studioAddress, setStudioAddress,
     serviceAreas, setServiceAreas,
+    serviceAreaType, setServiceAreaType,
     pricingStrategy, setPricingStrategy,
     workingDays, setWorkingDays,
     startTime, setStartTime,
@@ -185,12 +187,14 @@ export default function ProfilePage() {
           complement: (studioAddress.complement || '').trim(),
           neighborhood: (studioAddress.neighborhood || neighborhood.trim()).trim(),
           city: (studioAddress.city || sanitizedCity).trim(),
-          reference: (studioAddress.reference || '').trim()
+          reference: (studioAddress.reference || '').trim(),
+          privacyMode: studioAddress.privacyMode || 'reveal_after_booking'
         },
         whatsapp: sanitizedWhatsapp,
         instagram: instagram.trim(),
         slug: sanitizedSlug,
         serviceMode,
+        serviceAreaType,
         serviceAreas: sanitizedAreas,
         pricingStrategy,
         avatar,
@@ -212,11 +216,11 @@ export default function ProfilePage() {
       try {
         await setDoc(doc(db, 'users', user.uid), finalPayload, { merge: true });
         console.log('[ProfileSave] Success');
-        toast.success('Sua vitrine foi atualizada.');
+        toast.success('Seu perfil foi atualizado com sucesso.');
       } catch (err: any) {
         console.error('[ProfileSave] Failed:', err);
         if (err?.code === 'resource-exhausted' || err?.message?.includes('too large')) {
-          toast.error('Sua vitrine está com muitas informações. Tente remover algumas fotos.');
+          toast.error('Seu perfil está com muitas fotos. Tente remover algumas para salvar.');
         } else {
           handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
         }
@@ -310,13 +314,7 @@ export default function ProfilePage() {
         // 3b. AI Categorization
         let autoCategory = '';
         try {
-          const catRes = await fetch('/api/analyze-portfolio-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl: url, specialty })
-          });
-          const catData = await catRes.json();
-          autoCategory = catData.category || '';
+          autoCategory = await analyzePortfolio({ imageUrl: url, specialty });
         } catch {
           // silencioso — categoria fica vazia se falhar
         }
@@ -383,14 +381,14 @@ export default function ProfilePage() {
 
   return (
     <AppLayout activeRoute="profile">
-      <main className="flex-1 p-6 md:p-12 max-w-5xl mx-auto w-full">
+      <div className="p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
-            <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Minha Identidade Visual</h1>
-            <p className="text-brand-stone font-light">Personalize sua presença digital para encantar suas clientes.</p>
+            <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Meu Perfil Profissional</h1>
+            <p className="text-brand-stone font-light">Personalize como sua página pública aparece para as clientes.</p>
           </div>
           <Link to={`/p/${profile?.slug}`} target="_blank" className="flex items-center gap-2 text-brand-terracotta font-medium text-sm hover:text-brand-sienna transition-colors">
-            Ver meu espaço <ExternalLink size={16} />
+            Ver meu perfil <ExternalLink size={16} />
           </Link>
         </header>
 
@@ -398,7 +396,7 @@ export default function ProfilePage() {
           <div className="mb-12 p-8 bg-brand-white border border-brand-mist rounded-[40px] shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone">
-                Completude do Seu Perfil
+                Progresso do seu perfil
               </span>
               <span className="text-[12px] font-bold text-brand-terracotta">{profileCompleteness}%</span>
             </div>
@@ -447,9 +445,9 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                   <Camera size={20} className="text-brand-terracotta" />
-                  <h3 className="font-serif italic text-xl text-brand-ink">Minha Galeria</h3>
+                  <h3 className="font-serif italic text-xl text-brand-ink">Meu Portfólio</h3>
                 </div>
-                <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Exiba momentos do seu trabalho</p>
+                <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Exiba fotos do seu trabalho</p>
               </div>
               
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -570,8 +568,8 @@ export default function ProfilePage() {
                 setServiceMode={setServiceMode}
                 studioAddress={studioAddress}
                 setStudioAddress={setStudioAddress}
-                serviceAreaType={profile?.serviceAreaType || 'custom'} // Using profile for some persistent settings if not in state
-                setServiceAreaType={() => {}} // Could add state for this if needed in ProfilePage
+                serviceAreaType={serviceAreaType}
+                setServiceAreaType={setServiceAreaType}
                 serviceAreas={serviceAreas}
                 setServiceAreas={setServiceAreas}
                 pricingStrategy={pricingStrategy}
@@ -610,23 +608,23 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-6 pt-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Início do Dia</label>
+              <div className="grid grid-cols-2 gap-4 py-2">
+                <div className="space-y-2 min-w-0">
+                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início</label>
                   <input 
                     type="time" 
                     value={startTime} 
                     onChange={(e) => setStartTime(e.target.value)} 
-                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
+                    className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Fim do Dia</label>
+                <div className="space-y-2 min-w-0">
+                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim</label>
                   <input 
                     type="time" 
                     value={endTime} 
                     onChange={(e) => setEndTime(e.target.value)} 
-                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-brand-ink"
+                    className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                   />
                 </div>
               </div>
@@ -635,13 +633,28 @@ export default function ProfilePage() {
             <button 
               type="submit" 
               disabled={loading} 
-              className="w-full bg-brand-ink text-brand-white py-7 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+              className="w-full bg-brand-ink text-brand-white py-8 rounded-[32px] text-[12px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
             >
-              <Save size={18} /> {loading ? 'Refinando...' : 'Atualizar Minha Marca'}
+              <Save size={18} /> {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
+
+            <div className="pt-8 border-t border-brand-mist">
+              <button 
+                type="button"
+                onClick={async () => {
+                   if (confirm('Tem certeza que deseja sair da sua conta?')) {
+                     await auth.signOut();
+                     window.location.href = '/login';
+                   }
+                }}
+                className="w-full bg-white border border-red-100 text-red-500 py-6 rounded-[32px] text-[11px] font-bold uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-3"
+              >
+                <LogOut size={18} /> Sair da conta
+              </button>
+            </div>
           </div>
         </form>
-      </main>
+      </div>
     </AppLayout>
   );
 }

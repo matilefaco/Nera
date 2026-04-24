@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, updateAppointmentStatus, handleBookingError } from '../firebase';
+import { db, confirmAppointmentAtomic, declineAppointmentAtomic, handleBookingError } from '../firebase';
 import { motion } from 'motion/react';
 import { Check, X, Calendar, Clock, User, MessageCircle, MapPin, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ export default function BookingResponsePage() {
   const [appointment, setAppointment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<'confirmed' | 'cancelled' | null>(null);
+  const [result, setResult] = useState<'confirmed' | 'cancelled_by_professional' | null>(null);
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -25,7 +25,7 @@ export default function BookingResponsePage() {
           const data = docSnap.data();
           setAppointment(data);
           if (data.status !== 'pending') {
-            setResult(data.status === 'confirmed' ? 'confirmed' : 'cancelled');
+            setResult(data.status === 'confirmed' ? 'confirmed' : 'cancelled_by_professional');
           }
         }
       } catch (error) {
@@ -39,14 +39,25 @@ export default function BookingResponsePage() {
     fetchAppointment();
   }, [appointmentId]);
 
-  const handleResponse = async (decision: 'confirmed' | 'cancelled') => {
+  const handleResponse = async (decision: 'confirmed' | 'cancelled_by_professional') => {
     if (!appointmentId) return;
     setProcessing(true);
+    console.log(`[CONFIRM APPOINTMENT] initiating handleResponse for ${appointmentId} in BookingResponsePage`);
+    
     try {
-      await updateAppointmentStatus(appointmentId, decision);
+      if (decision === 'confirmed') {
+        await confirmAppointmentAtomic(appointmentId, appointment.professionalId);
+      } else {
+        await declineAppointmentAtomic(appointmentId, appointment.professionalId);
+      }
       setResult(decision);
       toast.success(decision === 'confirmed' ? 'Reserva confirmada com sucesso.' : 'Reserva marcada como indisponível.');
     } catch (error: any) {
+      console.error(`[CONFIRM ERROR RAW]`, {
+        message: error.message,
+        appointmentId: appointmentId,
+        stack: error.stack
+      });
       handleBookingError(error);
     } finally {
       setProcessing(false);
@@ -191,7 +202,7 @@ export default function BookingResponsePage() {
             {processing ? 'Processando...' : <><Check size={20} /> Confirmar Reserva</>}
           </button>
           <button
-            onClick={() => handleResponse('cancelled')}
+            onClick={() => handleResponse('cancelled_by_professional')}
             disabled={processing}
             className="w-full py-6 bg-brand-white text-brand-stone border border-brand-mist rounded-2xl font-medium flex items-center justify-center gap-3 hover:bg-brand-parchment transition-all disabled:opacity-50"
           >

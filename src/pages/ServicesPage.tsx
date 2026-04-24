@@ -2,24 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { 
   Calendar, List, Plus, Trash2, Edit2, X, Clock, 
-  DollarSign, Settings, Sparkles, ChevronRight, Info, Users
+  DollarSign, Settings, Sparkles, ChevronRight, Info, Users,
+  Wand2, Loader2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { formatCurrency, getHumanError } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
+import { UserProfile } from '../types';
+import { generateServiceDescription } from '../services/aiService';
 
 export default function ServicesPage() {
   const { user } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [services, setServices] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -31,6 +36,11 @@ export default function ServicesPage() {
   useEffect(() => {
     if (!user) return;
 
+    // Fetch profile for AI context
+    getDoc(doc(db, 'users', user.uid)).then(snap => {
+      if (snap.exists()) setProfile(snap.data() as UserProfile);
+    });
+
     const q = query(collection(db, 'services'), where('professionalId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -38,30 +48,102 @@ export default function ServicesPage() {
     return () => unsubscribe();
   }, [user]);
 
+  const generateAIDescription = async () => {
+    if (!name) {
+      toast.error('Dê um nome ao serviço primeiro.');
+      return;
+    }
+
+    setIsGeneratingAI(true);
+    try {
+      const specialty = profile?.professionalIdentity?.mainSpecialty || profile?.specialty || 'Beleza';
+      const style = profile?.professionalIdentity?.serviceStyle?.[0] || 'elegante';
+      
+      const result = await generateServiceDescription({
+        serviceName: name,
+        professionalSpecialty: specialty,
+        duration: duration,
+        price: price,
+        tone: style
+      });
+
+      if (result.description && result.description.trim().length > 0) {
+        // Sanitize: remove quotes at start/end and trim
+        const sanitized = result.description.trim().replace(/^["']|["']$/g, '').trim();
+        setDescription(sanitized.slice(0, 160));
+        
+        if (result.source === 'fallback') {
+          toast.success('Geramos uma sugestão básica. Você pode editar antes de salvar.', {
+            icon: '⚠️',
+            style: { border: '1px solid #EAB308', color: '#854D0E', fontSize: '12px' }
+          });
+        } else {
+          toast.success('Descrição gerada com IA! ✨');
+        }
+      } else {
+        toast.error('Não foi possível gerar no momento.');
+      }
+    } catch (error) {
+      console.error('[AI Generation] Error:', error);
+      toast.error('Não foi possível gerar a descrição agora.');
+    } finally {
+      setIsGeneratingAI(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    const professionalId = user?.uid;
+    
+    console.log('[SERVICE SAVE] starting', { 
+      editingId, 
+      professionalId,
+      name,
+      duration,
+      price 
+    });
+
+    if (!professionalId) {
+      toast.error('Sessão expirada. Por favor, faça login novamente.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const serviceData = {
-        professionalId: user?.uid,
-        name,
-        description,
-        duration: Number(duration),
-        price: Number(price),
-        category,
+        professionalId,
+        name: name.trim(),
+        description: description.trim(),
+        duration: Number(duration) || 0,
+        price: Number(price) || 0,
+        category: category || 'Geral', // Ensure category is present
         active: true,
+        updatedAt: new Date().toISOString()
       };
+
+      console.log('[SERVICE SAVE] payload:', serviceData);
+
       if (editingId) {
-        await updateDoc(doc(db, 'services', editingId), serviceData);
-        toast.success('Experiência atualizada com sucesso.');
+        const docRef = doc(db, 'services', editingId);
+        await updateDoc(docRef, serviceData);
+        console.log('[SERVICE SAVE] update success');
+        toast.success('Serviço atualizado com sucesso.');
       } else {
-        await addDoc(collection(db, 'services'), serviceData);
-        toast.success('Nova experiência adicionada ao seu menu.');
+        const colRef = collection(db, 'services');
+        await addDoc(colRef, {
+          ...serviceData,
+          createdAt: new Date().toISOString()
+        });
+        console.log('[SERVICE SAVE] create success');
+        toast.success('Novo serviço adicionado com sucesso.');
       }
       closeModal();
     } catch (error: any) {
-      console.error('[ServicesSave] Error:', error);
-      toast.error('Não foi possível concluir agora. Tente novamente.');
+      console.error('[SERVICE SAVE] failed:', error);
+      const errorMessage = getHumanError(error) || 'Não foi possível salvar o serviço. Verifique os dados e tente novamente.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -73,7 +155,7 @@ export default function ServicesPage() {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'services', serviceToDelete));
-      toast.success('Experiência removida.');
+      toast.success('Serviço removido.');
       setIsDeleteModalOpen(false);
       setServiceToDelete(null);
     } catch (error: any) {
@@ -111,11 +193,11 @@ export default function ServicesPage() {
 
   return (
     <AppLayout activeRoute="services">
-      <main className="flex-1 p-6 md:p-12 max-w-5xl mx-auto w-full">
+      <div className="p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
           <div>
-            <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Seu Menu de Serviços</h1>
-            <p className="text-brand-stone text-sm font-light">Defina o que você faz de melhor e quanto vale seu tempo.</p>
+            <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Seus Serviços</h1>
+            <p className="text-brand-stone text-sm font-light">Gerencie seus serviços, preços e durações.</p>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)} 
@@ -167,8 +249,8 @@ export default function ServicesPage() {
               <div className="w-24 h-24 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta mx-auto mb-8">
                 <List size={40} />
               </div>
-              <h3 className="text-2xl font-serif font-normal text-brand-ink mb-3">Comece adicionando um serviço</h3>
-              <p className="text-brand-stone text-sm font-light mb-10 max-w-xs mx-auto">Você precisa de pelo menos um serviço ativo para que as clientes possam agendar.</p>
+              <h3 className="text-2xl font-serif font-normal text-brand-ink mb-3">Adicione seu primeiro serviço</h3>
+              <p className="text-brand-stone text-sm font-light mb-10 max-w-xs mx-auto">Você precisa de pelo menos um serviço ativo para aparecer na sua página profissional.</p>
               <button 
                 onClick={() => setIsModalOpen(true)}
                 className="bg-brand-ink text-brand-white px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-widest shadow-xl hover:bg-brand-espresso transition-all"
@@ -217,69 +299,89 @@ export default function ServicesPage() {
 
         <AnimatePresence>
           {isModalOpen && (
-            <div className="fixed inset-0 bg-brand-ink/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+            <div className="fixed inset-0 bg-brand-ink/60 backdrop-blur-sm z-[110] flex items-center justify-center p-0 sm:p-6 overflow-hidden">
               <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+                initial={{ opacity: 0, scale: 0.98, y: 20 }} 
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-brand-white w-full max-w-xl rounded-[40px] p-12 shadow-2xl relative overflow-hidden border border-brand-mist"
+                exit={{ opacity: 0, scale: 0.98, y: 20 }}
+                className="bg-brand-white w-full h-[100dvh] sm:h-auto max-w-[min(100vw,560px)] sm:rounded-[40px] p-8 sm:p-12 shadow-2xl relative border-x sm:border-y border-brand-mist overflow-y-auto no-scrollbar box-border mx-auto flex flex-col"
               >
-                <div className="absolute top-0 left-0 w-full h-2 bg-brand-terracotta" />
-                <button onClick={closeModal} className="absolute right-10 top-10 text-brand-stone hover:text-brand-ink transition-colors"><X size={24} /></button>
+                <div className="absolute top-0 left-0 w-full h-2 bg-brand-terracotta shrink-0" />
+                <button onClick={closeModal} className="absolute right-6 top-8 sm:right-10 sm:top-10 text-brand-stone hover:text-brand-ink transition-colors z-10"><X size={24} /></button>
                 
-                <div className="mb-10">
-                  <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">{editingId ? 'Refinar Serviço' : 'Novo Serviço Boutique'}</h2>
-                  <p className="text-brand-stone text-sm font-light">Preencha os detalhes para valorizar seu trabalho.</p>
+                <div className="mb-8 sm:mb-10 pr-8 shrink-0">
+                  <h2 className="text-2xl sm:text-3xl font-serif font-normal text-brand-ink mb-2">{editingId ? 'Editar Serviço' : 'Novo Serviço'}</h2>
+                  <p className="text-brand-stone text-xs sm:text-sm font-light">Preencha os detalhes para valorizar seu trabalho.</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-8">
+                <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8 flex-1">
                   <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Nome do Serviço</label>
-                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Design de Sobrancelhas Premium" className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-lg font-light" required />
+                    <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Nome do Serviço</label>
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Design de Sobrancelhas" className="w-full px-5 sm:px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-base font-light min-w-0 box-border" required />
                   </div>
                   
                   <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Descrição (Venda seu peixe)</label>
-                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que torna este serviço especial?" className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink h-28 resize-none transition-all font-light" />
+                    <div className="flex items-center justify-between ml-1">
+                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Descrição (Opcional)</label>
+                      <button 
+                        type="button"
+                        onClick={generateAIDescription}
+                        disabled={isGeneratingAI || !name}
+                        className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-brand-terracotta hover:text-brand-sienna transition-colors disabled:opacity-40"
+                      >
+                        {isGeneratingAI ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" /> Gerando...
+                          </>
+                        ) : (
+                          <>
+                            <Wand2 size={12} /> Gerar com IA
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que torna este serviço especial?" className="w-full px-5 sm:px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink h-24 sm:h-28 resize-none transition-all font-light text-sm min-w-0 box-border" />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Duração (minutos)</label>
+                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Duração (min)</label>
                       <div className="relative">
-                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
-                        <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light" required />
+                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
+                        <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm min-w-0" required />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Preço (R$)</label>
+                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Preço (R$)</label>
                       <div className="relative">
-                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
-                        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" className="w-full pl-12 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light" required />
+                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
+                        <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0,00" className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm min-w-0" required />
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-brand-linen p-6 rounded-2xl flex gap-4 items-start border border-brand-mist">
+                  <div className="bg-brand-linen p-5 sm:p-6 rounded-2xl flex gap-4 items-start border border-brand-mist">
                     <Info size={18} className="text-brand-terracotta shrink-0 mt-0.5" />
-                    <p className="text-[10px] text-brand-stone font-medium uppercase leading-relaxed tracking-wider">
+                    <p className="text-[9px] sm:text-[10px] text-brand-stone font-medium uppercase leading-relaxed tracking-wider">
                       Serviços com descrições detalhadas e preços claros geram mais agendamentos imediatos.
                     </p>
                   </div>
 
-                  <button 
-                    type="submit" 
-                    disabled={loading} 
-                    className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest shadow-xl hover:bg-brand-espresso transition-all mt-4 flex items-center justify-center gap-3"
-                  >
-                    {loading ? 'Salvando...' : editingId ? 'Atualizar Serviço' : 'Criar Serviço'} <ChevronRight size={20} />
-                  </button>
+                  <div className="pt-2 pb-[calc(140px+env(safe-area-inset-bottom))] sm:pb-0">
+                    <button 
+                      type="submit" 
+                      disabled={loading} 
+                      className="w-full bg-brand-ink text-brand-white py-5 sm:py-6 rounded-full text-[11px] font-medium uppercase tracking-widest shadow-xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-70"
+                    >
+                      {loading ? 'Salvando...' : editingId ? 'Atualizar Serviço' : 'Criar Serviço'} <ChevronRight size={18} />
+                    </button>
+                  </div>
                 </form>
               </motion.div>
             </div>
           )}
         </AnimatePresence>
-      </main>
+      </div>
     </AppLayout>
   );
 }
