@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, confirmAppointmentAtomic, declineAppointmentAtomic, cancelConfirmedAppointmentAtomic, handleBookingError, createManualAppointment } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs, getDoc } from 'firebase/firestore';
+import { db, confirmAppointmentAtomic, declineAppointmentAtomic, cancelConfirmedAppointmentAtomic, handleBookingError, createManualAppointment, updateAppointmentStatus } from '../firebase';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs, getDoc, limit } from 'firebase/firestore';
 import { 
   Calendar, Clock, MessageCircle, 
   CheckCircle2, ChevronLeft, ChevronRight, Plus, MapPin,
@@ -15,6 +15,7 @@ import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, format
 import { getAvailableSlots, getDayAvailability } from '../lib/bookingUtils';
 import PremiumButton from '../components/PremiumButton';
 import { toast } from 'sonner';
+import { Appointment } from '../types';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
 import { AnimatePresence } from 'motion/react';
@@ -173,7 +174,8 @@ export default function AgendaPage() {
       collection(db, 'appointments'),
       where('professionalId', '==', user.uid),
       where('date', '==', selectedDate),
-      orderBy('time', 'asc')
+      orderBy('time', 'asc'),
+      limit(100)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -328,7 +330,11 @@ export default function AgendaPage() {
     
     try {
       if (decision === 'confirmed') {
-        if (!user?.uid) throw new Error("auth-error");
+        if (!user?.uid) {
+          console.error("[AGENDA CONFIRM] No user UID available");
+          toast.error("Sessão expirada. Entre novamente.");
+          return;
+        }
         await confirmAppointmentAtomic(id, user.uid);
         toast.success('Reserva confirmada!');
       } else {
@@ -364,9 +370,9 @@ export default function AgendaPage() {
   // Mapped Timeline items
   const timelineItems = React.useMemo(() => {
     const items: any[] = [];
-    const blockingStatuses = ['confirmed', 'accepted', 'completed', 'pending_conflict'];
+    const blockingStatuses = ['confirmed', 'accepted', 'completed', 'pending_conflict', 'pending', 'pending_confirmation'];
     
-    // Calculate slots with multiple confirmed appointments
+    // Calculate slots with multiple confirmed/pending appointments
     const counts: Record<string, number> = {};
     appointments.forEach(a => {
       if (blockingStatuses.includes(a.status)) {
@@ -376,6 +382,9 @@ export default function AgendaPage() {
 
     // Add appointments
     appointments.forEach(app => {
+      // Don't show cancelled or rejected here to keep timeline clean
+      if (['cancelled_by_client', 'cancelled_by_professional', 'rejected', 'expired'].includes(app.status)) return;
+
       items.push({
         type: 'appointment',
         time: app.time,
@@ -398,14 +407,28 @@ export default function AgendaPage() {
 
     // Add free slots
     openSlots.forEach(slot => {
-      items.push({
-        type: 'free',
-        time: slot
-      });
+      // Filter out slots that already have an appointment or a block starting exactly at this time
+      // Regra crítica: se houver QUALQUER appointment bloqueante, remove o slot livre.
+      const hasStrictMeeting = appointments.some(a => a.time === slot && blockingStatuses.includes(a.status));
+      const hasStrictBlock = blockedSchedules.some(b => b.startTime === slot);
+      
+      if (!hasStrictMeeting && !hasStrictBlock) {
+        items.push({
+          type: 'free',
+          time: slot
+        });
+      }
     });
 
     return items.sort((a, b) => a.time.localeCompare(b.time));
   }, [appointments, blockedSchedules, openSlots]);
+
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const isSelectedDateToday = selectedDate === getTodayLocale();
 
@@ -513,9 +536,31 @@ export default function AgendaPage() {
 
         {/* 3. TIMELINE DO DIA */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2 px-1">
-            <Clock size={14} className="text-brand-mist" />
-            <h3 className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Timeline do dia</h3>
+          <div className="flex flex-col gap-4 mb-2 px-1">
+            <div className="flex items-center gap-2">
+              <Clock size={14} className="text-brand-mist" />
+              <h3 className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Timeline do dia</h3>
+            </div>
+            
+            {/* Legenda visual */}
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-stone opacity-40" />
+                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Livre</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Pedido</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-ink" />
+                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Confirmado</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-stone/20" />
+                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Bloqueado</span>
+              </div>
+            </div>
           </div>
 
           <div className="bg-brand-white rounded-[32px] border border-brand-mist overflow-hidden divide-y divide-brand-parchment shadow-sm">
@@ -528,7 +573,10 @@ export default function AgendaPage() {
               </div>
             ) : (
               timelineItems.map((item, idx) => {
-                const isNow = false; // Add logic if needed for "now" highlighting
+                const [h, m] = item.time.split(':').map(Number);
+                const itemMinutes = h * 60 + m;
+                const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+                const isCurrent = isSelectedDateToday && Math.abs(itemMinutes - nowMinutes) < 15;
 
                 if (item.type === 'appointment') {
                   const app = item.data;
@@ -536,9 +584,17 @@ export default function AgendaPage() {
                   
                   return (
                     <div key={`appt-${app.id}`} className={cn(
-                      "p-5 flex items-center justify-between gap-4 transition-all group",
-                      isPending ? "bg-red-50/30" : "hover:bg-brand-parchment/30"
+                      "p-5 flex items-center justify-between gap-4 transition-all group relative",
+                      isPending ? "bg-red-50/30" : "hover:bg-brand-parchment/30",
+                      isCurrent && "border-l-4 border-brand-terracotta bg-brand-linen/10"
                     )}>
+                      {isCurrent && (
+                        <div className="absolute top-0 right-4 -translate-y-1/2">
+                          <span className="bg-brand-terracotta text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shadow-sm">
+                            Agora
+                          </span>
+                        </div>
+                      )}
                       <div className="flex items-center gap-4">
                         <span className="text-xs font-medium text-brand-stone w-10 shrink-0">{item.time}</span>
                         <div className="min-w-0">
@@ -639,9 +695,17 @@ export default function AgendaPage() {
 
                   return (
                     <div key={`free-${item.time}`} className={cn(
-                      "p-5 flex items-center justify-between gap-4 transition-colors",
-                      isPast ? "bg-brand-parchment/10 grayscale opacity-40" : "hover:bg-green-50/30"
+                      "p-5 flex items-center justify-between gap-4 transition-colors relative",
+                      isPast ? "bg-brand-parchment/10 grayscale opacity-40" : "hover:bg-green-50/30",
+                      isCurrent && !isPast && "border-l-4 border-brand-terracotta bg-brand-linen/10"
                     )}>
+                      {isCurrent && !isPast && (
+                         <div className="absolute top-0 right-4 -translate-y-1/2">
+                           <span className="bg-brand-terracotta text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shadow-sm">
+                             Agora
+                           </span>
+                         </div>
+                      )}
                       <div className="flex items-center gap-4">
                         <span className="text-xs font-medium text-brand-stone w-10 shrink-0">{item.time}</span>
                         <div>
@@ -972,9 +1036,15 @@ export default function AgendaPage() {
                     )}>
                       {selectedAppointment.status === 'confirmed' ? 'Confirmado' :
                        selectedAppointment.status === 'pending' ? 'Pendente' :
+                       selectedAppointment.status === 'pending_confirmation' ? 'Aguardando Cliente' :
                        selectedAppointment.status === 'completed' ? 'Concluído' :
                        selectedAppointment.status}
                     </span>
+                    {selectedAppointment.clientConfirmed24h && (
+                      <span className="bg-brand-ink text-white px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest flex items-center gap-1">
+                        <Check size={10} /> Confirmado 24h
+                      </span>
+                    )}
                   </div>
                 </div>
                 <h3 className="text-3xl font-serif text-brand-ink">{selectedAppointment.clientName}</h3>
@@ -1142,6 +1212,38 @@ export default function AgendaPage() {
                       {selectedAppointment.status === 'pending' ? 'Recusar Pedido' : 'Cancelar Atendimento'}
                     </button>
                   )}
+
+                  {selectedAppointment.status === 'confirmed' && (() => {
+                    const [h, m] = selectedAppointment.time.split(':').map(Number);
+                    const apptDate = new Date(selectedAppointment.date + 'T00:00:00');
+                    const apptTime = new Date(apptDate);
+                    apptTime.setHours(h, m, 0, 0);
+                    const isPast = apptTime < new Date();
+
+                    return isPast && (
+                      <button 
+                        onClick={async () => {
+                          setLoading(selectedAppointment.id);
+                          try {
+                            await updateDoc(doc(db, 'appointments', selectedAppointment.id), {
+                              noShow: true,
+                              status: 'cancelled_by_professional', // or maintain confirmed but with noShow flag
+                              updatedAt: serverTimestamp()
+                            });
+                            toast.success('Cliente marcado como No-Show. Isso ficará registrado no histórico.');
+                            setIsDetailsOpen(false);
+                          } catch (err) {
+                            toast.error('Erro ao marcar no-show.');
+                          } finally {
+                            setLoading(null);
+                          }
+                        }}
+                        className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-amber-600 hover:bg-amber-50 rounded-xl transition-all border border-amber-100 mt-2"
+                      >
+                        Marcar Faltou (No-Show)
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             </motion.div>

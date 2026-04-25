@@ -82,6 +82,15 @@ service cloud.firestore {
              data.totalEntries is number;
     }
 
+    function isValidClientSummary(data) {
+      return data.keys().hasAll(['professionalId', 'clientKey', 'clientName', 'totalSpent', 'totalAppointments']) &&
+             data.professionalId is string &&
+             data.clientKey is string && data.clientKey.size() <= 128 &&
+             data.clientName is string && data.clientName.size() <= 100 &&
+             data.totalSpent is number && data.totalSpent >= 0 &&
+             data.totalAppointments is number && data.totalAppointments >= 0;
+    }
+
     // Profile Rules
     match /users/{userId} {
       allow read: if true; 
@@ -177,6 +186,31 @@ service cloud.firestore {
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
       allow update: if isSignedIn() && existing().professionalId == request.auth.uid;
       allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true; // Público — qualquer cliente pode verificar
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
+      allow update: if isSignedIn() && existing().professionalId == request.auth.uid || isAdmin();
+      allow delete: if isSignedIn() && existing().professionalId == request.auth.uid || isAdmin();
+    }
+
+    match /client_summaries/{summaryId} {
+      allow read: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid && isValidClientSummary(incoming());
+      allow update: if isSignedIn() && existing().professionalId == request.auth.uid && isValidClientSummary(incoming());
+      allow delete: if isAdmin();
+    }
+
+    match /analytics_events/{eventId} {
+      allow read: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow create: if true; // Público — log de visitas/cliques
+      allow delete: if isAdmin();
+    }
+
+    match /reservation_links/{linkId} {
+      allow read: if true; // Público para lookup instantâneo
+      allow write: if isSignedIn(); // Apenas app via transação
     }
   }
 }

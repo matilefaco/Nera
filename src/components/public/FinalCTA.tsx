@@ -25,16 +25,10 @@ export const FinalCTA = ({ onBookingClick, completedBookings }: FinalCTAProps) =
           Horários disponíveis
         </span>
         
-        <h2 className="display-hero text-brand-white mb-6">
+        <h2 className="display-hero text-brand-white mb-12">
           Pronta para<br />
           <em className="font-serif italic text-brand-blush/60">seu momento?</em>
         </h2>
-
-        {completedBookings && completedBookings > 20 && (
-          <p className="text-[15px] font-light text-brand-blush/40 mb-12">
-            Junte-se a mais de {completedBookings} clientes que já descobriram o que significa ser atendida com cuidado real.
-          </p>
-        )}
 
         <PremiumButton
           onClick={onBookingClick}

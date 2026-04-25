@@ -213,6 +213,44 @@
         "totalEntries": { "type": "number" }
       },
       "required": ["professionalId"]
+    },
+    "WhatsAppLog": {
+      "title": "WhatsApp Log",
+      "description": "Registros de envios de mensagens via WhatsApp",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "phone": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "sent", "failed"] },
+        "error": { "type": "string" },
+        "appointmentId": { "type": "string" },
+        "userId": { "type": "string" },
+        "idempotencyKey": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "sentAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phone", "message", "status", "createdAt"]
+    },
+    "WhatsAppInboundLog": {
+      "title": "WhatsApp Inbound Log",
+      "description": "Logs de mensagens recebidas via WhatsApp e processadas pelo sistema",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "phone": { "type": "string" },
+        "rawMessage": { "type": "string" },
+        "normalizedMessage": { "type": "string" },
+        "intent": { "type": "string", "enum": ["confirm", "reschedule", "cancel", "help", "unknown"] },
+        "appointmentId": { "type": "string" },
+        "status": { "type": "string", "enum": ["received", "processed", "ignored", "failed"] },
+        "rawPayload": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" },
+        "error": { "type": "string" }
+      },
+      "required": ["phone", "rawMessage", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -263,6 +301,14 @@
     "/review_stats/{professionalId}": {
       "schema": "ReviewStats",
       "description": "Consolidado de reputação da profissional"
+    },
+    "/whatsapp_logs/{logId}": {
+      "schema": "WhatsAppLog",
+      "description": "Logs de envios do WhatsApp"
+    },
+    "/whatsapp_inbound_logs/{logId}": {
+      "schema": "WhatsAppInboundLog",
+      "description": "Logs de mensagens recebidas do WhatsApp"
     }
   }
 }

@@ -51,17 +51,6 @@ export const AboutSection = ({ profile, aboutBio }: AboutSectionProps) => {
             {displayBio}
           </p>
 
-          {profile.professionalIdentity?.differentials && (
-            <div className="flex flex-wrap gap-2 pt-4">
-              {profile.professionalIdentity.differentials.map((diff: string) => (
-                <div key={diff} className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest text-brand-ink">
-                  <div className="w-1 h-1 rounded-full bg-brand-terracotta" />
-                  {diff}
-                </div>
-              ))}
-            </div>
-          )}
-
           <div className="font-signature text-5xl text-brand-ink/20 pt-8">
             {profile.name.split(' ')[0]}
           </div>

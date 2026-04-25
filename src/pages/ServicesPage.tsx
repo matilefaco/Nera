@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { 
   Calendar, List, Plus, Trash2, Edit2, X, Clock, 
   DollarSign, Settings, Sparkles, ChevronRight, Info, Users,
@@ -17,8 +17,7 @@ import { UserProfile } from '../types';
 import { generateServiceDescription } from '../services/aiService';
 
 export default function ServicesPage() {
-  const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const { user, profile } = useAuth();
   const [services, setServices] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -36,9 +35,11 @@ export default function ServicesPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Fetch profile for AI context
-    getDoc(doc(db, 'users', user.uid)).then(snap => {
-      if (snap.exists()) setProfile(snap.data() as UserProfile);
+    // Log diagnostic info in dev
+    console.log("[SERVICES AI CONTEXT]", {
+      hasProfile: !!profile,
+      specialty: profile?.professionalIdentity?.mainSpecialty || profile?.specialty,
+      city: profile?.studioCity || profile?.city || profile?.address?.city
     });
 
     const q = query(collection(db, 'services'), where('professionalId', '==', user.uid));
@@ -326,12 +327,16 @@ export default function ServicesPage() {
                       <button 
                         type="button"
                         onClick={generateAIDescription}
-                        disabled={isGeneratingAI || !name}
+                        disabled={isGeneratingAI || !name || !profile}
                         className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-brand-terracotta hover:text-brand-sienna transition-colors disabled:opacity-40"
                       >
                         {isGeneratingAI ? (
                           <>
                             <Loader2 size={12} className="animate-spin" /> Gerando...
+                          </>
+                        ) : !profile ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" /> Carregando...
                           </>
                         ) : (
                           <>

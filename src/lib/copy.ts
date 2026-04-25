@@ -15,22 +15,80 @@ interface Tagline {
 export function getProfileHeroCopy(specialty?: string): Tagline {
   const s = (specialty || '').toLowerCase().trim();
   
-  // Mappings based on keywords
-  
-  if (s.includes('nail') || s.includes('unha') || s.includes('alongamento')) {
-    return { main: "Unhas bem feitas,", accent: "do seu jeito" };
+  // Unhas
+  if (s.includes('nail') || s.includes('unha') || s.includes('alongamento') || s.includes('gel') || s.includes('fibra') || s.includes('manicure')) {
+    return [
+      { main: "Unhas que falam,", accent: "antes de você" },
+      { main: "A arte do detalhe,", accent: "em suas mãos" },
+      { main: "Resistência e brilho,", accent: "que encantam" }
+    ][Math.floor(Math.random() * 3)];
   }
-  
-  if (s.includes('sobrancelha') || s.includes('brow') || s.includes('microblading') || s.includes('cílios') || s.includes('lash')) {
-    return { main: "Cuidado profissional,", accent: "sem complicação" };
+  // Sobrancelhas e cílios
+  if (s.includes('sobrancelha') || s.includes('brow') || s.includes('microblading') || s.includes('micropigment') || s.includes('cílio') || s.includes('lash') || s.includes('extensão')) {
+    return [
+      { main: "Olhos que", accent: "encantam" },
+      { main: "O poder do seu olhar,", accent: "redefinido" },
+      { main: "Moldura perfeita,", accent: "beleza natural" }
+    ][Math.floor(Math.random() * 3)];
   }
-  
-  if (s.includes('esteticista') || s.includes('estética') || s.includes('estetica') || s.includes('facial') || s.includes('corporal')) {
-    return { main: "Cuidado profissional,", accent: "sem complicação" };
+  // Estética facial e corporal
+  if (s.includes('esteticista') || s.includes('estética') || s.includes('facial') || s.includes('pele') || s.includes('skin') || s.includes('microagulha') || s.includes('limpeza')) {
+    return [
+      { main: "Sua melhor pele,", accent: "começa aqui" },
+      { main: "Equilíbrio facial,", accent: "resultados reais" },
+      { main: "A ciência do cuidado,", accent: "com sua pele" }
+    ][Math.floor(Math.random() * 3)];
   }
-
-  // Fallback geral sugerido pelo usuário
-  return { main: "Agende seu horário", accent: "com facilidade" };
+  // Cabelo
+  if (s.includes('cabel') || s.includes('hair') || s.includes('colorist') || s.includes('escova') || s.includes('corte') || s.includes('tranças') || s.includes('mechas')) {
+    return [
+      { main: "Cabelo de", accent: "editorial" },
+      { main: "Transformação com", accent: "propósito" },
+      { main: "Sua identidade,", accent: "em cada fio" }
+    ][Math.floor(Math.random() * 3)];
+  }
+  // Maquiagem
+  if (s.includes('maquiag') || s.includes('make') || s.includes('makeup') || s.includes('noiva') || s.includes('festa')) {
+    return [
+      { main: "Make que", accent: "dura o dia" },
+      { main: "Beleza atemporal,", accent: "para momentos únicos" },
+      { main: "Sua melhor versão,", accent: "iluminada" }
+    ][Math.floor(Math.random() * 3)];
+  }
+  // Massagem e bem-estar
+  if (s.includes('massag') || s.includes('relaxa') || s.includes('drenag') || s.includes('bem-estar') || s.includes('corpo')) {
+    return [
+      { main: "O descanso que", accent: "você merece" },
+      { main: "Pausa necessária,", accent: "renovação total" },
+      { main: "Conexão profunda,", accent: "com seu corpo" }
+    ][Math.floor(Math.random() * 3)];
+  }
+  // Depilação
+  if (s.includes('depila') || s.includes('cera') || s.includes('laser') || s.includes('pelo')) {
+    return [
+      { main: "Pele suave,", accent: "sem complicação" },
+      { main: "Liberdade e", accent: "conforto" },
+      { main: "Cuidado delicado,", accent: "pele renovada" }
+    ][Math.floor(Math.random() * 3)];
+  }
+  // Podologia e pés
+  if (s.includes('podolog') || s.includes('pé') || s.includes('pedicure') || s.includes('cutícula')) {
+    return [
+      { main: "Cuidado do pé", accent: "à cabeça" },
+      { main: "Seus pés em", accent: "boas mãos" },
+      { main: "Saúde e bem-estar,", accent: "a cada passo" }
+    ][Math.floor(Math.random() * 3)];
+  }
+  // Visagismo e imagem
+  if (s.includes('visag') || s.includes('imagem') || s.includes('estilo') || s.includes('personal')) {
+    return [
+      { main: "Sua imagem,", accent: "sua essência" },
+      { main: "Comunicação visual,", accent: "com autoconfiança" },
+      { main: "O espelho da", accent: "sua alma" }
+    ][Math.floor(Math.random() * 3)];
+  }
+  // Fallback premium (não genérico)
+  return { main: "Profissional de", accent: "excelência" };
 }
 
 /**

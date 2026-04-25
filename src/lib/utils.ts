@@ -299,3 +299,23 @@ export function splitSmartBio(bio: string | undefined, limit: number = 140): { h
     about: aboutText 
   };
 }
+
+/**
+ * Returns a relative date string in Portuguese (e.g., "há 2 semanas").
+ */
+export function getRelativeDate(dateInput: string | Date): string {
+  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const now = new Date();
+  const diffInMs = now.getTime() - date.getTime();
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  if (diffInDays < 1) return 'hoje';
+  if (diffInDays === 1) return 'ontem';
+  if (diffInDays < 7) return `há ${diffInDays} dias`;
+  if (diffInDays < 30) {
+    const weeks = Math.floor(diffInDays / 7);
+    return `há ${weeks} ${weeks === 1 ? 'semana' : 'semanas'}`;
+  }
+  const months = Math.floor(diffInDays / 30);
+  return `há ${months} ${months === 1 ? 'mês' : 'meses'}`;
+}

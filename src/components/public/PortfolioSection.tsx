@@ -80,9 +80,10 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
               >
                  <img
                   src={item.url}
-                  alt={item.category}
+                  alt={item.category || "Trabalho de Helena Prado"}
                   className="w-full h-full object-cover filter saturate-[0.8] group-hover:saturate-100 group-hover:scale-105 transition-all duration-700"
                   referrerPolicy="no-referrer"
+                  loading="lazy"
                 />
                 
                 {/* Visual Overlay */}

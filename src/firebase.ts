@@ -109,11 +109,17 @@ export function handleBookingError(error: any) {
   }
   // 5. Auth Errors
   else if (error.message === 'auth-error' || error.message?.includes('estar logado')) {
-    message = 'Profissional não autenticada ou logada.';
+    message = 'Sessão expirada. Entre novamente para confirmar reservas.';
   }
   // 6. Not Found
   else if (error.message === 'Agendamento não encontrado' || error.message === 'not-found') {
     message = 'A reserva solicitada não foi encontrada.';
+  }
+  else if (error.message === 'already-confirmed') {
+    message = 'Esta reserva já está confirmada.';
+  }
+  else if (error.message === 'permission-denied') {
+    message = 'Sem permissão para alterar esta reserva.';
   }
 
   toast.error(message);
@@ -281,6 +287,104 @@ export async function notify(type: string, payload: any) {
 }
 
 /**
+ * Normalizes client key based on phone or email
+ */
+export function getClientKey(phone?: string, email?: string, name?: string): string {
+  const cleanPhone = phone?.replace(/\D/g, '');
+  if (cleanPhone && cleanPhone.length >= 8) return cleanPhone;
+  if (email) return email.toLowerCase().trim();
+  return `name-${(name || 'anon').toLowerCase().replace(/\s+/g, '-')}`;
+}
+
+/**
+ * Internal helper to update client summary within a transaction
+ */
+async function updateClientSummaryInternal(transaction: any, appointment: Appointment, professionalId: string, isNew: boolean, oldStatus?: string) {
+  const clientKey = getClientKey(appointment.clientWhatsapp, appointment.clientEmail, appointment.clientName);
+  const summaryId = `${professionalId}_${clientKey}`;
+  const summaryRef = doc(db, 'client_summaries', summaryId);
+  
+  const summarySnap = await transaction.get(summaryRef);
+  let summary = summarySnap.exists() ? summarySnap.data() : {
+    professionalId,
+    clientKey,
+    clientName: appointment.clientName,
+    clientPhone: appointment.clientWhatsapp || '',
+    clientEmail: appointment.clientEmail || '',
+    totalAppointments: 0,
+    confirmedAppointments: 0,
+    cancelledAppointments: 0,
+    noShowCount: 0,
+    totalSpent: 0,
+    lastAppointmentDate: appointment.date,
+    lastServiceName: appointment.serviceName,
+    firstAppointmentDate: appointment.date,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const status = appointment.status;
+  const price = (appointment.price || 0) + (appointment.travelFee || 0);
+
+  // 1. Basic Stats
+  if (isNew) {
+    summary.totalAppointments += 1;
+    if (!summary.firstAppointmentDate || new Date(appointment.date) < new Date(summary.firstAppointmentDate)) {
+      summary.firstAppointmentDate = appointment.date;
+    }
+  }
+
+  // 2. Status specific updates
+  const wasConfirmed = oldStatus === 'confirmed' || oldStatus === 'accepted' || oldStatus === 'completed';
+  const isNowConfirmed = status === 'confirmed' || status === 'accepted' || status === 'completed';
+
+  if (isNowConfirmed && !wasConfirmed) {
+    summary.confirmedAppointments += 1;
+    summary.totalSpent += price;
+  } else if (!isNowConfirmed && wasConfirmed) {
+    summary.confirmedAppointments = Math.max(0, summary.confirmedAppointments - 1);
+    summary.totalSpent = Math.max(0, summary.totalSpent - price);
+  }
+
+  if (status === 'cancelled' || status === 'cancelled_by_client' || status === 'cancelled_by_professional') {
+    if (oldStatus !== 'cancelled' && oldStatus !== 'cancelled_by_client' && oldStatus !== 'cancelled_by_professional') {
+      summary.cancelledAppointments += 1;
+    }
+  }
+
+  if (appointment.noShow && !wasConfirmed && status === 'completed') { // Simplified logic for no-show
+     // If it's a no-show it usually comes from confirmed?
+  }
+  
+  // Explicit no-show check (if marked by pro)
+  if (appointment.noShow) {
+    summary.noShowCount += 1;
+  }
+
+  // 3. Last appointment logic
+  if (!summary.lastAppointmentDate || new Date(appointment.date) >= new Date(summary.lastAppointmentDate)) {
+    summary.lastAppointmentDate = appointment.date;
+    summary.lastServiceName = appointment.serviceName;
+    summary.clientName = appointment.clientName || summary.clientName;
+    summary.clientPhone = appointment.clientWhatsapp || summary.clientPhone;
+    summary.clientEmail = appointment.clientEmail || summary.clientEmail;
+  }
+
+  summary.updatedAt = new Date().toISOString();
+  transaction.set(summaryRef, summary, { merge: true });
+}
+
+/**
+ * Public function to manually trigger a summary update (e.g. during migration)
+ */
+export async function updateClientSummaryFromAppointment(appointment: Appointment) {
+  console.log(`[Summary] Manual update for client of appt ${appointment.id}`);
+  await runTransaction(db, async (transaction) => {
+    await updateClientSummaryInternal(transaction, appointment, appointment.professionalId, false);
+  });
+}
+
+/**
  * Creates a booking request and notifies the professional.
  * Regra Oficial: Pedido pendente NÃO bloqueia horário.
  */
@@ -330,11 +434,12 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
       createdAt: serverTimestamp(),
     };
 
-    await setDoc(apptRef, finalData);
+    await runTransaction(db, async (transaction) => {
+      transaction.set(apptRef, finalData);
 
-    // CRITICAL: Create reservation_links for instant backend lookup
-    try {
-      await setDoc(doc(db, 'reservation_links', manageSlug), {
+      // Create reservation_links for instant backend lookup
+      const linkRef = doc(db, 'reservation_links', manageSlug);
+      transaction.set(linkRef, {
         appointmentId: apptRef.id,
         manageSlug,
         reservationCode,
@@ -342,10 +447,11 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
         clientEmail: appointmentData.clientEmail,
         createdAt: serverTimestamp()
       });
-      console.log(`[BOOKING_FLOW] reservation_links document created for: ${manageSlug}`);
-    } catch (linkErr) {
-      console.error('[BOOKING_FLOW] Error creating reservation_link fallback:', linkErr);
-    }
+
+      // Update Client Summary
+      const apptForSummary = { id: apptRef.id, ...finalData } as Appointment;
+      await updateClientSummaryInternal(transaction, apptForSummary, appointmentData.professionalId!, true);
+    });
 
     console.log(`[BOOKING_FLOW] Document saved with ID: ${apptRef.id}`);
     
@@ -468,31 +574,19 @@ export async function checkAndExpireAppointments(professionalId: string) {
  * Atomic confirmation using Firestore Transactions.
  * Guarantees that two appointments cannot occupy the same slot (professional + date + time).
  */
-/**
- * Updates an appointment's status simply.
- */
-export async function updateAppointmentStatus(appointmentId: string, status: string) {
-  try {
-    const ref = doc(db, 'appointments', appointmentId);
-    await updateDoc(ref, {
-      status,
-      updatedAt: serverTimestamp()
-    });
-  } catch (error) {
-    console.error('Error updating appointment status:', error);
-    throw error;
-  }
-}
-
 export async function confirmAppointmentAtomic(appointmentId: string, professionalId: string) {
   console.log(`[CONFIRM START] Starting atomic confirmation for ${appointmentId}...`);
-  console.log(`[CONFIRM PRECHECK]`, { appointmentId, professionalId, timestamp: new Date().toISOString() });
   
   if (!professionalId) {
     const currentUid = auth.currentUser?.uid;
     console.warn("[CONFIRM PRECHECK] professionalId not provided, using current user:", currentUid);
     professionalId = currentUid || "";
   }
+
+  console.log("[AUTH STATE BEFORE CONFIRM]", {
+    currentUser: auth.currentUser?.uid,
+    professionalIdInput: professionalId
+  });
 
   if (!professionalId) {
     console.error("[CONFIRM ERROR] Auth missing: No professionalId available");
@@ -563,13 +657,14 @@ export async function confirmAppointmentAtomic(appointmentId: string, profession
 
       // Update Appointment
       console.log(`[CONFIRM TX] Updating appointment status to confirmed`);
-      transaction.update(apptRef, {
-        status: "confirmed",
+      const updateData = {
+        status: "confirmed" as const,
         confirmedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        lastChangeBy: 'professional_atomic',
+        lastChangeBy: 'professional',
         changeMessage: 'Reserva confirmada atomicamente'
-      });
+      };
+      transaction.update(apptRef, updateData);
 
       // Create/Update Lock
       console.log(`[CONFIRM TX] Creating slot lock: ${lockId}`);
@@ -585,7 +680,19 @@ export async function confirmAppointmentAtomic(appointmentId: string, profession
         updatedAt: serverTimestamp()
       }, { merge: true });
 
+      // Update Client Summary
+      const updatedAppt = { ...data, ...updateData } as Appointment;
+      await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, data.status);
+
       console.log(`[CONFIRM SUCCESS] Appointment ${appointmentId} confirmed atomicly`);
+      
+      // Trigger notification
+      notify('BOOKING_CONFIRMED', {
+        appointmentId,
+        professionalId,
+        ...updatedAppt
+      });
+
       return { success: true };
     });
   } catch (error: any) {
@@ -618,12 +725,26 @@ export async function declineAppointmentAtomic(appointmentId: string, profession
         throw new Error(`Transição de ${data.status} para recusada não permitida.`);
       }
 
-      transaction.update(apptRef, {
-        status: "cancelled_by_professional",
+      const updateData = {
+        status: "cancelled_by_professional" as const,
         declinedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        lastChangeBy: 'professional_declined_atomic',
+        lastChangeBy: 'professional',
         changeMessage: 'Pedido recusado pela profissional'
+      };
+      
+      transaction.update(apptRef, updateData);
+      
+      // Update Client Summary
+      const updatedAppt = { ...data, ...updateData } as Appointment;
+      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status);
+      
+      // Trigger notification
+      notify('BOOKING_REJECTED', {
+        appointmentId,
+        professionalId,
+        ...updatedAppt,
+        professionalSlug: null // Server will fetch if null
       });
     });
     console.log(`[DECLINE SUCCESS] Appointment ${appointmentId} declined.`);
@@ -675,12 +796,25 @@ export async function cancelConfirmedAppointmentAtomic(appointmentId: string, pr
         }
       }
 
-      transaction.update(apptRef, {
-        status: "cancelled_by_professional",
+      const updateData = {
+        status: "cancelled_by_professional" as const,
         cancelledAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        lastChangeBy: 'professional_cancelled_atomic',
+        lastChangeBy: 'professional',
         changeMessage: 'Agendamento confirmado foi cancelado pela profissional'
+      };
+
+      transaction.update(apptRef, updateData);
+      
+      // Update Client Summary
+      const updatedAppt = { ...data, ...updateData } as Appointment;
+      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status);
+      
+      // Trigger notification
+      notify('BOOKING_CANCELLED', {
+        appointmentId,
+        professionalId,
+        ...updatedAppt
       });
     });
     
@@ -796,6 +930,10 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
 
       transaction.update(apptRef, updatePayload);
       
+      // Update Client Summary
+      const updatedAppt = { ...data, ...updatePayload } as Appointment;
+      await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, currentStatus);
+      
       return data;
     });
 
@@ -849,14 +987,16 @@ export async function createManualAppointment(data: Partial<Appointment>) {
       }
 
       // Create appointment
-      transaction.set(apptRef, {
+      const updateData = {
         ...data,
-        status: 'confirmed',
+        status: 'confirmed' as const,
         confirmedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
-        lastChangeBy: 'manual_pro'
-      });
+        lastChangeBy: 'professional'
+      };
+      
+      transaction.set(apptRef, updateData);
 
       // Create lock
       transaction.set(lockRef, {
@@ -869,6 +1009,10 @@ export async function createManualAppointment(data: Partial<Appointment>) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
+
+      // Update Client Summary
+      const apptForSummary = { id: apptRef.id, ...updateData } as unknown as Appointment;
+      await updateClientSummaryInternal(transaction, apptForSummary, data.professionalId, true);
     });
 
     console.log('[Manual Booking] Created successfully');
@@ -886,11 +1030,27 @@ export async function createManualAppointment(data: Partial<Appointment>) {
 export async function confirmPresenceByClient(appointmentId: string) {
   console.log(`[Client] Confirming presence for ${appointmentId}`);
   const apptRef = doc(db, 'appointments', appointmentId);
-  await updateDoc(apptRef, {
-    clientConfirmedAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    lastChangeBy: 'client',
-    changeMessage: 'Cliente confirmou presença'
+  
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(apptRef);
+    if (!snap.exists()) throw new Error('Agendamento não encontrado');
+    const data = snap.data() as Appointment;
+    const oldStatus = data.status;
+
+    const updateData = {
+      clientConfirmedAt: serverTimestamp(),
+      clientConfirmed24h: true,
+      status: 'confirmed' as const,
+      updatedAt: serverTimestamp(),
+      lastChangeBy: 'client' as const,
+      changeMessage: 'Cliente confirmou presença 24h'
+    };
+
+    transaction.update(apptRef, updateData);
+
+    // Update Client Summary
+    const updatedAppt = { ...data, ...updateData } as Appointment;
+    await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, oldStatus);
   });
 }
 
@@ -915,14 +1075,20 @@ export async function cancelBookingByClient(appointmentId: string, reason?: stri
       }
 
       // Update appointment
-      transaction.update(apptRef, {
-        status: 'cancelled',
+      const updateData = {
+        status: 'cancelled' as const,
         cancellationReason: reason || 'Cancelado pelo cliente',
         updatedAt: serverTimestamp(),
         cancelledAt: serverTimestamp(),
-        lastChangeBy: 'client',
+        lastChangeBy: 'client' as const,
         changeMessage: 'Cliente cancelou a reserva'
-      });
+      };
+      
+      transaction.update(apptRef, updateData);
+
+      // Update Client Summary
+      const updatedAppt = { ...data, ...updateData } as Appointment;
+      await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, data.status);
 
       return data;
     });
@@ -1033,16 +1199,22 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
       }
 
       // 4. Update appointment
-      transaction.update(apptRef, {
+      const updatePayload = {
         date: newDate,
         time: newTime,
         previousDate: data.date,
         previousTime: data.time,
         rescheduledAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        lastChangeBy: 'client',
+        lastChangeBy: 'client' as const,
         changeMessage: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`
-      });
+      };
+      
+      transaction.update(apptRef, updatePayload);
+
+      // Update Client Summary
+      const updatedAppt = { ...data, ...updatePayload } as Appointment;
+      await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, data.status);
 
       return data;
     });
@@ -1178,4 +1350,30 @@ export async function markWaitlistAsBooked(entryId: string) {
     status: 'booked',
     bookedAt: serverTimestamp()
   });
+}
+
+/**
+ * Logs a growth analytics event (visit or click)
+ */
+export async function logAnalyticsEvent(professionalId: string, type: 'visit' | 'click_book' | 'click_book_sticky' | 'click_book_final' | 'week_calendar_click') {
+  try {
+    const referrer = document.referrer;
+    let origin: 'instagram' | 'direct' | 'other' = 'other';
+    
+    if (referrer.includes('instagram.com')) {
+      origin = 'instagram';
+    } else if (!referrer || referrer === window.location.origin) {
+      origin = 'direct';
+    }
+
+    await addDoc(collection(db, 'analytics_events'), {
+      professionalId,
+      type,
+      referrer,
+      origin,
+      timestamp: serverTimestamp()
+    });
+  } catch (err) {
+    console.error('[Analytics] Failed to log event:', err);
+  }
 }

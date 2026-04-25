@@ -7,7 +7,7 @@ import {
   MapPin, Home, Building2, MessageCircle, 
   Share2, Heart, Sparkles, LogOut, Settings
 } from 'lucide-react';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } from '../firebase';
 import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, WaitlistEntry } from '../types';
 import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage } from '../lib/utils';
@@ -22,10 +22,11 @@ interface BookingModalProps {
   onClose: () => void;
   open: boolean;
   initialService?: Service | null;
+  initialDate?: string | null;
   waitlistEntry?: WaitlistEntry | null;
 }
 
-export default function BookingModal({ profile, services, onClose, open, initialService, waitlistEntry }: BookingModalProps) {
+export default function BookingModal({ profile, services, onClose, open, initialService, initialDate, waitlistEntry }: BookingModalProps) {
   const [step, setStep] = useState(2);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
@@ -55,6 +56,11 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [showRestoreDraft, setShowRestoreDraft] = useState(false);
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
 
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<any | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [isCheckingCoupon, setIsCheckingCoupon] = useState(false);
+
   const isHomeService = bookingMode === 'home';
 
   // 1. MODAL OPEN/CLOSE SYNC & RESET
@@ -68,6 +74,9 @@ export default function BookingModal({ profile, services, onClose, open, initial
       if (initialService) {
         setSelectedService(initialService);
         setShowRestoreDraft(false); 
+      } else if (initialDate) {
+        setSelectedDate(initialDate);
+        setShowRestoreDraft(false);
       } else if (waitlistEntry) {
         const service = services.find(s => s.id === waitlistEntry.serviceId);
         if (service) setSelectedService(service);
@@ -286,6 +295,53 @@ export default function BookingModal({ profile, services, onClose, open, initial
     setBookingMode(null);
     setStep(2);
     setShowRestoreDraft(false);
+    setAppliedCoupon(null);
+    setCouponCode('');
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || !profile?.uid) return;
+    setIsCheckingCoupon(true);
+    setCouponError('');
+    try {
+      const q = query(
+        collection(db, 'coupons'),
+        where('professionalId', '==', profile.uid),
+        where('code', '==', couponCode.trim().toUpperCase()),
+        where('active', '==', true)
+      );
+      const snap = await getDocs(q);
+      if (snap.empty) { 
+        setCouponError('Cupom não encontrado ou inativo.'); 
+        setAppliedCoupon(null);
+        return; 
+      }
+      const coupon = { id: snap.docs[0].id, ...snap.docs[0].data() } as any;
+      
+      // Validations
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        setCouponError('Este cupom expirou.'); 
+        setAppliedCoupon(null);
+        return;
+      }
+      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
+        setCouponError('Este cupom atingiu o limite de usos.'); 
+        setAppliedCoupon(null);
+        return;
+      }
+      if (coupon.serviceIds && selectedService && !coupon.serviceIds.includes(selectedService.id)) {
+        setCouponError('Este cupom não é válido para o serviço selecionado.');
+        setAppliedCoupon(null);
+        return;
+      }
+
+      setAppliedCoupon(coupon);
+      toast.success(`Cupom "${coupon.code}" aplicado!`);
+    } catch (err) { 
+      console.error('Error checking coupon:', err);
+      setCouponError('Erro ao verificar cupom.'); 
+    }
+    finally { setIsCheckingCoupon(false); }
   };
 
   // Urgency logic based on real availability
@@ -357,7 +413,16 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const calculateTotalPrice = () => {
     if (!selectedService) return 0;
     const basePrice = Number(selectedService.price) || 0;
-    return basePrice + (selectedArea?.fee || 0);
+    const total = basePrice + (selectedArea?.fee || 0);
+    
+    if (appliedCoupon) {
+      if (appliedCoupon.type === 'percentage') {
+        return Math.max(0, total - (total * appliedCoupon.value / 100));
+      }
+      return Math.max(0, total - appliedCoupon.value);
+    }
+    
+    return total;
   };
 
   const handleBooking = async () => {
@@ -415,6 +480,18 @@ export default function BookingModal({ profile, services, onClose, open, initial
         reference: addressReference.trim()
       } : undefined;
 
+      const paymentMethodsList = (profile.paymentMethods || [])
+        .map(id => {
+          const names: Record<string, string> = {
+            pix: 'Pix',
+            credito: 'Cartão de crédito',
+            debito: 'Cartão de débito',
+            dinheiro: 'Dinheiro',
+            transferencia: 'Transferência'
+          };
+          return names[id] || id;
+        });
+
       const { bookingId, token, reservationCode: resCode } = await createBookingRequest({
         professionalId: profile.uid,
         professionalName: profile.name,
@@ -433,6 +510,8 @@ export default function BookingModal({ profile, services, onClose, open, initial
         clientEmail: clientEmail.trim().toLowerCase(),
         date: selectedDate,
         time: selectedTime,
+        couponId: appliedCoupon?.id,
+        appliedCouponCode: appliedCoupon?.code,
       });
 
       // LOGS OBRIGATÓRIOS DO USUÁRIO
@@ -463,7 +542,8 @@ export default function BookingModal({ profile, services, onClose, open, initial
               time: selectedTime,
               price: formatCurrency(totalPrice),
               reservationCode: resCode,
-              manageUrl: `${window.location.origin}/r/${token}`
+              manageUrl: `${window.location.origin}/r/${token}`,
+              paymentMethods: paymentMethodsList
             }
           })
         })
@@ -471,6 +551,27 @@ export default function BookingModal({ profile, services, onClose, open, initial
         .then(data => console.log('[EMAIL_PENDING] Result:', data))
         .catch(err => console.error('[EMAIL_PENDING_ERROR] Notification failed:', err));
       }
+      
+      // Notify professional
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'NEW_BOOKING_REQUEST',
+          payload: {
+            professionalId: profile.uid,
+            clientName: clientName.trim(),
+            serviceName: selectedService.name,
+            date: selectedDate,
+            time: selectedTime,
+            totalPrice: totalPrice,
+            appointmentId: bookingId,
+            token: token,
+            locationDetail: isHomeService ? `${addressNeighborhood.trim() || selectedArea?.name}, ${addressCity.trim() || profile?.city}` : 'No Estúdio',
+            paymentMethods: paymentMethodsList
+          }
+        })
+      });
       
       // If booking from waitlist, mark it as booked
       if (waitlistEntry?.id) {
@@ -747,7 +848,39 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         </div>
                         <div className="text-right">
                           <span className="text-[8px] font-bold uppercase tracking-widest text-brand-linen/40 block mb-1">Total</span>
-                          <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(calculateTotalPrice())}</span>
+                          <div className="flex flex-col items-end">
+                            {appliedCoupon && (
+                              <span className="text-[10px] text-brand-linen/40 line-through -mb-1">
+                                {formatCurrency((Number(selectedService?.price) || 0) + (selectedArea?.fee || 0))}
+                              </span>
+                            )}
+                            <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(calculateTotalPrice())}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Payment Methods Section - Added before form fields */}
+                      <div className="mt-6 pt-6 border-t border-brand-white/10">
+                        <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-brand-terracotta block mb-3">Formas de pagamento aceitas</span>
+                        <div className="flex flex-wrap gap-2">
+                          {profile.paymentMethods && profile.paymentMethods.length > 0 ? (
+                            profile.paymentMethods.map((id) => {
+                              const names: Record<string, string> = {
+                                pix: 'Pix',
+                                credito: 'Crédito',
+                                debito: 'Débito',
+                                dinheiro: 'Dinheiro',
+                                transferencia: 'Transferência'
+                              };
+                              return (
+                                <span key={id} className="px-3 py-1 bg-brand-white/5 border border-brand-white/10 rounded-full text-[9px] font-medium text-brand-linen/80">
+                                  {names[id] || id}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span className="text-[10px] text-brand-linen/40 italic">As formas de pagamento serão combinadas com a profissional.</span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -849,6 +982,53 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       <p className="text-[9px] text-brand-stone/70 font-medium uppercase tracking-wider ml-2 mt-4 leading-relaxed italic">
                         Você receberá a confirmação e atualizações do agendamento por e-mail.
                       </p>
+
+                      {/* Coupon Section */}
+                      <div className="pt-6 mt-6 border-t border-brand-mist/30 space-y-3">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
+                          Cupom de desconto
+                        </p>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={couponCode}
+                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                            placeholder="CÓDIGO"
+                            className="flex-1 px-5 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all uppercase"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleApplyCoupon}
+                            disabled={isCheckingCoupon || !couponCode.trim()}
+                            className="px-6 py-3.5 bg-brand-ink text-brand-white rounded-[18px] text-[10px] font-bold uppercase tracking-widest disabled:opacity-40 transition-all active:scale-95"
+                          >
+                            {isCheckingCoupon ? '...' : 'Aplicar'}
+                          </button>
+                        </div>
+                        {couponError && (
+                          <motion.p 
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-[10px] text-red-600 font-bold uppercase tracking-wide ml-2"
+                          >
+                            {couponError}
+                          </motion.p>
+                        )}
+                        {appliedCoupon && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center justify-between"
+                          >
+                            <p className="text-[10px] text-green-700 font-bold uppercase tracking-wide">
+                              ✓ {appliedCoupon.code}: {appliedCoupon.description || `Desconto de ${appliedCoupon.type === 'percentage' ? appliedCoupon.value + '%' : formatCurrency(appliedCoupon.value)} aplicado`}
+                            </p>
+                            <button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} className="text-green-700/50 hover:text-green-700">
+                              <X size={14} />
+                            </button>
+                          </motion.div>
+                        )}
+                      </div>
                     </div>
 <div className="hidden md:block">
   <PremiumButton variant="terracotta" className="w-full py-7" disabled={!clientName.trim() || clientName.trim().length < 2 || !clientPhone || !clientEmail || (isHomeService && (!addressStreet.trim() || !addressNumber.trim()))} onClick={handleBooking} loading={bookingLoading} loadingText="Enviando pedido...">Confirmar agendamento <Check size={18} className="ml-1" /></PremiumButton>
@@ -926,6 +1106,31 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     <div>
                       <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">Horário</span>
                       <span className="text-sm font-medium text-brand-ink">{selectedTime}</span>
+                    </div>
+                  </div>
+                  
+                  {/* Payment Methods in Success Screen */}
+                  <div className="pt-4 border-t border-brand-mist/30">
+                    <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-2">Pagamento</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {profile.paymentMethods && profile.paymentMethods.length > 0 ? (
+                        profile.paymentMethods.map((id) => {
+                          const names: Record<string, string> = {
+                            pix: 'Pix',
+                            credito: 'Crédito',
+                            debito: 'Débito',
+                            dinheiro: 'Dinheiro',
+                            transferencia: 'Transferência'
+                          };
+                          return (
+                            <span key={id} className="px-2 py-0.5 bg-brand-linen border border-brand-mist rounded-md text-[8px] font-bold text-brand-ink uppercase tracking-wider">
+                              {names[id] || id}
+                            </span>
+                          );
+                        })
+                      ) : (
+                        <span className="text-[9px] text-brand-stone/60 italic">A combinar com a profissional.</span>
+                      )}
                     </div>
                   </div>
                   

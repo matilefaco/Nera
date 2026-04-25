@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Camera, Sparkles } from 'lucide-react';
+import { User, Camera, Sparkles, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, cleanWhatsapp, formatWhatsappDisplay } from '../lib/utils';
 
@@ -246,8 +246,15 @@ export const FormIdentity = ({
 
           {(differentials !== undefined && setDifferentials) && (
             <div className="space-y-4">
-              {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-1">
+                {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>}
+                <p className="text-[10px] text-brand-stone/60 font-light ml-1 mb-2">
+                  Selecione os pontos que tornam seu atendimento único. Eles aparecerão em uma seção especial na sua vitrine.
+                </p>
+              </div>
+
+              {/* Sugestões */}
+              <div className="flex flex-wrap gap-2 mb-4">
                 {availableDifferentials.map(diff => (
                   <button
                     key={diff}
@@ -269,6 +276,60 @@ export const FormIdentity = ({
                     {diff}
                   </button>
                 ))}
+              </div>
+
+              {/* Meus diferenciais (para permitir remover personalizados que não estão na lista) */}
+              {differentials.filter(d => !availableDifferentials.includes(d)).length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Personalizados</p>
+                  <div className="flex flex-wrap gap-2">
+                    {differentials.filter(d => !availableDifferentials.includes(d)).map(diff => (
+                      <div key={diff} className="flex items-center gap-2 px-4 py-2 bg-brand-terracotta/10 border border-brand-terracotta/20 rounded-full text-[10px] font-medium text-brand-terracotta">
+                        {diff}
+                        <button 
+                          type="button" 
+                          onClick={() => setDifferentials(differentials.filter(d => d !== diff))}
+                          className="hover:text-brand-ink"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Adicionar Personalizado */}
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="Ex: Estacionamento gratuito"
+                  className="flex-1 px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-[11px]"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const val = (e.target as HTMLInputElement).value.trim();
+                      if (val && !differentials.includes(val)) {
+                        setDifferentials([...differentials, val]);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }
+                  }}
+                />
+                <button 
+                  type="button"
+                  onClick={(e) => {
+                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                    const val = input.value.trim();
+                    if (val && !differentials.includes(val)) {
+                      setDifferentials([...differentials, val]);
+                      input.value = '';
+                    }
+                  }}
+                  className="px-5 py-3 bg-brand-linen text-brand-ink border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
+                >
+                  Ok
+                </button>
               </div>
             </div>
           )}

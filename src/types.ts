@@ -48,6 +48,13 @@ export interface UserProfile {
   neighborhood?: string;
   
   instagram?: string; // Official social link
+  paymentMethods?: ('pix' | 'credito' | 'debito' | 'dinheiro' | 'transferencia')[];
+  
+  // Anti No-Show Settings
+  antiNoShowEnabled?: boolean;
+  advancePaymentRequired?: boolean;
+  delayTolerance?: 10 | 15 | 20;
+
   pinterest?: string;
   facebook?: string;
   
@@ -92,6 +99,10 @@ export interface UserProfile {
   whatsappNotificationsEnabled?: boolean;
   
   createdAt: string;
+  plan?: 'free' | 'essencial' | 'pro';
+  planExpiresAt?: string; // ISO date
+  trialStartedAt?: string;
+  referralCode?: string; // código único de indicação
   updatedAt: string;
 
   // --- LEGACY FIELDS FOR COMPATIBILITY ---
@@ -177,6 +188,13 @@ export interface Appointment {
   professionalName?: string;
   professionalWhatsapp?: string;
   
+  clientConfirmed24h?: boolean;
+  noShow?: boolean; // Marked by professional if client missed
+  retentionSent?: boolean; // For repurchase system
+
+  couponId?: string;
+  appliedCouponCode?: string;
+
   createdAt: any;
   updatedAt?: any;
 }
@@ -216,4 +234,47 @@ export interface WaitlistStats {
   recoveredSlots: number;
   savedRevenue: number;
   totalEntries: number;
+}
+
+export interface Coupon {
+  id: string;
+  professionalId: string;
+  code: string; // Ex: "PRIMEIRA10"
+  type: 'percentage' | 'fixed'; // % ou valor fixo
+  value: number; // 10 = 10% ou R$10
+  description?: string; // "10% no primeiro atendimento"
+  maxUses?: number; // null = ilimitado
+  usedCount: number;
+  expiresAt?: string; // ISO date
+  active: boolean;
+  serviceIds?: string[]; // null = todos os serviços
+  createdAt: any;
+}
+
+export interface AnalyticsEvent {
+  id: string;
+  professionalId: string;
+  type: 'visit' | 'click_book';
+  referrer?: string;
+  origin: 'instagram' | 'direct' | 'other';
+  timestamp: any;
+}
+
+export interface ClientSummary {
+  id: string; // professionalId_clientKey
+  professionalId: string;
+  clientKey: string; // phone (clean) or email
+  clientName: string;
+  clientPhone: string;
+  clientEmail: string;
+  totalAppointments: number;
+  confirmedAppointments: number;
+  cancelledAppointments: number;
+  noShowCount: number;
+  totalSpent: number;
+  lastAppointmentDate: string;
+  lastServiceName: string;
+  firstAppointmentDate: string;
+  updatedAt: string;
+  createdAt: string;
 }

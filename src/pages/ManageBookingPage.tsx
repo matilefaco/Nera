@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Calendar, Clock, MapPin, MessageCircle, 
@@ -25,6 +25,9 @@ import { toast } from 'sonner';
 export default function ManageBookingPage() {
   const { id, token } = useParams<{ id?: string, token?: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const action = searchParams.get('action');
+
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [professional, setProfessional] = useState<UserProfile | null>(null);
   const [service, setService] = useState<Service | null>(null);
@@ -43,7 +46,46 @@ export default function ManageBookingPage() {
   const [reviewToken, setReviewToken] = useState<string | null>(null);
 
   const [diagnosticResults, setDiagnosticResults] = useState<any>(null);
+  const [isAutoProcessed, setIsAutoProcessed] = useState(false);
   
+  useEffect(() => {
+    if (!appointment || isAutoProcessed || !action) return;
+
+    const handleAutoAction = async () => {
+      if (action === 'confirm-presence' && !appointment.clientConfirmed24h) {
+        setActionLoading(true);
+        try {
+          await confirmPresenceByClient(appointment.id);
+          setAppointment(prev => prev ? { 
+            ...prev, 
+            clientConfirmed24h: true, 
+            status: 'confirmed' 
+          } : null);
+          toast.success('Presença confirmada com sucesso! ✨');
+        } catch (err) {
+          console.error('[AUTO_ACTION] Error confirming presence:', err);
+          toast.error('Erro ao confirmar presença automaticamente.');
+        } finally {
+          setActionLoading(false);
+          setIsAutoProcessed(true);
+          // Remove action from URL
+          const newParams = new URLSearchParams(searchParams);
+          newParams.delete('action');
+          setSearchParams(newParams);
+        }
+      } else if (action === 'reschedule' && view !== 'reschedule') {
+        setView('reschedule');
+        // Pre-select current date if it's in the future
+        const today = new Date().toISOString().split('T')[0];
+        if (appointment.date >= today) {
+          setSelectedDate(appointment.date);
+        }
+      }
+    };
+
+    handleAutoAction();
+  }, [appointment, action, isAutoProcessed, searchParams, setSearchParams]);
+
   useEffect(() => {
     if (!id && !token) return;
 

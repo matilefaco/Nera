@@ -6,6 +6,9 @@ import {
 } from 'lucide-react';
 import Logo from '../components/Logo';
 
+// Substituir por depoimentos reais antes de campanhas pagas.
+const TESTIMONIALS_PLACEHOLDER = true;
+
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-brand-parchment">
@@ -48,7 +51,7 @@ export default function LandingPage() {
               
               <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
                 <Link to="/register" className="w-full sm:w-auto bg-brand-ink text-brand-white px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-espresso transition-all flex items-center justify-between gap-8 group">
-                  <span>Criar minha marca grátis</span>
+                  <span>Começar grátis</span>
                   <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <Link to="/p/helena-prado" className="w-full sm:w-auto bg-transparent text-brand-ink border border-brand-mist px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-linen transition-all text-center">
@@ -138,6 +141,204 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* Interactive Demo Section */}
+        <section className="bg-brand-white py-32 px-6 overflow-hidden">
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="grid lg:grid-cols-2 gap-20 items-center">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6 block">Vitrine Profissional</span>
+                <h2 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-ink leading-tight mb-8">
+                  Veja como sua <br />
+                  <span className="italic text-brand-terracotta">página pode ficar.</span>
+                </h2>
+                <p className="text-brand-stone text-lg mb-12 font-light leading-relaxed">
+                  Uma página bonita, profissional e pronta para receber reservas. 
+                  Dê à sua cliente a experiência de um salão de luxo, direto no link da sua bio.
+                </p>
+
+                <div className="space-y-6 mb-12">
+                  {[
+                    "Seus serviços organizados por categoria",
+                    "Agenda automática integrada",
+                    "Cálculo de taxa de serviço por bairro",
+                    "Visual premium que valoriza seu trabalho",
+                    "Funciona perfeitamente em qualquer celular"
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded-full bg-brand-linen flex items-center justify-center text-brand-terracotta">
+                        <Check size={12} />
+                      </div>
+                      <span className="text-sm font-medium text-brand-stone uppercase tracking-tight">{item}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <Link to="/register" className="w-full sm:w-auto bg-brand-ink text-white px-10 py-5 rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg text-center">
+                    Criar a minha agora
+                  </Link>
+                  <Link to="/p/helena-prado" className="w-full sm:w-auto text-brand-ink font-bold text-[11px] uppercase tracking-widest hover:underline text-center">
+                    Ver exemplo completo
+                  </Link>
+                </div>
+              </div>
+
+              <div className="relative">
+                {/* Phone Mockup */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 50 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="relative mx-auto w-[320px] h-[640px] bg-brand-ink rounded-[60px] border-[8px] border-brand-ink shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] overflow-hidden"
+                >
+                  {/* Notch */}
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-brand-ink rounded-b-3xl z-30" />
+                  
+                  {/* Simulated Content Scroll */}
+                  <motion.div 
+                    animate={{ y: [0, -400, 0] }}
+                    transition={{ 
+                      duration: 20, 
+                      repeat: Infinity, 
+                      ease: "linear"
+                    }}
+                    className="w-full"
+                  >
+                    {/* Simulated Header */}
+                    <div className="h-64 bg-brand-linen flex items-center justify-center relative overflow-hidden">
+                      <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-brand-ink/80 to-transparent">
+                        <h3 className="text-white font-serif text-2xl">Helena Prado</h3>
+                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Nail Designer & Estética</p>
+                      </div>
+                    </div>
+
+                    {/* Simulated Content */}
+                    <div className="p-6 bg-brand-parchment space-y-6">
+                      <div className="space-y-2">
+                        <div className="w-full h-1 bg-brand-mist/30 rounded-full" />
+                        <div className="w-2/3 h-1 bg-brand-mist/30 rounded-full" />
+                      </div>
+
+                      <div className="space-y-4">
+                        {[1, 2, 3, 4].map(i => (
+                          <div key={i} className="p-4 bg-white rounded-2xl border border-brand-mist flex justify-between items-center">
+                            <div>
+                                <div className="w-24 h-2 bg-brand-ink/10 rounded-full mb-2" />
+                                <div className="w-12 h-1.5 bg-brand-mist/50 rounded-full" />
+                            </div>
+                            <div className="w-10 h-10 rounded-xl bg-brand-linen flex items-center justify-center text-brand-terracotta">
+                                <Star size={12} fill="currentColor" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+
+                {/* Floating Elements */}
+                <motion.div 
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 4, repeat: Infinity }}
+                  className="absolute -right-10 top-1/4 bg-white p-4 rounded-2xl shadow-xl border border-brand-mist z-40 hidden md:block"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                      <Check size={16} />
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
+                      Reserva Confirmada
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div 
+                  animate={{ y: [0, 10, 0] }}
+                  transition={{ duration: 5, repeat: Infinity }}
+                  className="absolute -left-10 bottom-1/4 bg-brand-terracotta text-white p-4 rounded-2xl shadow-xl z-40 hidden md:block"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                      <Clock size={16} />
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest">
+                      Agenda Lotada ✨
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Planos */}
+        <section className="bg-brand-parchment py-32 px-6">
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="text-center mb-16">
+              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-4 block">Planos simples</span>
+              <h2 className="text-[42px] md:text-[52px] font-serif font-normal text-brand-ink leading-tight">
+                Comece grátis, <em className="italic text-brand-terracotta">cresça no seu ritmo.</em>
+              </h2>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {/* GRATUITO */}
+              <div className="card-refined p-10">
+                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">Gratuito</div>
+                <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 0</div>
+                <div className="text-brand-stone text-sm font-light mb-8">Plano gratuito para começar com teste sem risco. Sem cartão de crédito.</div>
+                <ul className="space-y-3 mb-10">
+                  {['Vitrine pública premium', 'Agendamentos mensais', 'Email para a cliente', 'Link para bio'].map(f => (
+                    <li key={f} className="text-sm text-brand-stone font-light flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/register" className="block text-center border border-brand-mist py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:bg-brand-linen transition-all">
+                  Criar conta grátis
+                </Link>
+              </div>
+
+              {/* ESSENCIAL */}
+              <div className="bg-brand-ink rounded-[32px] p-10 relative">
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <span className="bg-brand-terracotta text-white text-[8px] font-bold uppercase tracking-[0.2em] px-4 py-1.5 rounded-full">Mais popular</span>
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">Essencial</div>
+                <div className="text-[52px] font-serif font-normal text-brand-white leading-none mb-2">R$ 49</div>
+                <div className="text-brand-stone text-sm font-light mb-8">por mês · cancele quando quiser</div>
+                <ul className="space-y-3 mb-10">
+                  {['Agendamentos ilimitados', 'Notificações WhatsApp', 'Lista de espera', 'Bloqueio de horários', 'Lembrete 24h anti-no-show', 'Histórico de clientes'].map(f => (
+                    <li key={f} className="text-sm text-brand-white/70 font-light flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/register" className="block text-center bg-brand-terracotta text-white py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-sienna transition-all">
+                  Começar grátis por 30 dias
+                </Link>
+              </div>
+
+              {/* PRO */}
+              <div className="card-refined p-10 border-brand-terracotta/20">
+                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">Pro</div>
+                <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 89</div>
+                <div className="text-brand-stone text-sm font-light mb-8">por mês</div>
+                <ul className="space-y-3 mb-10">
+                  {['Tudo do Essencial', 'Cupons de desconto', 'Relatório mensal PDF', 'Link de indicação premiado', 'Badge Pro Nera na vitrine', 'Suporte prioritário'].map(f => (
+                    <li key={f} className="text-sm text-brand-stone font-light flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/register" className="block text-center border border-brand-mist py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:bg-brand-linen transition-all">
+                  Quero o Pro
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Testimonials */}
         <section className="bg-brand-white py-32 px-6">
           <div className="max-w-7xl mx-auto w-full">
@@ -149,10 +350,10 @@ export default function LandingPage() {
                   {[...Array(5)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
                 </div>
                 <p className="text-xl font-serif italic font-normal leading-relaxed mb-8">
-                  "Minha agenda lotou depois que coloquei o link na bio. Não perco mais tempo respondendo preço no direct."
+                  "Minha página ficou com cara de marca grande. Minhas clientes amaram a facilidade de agendar sozinhas e eu parei de perder tempo no WhatsApp."
                 </p>
                 <div className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/30">
-                  Bruna, Designer de Cílios · Fortaleza
+                  Karina M. · Nail Designer · São Paulo
                 </div>
               </div>
               
@@ -161,10 +362,10 @@ export default function LandingPage() {
                   {[...Array(5)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
                 </div>
                 <p className="text-xl font-serif italic font-normal leading-relaxed mb-8 text-brand-ink">
-                  "A função de domicílio mudou tudo. Cobro a taxa certa em cada bairro, automático."
+                  "O sistema de taxa por bairro mudou tudo. Agora cobro o valor justo pelo meu deslocamento de forma automática e profissional."
                 </p>
                 <div className="text-[10px] font-medium uppercase tracking-[0.15em] text-brand-stone">
-                  Aline, Maquiadora · Fortaleza
+                  Ana P. · Esteticista · Curitiba
                 </div>
               </div>
             </div>
@@ -185,7 +386,7 @@ export default function LandingPage() {
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </Link>
             <p className="text-brand-white/40 text-[10px] uppercase tracking-[0.1em] mt-8">
-              Sem cartão · Setup em 2 min · Cancele quando quiser
+              Sem cartão de crédito · Setup em 2 min · Cancele quando quiser
             </p>
           </div>
         </section>

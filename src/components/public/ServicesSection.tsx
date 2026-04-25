@@ -1,16 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Clock, ChevronRight, Filter } from 'lucide-react';
-import { Service } from '../../types';
+import { Service, UserProfile } from '../../types';
 import { formatCurrency, cn } from '../../lib/utils';
 import { categorizeService } from '../../lib/copy';
 
 interface ServicesSectionProps {
   services: Service[];
+  profile: UserProfile;
   onSelectService: (service: Service) => void;
 }
 
-export const ServicesSection = ({ services, onSelectService }: ServicesSectionProps) => {
+export const ServicesSection = ({ services, profile, onSelectService }: ServicesSectionProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
 
   const categories = useMemo(() => {
@@ -160,6 +161,28 @@ export const ServicesSection = ({ services, onSelectService }: ServicesSectionPr
           ))}
         </AnimatePresence>
       </div>
+
+      {profile.paymentMethods && profile.paymentMethods.length > 0 && (
+        <div className="mt-8 pt-8 border-t border-brand-mist">
+          <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-4">
+            Formas de Pagamento
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {profile.paymentMethods.map((m) => {
+              const labels: Record<string, string> = {
+                pix: '◉ Pix', credito: '⬡ Cartão de Crédito',
+                debito: '⬡ Cartão de Débito', dinheiro: '◎ Dinheiro',
+                transferencia: '⇄ Transferência'
+              };
+              return (
+                <span key={m} className="px-4 py-2 bg-brand-parchment border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-[0.15em] text-brand-stone">
+                  {labels[m] || m}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </section>
   );
 };

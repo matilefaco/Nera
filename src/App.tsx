@@ -18,6 +18,7 @@ import Dashboard from './pages/Dashboard';
 import ServicesPage from './pages/ServicesPage';
 import ProfilePage from './pages/ProfilePage';
 import ClientsPage from './pages/ClientsPage';
+import PlansPage from './pages/PlansPage';
 import AgendaPage from './pages/AgendaPage';
 import PublicProfile from './pages/PublicProfile';
 import OnboardingPage from './pages/OnboardingPage';
@@ -25,6 +26,7 @@ import ReviewPage from './pages/ReviewPage';
 import BookingResponsePage from './pages/BookingResponsePage';
 import PendingRequestsPage from './pages/PendingRequestsPage';
 import ManageBookingPage from './pages/ManageBookingPage';
+import WhatsAppSimulator from './pages/WhatsAppSimulator';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -93,6 +95,11 @@ export default function App() {
                 <AgendaPage />
               </PrivateRoute>
             } />
+            <Route path="/planos" element={
+              <PrivateRoute>
+                <PlansPage />
+              </PrivateRoute>
+            } />
             <Route path="/pedidos" element={
               <PrivateRoute>
                 <PendingRequestsPage />
@@ -111,6 +118,11 @@ export default function App() {
             <Route path="/profile" element={
               <PrivateRoute>
                 <ProfilePage />
+              </PrivateRoute>
+            } />
+            <Route path="/admin/whatsapp-test" element={
+              <PrivateRoute>
+                <WhatsAppSimulator />
               </PrivateRoute>
             } />
           </Routes>

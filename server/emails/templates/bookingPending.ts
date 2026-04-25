@@ -11,6 +11,7 @@ interface BookingPendingData {
   manageUrl: string;
   whatsappUrl: string;
   clientName: string;
+  paymentMethods?: string[];
 }
 
 export function buildBookingPendingEmail(data: BookingPendingData): string {
@@ -23,8 +24,13 @@ export function buildBookingPendingEmail(data: BookingPendingData): string {
     reservationCode,
     manageUrl,
     whatsappUrl,
-    clientName
+    clientName,
+    paymentMethods
   } = data;
+
+  const paymentMethodsHtml = paymentMethods && paymentMethods.length > 0 
+    ? paymentMethods.join(', ')
+    : 'A combinar com a profissional';
 
   const bodyHtml = `
     <p style="margin-bottom: 25px;">Olá, ${clientName}!</p>
@@ -35,6 +41,7 @@ export function buildBookingPendingEmail(data: BookingPendingData): string {
       { label: 'Data', value: formattedDate },
       { label: 'Horário', value: time },
       { label: 'Valor', value: price },
+      { label: 'Pagamento aceito', value: paymentMethodsHtml },
       { label: 'Código da reserva', value: reservationCode || '-' }
     ])}
     

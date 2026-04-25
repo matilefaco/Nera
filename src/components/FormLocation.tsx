@@ -20,7 +20,6 @@ export interface FormLocationProps {
     city: string;
     state?: string;
     reference: string;
-    googleMapsLink?: string;
     hasParking?: boolean;
     parkingInfo?: string;
     hasAccessibility?: boolean;

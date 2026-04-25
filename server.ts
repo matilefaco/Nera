@@ -6,14 +6,21 @@ import dotenv from "dotenv";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import { 
-  sendNewBookingEmail, 
-  sendBookingConfirmationEmail, 
-  send24hReminderEmail,
-  sendBookingCancellationEmail,
+  sendBookingPendingEmail, 
+  sendProfessionalNewBookingEmail,
+  sendConfirmationRequest24hEmail,
+  sendRetentionEmail,
+  sendBookingConfirmedEmail,
+  sendBookingCancelledEmail,
   sendReviewRequestEmail,
-  sendRawEmail
-} from "./src/services/emailService.ts";
-import { sendBookingPendingEmail } from "./server/emails/sendEmail.ts";
+  sendWelcomeEmail,
+  sendPasswordResetEmail,
+  sendWaitlistInviteEmail,
+  sendBookingRescheduledEmail,
+  sendBookingReminder24hEmail
+} from "./server/emails/sendEmail.ts";
+import { sendWhatsApp, normalizePhone, validateBrazilPhone, sendTestWhatsApp, handleInboundMessage } from "./server/services/whatsappService.ts";
+function sendRawEmail(...args: any[]) { console.warn("sendRawEmail is deprecated"); return { success: false }; }
 import { GoogleAuth } from "google-auth-library";
 import firebaseConfig from "./firebase-applet-config.json" with { type: "json" };
 
@@ -26,6 +33,40 @@ function formatBRNumber(phone: string): string {
     return '55' + cleaned;
   }
   return cleaned;
+}
+
+/**
+ * Unified Email Guard
+ * Prevents duplicate emails for the same event on an appointment.
+ */
+async function shouldSendEmail(appointmentId: string, eventKey: string): Promise<boolean> {
+  if (!appointmentId) return true; // Can't track if no ID
+  
+  try {
+    const doc = await db.collection('appointments').doc(appointmentId).get();
+    if (!doc.exists) return true;
+    
+    const data = doc.data();
+    if (data?.emailEvents?.[eventKey]) {
+      console.log(`[EMAIL_SKIP_DUPLICATE] Event ${eventKey} already sent for ${appointmentId}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[EMAIL_GUARD_ERROR]', err);
+    return true; // Send anyway on error to be safe? Or false to be safe? User says "Avoid duplicate", let's be careful.
+  }
+}
+
+async function markEmailSent(appointmentId: string, eventKey: string) {
+  if (!appointmentId) return;
+  try {
+    await db.collection('appointments').doc(appointmentId).update({
+      [`emailEvents.${eventKey}`]: admin.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    console.error('[EMAIL_MARK_ERROR]', err);
+  }
 }
 
 // WhatsApp Notification Handler (Official Meta Cloud API)
@@ -231,11 +272,24 @@ const processEmailQueue = async () => {
 
       // Status check (re-verify status hasn't changed while in queue)
       const isConfirmed = data.status === 'confirmed' || data.status === 'accepted';
-      if (!isConfirmed || data.emailConfirmationSent === true) continue;
+      const eventKey = 'bookingConfirmedClient';
+      
+      if (!isConfirmed) continue;
+      
+      // Duplicate Protection (Check both new event log and legacy flag)
+      const alreadySentLegacy = data.emailConfirmationSent === true;
+      if (data.emailEvents?.[eventKey] || alreadySentLegacy) {
+        console.log(`[EMAIL_SKIP_DUPLICATE] ${eventKey} already sent for ${id}`);
+        // If it was legacy, mark it in the new system too
+        if (alreadySentLegacy && !data.emailEvents?.[eventKey]) {
+          await markEmailSent(id, eventKey);
+        }
+        continue;
+      }
 
       if (!data.clientEmail) {
         console.warn(`[AUTO CONFIRM EMAIL] skipped for ${id}: missing clientEmail`);
-        await db.collection('appointments').doc(id).update({ emailConfirmationSent: true }).catch(() => {});
+        await markEmailSent(id, eventKey);
         continue;
       }
 
@@ -245,7 +299,7 @@ const processEmailQueue = async () => {
 
       console.log(`[AUTO CONFIRM EMAIL] sending to ${data.clientEmail}...`);
       
-      const result = await sendBookingConfirmationEmail({
+      const result = await sendBookingConfirmedEmail({
         clientName: data.clientName,
         serviceName: data.serviceName,
         date: data.date,
@@ -254,26 +308,19 @@ const processEmailQueue = async () => {
         clientEmail: data.clientEmail,
         professionalName: pro?.name || 'Sua Profissional',
         professionalEmail: pro?.email || '',
-        bookingId: id,
-        token: data.token
+        bookingId: id
       });
 
       if (result.success) {
         console.log(`[AUTO CONFIRM EMAIL] success for ${id} (ID: ${result.id})`);
-        await db.collection('appointments').doc(id).update({ 
-          emailConfirmationSent: true,
-          emailConfirmationTimestamp: admin.firestore.FieldValue.serverTimestamp()
-        }).catch(e => console.error(`[AUTO CONFIRM EMAIL] failed to update flag for ${id}:`, e.message));
+        await markEmailSent(id, eventKey);
       } else {
         const isPermanentError = result.error?.includes('verify a domain') || result.error?.includes('validation_error');
         console.warn(`[AUTO CONFIRM EMAIL] failed for ${id}: ${result.error || 'Unknown transport error'}`);
         
         if (isPermanentError) {
           console.log(`[AUTO CONFIRM EMAIL] marking as "sent" (Skipped/Permanent Error) for ${id}`);
-          await db.collection('appointments').doc(id).update({ 
-            emailConfirmationSent: true,
-            emailConfirmationError: result.error
-          }).catch(() => {});
+          await markEmailSent(id, eventKey);
         }
       }
     } catch (err: any) {
@@ -304,7 +351,7 @@ const setupBackgroundTriggers = () => {
 
       // TRIGGER: Confirmation Email
       const isConfirmed = status === 'confirmed' || status === 'accepted';
-      const alreadySent = data.emailConfirmationSent === true;
+      const alreadySent = data.emailConfirmationSent === true || data.emailEvents?.bookingConfirmedClient === true;
 
       if (isConfirmed && !alreadySent) {
         // Additional safety: don't process very old appointments if they somehow trigger an 'added' event
@@ -349,7 +396,7 @@ async function startServer() {
         timestamp: new Date().toISOString(),
         env: {
           resendKeyPresent: !!process.env.RESEND_API_KEY,
-          emailFrom: process.env.EMAIL_FROM || "Nera <agendamento@usenera.eu.cc>",
+          emailFrom: process.env.EMAIL_FROM || "Nera <agenda@usenera.com>",
           appUrl: process.env.APP_URL,
           nodeEnv: process.env.NODE_ENV
         }
@@ -529,7 +576,7 @@ async function startServer() {
 
       // Send
       response.sendAttempted = true;
-      const result = await sendBookingConfirmationEmail(payload);
+      const result = await sendBookingConfirmedEmail(payload);
       
       if (result.success) {
         response.resendSuccess = true;
@@ -595,7 +642,7 @@ async function startServer() {
       audit.sendFunctionCalled = true;
       audit.resendAttempted = true;
 
-      const result = await sendBookingConfirmationEmail({
+      const result = await sendBookingConfirmedEmail({
         clientName: data?.clientName,
         serviceName: data?.serviceName,
         date: data?.date,
@@ -1327,7 +1374,7 @@ async function startServer() {
 
   app.get("/api/debug-email", async (req, res) => {
     const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.EMAIL_FROM || "Nera <agendamento@usenera.eu.cc>";
+    const from = process.env.EMAIL_FROM || "Nera <agenda@usenera.com>";
     const appUrl = process.env.APP_URL;
     
     res.json({
@@ -1347,7 +1394,7 @@ async function startServer() {
         throw new Error('RESEND_API_KEY is missing');
       }
       
-      const result = await sendNewBookingEmail({
+      const result = await sendProfessionalNewBookingEmail({
         clientName: "Teste Audit",
         serviceName: "Corte de Cabelo (Teste)",
         date: new Date().toISOString().split('T')[0],
@@ -1548,6 +1595,104 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato:
     res.json(result);
   });
 
+  // --- WHATSAPP TEST ENDPOINTS ---
+  app.get("/api/test-whatsapp", async (req, res) => {
+    const { phone, message, type, simulateInbound } = req.query;
+    if (!phone) return res.status(400).json({ error: "Missing phone" });
+    
+    if (simulateInbound === 'true') {
+      const result = await handleInboundMessage(db, phone as string, message as string || '1', { simulated: true });
+      return res.json(result);
+    }
+
+    const targetPhone = phone as string;
+    const eventType = (type as string) || 'test_generic';
+    let msg = (message as string);
+
+    // Mock data for templating
+    const mockData = {
+      clientName: "Cliente Teste",
+      serviceName: "Design de Sobrancelhas",
+      date: "2026-04-26",
+      time: "14:00",
+      professionalName: "Helena Prado",
+      professionalSlug: "helena-prado",
+      reviewUrl: "https://nera.app/review/test"
+    };
+
+    if (!msg) {
+      const formattedDate = mockData.date.split('-').reverse().join('/');
+      switch (eventType) {
+        case 'NEW_BOOKING':
+          msg = `✨ *Novo pedido de agendamento*\n\n*Cliente:* ${mockData.clientName}\n*Serviço:* ${mockData.serviceName}\n*Data:* ${formattedDate}\n*Hora:* ${mockData.time}\n\nAbra o painel do Nera para confirmar.`;
+          break;
+        case 'CONFIRMED':
+          msg = `✨ *Seu horário foi confirmado!*\n\n*Profissional:* ${mockData.professionalName}\n*Serviço:* ${mockData.serviceName}\n*Data:* ${formattedDate}\n*Hora:* ${mockData.time}\n\nResponda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença\n\nNos vemos em breve 💛`;
+          break;
+        case 'CANCELLED':
+          msg = `Seu agendamento foi cancelado.\nSe desejar, reagende facilmente:\nhttps://nera.app/p/${mockData.professionalSlug}`;
+          break;
+        case 'REMINDER_24H':
+          msg = `✨ *Lembrete do seu atendimento amanhã:*\n\n${mockData.serviceName}\n${formattedDate}\n${mockData.time}\n\nResponda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença`;
+          break;
+        case 'REMINDER_2H':
+          msg = `Estamos te esperando hoje às ${mockData.time} 💛`;
+          break;
+        case 'REVIEW':
+          msg = `Obrigada por agendar com ${mockData.professionalName} 💛. Sua opinião é muito importante para nós. Se puder, deixe sua avaliação: ${mockData.reviewUrl}`;
+          break;
+        default:
+          msg = "Teste de WhatsApp do sistema Nera 🚀";
+      }
+    }
+
+    try {
+      const result = await sendWhatsApp(db, targetPhone, msg, { 
+        type: `simulated_${eventType}`,
+        metadata: { isSimulation: true }
+      });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // --- Z-API WEBHOOK ---
+  // Configure this URL in Z-API: https://[your-domain]/api/zapi/webhook
+  app.post("/api/zapi/webhook", async (req, res) => {
+    const payload = req.body;
+    console.log("[Z-API Webhook] Received payload:", JSON.stringify(payload));
+
+    // Basic structure check for Z-API
+    // Usually msg = payload.text?.message or similar depending on Z-API version/settings
+    // Let's handle 'on-message-received'
+    if (payload.type === 'on-message-received' || (payload.phone && payload.text)) {
+      const phone = payload.phone;
+      const message = payload.text?.message || payload.text || "";
+      
+      if (phone && message) {
+        // Run in background
+        handleInboundMessage(db, phone, message, payload).catch(err => {
+          console.error("[Z-API Webhook] Error processing message:", err);
+        });
+      }
+    }
+
+    // Always respond 200 OK fast
+    res.status(200).send("OK");
+  });
+
+  app.get("/api/debug-whatsapp", async (req, res) => {
+    res.json({
+      zapiInstanceId: !!process.env.ZAPI_INSTANCE_ID,
+      zapiInstanceToken: !!process.env.ZAPI_INSTANCE_TOKEN || !!process.env.ZAPI_TOKEN,
+      zapiClientToken: !!process.env.ZAPI_CLIENT_TOKEN,
+      zapiBaseUrl: !!process.env.ZAPI_BASE_URL,
+      metaAccessToken: !!process.env.META_ACCESS_TOKEN,
+      phoneNumberId: !!process.env.WHATSAPP_PHONE_NUMBER_ID
+    });
+  });
+
   async function getServiceDescriptionWithFallback(
     serviceName: string, 
     specialty: string, 
@@ -1728,114 +1873,90 @@ REGRAS:
 
     try {
       if (type === 'BOOKING_PENDING_CLIENT') {
-        const { clientEmail, clientName, professionalName, professionalWhatsapp, serviceName, date, time, price, reservationCode, manageUrl } = payload;
-        
-        console.log(`[BOOKING FLOW] BOOKING_PENDING_CLIENT (Code: ${reservationCode})`);
-        
-        const result = await sendBookingPendingEmail({
-          clientEmail,
-          clientName,
-          professionalName,
-          professionalWhatsapp,
-          serviceName,
-          date,
-          time,
-          price,
-          reservationCode,
-          manageUrl
-        });
-        
-        return res.json(result);
+        const { clientEmail, clientName, professionalName, professionalWhatsapp, serviceName, date, time, price, reservationCode, manageUrl, appointmentId, paymentMethods } = payload;
+        const eventKey = 'bookingPendingClient';
+
+        if (await shouldSendEmail(appointmentId, eventKey)) {
+          const result = await sendBookingPendingEmail({
+            clientEmail, clientName, professionalName, professionalWhatsapp,
+            serviceName, date, time, price, reservationCode, manageUrl, appointmentId, paymentMethods
+          });
+          if (result.success) await markEmailSent(appointmentId, eventKey);
+          return res.json(result);
+        }
+        return res.json({ success: true, skipped: 'duplicate' });
       }
 
       if (type === 'NEW_BOOKING_REQUEST') {
-        const { professionalId, clientName, serviceName, date, time, locationType, neighborhood, totalPrice, appointmentId, token } = payload;
-        
-        console.log(`[BOOKING FLOW] NEW_BOOKING_REQUEST (ID: ${appointmentId})`);
-        console.log(`[BOOKING FLOW] payload metadata: proId=${professionalId}, client=${clientName}, hasToken=${!!token}`);
-        
-        // Fetch pro info via ADMIN SDK
-        process.stdout.write(`[FIRESTORE READ] fetching professional users/${professionalId}... `);
+        const { professionalId, clientName, serviceName, date, time, totalPrice, appointmentId, token, paymentMethods } = payload;
+        const eventKey = 'professionalNewBooking';
+
         const userDoc = await db.collection('users').doc(professionalId).get();
-        if (!userDoc.exists) {
-          console.log('FAILED (not found)');
-          throw new Error(`Professional ${professionalId} not found`);
-        }
-        console.log('SUCCESS');
-        
+        if (!userDoc.exists) throw new Error(`Professional ${professionalId} not found`);
         const pro = userDoc.data();
         const proEmail = pro?.email;
-        const proName = pro?.name;
         const proPhone = pro?.whatsapp;
 
-        // ... rest of the flow
-
-        console.log(`[EMAIL FLOW] professional email candidate: ${proEmail || 'MISSING'}`);
-        console.log(`[EMAIL FLOW] proName: ${proName || 'MISSING'}`);
-        console.log(`[EMAIL FLOW] token candidate: ${token ? 'exists' : 'MISSING'}`);
-
-        // 2. Send real email (as reliable secondary channel)
-        if (proEmail) {
-          const location = locationType === 'home' ? `Domicílio (${neighborhood})` : 'Estúdio / Local Fixo';
-          console.log(`[EMAIL FLOW] calling sendNewBookingEmail to ${proEmail}...`);
-          
-          await sendNewBookingEmail({
-            clientName, 
-            serviceName, 
-            date, 
-            time, 
-            location,
-            totalPrice: new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPrice || 0),
+        if (proEmail && await shouldSendEmail(appointmentId, eventKey)) {
+          const result = await sendProfessionalNewBookingEmail({
             professionalEmail: proEmail,
-            professionalName: proName,
-            bookingId: appointmentId,
-            token: token
-          }).then(result => {
-            if (result.success) {
-              console.log(`[EMAIL FLOW] success (Professional Email ID: ${result.id})`);
-            } else {
-              console.error(`[EMAIL FLOW] failed: ${result.error || 'Unknown result error'}`);
-            }
-          }).catch(err => {
-            console.error('[EMAIL FLOW] failed:', err.message || err);
+            professionalName: pro?.name || 'Profissional',
+            clientName, serviceName, date, time,
+            price: `R$ ${(totalPrice || payload.price || 0).toFixed(2).replace('.', ',')}`,
+            location: payload.locationDetail || payload.neighborhood || 'Estúdio',
+            agendaUrl: `${baseUrl}/pedidos`,
+            appointmentId,
+            paymentMethods
           });
-        } else {
-          console.warn('[EMAIL FLOW] failed: professional has no email configured');
+          if (result.success) await markEmailSent(appointmentId, eventKey);
         }
 
-        // 3. Send WhatsApp Meta (Primary)
         if (proPhone) {
-          console.log(`[WHATSAPP FLOW] sending to professional: ${proPhone}`);
-          const msg = `✨ *Nova reserva no Nera!* 💅\n\n` +
+          const formattedDate = date.split('-').reverse().join('/');
+          const msg = `✨ *Novo pedido de agendamento*\n\n` +
                       `*Cliente:* ${clientName}\n` +
                       `*Serviço:* ${serviceName}\n` +
-                      `*Data:* ${date.split('-').reverse().join('/')} às ${time}\n\n` +
-                      `*Escolha uma ação:* \n\n` +
-                      `1️⃣ *Confirmar:* \n${baseUrl}/pedidos?id=${appointmentId}&token=${token}&action=confirm\n\n` +
-                      `2️⃣ *Recusar:* \n${baseUrl}/pedidos?id=${appointmentId}&token=${token}&action=reject\n\n` +
-                      `3️⃣ *Ver detalhes:* \n${baseUrl}/pedidos?id=${appointmentId}&token=${token}`;
+                      `*Data:* ${formattedDate}\n` +
+                      `*Hora:* ${time}\n\n` +
+                      `Abra o painel do Nera para confirmar:\n` +
+                      `${baseUrl}/pedidos?id=${appointmentId}&token=${token}`;
 
-          const ok = await sendWhatsAppMeta(proPhone, msg);
-          
-          // Fallback only if Meta fails and professional has CallMeBot setup
-          if (!ok) {
-            console.warn(`[WHATSAPP FLOW] Meta failed for ${proPhone}. Checking legacy fallback...`);
-            if (pro?.callmebotApiKey) {
-              await sendWhatsAppNotification(proPhone, msg, pro.callmebotApiKey);
-            }
-          } else {
-            console.log(`[WHATSAPP FLOW] success`);
-          }
-        } else {
-          console.warn(`[WHATSAPP FLOW] failed: professional phone is missing`);
+          await sendWhatsApp(db, proPhone, msg, {
+            appointmentId,
+            userId: professionalId,
+            type: 'professional_new_booking'
+          });
         }
 
         return res.json({ success: true });
       }
 
-      if (type === 'BOOKING_CANCELLED' || type === 'BOOKING_CANCELLED_BY_CLIENT') {
-        const { professionalId, clientName, serviceName, date, time } = payload;
+      if (type === 'BOOKING_REJECTED') {
+        const { professionalId, clientName, clientWhatsapp, serviceName, date, time, professionalSlug } = payload;
         
+        if (clientWhatsapp) {
+          let slug = professionalSlug;
+          if (!slug) {
+            const proDocSnap = await db.collection('users').doc(professionalId).get();
+            slug = proDocSnap.data()?.slug;
+          }
+
+          const profileLink = `${baseUrl}/p/${slug || 'app'}`;
+          const msg = `Olá ${clientName}, infelizmente esse horário não está disponível. Você pode escolher outro horário no link:\n${profileLink}`;
+          
+          await sendWhatsApp(db, clientWhatsapp, msg, {
+            userId: professionalId,
+            type: 'booking_rejected'
+          });
+        }
+        return res.json({ success: true });
+      }
+
+      if (type === 'BOOKING_CANCELLED' || type === 'BOOKING_CANCELLED_BY_CLIENT') {
+        const { professionalId, clientName, clientEmail, clientWhatsapp, serviceName, date, time, appointmentId, professionalSlug } = payload;
+        const eventKeyPro = 'bookingCancelledProfessional';
+        const eventKeyClient = 'bookingCancelledClient';
+
         const proDoc = await db.collection('users').doc(professionalId).get();
         if (proDoc.exists) {
           const pro = proDoc.data();
@@ -1843,51 +1964,49 @@ REGRAS:
           
           if (proPhone) {
             const formattedDate = date.split('-').reverse().join('/');
-            
-            // Waitlist check
-            const hour = parseInt(time.split(':')[0]);
-            const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'night';
-
-            const waitlistSnap = await db.collection('waitlist')
-              .where('professionalId', '==', professionalId)
-              .where('requestedDate', '==', date)
-              .where('status', '==', 'waiting')
-              .get();
-            
-            const matchesCount = waitlistSnap.docs.filter(doc => {
-              const d = doc.data();
-              return d.period === 'any' || d.period === period;
-            }).length;
-
-            let msg = `Horário liberado! 🗓️\n\nA reserva de ${clientName} em ${formattedDate} às ${time} foi CANCELADA. Seu horário ficou disponível novamente.`;
-            
-            if (matchesCount > 0) {
-              msg = `🚨 *Oportunidade de Recuperação!* \n\nO horário de ${time} (${formattedDate}) ficou livre e *há ${matchesCount} interessada${matchesCount > 1 ? 's' : ''}* na lista de espera.\n\nRecupere esse faturamento agora no Dashboard: \n${baseUrl}/dashboard?recovery=${date}_${time.replace(':', '')}`;
-            }
-
-            const ok = await sendWhatsAppMeta(proPhone, msg);
-            if (!ok && pro?.callmebotApiKey) {
-              await sendWhatsAppNotification(proPhone, msg, pro.callmebotApiKey);
-            }
+            const msg = `Horário liberado! 🗓️\n\nA reserva de ${clientName} em ${formattedDate} às ${time} foi CANCELADA. Seu horário ficou disponível novamente.`;
+            await sendWhatsApp(db, proPhone, msg, {
+              appointmentId,
+              userId: professionalId,
+              type: 'booking_cancelled_pro'
+            });
           }
 
-          // Email Notification
-          if (pro?.email) {
-            await sendBookingCancellationEmail({
+          if (pro?.email && await shouldSendEmail(appointmentId, eventKeyPro)) {
+            const result = await sendBookingCancelledEmail({
               clientName, serviceName, date, time, 
-              location: '', // Not strictly needed for cancellation notification
-              professionalEmail: pro.email,
-              professionalName: pro.name,
-              bookingId: ''
-            }).catch(err => console.error('[EMAIL] failed error (Cancellation-Fallback):', err));
+              location: '', professionalEmail: pro.email,
+              professionalName: pro.name, bookingId: appointmentId || ''
+            });
+            if (result.success) await markEmailSent(appointmentId, eventKeyPro);
+          }
+
+          // WhatsApp for client
+          if (clientWhatsapp) {
+            const profileLink = `${baseUrl}/p/${professionalSlug || pro.slug}`;
+            const msg = `Seu agendamento foi cancelado.\nSe desejar, reagende facilmente:\n${profileLink}`;
+            await sendWhatsApp(db, clientWhatsapp, msg, {
+              appointmentId,
+              userId: professionalId,
+              type: 'booking_cancelled_client'
+            });
+          }
+
+          // Also notify client about cancellation if possible
+          if (clientEmail && await shouldSendEmail(appointmentId, eventKeyClient)) {
+             const result = await sendBookingCancelledEmail({
+                clientName, serviceName, date, time,
+                location: '', professionalEmail: clientEmail, 
+                professionalName: pro?.name || 'Sua Profissional', bookingId: appointmentId || ''
+             });
+             if (result.success) await markEmailSent(appointmentId, eventKeyClient);
           }
         }
-        
         return res.json({ success: true });
       }
 
       if (type === 'BOOKING_CONFIRMED') {
-        const { professionalId, clientName, clientEmail, clientWhatsapp, serviceName, date, time, locationType, neighborhood, appointmentId, token, status } = payload;
+        const { professionalId, clientName, clientEmail, clientWhatsapp, serviceName, date, time, locationType, neighborhood, appointmentId, status } = payload;
         
         console.log(`[CONFIRM FLOW] notify called for ${appointmentId} (status: ${status})`);
         console.log(`[CONFIRM FLOW] Email confirmation skipped in notify (handled by background trigger)`);
@@ -1897,21 +2016,63 @@ REGRAS:
         const pro = proDocSnap.exists ? proDocSnap.data() : null;
         const proName = pro?.name || 'Sua Profissional';
 
-        // 1. WhatsApp to Client (keep here for immediate user feedback on state change)
+        // 1. WhatsApp to Client
         if (clientWhatsapp) {
           console.log(`[WHATSAPP FLOW] sending confirmation to client: ${clientWhatsapp}`);
           const formattedDate = date.split('-').reverse().join('/');
-          const msg = `Tudo certo, ${clientName}! ✨\n\nSua reserva com ${proName} foi CONFIRMADA.\n\n📅 *Data:* ${formattedDate}\n⏰ *Horário:* ${time}\n💅 *Serviço:* ${serviceName}\n📍 *Local:* ${locationType === 'home' ? neighborhood : 'No Estúdio'}\n\nAté logo! 👋`;
+          const msg = `✨ *Seu horário foi confirmado!*\n\n` +
+                      `*Profissional:* ${proName}\n` +
+                      `*Serviço:* ${serviceName}\n` +
+                      `*Data:* ${formattedDate}\n` +
+                      `*Hora:* ${time}\n\n` +
+                      `Responda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença\n\n` +
+                      `Nos vemos em breve 💛`;
           
-          await sendWhatsAppMeta(clientWhatsapp, msg).then(ok => {
-            if (ok) console.log(`[WHATSAPP FLOW] success`);
-            else console.warn(`[WHATSAPP FLOW] failed (WhatsApp Meta)`);
-          }).catch(err => {
-            console.error(`[WHATSAPP FLOW] error:`, err);
+          await sendWhatsApp(db, clientWhatsapp, msg, {
+            appointmentId,
+            userId: professionalId,
+            type: 'booking_confirmed_client'
           });
         }
 
         return res.json({ success: true, emailTriggered: 'background' });
+      }
+
+      if (type === 'BOOKING_RESCHEDULED_BY_CLIENT' || type === 'BOOKING_RESCHEDULED') {
+        const { professionalId, clientName, clientEmail, previousDate, previousTime, date, time, appointmentId, serviceName } = payload;
+        
+        const proDoc = await db.collection('users').doc(professionalId).get();
+        if (proDoc.exists) {
+          const pro = proDoc.data();
+          const proPhone = pro?.whatsapp;
+          
+          if (proPhone) {
+            const oldFormatted = previousDate.split('-').reverse().join('/');
+            const newFormatted = date.split('-').reverse().join('/');
+            
+            const msg = `🚨 *Alteração de Horário!* \n\n${clientName} REAGENDOU o atendimento:\n\n` +
+                        `De: ${oldFormatted} às ${previousTime}\n` +
+                        `Para: *${newFormatted} às ${time}*\n\n` +
+                        `O horário antigo foi liberado automaticamente. Confira no Dashboard: \n${baseUrl}/dashboard`;
+
+            await sendWhatsAppMeta(proPhone, msg);
+          }
+
+          // Email for client
+          if (clientEmail) {
+            const eventKey = 'bookingRescheduledClient';
+            if (await shouldSendEmail(appointmentId, eventKey)) {
+              const result = await sendBookingRescheduledEmail({
+                clientEmail, clientName, 
+                professionalName: pro?.name || 'Sua Profissional',
+                serviceName, oldDate: previousDate, oldTime: previousTime,
+                newDate: date, newTime: time, appointmentId
+              });
+              if (result.success) await markEmailSent(appointmentId, eventKey);
+            }
+          }
+        }
+        return res.json({ success: true });
       }
 
       if (type === 'WAITLIST_INVITATION') {
@@ -2007,66 +2168,76 @@ REGRAS:
           let sentSuccessfully = false;
           let deliveryChannel = '';
 
-          // STRATEGY A: WhatsApp Meta (Primary)
-          const phone = pro?.callmebotPhone || appt.professionalWhatsapp || pro?.whatsapp;
-          if (phone) {
+          // A. WhatsApp to Client (Requested by user)
+          const clientPhone = appt.clientWhatsapp;
+          if (clientPhone) {
             const formattedDate = tomorrowStr.split('-').reverse().join('/');
-            const msg = `Lembrete Nera! 🔔\n\nAmanhã, ${formattedDate}, você tem um atendimento com ${appt.clientName} às ${appt.time} (${appt.serviceName}).\n\nConsidere enviar uma mensagem de confirmação para sua cliente hoje! ✨`;
+            const msg = `✨ *Lembrete do seu atendimento amanhã:*\n\n${appt.serviceName}\n${formattedDate}\n${appt.time}\n\nResponda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença`;
             
-            const ok = await sendWhatsAppMeta(phone, msg);
-            if (ok) {
+            const result = await sendWhatsApp(db, clientPhone, msg, {
+              appointmentId: apptId,
+              userId: appt.professionalId,
+              type: 'reminder_24h_client'
+            });
+
+            if (result.success) {
               sentSuccessfully = true;
-              deliveryChannel = 'whatsapp_meta';
+              deliveryChannel = 'whatsapp_client';
               whatsappSent++;
-            } else if (pro?.callmebotApiKey) {
-              // Legacy fallback if professional has their own key
-              const legacyOk = await sendWhatsAppNotification(phone, msg, pro.callmebotApiKey);
-              if (legacyOk) {
-                sentSuccessfully = true;
-                deliveryChannel = 'whatsapp_legacy';
-                whatsappSent++;
-              }
             }
           }
 
-          // STRATEGY B: Email (Fallback) - Only if WhatsApp failed
-          if (!sentSuccessfully && process.env.RESEND_API_KEY && pro?.email) {
+          // B. WhatsApp to Professional
+          const proPhone = pro?.whatsapp;
+          if (proPhone) {
+            const formattedDate = tomorrowStr.split('-').reverse().join('/');
+            const msg = `Lembrete Nera! 🔔\n\nAmanhã, ${formattedDate}, você tem um atendimento com ${appt.clientName} às ${appt.time} (${appt.serviceName}).`;
+            
+            await sendWhatsApp(db, proPhone, msg, {
+              appointmentId: apptId,
+              userId: appt.professionalId,
+              type: 'reminder_24h_pro'
+            });
+          }
+
+          // C. Email (Fallback for Client)
+          if (!sentSuccessfully && process.env.RESEND_API_KEY && appt.clientEmail) {
             try {
-              await send24hReminderEmail({
+              const result = await sendBookingReminder24hEmail({
                 clientName: appt.clientName,
                 serviceName: appt.serviceName,
                 date: appt.date,
                 time: appt.time,
                 location: appt.locationDetail || appt.address || 'Local não informado',
-                professionalEmail: pro.email,
-                professionalName: pro.name,
+                professionalName: pro?.name || 'Profissional',
+                clientEmail: appt.clientEmail,
                 bookingId: apptId
               });
-              sentSuccessfully = true;
-              deliveryChannel = 'email';
-              emailSent++;
+              if (result.success) {
+                sentSuccessfully = true;
+                deliveryChannel = 'email_client';
+                emailSent++;
+              }
             } catch (emailErr) {
               console.error(`[Cron] Email delivery failed for ${apptId}:`, emailErr);
             }
           }
 
           // 2. Finalize
-          if (sentSuccessfully) {
-            console.log(`[Cron] Reminder sent for ${apptId} via ${deliveryChannel}`);
+          if (sentSuccessfully || proPhone) {
+            console.log(`[Cron] Reminder processed for ${apptId}`);
             await docSnap.ref.update({ 
               reminder24hSentAt: admin.firestore.FieldValue.serverTimestamp(),
-              deliveryChannel 
+              deliveryChannel: deliveryChannel || 'whatsapp_pro'
             });
           } else {
-            console.log(`[Cron] No delivery channel available for appointment ${apptId}`);
+            console.log(`[Cron] No delivery channel available for client on appt ${apptId}`);
             noChannelCount++;
-            // We DO NOT mark as sent here, so it can retry if configuration is fixed
           }
 
         } catch (innerErr: any) {
           console.error(`[Cron] Failed processing appointment ${apptId}:`, innerErr.message);
           errorsCount++;
-          // Continue to next appointment
         }
       }
       
@@ -2085,6 +2256,69 @@ REGRAS:
     } catch (err: any) {
       console.error('[Cron Critical Error] 24h reminders failed:', err.message);
       res.status(500).json({ error: String(err) });
+    }
+  });
+
+  /**
+   * Cron Job: 2h Reminders
+   */
+  app.get('/api/cron/reminders2h', async (req, res) => {
+    const secret = req.headers['x-cron-secret'];
+    if (secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const inTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      
+      // We want appointments between now + 1:50 and now + 2:10
+      // But query by date first
+      const snap = await db.collection('appointments')
+        .where('date', '==', today)
+        .where('status', '==', 'confirmed')
+        .where('reminder2hSentAt', '==', null)
+        .get();
+
+      console.log(`[Cron-2h] Found ${snap.docs.length} confirmed bookings today.`);
+
+      let sentCount = 0;
+      for (const docSnap of snap.docs) {
+        const appt = docSnap.data();
+        const apptId = docSnap.id;
+        
+        // Parse time (expecting HH:mm)
+        const [hours, minutes] = appt.time.split(':').map(Number);
+        const apptTime = new Date();
+        apptTime.setHours(hours, minutes, 0, 0);
+
+        const diffMinutes = (apptTime.getTime() - now.getTime()) / (1000 * 60);
+
+        // If appt is within 90 - 150 minutes (approx 2h)
+        if (diffMinutes > 90 && diffMinutes < 150) {
+          if (appt.clientWhatsapp) {
+            const msg = `Estamos te esperando hoje às ${appt.time} 💛`;
+            const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {
+              appointmentId: apptId,
+              userId: appt.professionalId,
+              type: 'reminder_2h'
+            });
+
+            if (result.success) {
+              await docSnap.ref.update({
+                reminder2hSentAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+              sentCount++;
+            }
+          }
+        }
+      }
+
+      res.json({ success: true, sent: sentCount });
+    } catch (err: any) {
+      console.error('[Cron-2h] Error:', err.message);
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -2135,29 +2369,34 @@ REGRAS:
           });
 
           // 1. WhatsApp Delivery
-          const msg = `Oi ${appt.clientName} 💛 como foi sua experiência com ${appt.professionalName || 'sua profissional'}? \n\nSe puder avaliar seu atendimento, isso ajuda muito no crescimento dela: \n\n${reviewUrl}`;
-          const ok = await sendWhatsAppMeta(clientPhone, msg);
+          const proName = appt.professionalName || 'sua profissional';
+          const msg = `Obrigada por agendar com ${proName} 💛. Sua opinião é muito importante para nós. Se puder, deixe sua avaliação: ${reviewUrl}`;
+          const result = await sendWhatsApp(db, clientPhone, msg, {
+            appointmentId: apptId,
+            userId: appt.professionalId,
+            type: 'review_request'
+          });
           
-          // Fallback legacy if global key exists
-          let sent = ok;
-          if (!sent && process.env.CALLMEBOT_API_KEY) {
-            sent = await sendWhatsAppNotification(clientPhone, msg, process.env.CALLMEBOT_API_KEY);
-          }
+          let sent = result.success;
 
           // 2. NEW: Email Delivery (Premium Visual)
           if (appt.clientEmail) {
-            await sendReviewRequestEmail({
-              clientName: appt.clientName,
-              serviceName: appt.serviceName,
-              date: appt.date,
-              time: appt.time,
-              location: appt.locationDetail || appt.address || appt.neighborhood || 'Local não informado',
-              professionalName: appt.professionalName,
-              professionalEmail: '', // Not used in client email
-              clientEmail: appt.clientEmail,
-              bookingId: apptId,
-              reviewUrl
-            }).catch(err => console.error(`[Cron-Reviews] Email failed for ${apptId}:`, err));
+            const eventKey = 'reviewRequestClient';
+            if (await shouldSendEmail(apptId, eventKey)) {
+              const result = await sendReviewRequestEmail({
+                clientName: appt.clientName,
+                serviceName: appt.serviceName,
+                date: appt.date,
+                time: appt.time,
+                location: appt.locationDetail || appt.address || appt.neighborhood || 'Local não informado',
+                professionalName: appt.professionalName,
+                professionalEmail: '', // Not used in client email
+                clientEmail: appt.clientEmail,
+                bookingId: apptId,
+                reviewUrl
+              });
+              if (result.success) await markEmailSent(apptId, eventKey);
+            }
           }
 
           if (sent || appt.clientEmail) {
@@ -2172,6 +2411,176 @@ REGRAS:
       res.json({ success: true, date: yesterdayStr, sent: sentCount });
     } catch (err: any) {
       console.error('[Cron-Reviews] Critical error:', err.message);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // --- ANTI NO-SHOW ENDPOINTS ---
+  
+  app.post("/api/booking/:id/confirm-presence", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const appRef = db.collection('appointments').doc(id);
+      const appDoc = await appRef.get();
+      
+      if (!appDoc.exists) return res.status(404).json({ error: "Reserva não encontrada" });
+      
+      await appRef.update({
+        clientConfirmed24h: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+      
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  /**
+   * Cron Job: Anti No-Show (Client Confirmation Request)
+   * Sends email to clients 24h before their appointment requesting confirmation.
+   */
+  app.get('/api/cron/anti-no-show', async (req, res) => {
+    const secret = req.headers['x-cron-secret'];
+    if (secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      
+      console.log(`[Anti No-Show] Running for ${tomorrowStr}...`);
+
+      const appointmentsRef = db.collection('appointments');
+      const snap = await appointmentsRef
+        .where('date', '==', tomorrowStr)
+        .where('status', '==', 'confirmed')
+        .where('clientConfirmed24h', '!=', true)
+        .get();
+      
+      let sentCount = 0;
+      const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://nera.app';
+
+      for (const docSnap of snap.docs) {
+        const appt = docSnap.data();
+        const apptId = docSnap.id;
+        
+        // 1. Fetch professional data to check if anti-no-show is enabled
+        const proSnap = await db.collection('users').doc(appt.professionalId).get();
+        if (!proSnap.exists) continue;
+        const pro = proSnap.data();
+        
+        if (pro?.antiNoShowEnabled) {
+          if (appt.clientEmail) {
+            const eventKey = 'confirmationRequest24h';
+            if (await shouldSendEmail(apptId, eventKey)) {
+              const result = await sendConfirmationRequest24hEmail({
+                clientEmail: appt.clientEmail,
+                clientName: appt.clientName,
+                professionalName: pro.name || 'Profissional',
+                serviceName: appt.serviceName,
+                date: appt.date,
+                time: appt.time,
+                confirmUrl: `${appUrl}/manage/${apptId}?action=confirm-presence`,
+                rescheduleUrl: `${appUrl}/manage/${apptId}?action=reschedule`,
+                cancelUrl: `${appUrl}/manage/${apptId}?action=cancel`,
+                appointmentId: apptId
+              });
+              
+              if (result.success) {
+                await markEmailSent(apptId, eventKey);
+                // Also update status as before
+                await docSnap.ref.update({
+                  status: 'pending_confirmation',
+                  antiNoShowSentAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                sentCount++;
+              }
+            }
+          }
+        }
+      }
+
+      res.json({ success: true, processed: snap.size, sent: sentCount });
+    } catch (err: any) {
+      console.error('[Anti No-Show Cron] Error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+  
+  /**
+   * Cron Job: Retention (Repurchase Request)
+   * Sends email to clients 30 days after their last appointment.
+   */
+  app.get('/api/cron/retention', async (req, res) => {
+    const secret = req.headers['x-cron-secret'];
+    if (secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+      
+      console.log(`[Retention] Running for ${thirtyDaysAgoStr}...`);
+
+      const appointmentsRef = db.collection('appointments');
+      const snap = await appointmentsRef
+        .where('date', '==', thirtyDaysAgoStr)
+        .where('status', 'in', ['confirmed', 'completed'])
+        .where('retentionSent', '!=', true)
+        .get();
+      
+      let sentCount = 0;
+      const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://nera.app';
+
+      for (const docSnap of snap.docs) {
+        const appt = docSnap.data();
+        
+        // Check if client has booked again in the future (optional but good)
+        const futureSnap = await appointmentsRef
+          .where('clientEmail', '==', appt.clientEmail)
+          .where('date', '>', thirtyDaysAgoStr)
+          .limit(1)
+          .get();
+        
+        if (futureSnap.empty) {
+          if (appt.clientEmail) {
+            const eventKey = 'retention30d';
+            if (await shouldSendEmail(docSnap.id, eventKey)) {
+              const result = await sendRetentionEmail({
+                clientEmail: appt.clientEmail,
+                clientName: appt.clientName,
+                professionalName: appt.professionalName || 'Profissional',
+                serviceName: appt.serviceName,
+                bookingUrl: `${appUrl}/p/${appt.professionalSlug || ''}`,
+                appointmentId: docSnap.id
+              });
+              
+              if (result.success) {
+                await markEmailSent(docSnap.id, eventKey);
+                await docSnap.ref.update({
+                  retentionSent: true,
+                  retentionSentAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                sentCount++;
+              }
+            }
+          }
+        } else {
+          // Already have a future booking, just mark as checked
+          await docSnap.ref.update({
+            retentionSent: true
+          });
+        }
+      }
+
+      res.json({ success: true, processed: snap.size, sent: sentCount });
+    } catch (err: any) {
+      console.error('[Retention Cron] Error:', err);
       res.status(500).json({ error: String(err) });
     }
   });

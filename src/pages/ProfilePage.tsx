@@ -23,9 +23,14 @@ import { useProfileForm } from '../hooks/useProfileForm';
 const IDENTITY_DIFFERENTIALS = [
   'Pontualidade',
   'Biossegurança',
+  'Atendimento personalizado',
   'Produtos premium',
+  'Ambiente confortável',
+  'Técnica avançada',
+  'Resultado duradouro',
   'Atendimento exclusivo',
-  'Técnica avançada'
+  'Naturalidade',
+  'Experiência comprovada'
 ];
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
@@ -75,7 +80,11 @@ export default function ProfilePage() {
     pricingStrategy, setPricingStrategy,
     workingDays, setWorkingDays,
     startTime, setStartTime,
-    endTime, setEndTime
+    endTime, setEndTime,
+    paymentMethods, setPaymentMethods,
+    antiNoShowEnabled, setAntiNoShowEnabled,
+    advancePaymentRequired, setAdvancePaymentRequired,
+    delayTolerance, setDelayTolerance
   } = useProfileForm(profile);
 
   const [newAreaName, setNewAreaName] = useState('');
@@ -198,6 +207,10 @@ export default function ProfilePage() {
         serviceAreas: sanitizedAreas,
         pricingStrategy,
         avatar,
+        paymentMethods: paymentMethods.length > 0 ? paymentMethods : undefined,
+        antiNoShowEnabled,
+        advancePaymentRequired,
+        delayTolerance,
         workingHours: {
           startTime,
           endTime,
@@ -553,6 +566,117 @@ export default function ProfilePage() {
                 showLabels={true}
                 errors={formErrors}
               />
+            </div>
+
+            {/* Anti No-Show Section */}
+            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
+              <div className="pt-2">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-brand-terracotta/10 rounded-xl">
+                    <ShieldCheck size={20} className="text-brand-terracotta" />
+                  </div>
+                  <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone">
+                    Proteção Anti No-Show
+                  </h3>
+                </div>
+
+                <div className="space-y-8">
+                  <div className="flex items-center justify-between p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-1">Confirmação 24h</p>
+                      <p className="text-xs text-brand-stone font-light italic">Enviar lembrete automático 24h antes do horário para o cliente confirmar presença.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAntiNoShowEnabled(!antiNoShowEnabled)}
+                      className={cn(
+                        "w-14 h-8 rounded-full transition-all relative",
+                        antiNoShowEnabled ? "bg-brand-ink" : "bg-brand-mist"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-6 h-6 rounded-full bg-brand-white transition-all",
+                        antiNoShowEnabled ? "left-7" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-1">Sinal Antecipado (Opcional)</p>
+                      <p className="text-xs text-brand-stone font-light italic">Indicar na vitrine que você solicita um sinal via Pix para garantir a reserva.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAdvancePaymentRequired(!advancePaymentRequired)}
+                      className={cn(
+                        "w-14 h-8 rounded-full transition-all relative",
+                        advancePaymentRequired ? "bg-brand-ink" : "bg-brand-mist"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-1 w-6 h-6 rounded-full bg-brand-white transition-all",
+                        advancePaymentRequired ? "left-7" : "left-1"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-4 ml-1">Tolerância de Atraso</p>
+                    <div className="flex gap-3">
+                      {[10, 15, 20].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setDelayTolerance(val as 10 | 15 | 20)}
+                          className={cn(
+                            "flex-1 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-all",
+                            delayTolerance === val
+                              ? "bg-brand-ink text-brand-white border-brand-ink"
+                              : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
+                          )}
+                        >
+                          {val} min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Methods Section */}
+            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
+              <div className="pt-2">
+                <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">
+                  Formas de Pagamento Aceitas
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {[
+                    { id: 'pix', label: 'Pix' },
+                    { id: 'credito', label: 'Cartão de Crédito' },
+                    { id: 'debito', label: 'Cartão de Débito' },
+                    { id: 'dinheiro', label: 'Dinheiro' },
+                    { id: 'transferencia', label: 'Transferência' }
+                  ].map(m => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPaymentMethods(prev =>
+                        prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
+                      )}
+                      className={cn(
+                        "px-5 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-all",
+                        paymentMethods.includes(m.id)
+                          ? "bg-brand-ink text-brand-white border-brand-ink"
+                          : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
+                      )}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Location Section */}

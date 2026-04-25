@@ -4,7 +4,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../AuthContext';
 import { db, confirmAppointmentAtomic, declineAppointmentAtomic, handleBookingError, checkAndExpireAppointments } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { 
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
@@ -90,7 +90,9 @@ export default function PendingRequestsPage() {
 
     const qAll = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', user.uid)
+      where('professionalId', '==', user.uid),
+      orderBy('date', 'desc'),
+      limit(500)
     );
 
     const unsubAll = onSnapshot(qAll, (snapshot) => {
@@ -173,7 +175,12 @@ export default function PendingRequestsPage() {
 
     try {
       if (decision === 'confirmed') {
-        if (!user?.uid) throw new Error("auth-error");
+        if (!user?.uid) {
+          console.error("[PENDING CONFIRM] No user UID available");
+          toast.error("Sessão expirada. Entre novamente.");
+          setTimeout(() => navigate('/login'), 2000);
+          return;
+        }
         await confirmAppointmentAtomic(id, user.uid);
         setConfirmedId(id);
         console.log(`[CONFIRM FLOW] SUCCESS: Booking ${id} confirmed.`);

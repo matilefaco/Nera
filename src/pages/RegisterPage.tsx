@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
@@ -17,6 +17,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get('ref') || '';
 
   const handleGoogleRegister = async () => {
     setLoading(true);
@@ -47,6 +49,7 @@ export default function RegisterPage() {
           whatsapp: '',
           avatar: user.photoURL || '',
           onboardingCompleted: false,
+          referredBy: referralCode || null,
           createdAt: new Date().toISOString()
         }, { merge: true });
         console.log('[SIGNUP FLOW] Profile creation success (Google)');
@@ -108,6 +111,7 @@ export default function RegisterPage() {
           whatsapp: '',
           avatar: '',
           onboardingCompleted: false,
+          referredBy: referralCode || null,
           createdAt: new Date().toISOString()
         });
         console.log('[SIGNUP FLOW] Firestore profile creation success');
@@ -191,7 +195,7 @@ export default function RegisterPage() {
 
         <div className="text-center mb-10">
           <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Crie sua presença profissional</h2>
-          <p className="text-brand-stone text-sm font-light">Comece sua página de agendamento em minutos.</p>
+          <p className="text-brand-stone text-sm font-light">Comece sua página de agendamento em minutos. <br/> Você começará no plano <span className="font-medium text-brand-terracotta">Gratuito</span>.</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-5 mb-10">

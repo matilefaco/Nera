@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Star } from 'lucide-react';
+import { Star, MapPin, Calendar } from 'lucide-react';
 import { Review } from '../../types';
+import { getRelativeDate } from '../../lib/utils';
 
 interface ReviewsSectionProps {
   reviews: Review[];
@@ -13,10 +14,10 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
 
   return (
     <section className="py-32 px-6 max-w-7xl mx-auto w-full">
-      <div className="flex flex-col md:flex-row md:items-center gap-16 mb-20">
+      <div className="flex flex-col md:flex-row md:items-center gap-16 mb-24">
         <div className="flex items-baseline gap-4">
           <span className="font-serif text-[80px] leading-none text-brand-ink">
-            {stats?.averageRating?.toFixed(1) || '5.0'}
+            {stats?.averageRating?.toFixed(1) || '4.9'}
           </span>
           <div className="flex flex-col gap-2">
             <div className="flex gap-1 text-brand-terracotta">
@@ -24,22 +25,22 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
                 <Star key={i} size={14} fill="currentColor" />
               ))}
             </div>
-            <span className="label-text">
+            <span className="text-[11px] font-bold uppercase tracking-widest text-brand-stone opacity-60">
               {stats?.totalReviews || reviews.length} avaliações
             </span>
           </div>
         </div>
 
         <div className="flex-1">
-          <span className="label-text mb-4 block">O que elas dizem</span>
-          <h2 className="heading-section text-brand-ink">
-            Experiências<br />
-            <em className="font-serif italic text-brand-stone">reais</em>
+          <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta mb-4 block">Experiências Reais</span>
+          <h2 className="text-4xl md:text-5xl font-serif text-brand-ink">
+            O que elas dizem sobre<br />
+            o <em className="font-serif italic text-brand-stone">atendimento</em>
           </h2>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {reviews.map((review, i) => (
           <motion.div
             key={review.id}
@@ -47,42 +48,41 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
-            className="group relative bg-brand-white border border-brand-mist rounded-[32px] p-9 hover:border-brand-blush hover:shadow-xl transition-all duration-500"
+            className="group bg-brand-white border border-brand-mist rounded-[40px] p-10 hover:border-brand-blush hover:shadow-2xl transition-all duration-500 flex flex-col justify-between"
           >
-            {/* Decorative Quote Mark */}
-            <span className="absolute top-6 right-8 font-serif text-[80px] text-brand-linen leading-none pointer-events-none select-none group-hover:text-brand-blush/30 transition-colors">
-              &ldquo;
-            </span>
+            <div>
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex gap-1 text-brand-terracotta">
+                  {Array.from({ length: review.rating }).map((_, i) => (
+                    <Star key={i} size={12} fill="currentColor" />
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-40">
+                  <Calendar size={10} />
+                  {getRelativeDate(review.createdAt)}
+                </div>
+              </div>
 
-            <div className="flex gap-1 text-brand-terracotta mb-6">
-              {Array.from({ length: review.rating }).map((_, i) => (
-                <Star key={i} size={12} fill="currentColor" />
-              ))}
+              {review.comment && (
+                <p className="font-serif italic text-[16px] leading-relaxed text-brand-ink mb-10 relative z-10">
+                  "{review.comment}"
+                </p>
+              )}
             </div>
 
-            {review.comment && (
-              <p className="font-serif italic text-[15px] leading-relaxed text-brand-ink mb-8 relative z-10">
-                {review.comment}
-              </p>
-            )}
-
-            <div className="pt-6 border-t border-brand-mist/50 flex items-center justify-between">
+            <div className="pt-8 border-t border-brand-mist/50 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-brand-linen flex items-center justify-center text-[14px] font-serif text-brand-terracotta border border-brand-mist shrink-0">
+                {(review.publicDisplayMode === 'named' ? (review.firstName || 'C')[0] : 'C')}
+              </div>
               <div>
-                <div className="text-[13px] font-medium text-brand-ink">
+                <div className="text-[13px] font-semibold text-brand-ink">
                   {review.publicDisplayMode === 'named' ? (review.firstName || 'Cliente Nera') : 'Cliente Nera'}
                 </div>
-                {review.neighborhood && (
-                  <div className="text-[9px] font-semibold uppercase tracking-widest text-brand-stone">
-                    {review.neighborhood}
-                  </div>
-                )}
-              </div>
-              
-              {review.serviceName && (
-                <div className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta text-right">
-                  {review.serviceName}
+                <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-50">
+                  <MapPin size={8} />
+                  {review.neighborhood ? `${review.neighborhood}, São Paulo` : 'São Paulo'}
                 </div>
-              )}
+              </div>
             </div>
           </motion.div>
         ))}

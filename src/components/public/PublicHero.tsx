@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { ShieldCheck, Zap, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car } from 'lucide-react';
+import { ShieldCheck, Zap, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
 import PremiumButton from '../PremiumButton';
@@ -48,11 +48,6 @@ export const PublicHero = ({
           className="space-y-10"
         >
           <div className="space-y-4">
-            <div className="flex items-center gap-3 text-brand-terracotta">
-              <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.4em]">Profissional Verificada Nera</span>
-            </div>
-            
             <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-brand-stone/60">
               {tagline.main} <span className="font-serif italic lowercase">{tagline.accent}</span>
             </p>
@@ -127,9 +122,9 @@ export const PublicHero = ({
               )}
             </div>
 
-            {stats && (stats.totalCompletedBookings > 10 || stats.averageRating > 4) && (
+            {((stats && (stats.totalCompletedBookings > 10 || stats.averageRating > 4)) || profile.waitlistMode === 'auto' || profile.professionalIdentity?.yearsExperience) && (
               <div className="flex flex-wrap gap-3">
-                {stats.totalCompletedBookings > 10 && (
+                {stats?.totalCompletedBookings && stats.totalCompletedBookings > 10 && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
                     <Users size={12} className="text-brand-terracotta" />
                     <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
@@ -137,11 +132,27 @@ export const PublicHero = ({
                     </span>
                   </div>
                 )}
-                {stats.averageRating >= 4.5 && (
+                {stats?.averageRating && stats.averageRating >= 4.5 && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
                     <Star size={12} className="text-brand-terracotta fill-brand-terracotta" />
                     <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                      {stats.averageRating.toFixed(1)} avaliação
+                      {stats.averageRating.toFixed(1)} nota média
+                    </span>
+                  </div>
+                )}
+                {profile.waitlistMode === 'auto' && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-linen border border-brand-terracotta/20 rounded-full shadow-sm">
+                    <Zap size={12} className="text-brand-terracotta" />
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
+                      Confirmação imediata
+                    </span>
+                  </div>
+                )}
+                {profile.professionalIdentity?.yearsExperience && (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
+                    <Award size={12} className="text-brand-terracotta" />
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
+                      {profile.professionalIdentity.yearsExperience} anos exp.
                     </span>
                   </div>
                 )}
@@ -295,11 +306,11 @@ export const PublicHero = ({
                 </div>
 
                 <div className="space-y-6 bg-brand-parchment/50 p-7 rounded-[32px] border border-brand-mist/50">
-                  <div className="space-y-4">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-terracotta">Endereço</p>
+                  <div className="space-y-4 text-center">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-terracotta">Localização</p>
                       <p className="text-sm font-medium text-brand-ink leading-relaxed">
-                        {profile.studioAddress ? (
+                        {profile.studioAddress?.street ? (
                           <>
                             {profile.studioAddress.street}, {profile.studioAddress.number}
                             {profile.studioAddress.complement && <span className="block">{profile.studioAddress.complement}</span>}
@@ -307,40 +318,44 @@ export const PublicHero = ({
                           </>
                         ) : (
                           <>
-                            {profile.neighborhood || profile.city}
-                            <span className="block opacity-60 text-[10px]">Endereço detalhado em atualização</span>
+                            <span className="block">{profile.neighborhood || profile.city}</span>
+                            <span className="block text-[11px] font-light italic text-brand-stone mt-2">Endereço detalhado disponível após a reserva</span>
                           </>
                         )}
                       </p>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                      <button 
-                        onClick={() => {
-                          if (profile.studioAddress) {
-                            const addr = `${profile.studioAddress.street}, ${profile.studioAddress.number}, ${profile.studioAddress.neighborhood}, ${profile.studioAddress.city}`;
-                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
-                          }
-                        }}
-                        disabled={!profile.studioAddress}
-                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-white border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all shadow-sm disabled:opacity-50"
-                      >
-                        <MapPin size={14} className="text-brand-terracotta" /> Abrir no Google Maps
-                      </button>
-                      
-                      <button 
-                        onClick={() => {
-                          if (profile.studioAddress) {
-                            const addr = `${profile.studioAddress.street}, ${profile.studioAddress.number} - ${profile.studioAddress.neighborhood}, ${profile.studioAddress.city}`;
-                            navigator.clipboard.writeText(addr);
-                            toast.success('Endereço copiado!');
-                          }
-                        }}
-                        disabled={!profile.studioAddress}
-                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-linen/50 border border-brand-mist/30 rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all disabled:opacity-50"
-                      >
-                        <Copy size={14} className="text-brand-stone" /> Copiar endereço
-                      </button>
+                      {profile.studioAddress?.street ? (
+                        <>
+                          <button 
+                            onClick={() => {
+                              const addr = `${profile.studioAddress!.street}, ${profile.studioAddress!.number}, ${profile.studioAddress!.neighborhood}, ${profile.studioAddress!.city}`;
+                              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-white border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all shadow-sm"
+                          >
+                            <MapPin size={14} className="text-brand-terracotta" /> Abrir no Google Maps
+                          </button>
+                          
+                          <button 
+                            onClick={() => {
+                              const addr = `${profile.studioAddress!.street}, ${profile.studioAddress!.number} - ${profile.studioAddress!.neighborhood}, ${profile.studioAddress!.city}`;
+                              navigator.clipboard.writeText(addr);
+                              toast.success('Endereço copiado!');
+                            }}
+                            className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-linen/50 border border-brand-mist/30 rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all"
+                          >
+                            <Copy size={14} className="text-brand-stone" /> Copiar endereço
+                          </button>
+                        </>
+                      ) : (
+                        <div className="p-4 bg-brand-linen/30 border border-dotted border-brand-mist rounded-xl">
+                          <p className="text-[10px] text-brand-stone font-light italic leading-snug">
+                            Para sua segurança e privacidade, a profissional optou por revelar o endereço exato apenas para clientes com reserva confirmada.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 

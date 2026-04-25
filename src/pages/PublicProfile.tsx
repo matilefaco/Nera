@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { db, createBookingRequest, handleBookingError } from '../firebase';
+import { db, createBookingRequest, handleBookingError, logAnalyticsEvent } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -15,13 +15,18 @@ import BookingModal from '../components/BookingModal';
 import WaitlistModal from '../components/WaitlistModal';
 import { UserProfile, Service, Review, Appointment } from '../types';
 
-import { getAvailableSlots, getDayAvailability, getNextAvailableSlot, getLocalDateStr } from '../lib/bookingUtils';
+import { getAvailableSlots, getDayAvailability, getNextAvailableSlot, getLocalDateStr, getBookableSlotsForDate } from '../lib/bookingUtils';
 import { PublicHero } from '../components/public/PublicHero';
 import { ServicesSection } from '../components/public/ServicesSection';
 import { PortfolioSection } from '../components/public/PortfolioSection';
 import { ReviewsSection } from '../components/public/ReviewsSection';
 import { AboutSection } from '../components/public/AboutSection';
 import { FinalCTA } from '../components/public/FinalCTA';
+import { ConfidenceSection } from '../components/public/ConfidenceSection';
+import { DifferentialsSection } from '../components/public/DifferentialsSection';
+import { WeekAvailability, WeeklyDayAvailability } from '../components/public/WeekAvailability';
+import { ExpertIntro } from '../components/public/ExpertIntro';
+import { PaymentMethods } from '../components/public/PaymentMethods';
 
 // --- Static Mock Data for Example Profile ---
 const MOCK_PROFILE: UserProfile = {
@@ -137,16 +142,22 @@ export default function PublicProfile() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const servicesRef = useRef<HTMLDivElement>(null);
-  const [scrolled, setScrolled] = useState(false);
+  const finalCtaRef = useRef<HTMLDivElement>(null);
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const [isCtaVisibleInContent, setIsCtaVisibleInContent] = useState(false);
   
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
+  
+  // Existing state...
   const [preSelectedService, setPreSelectedService] = useState<Service | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showInterestPopup, setShowInterestPopup] = useState(false);
   const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
   const [nextSlot, setNextSlot] = useState<{ date: string, time: string } | null>(null);
   const [totalWeeklySlots, setTotalWeeklySlots] = useState<number | null>(null);
+  const [weeklyAvailability, setWeeklyAvailability] = useState<WeeklyDayAvailability[]>([]);
+  const [selectedInitialDate, setSelectedInitialDate] = useState<string | null>(null);
   const [isAgendaFull, setIsAgendaFull] = useState(false);
   const [activeWaitlistEntry, setActiveWaitlistEntry] = useState<any>(null);
 
@@ -154,22 +165,23 @@ export default function PublicProfile() {
     return splitSmartBio(profile?.bio);
   }, [profile?.bio]);
 
-  const profileState = React.useMemo(() => {
-    if (!profile) return null;
-    return {
-      hasBio: !!profile.bio,
-      hasPortfolio: !!(profile.portfolio && profile.portfolio.length > 0),
-      hasReviews: reviews.length > 0,
-      hasStats: !!(stats?.totalCompletedBookings > 0 || stats?.averageRating),
-      hasDifferentials: !!(profile.professionalIdentity?.differentials && profile.professionalIdentity.differentials.length > 0)
-    };
-  }, [profile, reviews, stats]);
-
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 100);
-      const scrollPercent = (window.scrollY + window.innerHeight) / document.documentElement.scrollHeight;
-      if (scrollPercent > 0.7 && !showInterestPopup && !interestPopupDismissed && !isBookingModalOpen) {
+      // Show sticky CTA only after 30% scroll
+      const scrollY = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight;
+      const winHeight = window.innerHeight;
+      const scrollPercent = scrollY / (docHeight - winHeight);
+      
+      setScrolledPastHero(scrollPercent > 0.3);
+
+      // Check if the final CTA or any other prominent booking button is visible
+      if (finalCtaRef.current) {
+        const rect = finalCtaRef.current.getBoundingClientRect();
+        setIsCtaVisibleInContent(rect.top < winHeight && rect.bottom > 0);
+      }
+
+      if (scrollPercent > 0.8 && !showInterestPopup && !interestPopupDismissed && !isBookingModalOpen) {
         setShowInterestPopup(true);
       }
     };
@@ -204,6 +216,11 @@ export default function PublicProfile() {
           const professionalId = snapshot.docs[0].id;
           setProfile({ ...userData, uid: professionalId } as UserProfile);
           
+          // Growth Analytics: Log Visit
+          if (slug !== 'helena-prado' && slug !== 'exemplo') {
+            logAnalyticsEvent(professionalId, 'visit');
+          }
+
           // Secondary fetches should be silent and independent
           // 1. Services
           try {
@@ -344,6 +361,44 @@ export default function PublicProfile() {
           daysToLookAhead: 14 
         });
 
+        // Calculate Weekly Availability
+        const weekly: WeeklyDayAvailability[] = [];
+        for (let i = 0; i < 7; i++) {
+          const targetDate = new Date();
+          targetDate.setDate(now.getDate() + i);
+          const dateStr = getLocalDateStr(targetDate);
+          const dayOfWeek = targetDate.getDay();
+          
+          const slots = getBookableSlotsForDate({
+            date: dateStr,
+            workingHours: profile.workingHours,
+            appointments: allAppts.filter(a => a.date === dateStr),
+            blockedSchedules,
+            serviceDuration: duration,
+            now
+          });
+
+          const isWorkingDay = profile.workingHours.workingDays.includes(dayOfWeek);
+          
+          let status: 'available' | 'low' | 'full' | 'closed' = 'available';
+          if (!isWorkingDay) {
+            status = 'closed';
+          } else if (slots.length === 0) {
+            status = 'full';
+          } else if (slots.length <= 3) {
+            status = 'low';
+          }
+
+          weekly.push({
+            date: dateStr,
+            label: i === 0 ? 'Hoje' : targetDate.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase(),
+            dayNumber: targetDate.getDate().toString(),
+            status,
+            slotsCount: slots.length
+          });
+        }
+        setWeeklyAvailability(weekly);
+
         if (result) {
           // PROVA REAL: Re-verificar se os slots do dia escolhido realmente existem no motor mestre
           const verificationSlots = getAvailableSlots({
@@ -418,10 +473,18 @@ export default function PublicProfile() {
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10">
       <AnimatePresence>
-        {scrolled && !isBookingModalOpen && !loading && (
-          <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[150] md:hidden">
+        {scrolledPastHero && !isCtaVisibleInContent && !isBookingModalOpen && !loading && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }} 
+            animate={{ y: 0, opacity: 1 }} 
+            exit={{ y: 100, opacity: 0 }} 
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[150] md:hidden"
+          >
             <button 
               onClick={() => {
+                if (profile && profile.uid !== 'mock-helena') {
+                  logAnalyticsEvent(profile.uid, 'click_book_sticky');
+                }
                 if (urgencyInfo?.isAgendaFull) {
                   setIsWaitlistOpen(true);
                 } else {
@@ -432,7 +495,7 @@ export default function PublicProfile() {
               className="flex items-center gap-3 bg-brand-ink text-brand-white px-7 py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] shadow-2xl hover:bg-brand-terracotta transition-all whitespace-nowrap active:scale-95"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
-              {urgencyInfo?.isAgendaFull ? 'Entrar em lista de espera' : 'Reservar horário'}
+              {urgencyInfo?.isAgendaFull ? 'Fila de espera' : 'Reservar agora'}
               <ArrowRight size={14} />
             </button>
           </motion.div>
@@ -457,9 +520,14 @@ export default function PublicProfile() {
         }} 
       />
 
+      <ExpertIntro profile={profile} stats={stats} />
+      <AboutSection profile={profile} aboutBio={aboutBio} />
+      <DifferentialsSection differentials={profile.professionalIdentity?.differentials || []} />
+
       <div ref={servicesRef}>
         <ServicesSection 
           services={services} 
+          profile={profile}
           onSelectService={(s) => { 
             if (urgencyInfo?.isAgendaFull) {
               setIsWaitlistOpen(true);
@@ -470,6 +538,44 @@ export default function PublicProfile() {
           }} 
         />
       </div>
+
+      <PaymentMethods professionalName={profile.name} />
+
+      {/* Urgency Section */}
+      <section className="px-6 py-12 bg-brand-linen/30 border-y border-brand-mist/30">
+        <div className="max-w-xl mx-auto flex flex-col items-center text-center space-y-4">
+          <div className="flex items-center gap-2 px-4 py-2 bg-brand-white rounded-full border border-brand-mist shadow-sm">
+            <Zap size={14} className="text-brand-terracotta" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
+              {urgencyInfo?.message}
+            </span>
+          </div>
+          {nextSlot && (
+            <p className="text-[13px] text-brand-stone italic">
+              Próxima vaga disponível: <strong className="text-brand-ink font-semibold">{nextSlot.date.split('-').reverse().join('/')} às {nextSlot.time}</strong>
+            </p>
+          )}
+        </div>
+      </section>
+
+      <WeekAvailability 
+        availability={weeklyAvailability} 
+        onSelectDate={(date) => {
+          if (profile && profile.uid !== 'mock-helena') {
+            logAnalyticsEvent(profile.uid, 'week_calendar_click');
+          }
+          const day = weeklyAvailability.find(d => d.date === date);
+          if (day?.status === 'full') {
+            setIsWaitlistOpen(true);
+          } else if (day?.status !== 'closed') {
+            setSelectedInitialDate(date);
+            if (services.length > 0) setPreSelectedService(services[0]);
+            setIsBookingModalOpen(true);
+          } else {
+            toast.info('A profissional não atende neste dia.');
+          }
+        }}
+      />
 
       <PortfolioSection 
         portfolio={profile.portfolio || []} 
@@ -482,18 +588,23 @@ export default function PublicProfile() {
           }
         }} 
       />
-      <AboutSection profile={profile} aboutBio={aboutBio} />
       <ReviewsSection reviews={reviews} stats={stats} />
-      <FinalCTA 
-        onBookingClick={() => {
-          if (urgencyInfo?.isAgendaFull) {
-            setIsWaitlistOpen(true);
-          } else {
-            setIsBookingModalOpen(true);
-          }
-        }} 
-        completedBookings={stats?.totalCompletedBookings} 
-      />
+      <ConfidenceSection profile={profile} stats={stats} />
+      <div ref={finalCtaRef}>
+        <FinalCTA 
+          onBookingClick={() => {
+            if (profile && profile.uid !== 'mock-helena') {
+              logAnalyticsEvent(profile.uid, 'click_book_final');
+            }
+            if (urgencyInfo?.isAgendaFull) {
+              setIsWaitlistOpen(true);
+            } else {
+              setIsBookingModalOpen(true);
+            }
+          }} 
+          completedBookings={stats?.totalCompletedBookings} 
+        />
+      </div>
 
       <div className="h-32 md:hidden" /> {/* Bottom spacing for mobile CTA */}
 
@@ -553,8 +664,12 @@ export default function PublicProfile() {
         profile={profile} 
         services={services} 
         open={isBookingModalOpen} 
-        onClose={() => setIsBookingModalOpen(false)} 
+        onClose={() => {
+          setIsBookingModalOpen(false);
+          setSelectedInitialDate(null);
+        }} 
         initialService={preSelectedService} 
+        initialDate={selectedInitialDate}
         waitlistEntry={activeWaitlistEntry}
       />
       

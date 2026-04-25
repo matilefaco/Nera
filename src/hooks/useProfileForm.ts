@@ -9,6 +9,10 @@ export function useProfileForm(profile: UserProfile | null) {
   const [city, setCity] = useState(profile?.city || '');
   const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || '');
   const [instagram, setInstagram] = useState(profile?.instagram || '');
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(profile?.paymentMethods || []);
+  const [antiNoShowEnabled, setAntiNoShowEnabled] = useState(profile?.antiNoShowEnabled || false);
+  const [advancePaymentRequired, setAdvancePaymentRequired] = useState(profile?.advancePaymentRequired || false);
+  const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20>(profile?.delayTolerance || 15);
   const [slug, setSlug] = useState(profile?.slug || '');
   const [avatar, setAvatar] = useState(profile?.avatar || '');
   const [neighborhood, setNeighborhood] = useState(profile?.neighborhood || '');
@@ -20,7 +24,6 @@ export function useProfileForm(profile: UserProfile | null) {
     neighborhood: '',
     city: '',
     reference: '',
-    googleMapsLink: '',
     privacyMode: 'reveal_after_booking'
   });
   const [serviceAreas, setServiceAreas] = useState<any[]>(profile?.serviceAreas || []);
@@ -43,6 +46,10 @@ export function useProfileForm(profile: UserProfile | null) {
       setCity(profile.city || '');
       setWhatsapp(profile.whatsapp || '');
       setInstagram(profile.instagram || '');
+      setPaymentMethods(profile.paymentMethods || []);
+      setAntiNoShowEnabled(profile.antiNoShowEnabled || false);
+      setAdvancePaymentRequired(profile.advancePaymentRequired || false);
+      setDelayTolerance(profile.delayTolerance || 15);
       setSlug(profile.slug || '');
       setAvatar(profile.avatar || '');
       setNeighborhood(profile.neighborhood || '');
@@ -54,7 +61,6 @@ export function useProfileForm(profile: UserProfile | null) {
         neighborhood: '',
         city: '',
         reference: '',
-        googleMapsLink: '',
         privacyMode: 'reveal_after_booking'
       });
       setServiceAreas(profile.serviceAreas || []);
@@ -84,6 +90,10 @@ export function useProfileForm(profile: UserProfile | null) {
     city, setCity,
     whatsapp, setWhatsapp,
     instagram, setInstagram,
+    paymentMethods, setPaymentMethods,
+    antiNoShowEnabled, setAntiNoShowEnabled,
+    advancePaymentRequired, setAdvancePaymentRequired,
+    delayTolerance, setDelayTolerance,
     slug, setSlug,
     avatar, setAvatar,
     neighborhood, setNeighborhood,
