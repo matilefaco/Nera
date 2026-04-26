@@ -6,7 +6,8 @@ import { doc, updateDoc, collection, query, orderBy, getDocs, deleteDoc, setDoc 
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
-  Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut
+  Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
+  RefreshCw, CheckCircle2, AlertCircle, Trash2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -87,6 +88,10 @@ export default function ProfilePage() {
     delayTolerance, setDelayTolerance
   } = useProfileForm(profile);
 
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [googleCalendarEnabled, setGoogleCalendarEnabled] = useState(false);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
@@ -124,6 +129,85 @@ export default function ProfilePage() {
       }
     }
   }, [profile, user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchCalendarStatus();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Validate origin if needed
+      if (event.data?.type === 'CALENDAR_AUTH_SUCCESS') {
+        toast.success('Google Calendar conectado com sucesso!');
+        fetchCalendarStatus();
+      } else if (event.data?.type === 'CALENDAR_AUTH_ERROR') {
+        toast.error(`Erro ao conectar: ${event.data.error}`);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const fetchCalendarStatus = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/calendar/status?professionalId=${user.uid}`);
+      const data = await res.json();
+      setGoogleCalendarConnected(data.connected);
+      setGoogleCalendarEnabled(data.enabled);
+    } catch (err) {
+      console.error('Error fetching calendar status:', err);
+    }
+  };
+
+  const handleConnectCalendar = async () => {
+    if (!user) return;
+    setCalendarLoading(true);
+    try {
+      const res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`);
+      const data = await res.json();
+      if (data.url) {
+        window.open(data.url, 'google_auth', 'width=600,height=700');
+      }
+    } catch (err) {
+      toast.error('Erro ao iniciar conexão com Google Calendar.');
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  const handleToggleCalendar = async (enabled: boolean) => {
+    if (!user) return;
+    try {
+      await fetch('/api/calendar/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ professionalId: user.uid, enabled }),
+      });
+      setGoogleCalendarEnabled(enabled);
+      toast.success(enabled ? 'Sincronização ativada.' : 'Sincronização desativada.');
+    } catch (err) {
+      toast.error('Erro ao alterar status da sincronização.');
+    }
+  };
+
+  const handleDisconnectCalendar = async () => {
+    if (!user || !confirm('Tem certeza que deseja remover a integração com Google Calendar?')) return;
+    try {
+      await fetch('/api/calendar/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ professionalId: user.uid }),
+      });
+      setGoogleCalendarConnected(false);
+      setGoogleCalendarEnabled(false);
+      toast.success('Google Calendar desconectado.');
+    } catch (err) {
+      toast.error('Erro ao desconectar.');
+    }
+  };
 
   if (authLoading) {
     return <AppLoadingScreen message="Carregando seu perfil..." />;
@@ -751,6 +835,91 @@ export default function ProfilePage() {
                     className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                   />
                 </div>
+              </div>
+            </div>
+            
+            {/* Google Calendar Section */}
+            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm space-y-8">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                    <Calendar size={20} />
+                  </div>
+                  <h3 className="font-serif italic text-xl text-brand-ink">Google Calendar</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    googleCalendarConnected ? "bg-green-500" : "bg-brand-mist"
+                  )} />
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">
+                    {googleCalendarConnected ? "Conectado" : "Disponível"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                {!googleCalendarConnected ? (
+                  <div className="space-y-4">
+                    <p className="text-xs text-brand-stone font-light leading-relaxed">
+                      Sincronize sua agenda do Nera com seu Google Calendar pessoal. Novos agendamentos confirmados serão adicionados automaticamente com todos os detalhes da cliente.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleConnectCalendar}
+                      disabled={calendarLoading}
+                      className="w-full py-4 bg-white border border-brand-mist rounded-2xl flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-linen transition-all disabled:opacity-50"
+                    >
+                      {calendarLoading ? (
+                        <RefreshCw size={14} className="animate-spin" />
+                      ) : (
+                        <>
+                          <Calendar size={14} /> Conectar Google Calendar
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-1">Sincronização Ativa</p>
+                        <p className="text-[10px] text-brand-stone font-light italic">
+                          {googleCalendarEnabled 
+                            ? "Sua agenda está sendo sincronizada automaticamente." 
+                            : "A sincronização está pausada."}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleCalendar(!googleCalendarEnabled)}
+                        className={cn(
+                          "w-14 h-8 rounded-full transition-all relative",
+                          googleCalendarEnabled ? "bg-brand-ink" : "bg-brand-mist"
+                        )}
+                      >
+                        <div className={cn(
+                          "absolute top-1 w-6 h-6 rounded-full bg-brand-white transition-all",
+                          googleCalendarEnabled ? "left-7" : "left-1"
+                        )} />
+                      </button>
+                    </div>
+
+                    <div className="pt-4 border-t border-brand-mist/50 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[10px] text-green-600 font-medium">
+                        <CheckCircle2 size={12} />
+                        Conectado ao seu Google
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleDisconnectCalendar}
+                        className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors flex items-center gap-2"
+                      >
+                        <Trash2 size={12} /> Desconectar
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -15,7 +15,10 @@ interface EmailBaseOptions {
   bodyHtml: string;
   ctaText?: string;
   ctaUrl?: string;
+  ctaSubtext?: string;
   footerLinksHtml?: string;
+  unsubscribeUrl?: string;
+  showUnsubscribe?: boolean;
 }
 
 export const COLORS = {
@@ -45,7 +48,10 @@ export function buildEmailBase(options: EmailBaseOptions): string {
     bodyHtml,
     ctaText,
     ctaUrl,
+    ctaSubtext,
     footerLinksHtml,
+    unsubscribeUrl,
+    showUnsubscribe,
   } = options;
 
   const heroBg = COLORS[heroVariant];
@@ -179,6 +185,12 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                               </td>
                             </tr>
                           </table>
+
+                          ${ctaSubtext ? `
+                          <div style="margin-top: 20px; font-size: 11px; font-family: ${FONTS.sans}; color: ${COLORS.stone}; text-align: center;">
+                            ${ctaSubtext}
+                          </div>
+                          ` : ''}
                         </td>
                       </tr>
                       ` : ''}
@@ -192,7 +204,7 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td align="center" style="padding-bottom: 25px;">
-                          <font style="font-family: ${FONTS.serif}; font-size: 24px; color: ${COLORS.ink}; letter-spacing: 0.2em;">NERA</font>
+                          <font style="font-family: ${FONTS.sans}; font-weight: bold; font-size: 22px; color: ${COLORS.ink}; letter-spacing: 0.3em;">NERA</font>
                         </td>
                       </tr>
                       
@@ -208,8 +220,15 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                         <td align="center">
                           <p style="margin: 0; color: ${COLORS.stone}; font-size: 11px; font-family: ${FONTS.sans}; line-height: 1.5;">
                             NERA &copy; 2026 &bull; Agendamento Premium.<br>
-                            Este é um comunicado automático do sistema Nera.
+                            Enviado com carinho pelo Nera • Agendamento para profissionais autônomas
                           </p>
+                          ${showUnsubscribe && unsubscribeUrl ? `
+                            <div style="margin-top: 15px;">
+                              <a href="${unsubscribeUrl}" style="color: ${COLORS.stone}; font-size: 10px; text-decoration: underline; font-family: ${FONTS.sans};">
+                                Descadastrar desta lista
+                              </a>
+                            </div>
+                          ` : ''}
                         </td>
                       </tr>
                     </table>
@@ -233,22 +252,38 @@ export function buildEmailBase(options: EmailBaseOptions): string {
   `;
 }
 
-export function buildEmailCard(items: { label: string; value: string }[]): string {
+export function buildEmailCard(items: { label: string; value: string; valueUrl?: string }[]): string {
   return `
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="${COLORS.parchment}" style="border: 1px solid ${COLORS.mist}; margin: 30px 0;">
       <tr>
         <td style="padding: 30px;">
           <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-            ${items.map((item, index) => `
-              <tr>
-                <td style="padding-bottom: ${index === items.length - 1 ? '0' : '20px'};">
-                  <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; color: ${COLORS.stone}; margin-bottom: 4px; font-family: ${FONTS.sans};">${item.label}</font>
-                  <font style="display: block; font-size: 16px; color: ${COLORS.ink}; font-family: ${FONTS.serif}; line-height: 1.3;">${item.value}</font>
-                </td>
-              </tr>
-            `).join('')}
+            ${items.map((item, index) => {
+              const displayValue = item.valueUrl 
+                ? `<a href="${item.valueUrl}" style="color: ${COLORS.terracotta}; text-decoration: underline;">${item.value}</a>`
+                : item.value;
+
+              return `
+                <tr>
+                  <td style="padding-bottom: ${index === items.length - 1 ? '0' : '20px'};">
+                    <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; color: ${COLORS.stone}; margin-bottom: 4px; font-family: ${FONTS.sans};">${item.label}</font>
+                    <font style="display: block; font-size: 16px; color: ${COLORS.ink}; font-family: ${FONTS.serif}; line-height: 1.3;">${displayValue}</font>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
           </table>
         </td>
+      </tr>
+    </table>
+  `;
+}
+
+export function buildEmailDivider(): string {
+  return `
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 20px 0;">
+      <tr>
+        <td height="1" bgcolor="${COLORS.mist}" style="font-size: 1px; line-height: 1px;">&nbsp;</td>
       </tr>
     </table>
   `;

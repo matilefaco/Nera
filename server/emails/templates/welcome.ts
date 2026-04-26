@@ -1,27 +1,64 @@
-import { buildEmailBase } from '../../../src/services/emailBuilder';
+import { buildEmailBase, buildEmailCard } from '../../../src/services/emailBuilder';
 
 interface WelcomeData {
-  name: string;
-  loginUrl: string;
+  name: string; // Primeiro nome
+  slug: string;
+  onboardingUrl: string;
 }
 
 export function buildWelcomeEmail(data: WelcomeData): string {
-  const { name, loginUrl } = data;
+  const { name, slug, onboardingUrl } = data;
+  const firstName = name.split(' ')[0];
 
   const bodyHtml = `
-    <p>Olá, ${name}!</p>
-    <p>É um prazer ter você conosco. O Nera foi criado para profissionais que buscam excelência na gestão e uma experiência premium para suas clientes.</p>
-    <p>Sua jornada para uma agenda mais inteligente e lucrativa começa aqui.</p>
-    
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#FDFAF7" style="border: 1px solid #E5DDD6; margin: 30px 0;">
+    <p style="font-family: Arial, sans-serif; font-size: 15px; color: #18120E; margin-bottom: 24px;">
+      Em menos de 5 minutos, você vai receber seus primeiros agendamentos.
+    </p>
+
+    ${buildEmailCard([
+      { label: "Seu plano atual", value: "Gratuito — até 15 agendamentos por mês" },
+      { label: "Seu link exclusivo", value: `usenera.com/p/${slug}`, valueUrl: `https://usenera.com/p/${slug}` }
+    ])}
+
+    <p style="font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">
+      3 passos para começar
+    </p>
+
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
       <tr>
-        <td style="padding: 25px;">
-          <p style="margin: 0 0 10px 0; font-weight: bold; color: #18120E; font-family: Arial, sans-serif;">Próximos passos:</p>
-          <ul style="margin: 0; padding-left: 20px; color: #8A7060; font-size: 14px; font-family: Arial, sans-serif;">
-            <li style="margin-bottom: 8px;">Configure seus serviços e valores</li>
-            <li style="margin-bottom: 8px;">Defina seus horários de atendimento</li>
-            <li>Compartilhe seu link exclusivo com suas clientes</li>
-          </ul>
+        <td style="padding-bottom: 12px;">
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td width="24" valign="top" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; color: #A85C3A;">1.</td>
+              <td style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060;">
+                <a href="https://usenera.com/servicos" style="color: #18120E; text-decoration: underline;">Adicione seus serviços e preços</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding-bottom: 12px;">
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td width="24" valign="top" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; color: #A85C3A;">2.</td>
+              <td style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060;">
+                <a href="https://usenera.com/perfil" style="color: #18120E; text-decoration: underline;">Configure seus horários</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+            <tr>
+              <td width="24" valign="top" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; color: #A85C3A;">3.</td>
+              <td style="font-family: Arial, sans-serif; font-size: 14px; color: #18120E;">
+                Compartilhe seu link com suas clientes
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
@@ -30,11 +67,13 @@ export function buildWelcomeEmail(data: WelcomeData): string {
   return buildEmailBase({
     topbarText: 'Bem-vinda',
     heroVariant: 'ink',
-    heroLabel: 'Comece agora',
-    heroTitle: 'Seja bem-vinda',
-    heroTitleItalic: 'ao Universo Nera',
+    heroLabel: 'Sua agenda começa agora',
+    heroTitle: `${firstName},`,
+    heroTitleItalic: 'sua vitrine está pronta.',
+    badgeText: '✓ Conta criada com sucesso',
+    badgeVariant: 'success',
     bodyHtml,
-    ctaText: 'Acessar meu Painel',
-    ctaUrl: loginUrl
+    ctaText: 'Completar Meu Perfil',
+    ctaUrl: onboardingUrl
   });
 }

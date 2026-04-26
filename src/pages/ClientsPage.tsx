@@ -17,8 +17,19 @@ import { toast } from 'sonner';
 
 const PAGE_SIZE = 50;
 
+import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
+import UpgradeModal from '../components/UpgradeModal';
+
 export default function ClientsPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  const { 
+    isUpgradeModalOpen, 
+    upgradeFeature, 
+    usageCount, 
+    closeUpgradeModal, 
+    checkFeatureAccess 
+  } = useUpgradeTriggers();
+
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -250,6 +261,8 @@ export default function ClientsPage() {
             {clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length > 0 && (
               <PremiumButton
                 onClick={() => {
+                  if (!checkFeatureAccess('analytics')) return;
+                  
                   const top10 = clients
                     .filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30)
                     .sort((a,b) => b.totalSpent - a.totalSpent)
@@ -402,6 +415,12 @@ export default function ClientsPage() {
           )}
         </div>
       </div>
+      <UpgradeModal 
+        open={isUpgradeModalOpen} 
+        onClose={closeUpgradeModal}
+        feature={upgradeFeature}
+        count={usageCount}
+      />
     </AppLayout>
   );
 }

@@ -1,34 +1,28 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, indexedDBLocalPersistence } from 'firebase/auth';
-import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit } from 'firebase/firestore';
+import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit, increment } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import firebaseConfig from '../firebase-applet-config.json';
 import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
-import { removeEmptyFields } from './lib/utils';
+import { removeEmptyFields, parseFirestoreDate } from './lib/utils';
 import { toast } from 'sonner';
 
-console.log('[FIREBASE CONFIG] Verifying configuration...');
-console.log('[FIREBASE CONFIG] apiKey present:', !!firebaseConfig.apiKey);
-console.log('[FIREBASE CONFIG] authDomain:', firebaseConfig.authDomain || 'MISSING');
-console.log('[FIREBASE CONFIG] projectId:', firebaseConfig.projectId || 'MISSING');
-console.log('[FIREBASE CONFIG] appId:', firebaseConfig.appId || 'MISSING');
-
-if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId) {
-  console.error('[FIREBASE CONFIG] CRITICAL: Essential Firebase configuration keys are missing!');
-}
+const requiredKeys = ['apiKey', 'authDomain', 'projectId'];
+requiredKeys.forEach(key => {
+  if (!firebaseConfig[key as keyof typeof firebaseConfig]) {
+    throw new Error(`[FIREBASE CONFIG] CRITICAL: Missing ${key}. Check firebase-applet-config.json`);
+  }
+});
 
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const storage = getStorage(app);
-console.log('[Firebase] Storage initialized with bucket:', storage.app.options.storageBucket);
 
 // Initialize Auth with browserLocalPersistence for maximum compatibility in iframes (Safari/iPhone)
-console.log('[Firebase] Initializing Auth with browserLocalPersistence...');
 export const auth = initializeAuth(app, {
   persistence: browserLocalPersistence,
   popupRedirectResolver: browserPopupRedirectResolver,
 });
-console.log('[Firebase] Auth initialized.');
 
 export enum OperationType {
   CREATE = 'create',
@@ -437,6 +431,22 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
     await runTransaction(db, async (transaction) => {
       transaction.set(apptRef, finalData);
 
+      // If coupon is applied, increment its usedCount
+      if (appointmentData.couponId) {
+        const couponRef = doc(db, 'coupons', appointmentData.couponId);
+        const couponSnap = await transaction.get(couponRef);
+        if (couponSnap.exists()) {
+          const coupon = couponSnap.data();
+          // Safety check for max uses inside transaction
+          if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
+            throw new Error('Este cupom atingiu o limite de usos.');
+          }
+          transaction.update(couponRef, {
+            usedCount: increment(1)
+          });
+        }
+      }
+
       // Create reservation_links for instant backend lookup
       const linkRef = doc(db, 'reservation_links', manageSlug);
       transaction.set(linkRef, {
@@ -551,7 +561,7 @@ export async function checkAndExpireAppointments(professionalId: string) {
 
     for (const d of snap.docs) {
       const appt = d.data() as Appointment;
-      const createdAt = appt.createdAt?.toDate?.()?.getTime() || now;
+      const createdAt = parseFirestoreDate(appt.createdAt).getTime();
       const isToday = appt.date === new Date().toISOString().split('T')[0];
       
       const expireTime = isToday ? 2 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
@@ -1220,7 +1230,16 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
     });
 
     // Notify pro about reschedule
-    notify('BOOKING_RESCHEDULED_BY_CLIENT', { id: appointmentId, ...data });
+    notify('BOOKING_RESCHEDULED_BY_CLIENT', { 
+      id: appointmentId, 
+      appointmentId,
+      ...data, 
+      previousDate: data.date, 
+      previousTime: data.time, 
+      date: newDate, 
+      time: newTime,
+      rescheduledBy: 'client'
+    });
     
     // Trigger waitlist check for the OLD slot
     triggerWaitlistCheck(data.professionalId, data.date, data.time);

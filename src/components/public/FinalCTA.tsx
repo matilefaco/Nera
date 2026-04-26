@@ -25,19 +25,24 @@ export const FinalCTA = ({ onBookingClick, completedBookings }: FinalCTAProps) =
           Horários disponíveis
         </span>
         
-        <h2 className="display-hero text-brand-white mb-12">
-          Pronta para<br />
-          <em className="font-serif italic text-brand-blush/60">seu momento?</em>
+        <h2 className="display-hero text-brand-white mb-10">
+          Transforme o seu<br />
+          <em className="font-serif italic text-brand-blush/60">olhar hoje</em>
         </h2>
 
-        <PremiumButton
-          onClick={onBookingClick}
-          variant="terracotta"
-          className="px-14 py-6 text-[11px] shadow-[0_16px_48px_rgba(168,92,58,0.45)]"
-        >
-          Reservar meu horário
-          <ChevronRight size={14} className="ml-2" />
-        </PremiumButton>
+        <div className="flex flex-col items-center gap-4">
+          <PremiumButton
+            onClick={onBookingClick}
+            variant="terracotta"
+            className="px-14 py-6 text-[11px] shadow-[0_16px_48px_rgba(168,92,58,0.45)]"
+          >
+            Agendar meu horário
+            <ChevronRight size={14} className="ml-2" />
+          </PremiumButton>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-white/30">
+            Leva menos de 30 segundos
+          </p>
+        </div>
 
         <div className="flex flex-wrap items-center justify-center gap-10 mt-12 opacity-30">
           <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] text-brand-blush">

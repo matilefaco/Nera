@@ -5,7 +5,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Clock, ChevronRight, Sparkles, ShieldCheck, Instagram, Info, MessageCircle,
-  Plus, X, Camera, ChevronDown, ArrowRight, Star, Zap, CheckCircle2, Users, MapPin, Home, Award
+  Plus, X, Camera, ChevronDown, ArrowRight, Star, CheckCircle2, Users, MapPin, Home, Award, ArrowLeft
 } from 'lucide-react';
 import { formatCurrency, cn, buildWhatsappLink, splitSmartBio } from '../lib/utils';
 import { toast } from 'sonner';
@@ -20,13 +20,12 @@ import { PublicHero } from '../components/public/PublicHero';
 import { ServicesSection } from '../components/public/ServicesSection';
 import { PortfolioSection } from '../components/public/PortfolioSection';
 import { ReviewsSection } from '../components/public/ReviewsSection';
-import { AboutSection } from '../components/public/AboutSection';
 import { FinalCTA } from '../components/public/FinalCTA';
 import { ConfidenceSection } from '../components/public/ConfidenceSection';
-import { DifferentialsSection } from '../components/public/DifferentialsSection';
 import { WeekAvailability, WeeklyDayAvailability } from '../components/public/WeekAvailability';
 import { ExpertIntro } from '../components/public/ExpertIntro';
 import { PaymentMethods } from '../components/public/PaymentMethods';
+import SEOHead from '../components/SEOHead';
 
 // --- Static Mock Data for Example Profile ---
 const MOCK_PROFILE: UserProfile = {
@@ -35,10 +34,10 @@ const MOCK_PROFILE: UserProfile = {
   email: 'helena@exemplo.com',
   whatsapp: '11999999999',
   slug: 'helena-prado',
-  avatar: 'https://images.unsplash.com/photo-1607008829749-c0f284a49fc4?auto=format&fit=crop&w=800&q=80',
-  bio: 'Especialista em beleza natural e cuidados integrativos. Com mais de 10 anos de experiência, acredito que a beleza real nasce do equilíbrio e do autocuidado consciente.',
-  headline: 'Visagista & Especialista em Design de Olhar',
-  specialty: 'Beauty Artist',
+  avatar: 'https://i.imgur.com/gBdf3tO.png',
+  bio: 'Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica sem transformações artificiais. Cada traço é pensado para valorizar o seu olhar de forma única e elegante.',
+  headline: 'Especialista em Design de Sobrancelhas Naturais',
+  specialty: 'Sobrancelhas e Harmonização do Olhar',
   city: 'São Paulo',
   neighborhood: 'Jardins',
   serviceMode: 'hybrid',
@@ -48,44 +47,32 @@ const MOCK_PROFILE: UserProfile = {
     workingDays: [1, 2, 3, 4, 5, 6]
   },
   professionalIdentity: {
-    mainSpecialty: 'Estética Facial',
-    subSpecialties: ['Microagulhamento', 'Limpeza de Pele', 'Peeling'],
-    yearsExperience: '5+',
-    serviceStyle: ['Premium e sofisticada', 'Técnica e precisa'],
-    differentials: ['Pontualidade', 'Biossegurança', 'Produtos premium'],
+    mainSpecialty: 'Design de Sobrancelhas',
+    subSpecialties: ['Brow Lamination', 'Micropigmentação Natural', 'Design com Henna'],
+    yearsExperience: '8',
+    serviceStyle: ['Minimalista e Natural', 'Premium e Personalizado'],
+    differentials: ['Biossegurança rigorosa', 'Atendimento pontual', 'Produtos de alta performance'],
     attendsAt: 'hybrid'
   },
   portfolio: [
     {
       id: '1',
-      url: 'https://images.unsplash.com/photo-1560750588-73207b1ef5b8?auto=format&fit=crop&w=800&q=80',
-      category: 'Estética Facial',
+      url: 'https://i.imgur.com/O9b1cB9.png', // processo
+      category: 'Processo',
       createdAt: new Date().toISOString()
     },
     {
       id: '2',
-      url: 'https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?auto=format&fit=crop&w=800&q=80',
-      category: 'Design de Sobrancelhas',
+      url: 'https://i.imgur.com/pk8kE8K_d.webp?maxwidth=760&fidelity=grand', // close resultado
+      category: 'Resultado',
       createdAt: new Date().toISOString()
     },
     {
       id: '3',
-      url: 'https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?auto=format&fit=crop&w=800&q=80',
-      category: 'Skincare',
+      url: 'https://i.imgur.com/D8hEvtH_d.webp?maxwidth=1520&fidelity=grand', // antes/depois
+      category: 'Antes e Depois',
       createdAt: new Date().toISOString()
-    },
-    {
-      id: '4',
-      url: 'https://images.unsplash.com/photo-1515377905703-c4788e51af15?auto=format&fit=crop&w=800&q=80',
-      category: 'Ritual Facial',
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: '5',
-      url: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80',
-      category: 'Transformação',
-      createdAt: new Date().toISOString()
-    },
+    }
   ],
   services: [], // Placeholder, fetched separately in mock logic
   createdAt: new Date().toISOString(),
@@ -93,14 +80,57 @@ const MOCK_PROFILE: UserProfile = {
 };
 
 const MOCK_SERVICES: Service[] = [
-  { id: 's1', name: 'Design de Sobrancelhas Premium', price: 120, duration: 45, description: 'Mapeamento facial completo e design personalizado com pinça e acabamento.' },
-  { id: 's2', name: 'Limpeza de Pele Profunda', price: 250, duration: 90, description: 'Extração cuidadosa, peeling de diamante e máscara revitalizante.' },
-  { id: 's3', name: 'Revitalização Facial Nera', price: 180, duration: 60, description: 'Ritual de hidratação profunda com massagem relaxante e ativos botânicos.' }
+  { id: 's1', name: 'Sobrancelhas Harmonizadas', price: 150, duration: 45, description: 'Sobrancelhas alinhadas ao seu rosto, com resultado natural e harmonioso que valoriza seu olhar.' },
+  { id: 's2', name: 'Brow Lamination Premium', price: 280, duration: 60, description: 'Efeito de sobrancelhas cheias e disciplinadas, ideal para quem busca volume com elegância.' },
+  { id: 's3', name: 'Micropigmentação Soft', price: 950, duration: 150, description: 'Preenchimento fio a fio ultra-realista para quem deseja acordar pronta todos os dias.' }
 ];
 
 const MOCK_REVIEWS: Review[] = [
-  { id: 'r1', bookingId: 'b1', professionalId: 'mock-helena', serviceId: 's1', serviceName: 'Design', rating: 5, tags: ['Pontualidade', 'Excelente'], comment: 'Incrível! O cuidado da Helena é sem igual.', publicDisplayMode: 'named', publicApproved: true, firstName: 'Mariana', neighborhood: 'Pinheiros', createdAt: new Date().toISOString() },
-  { id: 'r2', bookingId: 'b2', professionalId: 'mock-helena', serviceId: 's2', serviceName: 'Limpeza', rating: 5, tags: ['Biossegurança'], comment: 'Me sinto renovada após cada sessão.', publicDisplayMode: 'named', publicApproved: true, firstName: 'Beatriz', neighborhood: 'Vila Madalena', createdAt: new Date().toISOString() }
+  { 
+    id: 'r1', 
+    bookingId: 'b1', 
+    professionalId: 'mock-helena', 
+    serviceId: 's1', 
+    serviceName: 'Design', 
+    rating: 5, 
+    tags: ['Excelência', 'Pontualidade'], 
+    comment: 'A Helena é uma verdadeira artista. Minhas sobrancelhas nunca ficaram tão harmoniosas e naturais. Ela realmente entende como valorizar o olhar.', 
+    publicDisplayMode: 'named', 
+    publicApproved: true, 
+    firstName: 'Mariana', 
+    neighborhood: 'Pinheiros', 
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() // há 2 dias
+  },
+  { 
+    id: 'r2', 
+    bookingId: 'b2', 
+    professionalId: 'mock-helena', 
+    serviceId: 's2', 
+    serviceName: 'Lamination', 
+    rating: 5, 
+    tags: ['Ambiente Acolhedor', 'Biossegurança'], 
+    comment: 'Experiência impecável. O design valorizou muito meu rosto sem parecer nada artificial. O ambiente é super relaxante e profissional.', 
+    publicDisplayMode: 'named', 
+    publicApproved: true, 
+    firstName: 'Beatriz', 
+    neighborhood: 'Vila Madalena', 
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() // há 1 semana
+  },
+  { 
+    id: 'r3', 
+    bookingId: 'b3', 
+    professionalId: 'mock-helena', 
+    serviceId: 's3', 
+    serviceName: 'Micropigmentação', 
+    rating: 5, 
+    tags: ['Excelência', 'Resultado Natural'], 
+    comment: 'Finalmente encontrei alguém que respeita o formato natural das minhas sobrancelhas. Me sinto muito mais confiante e a recuperação foi super rápida.', 
+    publicDisplayMode: 'named', 
+    publicApproved: true, 
+    firstName: 'Carolina', 
+    neighborhood: 'Jardins', 
+    createdAt: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString() // há 3 semanas
+  }
 ];
 
 const MOCK_STATS = {
@@ -472,6 +502,28 @@ export default function PublicProfile() {
 
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10">
+      <SEOHead 
+        title={`${profile.name} | ${profile.specialty || 'Profissional Nera'}`}
+        description={profile.bio || `Agende um horário com ${profile.name}, especialista em beleza.`}
+        image={profile.avatar}
+        url={`https://usenera.com/p/${profile.slug}`}
+      />
+
+      {/* Back to Home Link for Demo Purposes */}
+      {(slug === 'helena-prado' || slug === 'exemplo') && (
+        <div className="bg-brand-parchment/50 border-b border-brand-mist/20 py-2 px-6">
+          <div className="max-w-7xl mx-auto">
+            <Link 
+              to="/" 
+              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand- ink transition-colors group"
+            >
+              <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+              Voltar
+            </Link>
+          </div>
+        </div>
+      )}
+
       <AnimatePresence>
         {scrolledPastHero && !isCtaVisibleInContent && !isBookingModalOpen && !loading && (
           <motion.div 
@@ -520,10 +572,6 @@ export default function PublicProfile() {
         }} 
       />
 
-      <ExpertIntro profile={profile} stats={stats} />
-      <AboutSection profile={profile} aboutBio={aboutBio} />
-      <DifferentialsSection differentials={profile.professionalIdentity?.differentials || []} />
-
       <div ref={servicesRef}>
         <ServicesSection 
           services={services} 
@@ -539,24 +587,30 @@ export default function PublicProfile() {
         />
       </div>
 
-      <PaymentMethods professionalName={profile.name} />
+      <ExpertIntro 
+        profile={profile} 
+        stats={stats} 
+        customBio={profile.slug === 'helena-prado' || profile.slug === 'exemplo' 
+          ? "Cada atendimento é personalizado, respeitando o formato do seu rosto e seu estilo. Meu objetivo é realçar sua beleza natural com leveza, sem exageros, criando um resultado elegante e duradouro."
+          : aboutBio
+        }
+      />
 
-      {/* Urgency Section */}
-      <section className="px-6 py-12 bg-brand-linen/30 border-y border-brand-mist/30">
-        <div className="max-w-xl mx-auto flex flex-col items-center text-center space-y-4">
-          <div className="flex items-center gap-2 px-4 py-2 bg-brand-white rounded-full border border-brand-mist shadow-sm">
-            <Zap size={14} className="text-brand-terracotta" />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
-              {urgencyInfo?.message}
-            </span>
-          </div>
-          {nextSlot && (
-            <p className="text-[13px] text-brand-stone italic">
-              Próxima vaga disponível: <strong className="text-brand-ink font-semibold">{nextSlot.date.split('-').reverse().join('/')} às {nextSlot.time}</strong>
-            </p>
-          )}
-        </div>
-      </section>
+      <PortfolioSection 
+        portfolio={profile.portfolio || []} 
+        specialty={profile.professionalIdentity?.mainSpecialty || profile.specialty}
+        onBookingClick={() => {
+          if (urgencyInfo?.isAgendaFull) {
+            setIsWaitlistOpen(true);
+          } else {
+            setIsBookingModalOpen(true);
+          }
+        }} 
+      />
+
+      <ReviewsSection reviews={reviews} stats={stats} />
+
+      <PaymentMethods professionalName={profile.name} />
 
       <WeekAvailability 
         availability={weeklyAvailability} 
@@ -577,19 +631,8 @@ export default function PublicProfile() {
         }}
       />
 
-      <PortfolioSection 
-        portfolio={profile.portfolio || []} 
-        specialty={profile.professionalIdentity?.mainSpecialty || profile.specialty}
-        onBookingClick={() => {
-          if (urgencyInfo?.isAgendaFull) {
-            setIsWaitlistOpen(true);
-          } else {
-            setIsBookingModalOpen(true);
-          }
-        }} 
-      />
-      <ReviewsSection reviews={reviews} stats={stats} />
       <ConfidenceSection profile={profile} stats={stats} />
+
       <div ref={finalCtaRef}>
         <FinalCTA 
           onBookingClick={() => {

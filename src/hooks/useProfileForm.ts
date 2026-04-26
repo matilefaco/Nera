@@ -35,6 +35,7 @@ export function useProfileForm(profile: UserProfile | null) {
   const [workingDays, setWorkingDays] = useState<number[]>(profile?.workingHours?.workingDays || profile?.workingDays || [1, 2, 3, 4, 5]);
   const [startTime, setStartTime] = useState(profile?.workingHours?.startTime || profile?.startTime || '09:00');
   const [endTime, setEndTime] = useState(profile?.workingHours?.endTime || profile?.endTime || '18:00');
+  const [avatarSkipped, setAvatarSkipped] = useState(profile?.avatarSkipped || false);
 
   // Sincronizar quando profile mudar
   useEffect(() => {
@@ -54,6 +55,7 @@ export function useProfileForm(profile: UserProfile | null) {
       setAvatar(profile.avatar || '');
       setNeighborhood(profile.neighborhood || '');
       setServiceMode(profile.serviceMode || 'studio');
+      setAvatarSkipped(profile.avatarSkipped || false);
       setStudioAddress(profile.studioAddress || {
         street: '',
         number: '',
@@ -105,6 +107,7 @@ export function useProfileForm(profile: UserProfile | null) {
     differentials, setDifferentials,
     workingDays, setWorkingDays,
     startTime, setStartTime,
-    endTime, setEndTime
+    endTime, setEndTime,
+    avatarSkipped, setAvatarSkipped
   };
 }

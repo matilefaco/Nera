@@ -64,6 +64,8 @@ export interface ProfessionalNotificationPayload {
   professionalEmail: string;
   professionalName: string;
   clientName: string;
+  clientWhatsapp: string;
+  whatsappUrl?: string;
   serviceName: string;
   date: string;
   time: string;
@@ -90,6 +92,11 @@ export interface BookingEmailData {
   manageUrl?: string;
   reviewUrl?: string;
   token?: string;
+  prepInstructions?: string;
+  whatsappUrl?: string;
+  cancellationReason?: string;
+  waitlistCount?: number;
+  profileUrl?: string;
 }
 
 // --- EMAIL FUNCTIONS ---
@@ -145,7 +152,7 @@ export async function sendBookingPendingEmail(data: PendingEmailPayload) {
  * EVENT: booking_created_professional
  */
 export async function sendProfessionalNewBookingEmail(data: ProfessionalNotificationPayload) {
-  const { professionalEmail, professionalName, clientName, appointmentId, paymentMethods } = data;
+  const { professionalEmail, professionalName, clientName, appointmentId, paymentMethods, clientWhatsapp } = data;
 
   logEmail('START', 'booking_created_professional', { to: professionalEmail, appointmentId });
 
@@ -161,7 +168,8 @@ export async function sendProfessionalNewBookingEmail(data: ProfessionalNotifica
   const html = buildProfessionalNewBookingEmail({
     ...data,
     formattedDate,
-    paymentMethods
+    paymentMethods,
+    clientWhatsapp: clientWhatsapp || 'Não informado'
   });
 
   try {
@@ -202,12 +210,14 @@ export async function sendBookingConfirmedEmail(data: BookingEmailData) {
   });
 
   const calendarUrl = data.manageUrl || `${APP_URL}/manage/${bookingId}`;
+  const manageUrl = data.manageUrl || `${APP_URL}/manage/${bookingId}`;
 
   const html = buildBookingConfirmedEmail({
     ...data,
     professionalName: professionalName || 'Sua profissional',
     formattedDate,
-    calendarUrl
+    calendarUrl,
+    manageUrl
   } as any);
 
   try {
@@ -334,6 +344,8 @@ export async function sendBookingReminder24hEmail(data: any) {
 
   const html = buildBookingReminder24hEmail({
     ...data,
+    duration: data.duration || 60,
+    confirmUrl: manageUrl || `${APP_URL}/manage/${appointmentId}`,
     formattedDate,
     whatsappUrl: whatsappUrl || '#',
     manageUrl: manageUrl || `${APP_URL}/manage/${appointmentId}`
@@ -363,7 +375,7 @@ export async function sendBookingReminder24hEmail(data: any) {
  * EVENT: booking_rescheduled_client
  */
 export async function sendBookingRescheduledEmail(data: any) {
-  const { clientEmail, clientName, professionalName, appointmentId, manageUrl } = data;
+  const { clientEmail, clientName, professionalName, appointmentId, manageUrl, rescheduledBy, cancelUrl } = data;
 
   logEmail('START', 'booking_rescheduled_client', { to: clientEmail, appointmentId });
 
@@ -379,6 +391,8 @@ export async function sendBookingRescheduledEmail(data: any) {
 
   const html = buildBookingRescheduledEmail({
     ...data,
+    rescheduledBy: rescheduledBy || 'professional',
+    cancelUrl: cancelUrl || `${APP_URL}/manage/${appointmentId}/cancel`,
     oldDate: oldDateFormatted,
     newDate: newDateFormatted,
     manageUrl: manageUrl || `${APP_URL}/manage/${appointmentId}`
@@ -478,8 +492,32 @@ export async function sendRetentionEmail(data: any) {
 /**
  * EVENT: waitlist_invite
  */
-export async function sendWaitlistInviteEmail(data: { clientName: string, clientEmail: string, professionalName: string, date: string, time: string, bookingUrl: string, appointmentId?: string }) {
-  const { clientName, clientEmail, professionalName, date, time, bookingUrl, appointmentId } = data;
+export async function sendWaitlistInviteEmail(data: { 
+  clientName: string, 
+  clientEmail: string, 
+  professionalName: string, 
+  date: string, 
+  time: string, 
+  bookingUrl: string, 
+  serviceName: string,
+  servicePrice?: string,
+  expiresInHours: number,
+  isExclusive?: boolean,
+  appointmentId?: string 
+}) {
+  const { 
+    clientName, 
+    clientEmail, 
+    professionalName, 
+    date, 
+    time, 
+    bookingUrl, 
+    serviceName,
+    servicePrice,
+    expiresInHours,
+    isExclusive,
+    appointmentId 
+  } = data;
   
   logEmail('START', 'waitlist_invite', { to: clientEmail, appointmentId });
 
@@ -488,7 +526,15 @@ export async function sendWaitlistInviteEmail(data: { clientName: string, client
   });
 
   const html = buildWaitlistInviteEmail({
-    clientName, professionalName, formattedDate, time, bookingUrl
+    clientName, 
+    professionalName, 
+    serviceName,
+    servicePrice,
+    formattedDate, 
+    time, 
+    bookingUrl,
+    expiresInHours: expiresInHours || 2,
+    isExclusive
   });
 
   try {
@@ -514,11 +560,16 @@ export async function sendWaitlistInviteEmail(data: { clientName: string, client
 /**
  * EVENT: welcome_professional
  */
-export async function sendWelcomeEmail(data: { name: string, email: string }) {
+export async function sendWelcomeEmail(data: { name: string, email: string, slug?: string }) {
   logEmail('START', 'welcome_professional', { to: data.email });
-  const loginUrl = `${APP_URL}/login`;
+  const onboardingUrl = `${APP_URL}/onboarding`;
+  const slug = data.slug || 'profissional';
   
-  const html = buildWelcomeEmail({ name: data.name, loginUrl });
+  const html = buildWelcomeEmail({ 
+    name: data.name, 
+    slug, 
+    onboardingUrl 
+  });
 
   try {
     const resend = getResendClient();
@@ -563,6 +614,46 @@ export async function sendPasswordResetEmail(data: { email: string, resetUrl: st
     return { success: true, id: resendData?.id };
   } catch (err: any) {
     logEmail('ERROR', 'password_reset', { error: err.message });
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * EVENT: referral_reward
+ */
+export async function sendReferralRewardEmail(data: { referrerEmail: string, referrerName: string, refereeName: string, amount: number }) {
+  const { referrerEmail, referrerName, refereeName, amount } = data;
+  logEmail('START', 'referral_reward', { to: referrerEmail });
+
+  const html = `
+    <div style="font-family: serif; color: #1a1a1a; padding: 40px; background: #faf9f6; max-width: 600px; margin: 0 auto; border: 1px solid #e9e5db; border-radius: 30px;">
+      <h1 style="font-size: 24px; font-weight: normal; margin-bottom: 20px;">Boas notícias, ${referrerName}!</h1>
+      <p style="font-size: 16px; line-height: 1.6; color: #4a4a4a;">Sua indicação <strong>${refereeName}</strong> começou a usar o Nera Pro!</p>
+      <div style="background: #e9e5db; padding: 30px; border-radius: 20px; margin: 30px 0; text-align: center;">
+        <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: #8c8c8c; display: block; margin-bottom: 8px;">Você ganhou</span>
+        <h2 style="font-size: 36px; color: #a67c52; margin: 0;">R$${amount.toFixed(2)} em créditos</h2>
+      </div>
+      <p style="font-size: 14px; color: #666; line-height: 1.6;">O valor foi adicionado à sua carteira e será descontado automaticamente na sua próxima mensalidade.</p>
+      <p style="margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #e9e5db; pt-20px;">Equipe Nera</p>
+    </div>
+  `;
+
+  try {
+    const resend = getResendClient();
+    const { data: resendData, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [referrerEmail],
+      subject: `Sua indicação rendeu R$${amount} de crédito! 🎁`,
+      html,
+    });
+    if (error) {
+      logEmail('ERROR', 'referral_reward', { error });
+      return { success: false, error };
+    }
+    logEmail('SUCCESS', 'referral_reward', { resendId: resendData?.id });
+    return { success: true, id: resendData?.id };
+  } catch (err: any) {
+    logEmail('ERROR', 'referral_reward', { error: err.message });
     return { success: false, error: err.message };
   }
 }

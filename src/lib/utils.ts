@@ -1,5 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Timestamp, FieldValue } from 'firebase/firestore';
+import { AddressData } from '../types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -318,4 +320,63 @@ export function getRelativeDate(dateInput: string | Date): string {
   }
   const months = Math.floor(diffInDays / 30);
   return `há ${months} ${months === 1 ? 'mês' : 'meses'}`;
+}
+
+/**
+ * Generates a unique 6-character referral code based on name + random chars.
+ */
+export function generateReferralCode(name: string): string {
+  const cleanName = (name || 'NERA').trim().split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
+  const prefix = cleanName.substring(0, 4);
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid O, 0, I, 1 for clarity
+  let random = '';
+  const remainingLength = Math.max(2, 6 - prefix.length);
+  
+  for (let i = 0; i < remainingLength; i++) {
+    random += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  return (prefix + random).substring(0, 6);
+}
+
+/**
+ * Converts various date formats (Timestamp, Date, ISO String) to a standard JS Date.
+ */
+export function parseFirestoreDate(date: Timestamp | Date | string | FieldValue): Date {
+  if (!date) return new Date();
+  
+  if (date instanceof Date) return date;
+  
+  if (typeof date === 'string') {
+    return new Date(date);
+  }
+  
+  if (date && typeof date === 'object' && 'seconds' in date) {
+    return (date as Timestamp).toDate();
+  }
+  
+  // For FieldValue or unknown types, return current date as fallback
+  return new Date();
+}
+
+/**
+ * Normalizes an address from legacy string format to standard AddressData object.
+ */
+export function parseAddress(address: AddressData | string): AddressData {
+  if (!address) {
+    return { street: '', number: '', neighborhood: '', city: '' };
+  }
+  
+  if (typeof address === 'string') {
+    // Basic heuristics for legacy string format "Street, Number - Neighborhood, City"
+    const parts = address.split(/[,\-]/).map(p => p.trim());
+    return {
+      street: parts[0] || address,
+      number: parts[1] || '',
+      neighborhood: parts[2] || '',
+      city: parts[3] || '',
+    };
+  }
+  
+  return address;
 }

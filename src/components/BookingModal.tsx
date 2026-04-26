@@ -5,7 +5,7 @@ import {
   X, Clock, Calendar as CalendarIcon, Check, 
   ArrowLeft, ArrowRight, ShieldCheck, Zap, 
   MapPin, Home, Building2, MessageCircle, 
-  Share2, Heart, Sparkles, LogOut, Settings
+  Share2, Heart, Sparkles, LogOut, Settings, Tag, CircleSlash
 } from 'lucide-react';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } from '../firebase';
@@ -26,8 +26,10 @@ interface BookingModalProps {
   waitlistEntry?: WaitlistEntry | null;
 }
 
+import BookingStep from './BookingStep';
+
 export default function BookingModal({ profile, services, onClose, open, initialService, initialDate, waitlistEntry }: BookingModalProps) {
-  const [step, setStep] = useState(2);
+  const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -93,7 +95,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       }
       
       // For any opening, ensure we start from the beginning unless a restore happens later
-      if (step === 5) setStep(2); // If they reached success and re-opened, reset step
+      if (step === 4) setStep(1); // If they reached success and re-opened, reset step
 
       // Pre-select booking mode if not hybrid for fresh openings
       if (profile?.serviceMode && profile.serviceMode !== 'hybrid' && !bookingMode) {
@@ -102,7 +104,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
     } else {
       // 2. Proactive reset when closed (after animation)
       const timer = setTimeout(() => {
-        setStep(2);
+        setStep(1);
         setSelectedService(null);
         setSelectedDate('');
         setSelectedTime('');
@@ -225,13 +227,9 @@ export default function BookingModal({ profile, services, onClose, open, initial
       
       // Determine initial step after restore
       if (draft.clientName || draft.clientPhone) {
-        setStep(4);
-      } else if (draft.date && draft.time) {
-        setStep(4);
-      } else if (draft.date) {
-        setStep(3);
-      } else {
         setStep(2);
+      } else {
+        setStep(1);
       }
       
       setShowRestoreDraft(false);
@@ -464,7 +462,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
         toast.error('Este horário não está mais disponível.', {
           description: availabilityCheck.reason || 'Por favor, escolha outro horário.'
         });
-        setStep(3);
+        setStep(1);
         setBookingLoading(false);
         return;
       }
@@ -580,7 +578,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
       localStorage.removeItem('booking_draft');
       setTimeout(() => {
-        setStep(5);
+        setStep(4);
       }, 800);
     } catch (error: any) {
       handleBookingError(error);
@@ -589,7 +587,9 @@ export default function BookingModal({ profile, services, onClose, open, initial
     }
   };
 
-  if (!open && step !== 5) return null;
+  if (!open && step !== 4) return null;
+
+  const totalSteps = 3;
 
   return (
     <>
@@ -632,90 +632,11 @@ export default function BookingModal({ profile, services, onClose, open, initial
               <button onClick={onClose} className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors">
                 <X size={24} />
               </button>
-              <div className="flex gap-2 mb-8">
-                {[2, 3, 4].map((s) => (
-                   <div key={s} className={cn("h-1 flex-1 rounded-full transition-all duration-500", step >= s ? "bg-brand-terracotta" : "bg-brand-mist")} />
-                ))}
-              </div>
-
-              {step === 2 && (
+              {step === 1 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                  <h3 className="text-2xl font-serif text-brand-ink mb-2">Escolha o serviço</h3>
-                  <p className="text-xs text-brand-stone font-light mb-8">Selecione o serviço e onde você prefere o atendimento.</p>
+                  <BookingStep step={1} total={totalSteps} title="Escolha o serviço e horário" />
                   
-                  {/* Location Context Header */}
-                  <div className="bg-brand-linen/40 border border-brand-mist/50 rounded-3xl p-5 mb-10 flex items-start gap-4">
-                    <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shadow-sm shrink-0">
-                      {bookingMode === 'home' || profile.serviceMode === 'home' ? <Home size={18} /> : <MapPin size={18} />}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
-                        {profile.city}
-                        {bookingMode === 'home' ? ' • Em Domicílio' : ' • No Estúdio'}
-                      </p>
-                      {bookingMode === 'home' && (
-                        <p className="text-[10px] text-brand-stone leading-relaxed">
-                          {profile.serviceAreaType === 'city_wide' 
-                            ? 'Atendimento disponível em toda a cidade.'
-                            : profile.serviceAreas && profile.serviceAreas.length > 0 
-                              ? `Atende nos bairros: ${profile.serviceAreas.slice(0, 4).map(a => a.name).join(', ')}${profile.serviceAreas.length > 4 ? ' e outros.' : '.'}`
-                              : 'Consulte a disponibilidade para seu bairro.'}
-                        </p>
-                      )}
-                      {bookingMode === 'studio' && (
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-brand-ink font-bold flex items-center gap-1.5 uppercase tracking-widest">
-                            <Building2 size={10} className="text-brand-terracotta" />
-                            Atendimento no estúdio
-                          </p>
-                          <p className="text-[10px] text-brand-stone leading-relaxed uppercase tracking-widest">
-                            {profile.studioAddress ? (
-                              <>
-                                <span className="block">{profile.studioAddress.street}, {profile.studioAddress.number}</span>
-                                <span className="block">{profile.studioAddress.neighborhood}, {profile.studioAddress.city}</span>
-                              </>
-                            ) : (
-                              <>{profile.studioAddress?.neighborhood || profile.neighborhood || profile.city}</>
-                            )}
-                            {profile.studioAddress?.reference && (
-                              <span className="block opacity-60 text-[9px] lowercase italic first-letter:uppercase">
-                                • Próximo {profile.studioAddress.reference.toLowerCase().startsWith('à') || profile.studioAddress.reference.toLowerCase().startsWith('a ') ? '' : 'à '}{profile.studioAddress.reference}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
                   <div className="space-y-8">
-                    {profile.serviceMode === 'hybrid' && (
-                      <div className="space-y-4">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Onde prefere o atendimento?</label>
-                        <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-4">
-                          <button onClick={() => setBookingMode('studio')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all min-w-0", bookingMode === 'studio' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink")}>
-                            <Building2 size={20} className={bookingMode === 'studio' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-xs font-medium uppercase tracking-widest truncate">No Estúdio</span>
-                          </button>
-                          <button onClick={() => setBookingMode('home')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all min-w-0", bookingMode === 'home' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink")}>
-                            <Home size={20} className={bookingMode === 'home' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-xs font-medium uppercase tracking-widest truncate">Em Casa</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {isHomeService && profile.serviceAreaType === 'custom' && (
-                      <div className="space-y-4">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Em qual bairro você está?</label>
-                        <div className="flex flex-wrap gap-2">
-                          {profile.serviceAreas?.map((area) => (
-                            <button key={area.name} onClick={() => setSelectedArea(area)} className={cn("px-6 py-3 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all", selectedArea?.name === area.name ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone hover:border-brand-ink")}>
-                              {area.name} {area.fee > 0 && `(+${formatCurrency(area.fee)})`}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     <div className="space-y-4">
                       <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Para qual serviço deseja agendar?</label>
                       <div className="space-y-3">
@@ -730,161 +651,85 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         ))}
                       </div>
                     </div>
-                    <div className="hidden md:block">
-                      <PremiumButton className="w-full mt-8" variant="terracotta" disabled={!selectedService || (isHomeService && profile.serviceAreaType === 'custom' && !selectedArea)} onClick={() => setStep(3)}>
-                        Continuar <ArrowRight size={18} className="ml-1" />
-                      </PremiumButton>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
 
-              {step === 3 && (
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                    <div className="flex items-center gap-4 mb-2">
-                      <button onClick={() => setStep(2)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                      <h3 className="text-2xl font-serif text-brand-ink">Escolha a data e horário</h3>
-                    </div>
-                    {/* DEBUG INFO - MODO DESENVOLVIMENTO */}
-                    <div className="ml-9 mb-4">
-                      <p className="text-[10px] text-brand-terracotta/60 font-mono">
-                        DEBUG slots reais do dia: {availableSlots.length} | Data: {selectedDate}
-                      </p>
-                    </div>
-                    <p className="text-xs text-brand-stone font-light mb-10 ml-9">Selecione o melhor momento para você.</p>
-                  <div className="flex overflow-x-auto gap-3 pb-4 mb-10 no-scrollbar -mx-2 px-2">
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(offset => {
-                      const date = new Date();
-                      date.setDate(date.getDate() + offset);
-                      const dateStr = date.toISOString().split('T')[0];
-                      const isSelected = selectedDate === dateStr;
-                      const dayOfWeek = date.getDay();
-                      const isWorkingDay = profile?.workingHours?.workingDays?.includes(dayOfWeek);
-                      return (
-                        <button key={offset} onClick={() => { if (!isWorkingDay) { toast.info('A profissional não atende neste dia'); return; } setSelectedDate(dateStr); }} className={cn("min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0", isSelected ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105" : isWorkingDay ? "bg-brand-parchment border-brand-mist hover:border-brand-ink" : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed")}>
-                          <span className={cn("text-[8px] font-bold uppercase tracking-widest mb-1", isWorkingDay ? "opacity-40" : "opacity-20")}>{date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
-                          <span className={cn("text-lg font-serif", !isWorkingDay && "opacity-40")}>{date.getDate()}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <div className="space-y-4 mb-24 md:mb-12">
-                    <div className="flex items-center justify-between ml-1 mb-1">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Horários disponíveis</label>
-                      {urgencyInfo && (
-                        <motion.div 
-                          initial={{ opacity: 0, x: 10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className={cn(
-                            "flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.15em]",
-                            urgencyInfo.isUrgent ? "text-brand-terracotta" : "text-brand-stone/60"
-                          )}
-                        >
-                          {urgencyInfo.isUrgent && <div className="w-1 h-1 rounded-full bg-current animate-pulse" />}
-                          {urgencyInfo.message}
-                        </motion.div>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                      {selectedDate ? (
-                        availableSlots.length > 0 ? (
-                          availableSlots.map(time => (
-                            <button key={time} onClick={() => setSelectedTime(time)} className={cn("py-3.5 rounded-xl border transition-all text-[11px] font-bold flex items-center justify-center gap-1.5", selectedTime === time ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-stone")}>
-                              <Clock size={12} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist/40"} />
-                              {time}
+                    <div className="pt-8 border-t border-brand-mist/30">
+                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1 mb-4 block">Selecione o melhor momento</label>
+                      <div className="flex overflow-x-auto gap-3 pb-4 mb-6 no-scrollbar -mx-2 px-2">
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(offset => {
+                          const date = new Date();
+                          date.setDate(date.getDate() + offset);
+                          const dateStr = date.toISOString().split('T')[0];
+                          const isSelected = selectedDate === dateStr;
+                          const dayOfWeek = date.getDay();
+                          const isWorkingDay = profile?.workingHours?.workingDays?.includes(dayOfWeek);
+                          return (
+                            <button key={offset} onClick={() => { if (!isWorkingDay) { toast.info('A profissional não atende neste dia'); return; } setSelectedDate(dateStr); }} className={cn("min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0", isSelected ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105" : isWorkingDay ? "bg-brand-parchment border-brand-mist hover:border-brand-ink" : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed")}>
+                              <span className={cn("text-[8px] font-bold uppercase tracking-widest mb-1", isWorkingDay ? "opacity-40" : "opacity-20")}>{date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
+                              <span className={cn("text-lg font-serif", !isWorkingDay && "opacity-40")}>{date.getDate()}</span>
                             </button>
-                          ))
-                        ) : (
-                          <div className="col-span-3 py-16 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
-                            <p className="text-sm text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura neste dia</p>
-                            <p className="text-xs text-brand-stone font-light mb-8">Todos os horários estão reservados. Quer ser avisado de desistências?</p>
-                            <button 
-                              onClick={() => setIsWaitlistOpen(true)}
-                              className="flex items-center gap-3 bg-brand-ink text-brand-white px-7 py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] shadow-xl hover:bg-brand-terracotta transition-all mx-auto active:scale-95"
-                            >
-                              <Zap size={14} className="fill-brand-terracotta text-brand-terracotta" />
-                              Entrar na lista prioritária
-                            </button>
-                          </div>
-                        )
-                      ) : (
-                        <div className="col-span-3 py-16 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
-                          <p className="text-sm text-brand-stone font-light italic">Selecione uma data acima</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <PremiumButton variant="terracotta" className="w-full" disabled={!selectedDate || !selectedTime} onClick={() => setStep(4)}>Confirmar este horário <ArrowRight size={18} className="ml-1" /></PremiumButton>
-                </motion.div>
-              )}
-
-              {step === 4 && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                  <div className="flex items-center gap-4 mb-2">
-                    <button onClick={() => setStep(3)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
-                    <h3 className="text-2xl font-serif text-brand-ink">Confirme seus dados</h3>
-                  </div>
-                  <p className="text-xs text-brand-stone font-light mb-10 ml-9">Revise as informações para solicitar seu agendamento.</p>
-                  <div className="bg-brand-ink text-brand-white rounded-[40px] p-8 mb-10 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-brand-terracotta/10 rounded-full -mr-32 -mt-32 blur-3xl opacity-40 group-hover:opacity-60 transition-opacity" />
-                    <div className="flex flex-col relative z-10">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-4">Resumo do Agendamento</span>
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <h4 className="text-2xl font-serif text-brand-linen">{selectedService?.name}</h4>
-                          <div className="flex items-center gap-4 text-xs font-light text-brand-linen/60">
-                            <span className="flex items-center gap-2">
-                              <CalendarIcon size={14} className="text-brand-terracotta/60" /> 
-                              {selectedDate ? (
-                                (() => {
-                                  const [year, month, day] = selectedDate.split('-').map(Number);
-                                  return new Date(year, month - 1, day).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-                                })()
-                              ) : '--/--'}
-                            </span>
-                            <span className="w-px h-3 bg-brand-white/10" />
-                            <span className="flex items-center gap-2"><Clock size={14} className="text-brand-terracotta/60" /> {selectedTime || '--:--'}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-[8px] font-bold uppercase tracking-widest text-brand-linen/40 block mb-1">Total</span>
-                          <div className="flex flex-col items-end">
-                            {appliedCoupon && (
-                              <span className="text-[10px] text-brand-linen/40 line-through -mb-1">
-                                {formatCurrency((Number(selectedService?.price) || 0) + (selectedArea?.fee || 0))}
-                              </span>
-                            )}
-                            <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(calculateTotalPrice())}</span>
-                          </div>
-                        </div>
+                          );
+                        })}
                       </div>
-                      
-                      {/* Payment Methods Section - Added before form fields */}
-                      <div className="mt-6 pt-6 border-t border-brand-white/10">
-                        <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-brand-terracotta block mb-3">Formas de pagamento aceitas</span>
-                        <div className="flex flex-wrap gap-2">
-                          {profile.paymentMethods && profile.paymentMethods.length > 0 ? (
-                            profile.paymentMethods.map((id) => {
-                              const names: Record<string, string> = {
-                                pix: 'Pix',
-                                credito: 'Crédito',
-                                debito: 'Débito',
-                                dinheiro: 'Dinheiro',
-                                transferencia: 'Transferência'
-                              };
-                              return (
-                                <span key={id} className="px-3 py-1 bg-brand-white/5 border border-brand-white/10 rounded-full text-[9px] font-medium text-brand-linen/80">
-                                  {names[id] || id}
-                                </span>
-                              );
-                            })
+
+                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                        {selectedDate ? (
+                          availableSlots.length > 0 ? (
+                            availableSlots.map(time => (
+                              <button key={time} onClick={() => setSelectedTime(time)} className={cn("py-3.5 rounded-xl border transition-all text-[11px] font-bold flex items-center justify-center gap-1.5", selectedTime === time ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-stone")}>
+                                <Clock size={12} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist/40"} />
+                                {time}
+                              </button>
+                            ))
                           ) : (
-                            <span className="text-[10px] text-brand-linen/40 italic">As formas de pagamento serão combinadas com a profissional.</span>
-                          )}
-                        </div>
+                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                              <p className="text-[10px] text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura neste dia</p>
+                              <button onClick={() => setIsWaitlistOpen(true)} className="flex items-center gap-2 bg-brand-ink text-brand-white px-5 py-3 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-xl mx-auto">
+                                <Zap size={12} className="fill-brand-terracotta text-brand-terracotta" /> Entrar na Lista
+                              </button>
+                            </div>
+                          )
+                        ) : (
+                          <div className="col-span-3 py-10 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
+                            <p className="text-[10px] text-brand-stone font-light italic uppercase tracking-widest">Selecione uma data acima</p>
+                          </div>
+                        )}
                       </div>
                     </div>
+
+                    <PremiumButton className="w-full mt-8 hidden md:flex" variant="terracotta" disabled={!selectedService || !selectedDate || !selectedTime} onClick={() => setStep(2)}>
+                      Próximo Passo <ArrowRight size={18} className="ml-1" />
+                    </PremiumButton>
                   </div>
+                </motion.div>
+              )}
+
+
+
+
+              {step === 2 && (
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                  <div className="flex items-center gap-4 mb-4">
+                    <button onClick={() => setStep(1)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
+                    <BookingStep step={2} total={totalSteps} title="Seus Dados" />
+                  </div>
+
+                  <div className="space-y-6">
+                    {profile.serviceMode === 'hybrid' && (
+                      <div className="space-y-4">
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Onde prefere o atendimento?</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <button onClick={() => setBookingMode('studio')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all", bookingMode === 'studio' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone")}>
+                            <Building2 size={20} className={bookingMode === 'studio' ? "text-brand-terracotta" : "text-brand-mist"} />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">No Estúdio</span>
+                          </button>
+                          <button onClick={() => setBookingMode('home')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all", bookingMode === 'home' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone")}>
+                            <Home size={20} className={bookingMode === 'home' ? "text-brand-terracotta" : "text-brand-mist"} />
+                            <span className="text-[10px] font-bold uppercase tracking-widest">Em Casa</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-4 mb-8">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Seu Nome <span className="text-brand-terracotta">*</span></label>
@@ -982,57 +827,135 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       <p className="text-[9px] text-brand-stone/70 font-medium uppercase tracking-wider ml-2 mt-4 leading-relaxed italic">
                         Você receberá a confirmação e atualizações do agendamento por e-mail.
                       </p>
+                    </div>
+                    <div className="hidden md:block">
+                      <PremiumButton className="w-full mt-8" variant="terracotta" disabled={!clientName || !clientPhone || !clientEmail || (isHomeService && (!addressStreet || !addressNumber))} onClick={() => setStep(3)}>
+                        Revisar Agendamento <ArrowRight size={18} className="ml-1" />
+                      </PremiumButton>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
 
-                      {/* Coupon Section */}
-                      <div className="pt-6 mt-6 border-t border-brand-mist/30 space-y-3">
-                        <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
-                          Cupom de desconto
-                        </p>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                            placeholder="CÓDIGO"
-                            className="flex-1 px-5 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all uppercase"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleApplyCoupon}
-                            disabled={isCheckingCoupon || !couponCode.trim()}
-                            className="px-6 py-3.5 bg-brand-ink text-brand-white rounded-[18px] text-[10px] font-bold uppercase tracking-widest disabled:opacity-40 transition-all active:scale-95"
-                          >
-                            {isCheckingCoupon ? '...' : 'Aplicar'}
-                          </button>
+              {step === 3 && (
+                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
+                  <div className="flex items-center gap-4 mb-4">
+                    <button onClick={() => setStep(2)} className="text-brand-stone hover:text-brand-ink"><ArrowLeft size={20} /></button>
+                    <BookingStep step={3} total={totalSteps} title="Revisão Final" />
+                  </div>
+
+                  <div className="bg-brand-ink text-brand-white rounded-[40px] p-8 mb-8 shadow-2xl relative overflow-hidden group">
+                    <div className="flex flex-col relative z-10">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-4">Resumo</span>
+                      <div className="flex justify-between items-start mb-6">
+                        <div className="space-y-1">
+                          <h4 className="text-2xl font-serif text-brand-linen">{selectedService?.name}</h4>
+                          <p className="text-xs font-light text-brand-linen/60 flex items-center gap-3">
+                            <span>{selectedDate?.split('-').reverse().slice(0,2).join('/')} às {selectedTime}</span>
+                            <span className="w-px h-3 bg-brand-white/10" />
+                            <span>{isHomeService ? 'Em Domicílio' : 'No Estúdio'}</span>
+                          </p>
                         </div>
-                        {couponError && (
-                          <motion.p 
-                            initial={{ opacity: 0, y: -5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="text-[10px] text-red-600 font-bold uppercase tracking-wide ml-2"
-                          >
-                            {couponError}
-                          </motion.p>
-                        )}
-                        {appliedCoupon && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: -5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-green-50 border border-green-100 p-3 rounded-xl flex items-center justify-between"
-                          >
-                            <p className="text-[10px] text-green-700 font-bold uppercase tracking-wide">
-                              ✓ {appliedCoupon.code}: {appliedCoupon.description || `Desconto de ${appliedCoupon.type === 'percentage' ? appliedCoupon.value + '%' : formatCurrency(appliedCoupon.value)} aplicado`}
-                            </p>
-                            <button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} className="text-green-700/50 hover:text-green-700">
-                              <X size={14} />
-                            </button>
-                          </motion.div>
+                        <div className="text-right">
+                          <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(calculateTotalPrice())}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="pt-6 border-t border-brand-white/10 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <Check size={14} className="text-brand-terracotta mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-linen">{clientName}</p>
+                            <p className="text-[10px] text-brand-linen/60">{formatWhatsappDisplay(clientPhone)}</p>
+                          </div>
+                        </div>
+                        {isHomeService && (
+                          <div className="flex items-start gap-3">
+                            <MapPin size={14} className="text-brand-terracotta mt-0.5 shrink-0" />
+                            <p className="text-[10px] text-brand-linen/60">{addressStreet}, {addressNumber} - {addressNeighborhood}</p>
+                          </div>
                         )}
                       </div>
                     </div>
-<div className="hidden md:block">
-  <PremiumButton variant="terracotta" className="w-full py-7" disabled={!clientName.trim() || clientName.trim().length < 2 || !clientPhone || !clientEmail || (isHomeService && (!addressStreet.trim() || !addressNumber.trim()))} onClick={handleBooking} loading={bookingLoading} loadingText="Enviando pedido...">Confirmar agendamento <Check size={18} className="ml-1" /></PremiumButton>
-</div>
+                  </div>
+
+                  {/* Coupon Section moved to step 3 */}
+                  <div className="mb-8 space-y-4">
+                    <div className="flex items-center justify-between px-2">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">
+                        Tenho um cupom
+                      </p>
+                      {!appliedCoupon && !couponCode && (
+                        <span className="text-[8px] text-brand-stone/40 italic uppercase tracking-widest">Opcional</span>
+                      )}
+                    </div>
+                    
+                    {!appliedCoupon ? (
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                          placeholder="DIGITE O CÓDIGO"
+                          className="flex-1 px-5 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all uppercase font-mono tracking-widest"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyCoupon}
+                          disabled={isCheckingCoupon || !couponCode.trim()}
+                          className="px-6 py-3.5 bg-brand-ink text-brand-white rounded-[18px] text-[10px] font-bold uppercase tracking-widest disabled:opacity-40 transition-all active:scale-95"
+                        >
+                          {isCheckingCoupon ? '...' : 'Validar'}
+                        </button>
+                      </div>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-brand-linen border border-brand-terracotta/20 p-4 rounded-2xl flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-brand-terracotta/10 flex items-center justify-center text-brand-terracotta">
+                            <Tag size={14} />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-brand-ink font-bold uppercase tracking-widest">
+                              {appliedCoupon.code}
+                            </p>
+                            <p className="text-[9px] text-brand-terracotta font-medium italic">
+                              Desconto de {appliedCoupon.type === 'percentage' ? appliedCoupon.value + '%' : formatCurrency(appliedCoupon.value)} aplicado
+                            </p>
+                          </div>
+                        </div>
+                        <button onClick={() => { setAppliedCoupon(null); setCouponCode(''); }} className="text-brand-stone hover:text-brand-ink transition-colors">
+                          <CircleSlash size={16} />
+                        </button>
+                      </motion.div>
+                    )}
+
+                    {couponError && (
+                      <motion.p 
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-[10px] text-red-600 font-bold uppercase tracking-wide ml-2"
+                      >
+                        {couponError}
+                      </motion.p>
+                    )}
+                  </div>
+
+                  <div className="bg-brand-linen/30 border border-brand-mist rounded-3xl p-6 mb-10">
+                    <p className="text-[10px] text-brand-stone font-light text-center leading-relaxed">
+                      Ao confirmar, seu pedido será enviado para aprovação da profissional.
+                      Você receberá as atualizações por e-mail e WhatsApp.
+                    </p>
+                  </div>
+
+                  <div className="hidden md:block">
+                    <PremiumButton variant="terracotta" className="w-full py-7" onClick={handleBooking} loading={bookingLoading} loadingText="Confirmando...">
+                      Confirmar Agendamento <Check size={18} className="ml-1" />
+                    </PremiumButton>
+                  </div>
                 </motion.div>
               )}
             </motion.div>
@@ -1041,7 +964,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       </AnimatePresence>
 
       <AnimatePresence>
-        {open && step >= 2 && step <= 4 && (
+        {open && step >= 1 && step <= 3 && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
@@ -1049,10 +972,23 @@ export default function BookingModal({ profile, services, onClose, open, initial
             className="fixed bottom-0 left-0 right-0 z-[250] md:hidden p-6 bg-gradient-to-t from-brand-white via-brand-white to-transparent pt-16 pointer-events-none"
           >
             <div className="pointer-events-auto">
-              <PremiumButton variant="terracotta" className="w-full py-7" disabled={(step === 2 && (!selectedService || (isHomeService && profile?.serviceAreaType === 'custom' && !selectedArea))) || (step === 3 && (!selectedDate || !selectedTime)) || (step === 4 && (!clientName.trim() || clientName.trim().length < 2 || !clientPhone || !clientEmail || (isHomeService && (!addressStreet.trim() || !addressNumber.trim()))))} loading={step === 4 && bookingLoading} onClick={() => { if (step === 2) setStep(3); else if (step === 3) setStep(4); else if (step === 4) handleBooking(); }}>
-                {step === 2 && (selectedService ? `Agendar ${selectedService.name.split(' ')[0]}` : 'Escolher serviço')}
-                {step === 3 && (selectedTime ? `Confirmar para ${selectedTime}` : 'Escolher horário')}
-                {step === 4 && 'Confirmar agendamento'}
+              <PremiumButton 
+                variant="terracotta" 
+                className="w-full py-7" 
+                disabled={
+                  (step === 1 && (!selectedService || !selectedDate || !selectedTime)) || 
+                  (step === 2 && (!clientName || !clientPhone || !clientEmail || (isHomeService && (!addressStreet || !addressNumber))))
+                } 
+                loading={step === 3 && bookingLoading} 
+                onClick={() => { 
+                  if (step === 1) setStep(2); 
+                  else if (step === 2) setStep(3); 
+                  else if (step === 3) handleBooking(); 
+                }}
+              >
+                {step === 1 && 'Continuar para Dados'}
+                {step === 2 && 'Revisar Agendamento'}
+                {step === 3 && 'Confirmar Agora'}
                 <ArrowRight size={18} className="ml-1" />
               </PremiumButton>
             </div>
@@ -1061,7 +997,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       </AnimatePresence>
 
       <AnimatePresence>
-        {step === 5 && (
+        {step === 4 && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
@@ -1196,7 +1132,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">Compartilhe sua descoberta com quem você ama</p>
                 <PremiumButton variant="primary" className="w-full py-5 !text-[10px]" onClick={() => { const url = window.location.origin + '/p/' + (profile?.slug || ''); const text = `Te recomendo essa profissional ✨`; const fullText = `${text} Reserve online aqui: ${url}`; if (navigator.share) { navigator.share({ title: profile?.name, text: text, url: url }).catch(() => { navigator.clipboard.writeText(fullText); toast.success('Link de indicação copiado!'); }); } else { navigator.clipboard.writeText(fullText); toast.success('Link de indicação copiado!'); } }}>Compartilhar perfil <Share2 size={14} className="ml-1" /></PremiumButton>
               </div>
-              <button onClick={() => { setStep(2); setSelectedService(null); setSelectedDate(''); setSelectedTime(''); setBookingSuccess(false); onClose(); }} className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors">Voltar para o perfil</button>
+              <button onClick={() => { setStep(1); setSelectedService(null); setSelectedDate(''); setSelectedTime(''); setBookingSuccess(false); onClose(); }} className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors">Voltar para o perfil</button>
             </div>
           </motion.div>
         )}

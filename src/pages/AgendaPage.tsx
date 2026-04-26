@@ -24,8 +24,20 @@ import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 import WaitlistCentralModal from '../components/WaitlistCentralModal';
 import QuickBlockModal from '../components/QuickBlockModal';
 
+import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
+import UpgradeModal from '../components/UpgradeModal';
+
 export default function AgendaPage() {
   const { user, profile } = useAuth();
+  const { 
+    isUpgradeModalOpen, 
+    upgradeFeature, 
+    usageCount, 
+    closeUpgradeModal, 
+    checkFeatureAccess,
+    openUpgradeModal
+  } = useUpgradeTriggers();
+
   const [searchParams] = useSearchParams();
   const dateFromUrl = searchParams.get('date');
   const appointmentIdFromUrl = searchParams.get('appointment');
@@ -730,8 +742,10 @@ export default function AgendaPage() {
                             {/* WAITLIST: Demand check */}
                             <button 
                               onClick={() => {
-                                setManualTime(item.time); // Pre-fill for 'onFit'
-                                setIsWaitlistOpen(true);
+                                if (checkFeatureAccess('waitlist')) {
+                                  setManualTime(item.time); // Pre-fill for 'onFit'
+                                  setIsWaitlistOpen(true);
+                                }
                               }}
                               className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
                             >
@@ -742,7 +756,15 @@ export default function AgendaPage() {
                         
                         {/* FILL: Manual entry */}
                         <button 
-                          onClick={() => { setManualTime(item.time); setManualDate(selectedDate); setIsManualModalOpen(true); }}
+                          onClick={() => { 
+                            if (usageCount >= 15 && profile?.plan === 'free') {
+                              openUpgradeModal('unlimitedBookings');
+                              return;
+                            }
+                            setManualTime(item.time); 
+                            setManualDate(selectedDate); 
+                            setIsManualModalOpen(true); 
+                          }}
                           className="px-4 py-1.5 border border-brand-mist bg-brand-white text-brand-stone rounded-lg text-[9px] font-bold uppercase tracking-widest hover:border-brand-ink hover:text-brand-ink"
                         >
                           Preencher
@@ -794,7 +816,11 @@ export default function AgendaPage() {
                   <Share2 size={12} /> Divulgar agenda
                 </button>
                 <button 
-                   onClick={() => setIsWaitlistOpen(true)}
+                   onClick={() => {
+                     if (checkFeatureAccess('waitlist')) {
+                       setIsWaitlistOpen(true);
+                     }
+                   }}
                    className="flex-1 py-3 bg-brand-white border border-brand-mist text-brand-stone rounded-xl text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2"
                 >
                   <Users size={12} /> Ver espera
@@ -1251,6 +1277,12 @@ export default function AgendaPage() {
         )}
       </AnimatePresence>
 
-      </AppLayout>
+        <UpgradeModal 
+        open={isUpgradeModalOpen} 
+        onClose={closeUpgradeModal}
+        feature={upgradeFeature}
+        count={usageCount}
+      />
+    </AppLayout>
   );
 }

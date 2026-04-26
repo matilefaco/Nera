@@ -32,13 +32,13 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
               <div className="w-12 h-px bg-brand-mist" />
             </div>
             <h2 className="heading-section text-brand-ink">
-              {tagline.main}<br />
-              <em className="font-serif italic text-brand-stone">{tagline.accent}</em>
+              Resultados de<br />
+              <em className="font-serif italic text-brand-stone">alta performance</em>
             </h2>
           </div>
 
-          <PremiumButton onClick={onBookingClick} variant="terracotta" className="px-10 py-5 text-[10px]">
-            Agendar agora
+          <PremiumButton onClick={onBookingClick} variant="terracotta" className="px-10 py-5 text-[10px] tracking-widest shadow-lg">
+            Quero esse resultado
             <ChevronRight size={14} className="ml-2" />
           </PremiumButton>
         </div>

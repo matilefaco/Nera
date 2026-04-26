@@ -4,10 +4,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
-import { User as UserIcon, Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
+import { User as UserIcon, Mail, Lock, ArrowRight, Sparkles, LogOut, Gift } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { toast } from 'sonner';
-import { generateSlug, getHumanError } from '../lib/utils';
+import { generateSlug, getHumanError, generateReferralCode } from '../lib/utils';
 import Logo from '../components/Logo';
 
 export default function RegisterPage() {
@@ -18,7 +18,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const referralCode = searchParams.get('ref') || '';
+  const [manualReferralCode, setManualReferralCode] = useState(searchParams.get('ref') || '');
 
   const handleGoogleRegister = async () => {
     setLoading(true);
@@ -36,6 +36,7 @@ export default function RegisterPage() {
       console.log('[SIGNUP FLOW] Auth success (Google):', user.uid);
       
       const slug = generateSlug(user.displayName || 'profissional');
+      const userReferralCode = generateReferralCode(user.displayName || 'PROFISSIONAL');
       
       try {
         await setDoc(doc(db, 'users', user.uid), {
@@ -49,7 +50,9 @@ export default function RegisterPage() {
           whatsapp: '',
           avatar: user.photoURL || '',
           onboardingCompleted: false,
-          referredBy: referralCode || null,
+          referredBy: manualReferralCode || null,
+          referralCode: userReferralCode,
+          credits: 0,
           createdAt: new Date().toISOString()
         }, { merge: true });
         console.log('[SIGNUP FLOW] Profile creation success (Google)');
@@ -98,6 +101,7 @@ export default function RegisterPage() {
       }
       
       const slug = generateSlug(name);
+      const userReferralCode = generateReferralCode(name);
       
       try {
         await setDoc(doc(db, 'users', user.uid), {
@@ -111,7 +115,9 @@ export default function RegisterPage() {
           whatsapp: '',
           avatar: '',
           onboardingCompleted: false,
-          referredBy: referralCode || null,
+          referredBy: manualReferralCode || null,
+          referralCode: userReferralCode,
+          credits: 0,
           createdAt: new Date().toISOString()
         });
         console.log('[SIGNUP FLOW] Firestore profile creation success');
@@ -241,6 +247,20 @@ export default function RegisterPage() {
                 className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] focus:ring-1 focus:ring-brand-ink outline-none transition-all text-brand-ink font-light"
                 required
                 minLength={6}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Código de Indicação (Opcional)</label>
+            <div className="relative">
+              <Gift className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
+              <input 
+                type="text" 
+                value={manualReferralCode}
+                onChange={(e) => setManualReferralCode(e.target.value.toUpperCase())}
+                placeholder="Ex: MARI2A"
+                className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] focus:ring-1 focus:ring-brand-ink outline-none transition-all text-brand-ink font-light uppercase"
               />
             </div>
           </div>

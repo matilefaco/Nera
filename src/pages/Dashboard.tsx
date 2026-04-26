@@ -11,7 +11,7 @@ import {
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp, Heart,
   ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
-  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star
+  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -27,11 +27,28 @@ import AppLayout from '../components/AppLayout';
 import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 import QuickBlockModal from '../components/QuickBlockModal';
 import UpgradeModal from '../components/UpgradeModal';
+import PremiumButton from '../components/PremiumButton';
+import WeeklyRevenueSummary from '../components/WeeklyRevenueSummary';
+import InstallPrompt from '../components/InstallPrompt';
 import { getAvailableSlots, getDayAvailability } from '../lib/bookingUtils';
+
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const { features } = usePlanFeatures();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  
+  const { 
+    isUpgradeModalOpen, 
+    upgradeFeature, 
+    usageCount, 
+    closeUpgradeModal, 
+    checkFeatureAccess,
+    openUpgradeModal
+  } = useUpgradeTriggers(appointments);
+
   const [confirmedToday, setConfirmedToday] = useState<Appointment[]>([]);
   const [dailyRevenue, setDailyRevenue] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
@@ -50,10 +67,9 @@ export default function Dashboard() {
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
-  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [unconfirmedTomorrow, setUnconfirmedTomorrow] = useState<Appointment[]>([]);
-  const [retentionCandidates, setRetentionCandidates] = useState<Appointment[]>([]);
+  const [rawRetentionCandidates, setRawRetentionCandidates] = useState<Appointment[]>([]);
   const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
   const [blockedSchedules, setBlockedSchedules] = useState<BlockedSchedule[]>([]);
   const [referralLink, setReferralLink] = useState('');
@@ -61,28 +77,7 @@ export default function Dashboard() {
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
 
-  // Soft limit check: if user has >= 15 appointments this month, show upgrade modal once
-  useEffect(() => {
-    if (appointments.length > 0) {
-      const currentMonthAppts = appointments.filter(a => {
-        const d = new Date(a.date + 'T12:00:00');
-        const now = new Date();
-        return (
-          d.getMonth() === now.getMonth() && 
-          d.getFullYear() === now.getFullYear() &&
-          (a.status === 'confirmed' || a.status === 'completed' || a.status === 'pending_confirmation')
-        );
-      });
-
-      if (currentMonthAppts.length >= 15) {
-        const hasSeenModal = sessionStorage.getItem('nera_upgrade_modal_seen');
-        if (!hasSeenModal) {
-          setIsUpgradeModalOpen(true);
-          sessionStorage.setItem('nera_upgrade_modal_seen', 'true');
-        }
-      }
-    }
-  }, [appointments]);
+  // Triggers handled by hook
 
   useEffect(() => {
     if (!user) return;
@@ -115,8 +110,11 @@ export default function Dashboard() {
     const visits7d = analyticsEvents.filter(e => e.type === 'visit' && e.timestamp?.toDate() > sevenDaysAgo).length;
     const clicksBook = analyticsEvents.filter(e => e.type === 'click_book' && e.timestamp?.toDate() > thirtyDaysAgo).length;
     
-    // Appointments in 30d
-    const appointments30d = appointments.filter(a => new Date(a.date) > thirtyDaysAgo).length;
+    // 3. MÉTRICAS DE CRESCIMENTO: contando apenas status válidos (confirmados, concluídos ou aceitos) conforme solicitado
+    const appointments30d = appointments.filter(a => 
+      new Date(a.date) > thirtyDaysAgo && 
+      ['confirmed', 'completed', 'accepted'].includes(a.status)
+    ).length;
     
     // Conversion rate: appointments / visits
     const convRate = visits30d > 0 ? (appointments30d / visits30d) * 100 : 0;
@@ -166,10 +164,34 @@ export default function Dashboard() {
     };
   }, [analyticsEvents, appointments]);
 
+  // 2. RETENÇÃO REAL: Verifica se candidatos a retenção (30 dias atrás) agendaram algo novo depois disso
+  const retentionCandidates = useMemo(() => {
+    return rawRetentionCandidates.filter(candidate => {
+      const hasFutureBooking = appointments.some(app => {
+        const isSameClient = (app.clientWhatsapp && app.clientWhatsapp === candidate.clientWhatsapp) ||
+                             (app.clientEmail && app.clientEmail === candidate.clientEmail);
+        const isNewer = app.date > candidate.date;
+        return isSameClient && isNewer;
+      });
+      return !hasFutureBooking;
+    });
+  }, [rawRetentionCandidates, appointments]);
+
   const getContextualTip = () => {
     if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
-    if (confirmedToday.length === 0) return 'Nenhum atendimento confirmado hoje. Que tal compartilhar seu perfil?';
-    return 'Mantenha seu perfil atualizado para atrair novas clientes.';
+    if (confirmedToday.length === 0) return 'Nenhuma reserva hoje. Que tal compartilhar seu link nos Stories para atrair clientes?';
+    
+    const variations = [
+      "Adicione novas fotos ao portfólio para mostrar a evolução do seu trabalho.",
+      "Revisou seus horários de bloqueio? Garanta seu tempo de descanso e evite imprevistos.",
+      "Mantenha seus serviços mais procurados no topo da lista para facilitar a reserva.",
+      "Compartilhe seu link Nera hoje para converter curiosidade em agendamentos reais.",
+      "Ajuste suas taxas por bairro para garantir a lucratividade do seu atendimento."
+    ];
+    
+    // Pick one variation based on the current day to keep it fresh
+    const index = new Date().getDate() % variations.length;
+    return variations[index];
   };
 
   const dailyTip = getContextualTip();
@@ -198,8 +220,10 @@ export default function Dashboard() {
 
     const unsubToday = onSnapshot(qToday, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      setConfirmedToday(docs.filter(a => a.status === 'confirmed'));
-      setDailyRevenue(docs.filter(a => a.status === 'confirmed').reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0));
+      // 1. RECEITA DIÁRIA: Incluindo tanto confirmados quanto já concluídos no faturamento e na lista de hoje
+      const relevantToday = docs.filter(a => a.status === 'confirmed' || a.status === 'completed');
+      setConfirmedToday(relevantToday);
+      setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0));
     });
 
     const unsubPending = onSnapshot(qPending, (snapshot) => {
@@ -244,9 +268,7 @@ export default function Dashboard() {
 
     const unsubRetention = onSnapshot(qRetention, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      // In a real app, we'd further filter to ensure they haven't booked again in the future
-      // For the dashboard, we'll just show these as candidates
-      setRetentionCandidates(docs);
+      setRawRetentionCandidates(docs);
     });
 
     // Query: All appointments to calculate metrics
@@ -515,6 +537,31 @@ export default function Dashboard() {
     <AppLayout activeRoute="dashboard">
       <div className="p-6 md:p-12 max-w-2xl mx-auto w-full space-y-10">
         
+        {/* Avatar Skipped Reminder Banner */}
+        {profile?.avatarSkipped && !profile?.avatar && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-yellow-50 border border-yellow-200 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 shrink-0">
+                <Camera size={20} />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-brand-ink leading-tight">Adicione sua foto de perfil</p>
+                <p className="text-[10px] text-brand-stone font-light italic">Profissionais com foto recebem 3x mais clientes.</p>
+              </div>
+            </div>
+            <Link 
+              to="/perfil" 
+              className="px-4 py-2 bg-white border border-yellow-200 rounded-full text-[9px] font-bold uppercase tracking-widest text-brand-ink hover:bg-yellow-100 transition-all shrink-0"
+            >
+              Atualizar Perfil
+            </Link>
+          </motion.div>
+        )}
+
         {/* 1. HEADER LIMPO */}
         <header className="flex items-center justify-between">
           <div>
@@ -582,29 +629,17 @@ export default function Dashboard() {
           </motion.section>
         )}
 
-        {/* 2. RESUMO DO DIA (CARD PRINCIPAL) */}
-        <section className="bg-brand-ink rounded-[40px] p-8 text-white shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl -mr-16 -mt-16" />
-          
-          <div className="relative z-10 space-y-6">
-            <span className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] block">Hoje</span>
-            
-            <div className="space-y-2">
-              <p className="text-2xl font-serif">{confirmedToday.length} agendamentos</p>
-              <p className="text-2xl font-serif">{formatCurrency(dailyRevenue)} confirmados</p>
-              <p className={cn("text-2xl font-serif", freeSlotsToday > 0 ? "text-white" : "text-white/40")}>
-                {freeSlotsToday} {freeSlotsToday === 1 ? 'horário livre restante' : 'horários livres restantes'}
-              </p>
-            </div>
-
-            <Link 
-              to="/agenda" 
-              className="w-full py-4 bg-brand-terracotta text-white rounded-full text-[11px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-sienna transition-all shadow-lg mt-4"
-            >
-              Ver agenda
-            </Link>
-          </div>
-        </section>
+        {/* Weekly Revenue Summary & Daily Timeline */}
+        {user && (
+          <>
+            <WeeklyRevenueSummary 
+              appointments={appointments}
+              profile={profile}
+              userId={user.uid}
+            />
+            <InstallPrompt />
+          </>
+        )}
 
         {/* 3. PEDIDOS PENDENTES (CONDICIONAL) */}
         <AnimatePresence>
@@ -744,7 +779,21 @@ export default function Dashboard() {
         </AnimatePresence>
 
         {/* WhatsApp Inteligente: Ações Rápidas de Venda e Confirmação */}
-        <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm space-y-8">
+        <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm space-y-8 relative overflow-hidden">
+          {!features.whatsappNotifications && (
+            <div className="absolute inset-0 z-20 bg-brand-white/40 backdrop-blur-[2px] flex items-center justify-center p-8 text-center">
+              <div className="bg-brand-white p-8 rounded-[32px] shadow-2xl border border-brand-mist max-w-sm">
+                <div className="w-12 h-12 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Star size={24} />
+                </div>
+                <h4 className="text-xl font-serif text-brand-ink mb-2">WhatsApp Pro</h4>
+                <p className="text-[10px] text-brand-stone uppercase tracking-widest font-bold mb-6">Recurso Exclusivo</p>
+                <Link to="/planos">
+                  <PremiumButton variant="terracotta" className="w-full">Fazer Upgrade</PremiumButton>
+                </Link>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-[#25D366]/10 text-[#25D366] rounded-xl">
@@ -900,7 +949,23 @@ export default function Dashboard() {
 
         {/* Growth Dashboard: KPIs de Conversão e Insights */}
         {growthMetrics && (
-          <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-10">
+          <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-10 relative overflow-hidden">
+            {!features.advancedDashboard && (
+              <div className="absolute inset-0 z-20 bg-brand-white/60 backdrop-blur-md flex items-center justify-center p-8 text-center">
+                <div className="space-y-4">
+                  <div className="w-12 h-12 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Lock size={20} />
+                  </div>
+                  <h4 className="text-xl font-serif text-brand-ink italic">Dashboard Avançado</h4>
+                  <p className="text-xs text-brand-stone font-light max-w-xs mx-auto">
+                    Tenha acesso a métricas de conversão e insights de faturamento detalhados em tempo real.
+                  </p>
+                  <Link to="/planos" className="inline-block mt-4">
+                    <PremiumButton variant="ink" className="py-4">Conhecer Plano Pro</PremiumButton>
+                  </Link>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between border-b border-brand-linen pb-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
@@ -1348,7 +1413,8 @@ export default function Dashboard() {
                        </div>
                     </div>
                     
-                    <button 
+                    <PremiumButton 
+                      feature="waitlist"
                       onClick={() => setIsWaitlistModalOpen(true)}
                       className="p-5 bg-brand-linen rounded-[24px] border border-brand-mist flex flex-col items-start gap-2 hover:bg-brand-white transition-all group"
                     >
@@ -1357,7 +1423,7 @@ export default function Dashboard() {
                          <Users size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
                          <span className="text-[10px] text-brand-ink uppercase tracking-widest">Avisar Lista de Espera</span>
                       </div>
-                    </button>
+                    </PremiumButton>
                   </div>
 
                   <div className="pt-6 border-t border-brand-mist space-y-3">
@@ -1498,7 +1564,21 @@ export default function Dashboard() {
               </div>
 
               {/* STATS AREA */}
-              <div className="grid grid-cols-1 gap-4 mb-10">
+              <div className="grid grid-cols-1 gap-4 mb-10 relative">
+                {!features.waitlist && (
+                  <div className="absolute inset-0 z-20 bg-brand-white/80 backdrop-blur-sm flex items-center justify-center rounded-[32px] border border-brand-mist border-dashed">
+                    <div className="text-center p-6">
+                      <Lock size={24} className="mx-auto mb-3 text-brand-terracotta" />
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-1">Lista de Espera Pro</p>
+                      <button 
+                        onClick={() => { setIsWaitlistModalOpen(false); openUpgradeModal('waitlist'); }}
+                        className="text-[9px] text-brand-terracotta underline font-bold uppercase tracking-widest mt-2"
+                      >
+                        Desbloquear agora
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="p-6 bg-brand-parchment rounded-[28px] border border-brand-mist/50">
                   <p className="text-[9px] text-brand-stone uppercase tracking-widest mb-2">Vagas Disponíveis</p>
                   <div className="flex items-baseline gap-2">
@@ -1602,14 +1682,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      <UpgradeModal
-        open={isUpgradeModalOpen}
-        onClose={() => setIsUpgradeModalOpen(false)}
-        count={appointments.filter(a => {
-          const d = new Date(a.date + 'T12:00:00');
-          const now = new Date();
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        }).length}
+      <UpgradeModal 
+        open={isUpgradeModalOpen} 
+        onClose={closeUpgradeModal}
+        feature={upgradeFeature}
+        count={usageCount}
+        totalClients={totalClientsCount}
+        averageTicket={monthlyRevenue / (appointments.length || 1)}
       />
 
     </AppLayout>

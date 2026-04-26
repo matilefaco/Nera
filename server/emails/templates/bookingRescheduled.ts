@@ -1,4 +1,4 @@
-import { buildEmailBase, buildEmailCard } from '../../../src/services/emailBuilder';
+import { buildEmailBase, buildEmailCard, COLORS, FONTS } from '../../../src/services/emailBuilder';
 
 interface BookingRescheduledData {
   clientName: string;
@@ -9,6 +9,8 @@ interface BookingRescheduledData {
   newTime: string;
   professionalName: string;
   manageUrl: string;
+  rescheduledBy: 'professional' | 'client' | 'system';
+  cancelUrl?: string;
 }
 
 export function buildBookingRescheduledEmail(data: BookingRescheduledData): string {
@@ -20,29 +22,96 @@ export function buildBookingRescheduledEmail(data: BookingRescheduledData): stri
     newDate, 
     newTime, 
     professionalName, 
-    manageUrl 
+    manageUrl,
+    rescheduledBy,
+    cancelUrl
   } = data;
 
+  const headerMessage = rescheduledBy === 'professional' 
+    ? `<p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 5px;"><strong>${professionalName}</strong> precisou ajustar seu horário.</p>
+       <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin-bottom: 25px;">Veja o novo horário abaixo.</p>`
+    : `<p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 5px;">Você reagendou seu horário com sucesso.</p>
+       <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin-bottom: 25px;">Confirme os dados abaixo.</p>`;
+
   const bodyHtml = `
-    <p>Olá, ${clientName}!</p>
-    <p>O seu agendamento de <strong>${serviceName}</strong> com <strong>${professionalName || 'sua profissional'}</strong> foi alterado para um novo horário.</p>
+    ${headerMessage}
     
     <div style="margin: 25px 0;">
-      <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: #8A7060; margin-bottom: 10px; font-family: Arial, sans-serif;">Horário Anterior</font>
-      <p style="margin: 0; color: #8A7060; font-size: 14px; text-decoration: line-through;">${oldDate} às ${oldTime}</p>
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#F5F5F5" style="border: 1px solid ${COLORS.mist};">
+        <tr>
+          <td style="padding: 15px;">
+            <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.stone}; margin-bottom: 5px; font-family: ${FONTS.sans};">Horário Anterior</font>
+            <p style="margin: 0; color: ${COLORS.stone}; font-size: 14px; text-decoration: line-through; font-family: ${FONTS.sans};">${oldDate} às ${oldTime}</p>
+          </td>
+        </tr>
+      </table>
     </div>
 
-    <div style="margin: 25px 0 35px 0;">
-      <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: #A85C3A; margin-bottom: 10px; font-family: Arial, sans-serif;">Novo Horário</font>
-      ${buildEmailCard([
-        { label: 'Data', value: newDate },
-        { label: 'Horário', value: newTime }
-      ])}
+    <div style="margin: 10px 0 35px 0;">
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#F9F5F0" style="border: 1px solid ${COLORS.terracotta};">
+        <tr>
+          <td style="padding: 20px;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+              <tr>
+                <td>
+                  <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.terracotta}; margin-bottom: 10px; font-family: ${FONTS.sans};">Novo Horário</font>
+                </td>
+                <td align="right">
+                  <span style="background-color: ${COLORS.terracotta}; color: ${COLORS.white}; font-size: 9px; font-weight: bold; padding: 2px 8px; border-radius: 2px; font-family: ${FONTS.sans};">NOVO</span>
+                </td>
+              </tr>
+            </table>
+            <p style="margin: 0; color: ${COLORS.ink}; font-size: 16px; font-weight: bold; font-family: ${FONTS.sans};">${newDate} às ${newTime}</p>
+            <p style="margin: 5px 0 0 0; color: ${COLORS.stone}; font-size: 13px; font-family: ${FONTS.sans};">${serviceName}</p>
+          </td>
+        </tr>
+      </table>
     </div>
-    
-    <p style="font-size: 13px; color: #8A7060; line-height: 1.6;">
-      Todas as outras informações do seu atendimento permanecem as mesmas. Caso tenha algum imprevisto com o novo horário, você pode gerenciar pelo link abaixo.
-    </p>
+
+    ${rescheduledBy === 'professional' ? `
+      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px; border: 1px dashed ${COLORS.mist}; padding: 15px;">
+        <tr>
+          <td style="font-family: ${FONTS.sans}; font-size: 12px; color: ${COLORS.stone}; text-align: center; line-height: 1.5;">
+            Se o novo horário não servir, você pode reagendar ou cancelar pelo link abaixo.
+          </td>
+        </tr>
+      </table>
+    ` : ''}
+
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td align="center">
+          <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td align="center" bgcolor="${COLORS.ink}" style="padding: 18px 45px;">
+                <a href="${manageUrl}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; color: ${COLORS.white}; text-decoration: none; display: inline-block;">
+                  Ver Minha Reserva
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      
+      ${(rescheduledBy === 'professional' && cancelUrl) ? `
+        <tr>
+          <td height="12" style="font-size: 12px; line-height: 12px;">&nbsp;</td>
+        </tr>
+        <tr>
+          <td align="center">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" style="border: 1px solid ${COLORS.mist}; padding: 14px 40px;">
+                  <a href="${cancelUrl}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.stone}; text-decoration: none; display: inline-block;">
+                    Preciso de outro horário
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      ` : ''}
+    </table>
   `;
 
   return buildEmailBase({
@@ -51,10 +120,6 @@ export function buildBookingRescheduledEmail(data: BookingRescheduledData): stri
     heroLabel: 'Houve uma mudança',
     heroTitle: 'Seu horário foi',
     heroTitleItalic: 'reagendado ✨',
-    badgeText: 'Horário Atualizado',
-    badgeVariant: 'info',
-    bodyHtml,
-    ctaText: 'Ver Nova Reserva',
-    ctaUrl: manageUrl
+    bodyHtml
   });
 }

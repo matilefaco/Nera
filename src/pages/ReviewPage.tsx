@@ -176,14 +176,31 @@ export default function ReviewPage() {
           topTags: updatedTags.slice(0, 5),
           updatedAt: new Date().toISOString()
         });
+
+        // 4. Sync to user profile for directory/sorting
+        const userRef = doc(db, 'users', request.professionalId);
+        await updateDoc(userRef, {
+          averageRating: Number(newAverageRating.toFixed(1)),
+          totalReviews: newTotalReviews,
+          topTags: updatedTags.slice(0, 5)
+        });
       } else {
-        await setDoc(statsRef, {
+        const initialStats = {
           professionalId: request.professionalId,
           averageRating: rating,
           totalReviews: 1,
-          totalCompletedBookings: 1, // This should ideally be tracked elsewhere too
+          totalCompletedBookings: 1,
           topTags: selectedTags.slice(0, 5),
           updatedAt: new Date().toISOString()
+        };
+        await setDoc(statsRef, initialStats);
+
+        // 4. Sync to user profile
+        const userRef = doc(db, 'users', request.professionalId);
+        await updateDoc(userRef, {
+          averageRating: rating,
+          totalReviews: 1,
+          topTags: selectedTags.slice(0, 5)
         });
       }
 

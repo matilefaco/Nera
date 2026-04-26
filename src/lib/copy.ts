@@ -11,9 +11,24 @@ interface Tagline {
 /**
  * Returns a dynamic tagline based on the professional's specialty.
  * Focused on premium, editorial and trustworthy style.
+ * Uses a seed (slug/uid) to ensure consistency.
  */
-export function getProfileHeroCopy(specialty?: string): Tagline {
+export function getProfileHeroCopy(specialty?: string, seed?: string): Tagline {
   const s = (specialty || '').toLowerCase().trim();
+  
+  // Deterministic index determination
+  let index = 0;
+  if (seed) {
+    // Get first 4 chars, convert to numbers, sum them up
+    const chars = seed.slice(0, 4).toLowerCase();
+    let val = 0;
+    for (let i = 0; i < chars.length; i++) {
+      val += chars.charCodeAt(i);
+    }
+    index = val % 3;
+  } else {
+    index = Math.floor(Math.random() * 3);
+  }
   
   // Unhas
   if (s.includes('nail') || s.includes('unha') || s.includes('alongamento') || s.includes('gel') || s.includes('fibra') || s.includes('manicure')) {
@@ -21,7 +36,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Unhas que falam,", accent: "antes de você" },
       { main: "A arte do detalhe,", accent: "em suas mãos" },
       { main: "Resistência e brilho,", accent: "que encantam" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Sobrancelhas e cílios
   if (s.includes('sobrancelha') || s.includes('brow') || s.includes('microblading') || s.includes('micropigment') || s.includes('cílio') || s.includes('lash') || s.includes('extensão')) {
@@ -29,7 +44,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Olhos que", accent: "encantam" },
       { main: "O poder do seu olhar,", accent: "redefinido" },
       { main: "Moldura perfeita,", accent: "beleza natural" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Estética facial e corporal
   if (s.includes('esteticista') || s.includes('estética') || s.includes('facial') || s.includes('pele') || s.includes('skin') || s.includes('microagulha') || s.includes('limpeza')) {
@@ -37,7 +52,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Sua melhor pele,", accent: "começa aqui" },
       { main: "Equilíbrio facial,", accent: "resultados reais" },
       { main: "A ciência do cuidado,", accent: "com sua pele" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Cabelo
   if (s.includes('cabel') || s.includes('hair') || s.includes('colorist') || s.includes('escova') || s.includes('corte') || s.includes('tranças') || s.includes('mechas')) {
@@ -45,7 +60,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Cabelo de", accent: "editorial" },
       { main: "Transformação com", accent: "propósito" },
       { main: "Sua identidade,", accent: "em cada fio" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Maquiagem
   if (s.includes('maquiag') || s.includes('make') || s.includes('makeup') || s.includes('noiva') || s.includes('festa')) {
@@ -53,7 +68,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Make que", accent: "dura o dia" },
       { main: "Beleza atemporal,", accent: "para momentos únicos" },
       { main: "Sua melhor versão,", accent: "iluminada" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Massagem e bem-estar
   if (s.includes('massag') || s.includes('relaxa') || s.includes('drenag') || s.includes('bem-estar') || s.includes('corpo')) {
@@ -61,7 +76,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "O descanso que", accent: "você merece" },
       { main: "Pausa necessária,", accent: "renovação total" },
       { main: "Conexão profunda,", accent: "com seu corpo" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Depilação
   if (s.includes('depila') || s.includes('cera') || s.includes('laser') || s.includes('pelo')) {
@@ -69,7 +84,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Pele suave,", accent: "sem complicação" },
       { main: "Liberdade e", accent: "conforto" },
       { main: "Cuidado delicado,", accent: "pele renovada" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Podologia e pés
   if (s.includes('podolog') || s.includes('pé') || s.includes('pedicure') || s.includes('cutícula')) {
@@ -77,7 +92,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Cuidado do pé", accent: "à cabeça" },
       { main: "Seus pés em", accent: "boas mãos" },
       { main: "Saúde e bem-estar,", accent: "a cada passo" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Visagismo e imagem
   if (s.includes('visag') || s.includes('imagem') || s.includes('estilo') || s.includes('personal')) {
@@ -85,7 +100,7 @@ export function getProfileHeroCopy(specialty?: string): Tagline {
       { main: "Sua imagem,", accent: "sua essência" },
       { main: "Comunicação visual,", accent: "com autoconfiança" },
       { main: "O espelho da", accent: "sua alma" }
-    ][Math.floor(Math.random() * 3)];
+    ][index];
   }
   // Fallback premium (não genérico)
   return { main: "Profissional de", accent: "excelência" };

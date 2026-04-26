@@ -9,7 +9,7 @@ import {
   User, MapPin, Home, Building2, Briefcase, 
   Clock, DollarSign, Instagram, MessageCircle, 
   CheckCircle2, ArrowRight, ArrowLeft, Sparkles,
-  Camera, Plus, X, Globe, Copy, Share2, ExternalLink
+  Camera, Plus, X, Globe, Copy, Share2, ExternalLink, AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
@@ -80,10 +80,17 @@ export default function OnboardingPage() {
     differentials: selectedDifferentials, setDifferentials: setSelectedDifferentials,
     workingDays, setWorkingDays,
     startTime, setStartTime,
-    endTime, setEndTime
+    endTime, setEndTime,
+    avatarSkipped, setAvatarSkipped
   } = useProfileForm(profile);
 
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   const prevNameRef = useRef(name);
+
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable' | 'invalid'>('idle');
+  const [slugMessage, setSlugMessage] = useState('');
+  const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
+  const [isSlugDebouncing, setIsSlugDebouncing] = useState(false);
 
   // Auto-generate slug when name changes, but only if slug was empty or matched the previous name
   useEffect(() => {
@@ -93,6 +100,57 @@ export default function OnboardingPage() {
     }
     prevNameRef.current = name;
   }, [name]);
+
+  // Debounced slug check
+  useEffect(() => {
+    if (!slug) {
+      setSlugStatus('idle');
+      setSlugMessage('');
+      return;
+    }
+
+    const cleanSlug = slug.toLowerCase().trim();
+    const slugRegex = /^[a-z0-9-]+$/;
+
+    if (cleanSlug.length < 3 || cleanSlug.length > 50) {
+      setSlugStatus('invalid');
+      setSlugMessage('O link deve ter entre 3 e 50 caracteres.');
+      return;
+    }
+
+    if (!slugRegex.test(cleanSlug)) {
+      setSlugStatus('invalid');
+      setSlugMessage('Use apenas letras, números e hífens.');
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSlugStatus('checking');
+      try {
+        const queryParams = new URLSearchParams({ 
+          slug: cleanSlug,
+          uid: user?.uid || '',
+          city: city || ''
+        });
+        const res = await fetch(`/api/slug/check?${queryParams}`);
+        const data = await res.json();
+        
+        if (data.available) {
+          setSlugStatus('available');
+          setSlugMessage(`Link disponível: usenera.com/p/${cleanSlug}`);
+          setSlugSuggestions([]);
+        } else {
+          setSlugStatus('unavailable');
+          setSlugMessage('Este link já está em uso.');
+          setSlugSuggestions(data.suggestions || []);
+        }
+      } catch (err) {
+        console.error('Error checking slug:', err);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [slug]);
 
   // Step 2: Service Mode Details
   const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>('city_wide');
@@ -348,6 +406,13 @@ export default function OnboardingPage() {
   const handleFinish = async () => {
     console.log('[OnboardingSave] handleFinish triggered');
     setFormErrors({});
+
+    // 0. CHECK AVATAR
+    if (!avatar && !avatarSkipped) {
+      setShowAvatarModal(true);
+      return;
+    }
+
     if (!user || isFinalizing || profile?.onboardingCompleted) {
       console.log('[OnboardingSave] handleFinish blocked:', { 
         noUser: !user, 
@@ -407,12 +472,14 @@ export default function OnboardingPage() {
     
     setLoading(true);
     setIsFinalizing(true);
-    console.log('[ONBOARDING] starting finalization');
+    console.log('[ONBOARDING] starting finalization via API');
 
     try {
       console.log('[ONBOARDING] Preparing final data...');
-      // 2. Prepare Final Data (without setting completed: true yet)
-      const finalData: Partial<UserProfile> = {
+      
+      const activeServices = services.filter(s => s.name.trim() !== '' && s.price);
+      
+      const profileData: Partial<UserProfile> = {
         name: name.trim(),
         specialty: specialty.trim(),
         city: (studioAddress.city || city).trim(),
@@ -450,34 +517,38 @@ export default function OnboardingPage() {
           attendsAt: serviceMode as any
         } as ProfessionalIdentity,
         onboardingCompleted: true,
-        onboardingStep: 6
+        onboardingStep: 6,
+        indexable: true,
+        planRank: profile?.planRank || 0,
+        avatarSkipped: avatar ? false : avatarSkipped
       };
 
-      console.log('[ONBOARDING] Payload prepared');
+      const servicesData = activeServices.map(service => ({
+        name: service.name.trim(),
+        duration: Number(service.duration) || 60,
+        price: Number(service.price) || 0,
+        description: (service.description || '').trim()
+      }));
 
-      // 3. Save Services
-      console.log('[ONBOARDING] Saving services...');
-      const activeServices = services.filter(s => s.name && s.price);
-      const servicePromises = activeServices.map(service => {
-        return addDoc(collection(db, 'services'), {
-          professionalId: user.uid,
-          name: service.name.trim(),
-          duration: Number(service.duration) || 60,
-          price: Number(service.price) || 0,
-          description: (service.description || '').trim(),
-          active: true,
-          createdAt: new Date().toISOString()
-        });
+      // Use the new API for transactional save
+      const response = await fetch('/api/profile/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          profileData,
+          services: servicesData
+        })
       });
-      await Promise.all(servicePromises);
-      console.log('[ONBOARDING] Services saved');
 
-      // 4. Save Profile
-      console.log('[ONBOARDING] Saving profile...');
-      await saveProfilePartial(user.uid, finalData);
-      console.log('[ONBOARDING] Profile saved');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao publicar seu perfil.');
+      }
 
-      console.log('[ONBOARDING] completed successfully');
+      console.log('[ONBOARDING] Transactional save completed');
       setStep(6);
       setIsFinalizing(false); 
     } catch (error: any) {
@@ -510,7 +581,11 @@ export default function OnboardingPage() {
     setIsFinalizing(true);
     try {
       console.log('[ONBOARDING] Final step: setting onboardingCompleted = true');
-      await saveProfilePartial(user.uid, { onboardingCompleted: true });
+      await saveProfilePartial(user.uid, { 
+        onboardingCompleted: true,
+        indexable: true,
+        planRank: profile?.planRank || 0
+      });
       console.log('[ONBOARDING] Success. Navigating to dashboard');
       navigate('/dashboard');
     } catch (error) {
@@ -721,6 +796,10 @@ export default function OnboardingPage() {
                 onFileUpload={handleFileUpload}
                 slug={slug}
                 setSlug={setSlug}
+                slugStatus={slugStatus}
+                slugMessage={slugMessage}
+                slugSuggestions={slugSuggestions}
+                onSelectSuggestion={(val) => setSlug(val)}
                 headline={headline}
                 setHeadline={setHeadline}
                 bio={bio}
@@ -734,7 +813,7 @@ export default function OnboardingPage() {
 
               <button 
                 onClick={nextStep}
-                disabled={!name || !specialty || !slug || uploadingImage || isSavingStep}
+                disabled={!name || !specialty || !slug || uploadingImage || isSavingStep || slugStatus !== 'available'}
                 className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
               >
                 {isSavingStep || uploadingImage ? (
@@ -991,6 +1070,10 @@ export default function OnboardingPage() {
                 onFileUpload={handleFileUpload}
                 slug={slug}
                 setSlug={setSlug}
+                slugStatus={slugStatus}
+                slugMessage={slugMessage}
+                slugSuggestions={slugSuggestions}
+                onSelectSuggestion={(val) => setSlug(val)}
                 headline={headline}
                 setHeadline={setHeadline}
                 bio={bio}
@@ -1020,11 +1103,20 @@ export default function OnboardingPage() {
               )}
 
               {/* Mini Preview */}
-              <div className="bg-brand-ink p-8 rounded-[40px] text-brand-white flex items-center gap-6 shadow-xl">
-                <div className="w-16 h-16 bg-brand-linen rounded-full overflow-hidden shrink-0 border border-brand-mist/20">
-                  {avatarPreview || avatar ? <img src={avatarPreview || avatar} className="w-full h-full object-cover" /> : <User size={24} className="text-brand-stone" />}
+              <div className="bg-brand-ink p-8 rounded-[40px] text-brand-white flex items-center gap-6 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+                <div className="w-16 h-16 bg-brand-linen rounded-full overflow-hidden shrink-0 border border-brand-mist/20 relative z-10">
+                  {avatarPreview || avatar ? (
+                    <img src={avatarPreview || avatar} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-[#A85C3A] to-[#C47A5A] flex items-center justify-center">
+                      <span className="text-brand-white font-serif text-xl border-brand-white/20 select-none">
+                        {name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 relative z-10">
                   <h4 className="font-serif italic text-lg truncate">{name || 'Seu Nome'}</h4>
                   <p className="text-[10px] text-brand-mist uppercase tracking-widest truncate">{specialty || 'Sua Especialidade'}</p>
                   <div className="flex gap-2 mt-3">
@@ -1032,7 +1124,77 @@ export default function OnboardingPage() {
                     <div className="w-7 h-7 rounded-full bg-brand-white/10 flex items-center justify-center"><MessageCircle size={14} /></div>
                   </div>
                 </div>
-                <div className="bg-brand-terracotta px-4 py-2 rounded-full text-[8px] font-medium uppercase tracking-widest">Preview</div>
+                <div className="bg-brand-terracotta px-4 py-2 rounded-full text-[8px] font-medium uppercase tracking-widest relative z-10">Preview</div>
+              </div>
+
+              {/* Revision Checklist */}
+              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm space-y-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-1 px-3 bg-brand-linen text-brand-ink rounded-full text-[8px] font-bold uppercase tracking-widest">Checklist de Publicação</div>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-green-500"><CheckCircle2 size={16} /></div>
+                      <span className="text-[11px] text-brand-ink font-medium">Nome e especialidade</span>
+                    </div>
+                    <span className="text-[9px] text-brand-stone font-bold uppercase tracking-widest">OK</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-green-500"><CheckCircle2 size={16} /></div>
+                      <span className="text-[11px] text-brand-ink font-medium">Localização e contato</span>
+                    </div>
+                    <span className="text-[9px] text-brand-stone font-bold uppercase tracking-widest">OK</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {services.filter(s => s.name.trim() !== '').length > 0 ? (
+                        <div className="text-green-500"><CheckCircle2 size={16} /></div>
+                      ) : (
+                        <div className="text-brand-terracotta"><AlertCircle size={16} /></div>
+                      )}
+                      <span className="text-[11px] text-brand-ink font-medium">Ao menos 1 serviço cadastrado</span>
+                    </div>
+                    <span className="text-[9px] text-brand-stone font-bold uppercase tracking-widest">
+                      {services.filter(s => s.name.trim() !== '').length} Serviço(s)
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {avatar ? (
+                        <div className="text-green-500"><CheckCircle2 size={16} /></div>
+                      ) : (
+                        <div className="text-brand-terracotta/60"><AlertCircle size={16} /></div>
+                      )}
+                      <span className={cn(
+                        "text-[11px] font-medium",
+                        avatar ? "text-brand-ink" : "text-brand-stone italic"
+                      )}>Foto de perfil</span>
+                    </div>
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase tracking-widest",
+                      avatar ? "text-brand-stone" : "text-brand-terracotta"
+                    )}>{avatar ? "OK" : "Pendente"}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {bio.trim().length > 20 ? (
+                        <div className="text-green-500"><CheckCircle2 size={16} /></div>
+                      ) : (
+                        <div className="text-brand-terracotta/60"><AlertCircle size={16} /></div>
+                      )}
+                      <span className={cn(
+                        "text-[11px] font-medium",
+                        bio.trim().length > 20 ? "text-brand-ink" : "text-brand-stone italic"
+                      )}>Biografia detalhada</span>
+                    </div>
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase tracking-widest",
+                      bio.trim().length > 20 ? "text-brand-stone" : "text-brand-terracotta"
+                    )}>{bio.trim().length > 20 ? "OK" : "Curta"}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-4">
@@ -1141,6 +1303,71 @@ export default function OnboardingPage() {
           )}
         </AnimatePresence>
       </main>
+
+      {/* Avatar Blocker Modal */}
+      <AnimatePresence>
+        {showAvatarModal && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAvatarModal(false)}
+              className="absolute inset-0 bg-brand-ink/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-brand-white rounded-[40px] p-10 shadow-2xl overflow-hidden border border-brand-mist text-center"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+              
+              <div className="relative z-10 space-y-8">
+                <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto shadow-sm border border-brand-mist">
+                  <Camera size={36} />
+                </div>
+                
+                <div className="space-y-4">
+                  <h3 className="font-serif text-3xl text-brand-ink">Adicione sua foto</h3>
+                  <p className="text-brand-stone font-light text-sm leading-relaxed">
+                    Profissionais com foto recebem <span className="font-bold text-brand-ink underline decoration-brand-terracotta/30">3x mais agendamentos</span>. Sua foto é sua primeira impressão.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  <button 
+                    onClick={() => {
+                      setShowAvatarModal(false);
+                      setStep(1);
+                      setTimeout(() => {
+                        avatarInputRef.current?.click();
+                      }, 500);
+                    }}
+                    className="w-full py-6 bg-brand-ink text-brand-white rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-xl flex items-center justify-center gap-2"
+                  >
+                    Adicionar Foto Agora <Sparkles size={14} />
+                  </button>
+                  
+                  <button 
+                    onClick={() => {
+                      setAvatarSkipped(true);
+                      setShowAvatarModal(false);
+                      // Use a timeout to ensure state settles before calling handleFinish
+                      setTimeout(() => {
+                        handleFinish();
+                      }, 100);
+                    }}
+                    className="w-full py-4 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
+                  >
+                    Usar inicial por enquanto
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Debug Overlay - Only visible during development/debugging if showDebugHUD is true */}
       {process.env.NODE_ENV === 'development' && (window as any).showDebugHUD && (

@@ -17,22 +17,17 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
   const badges = [
     {
       icon: <Clock size={16} />,
-      text: "Resposta ágil via WhatsApp",
+      text: "Atendimento rápido direto no WhatsApp, sem complicação",
       show: !!profile.whatsapp
     },
     {
-      icon: <Zap size={16} />,
-      text: "Confirmação imediata da reserva",
-      show: isAuto
-    },
-    {
       icon: <ShieldCheck size={16} />,
-      text: "Plataforma segura e verificada",
+      text: "Profissionais verificadas para sua segurança e tranquilidade",
       show: true
     },
     {
       icon: <CheckCircle2 size={16} />,
-      text: "Atendimento com pontualidade",
+      text: "Compromisso com horário e qualidade no atendimento",
       show: true
     }
   ].filter(b => b.show);
@@ -42,7 +37,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
           <span className="label-text text-brand-terracotta/60 mb-4 block">Segurança e Qualidade</span>
-          <h2 className="text-3xl font-serif text-brand-ink mb-4">Por que reservar aqui?</h2>
+          <h2 className="text-3xl font-serif text-brand-ink mb-4">Por que escolher a Nera?</h2>
           <div className="w-12 h-1 bg-brand-linen mx-auto rounded-full" />
         </div>
 
@@ -68,7 +63,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
 
         <div className="mt-16 p-8 bg-brand-linen/10 rounded-[40px] border border-brand-mist/50 text-center">
           <p className="text-[10px] text-brand-stone font-medium uppercase tracking-[0.2em] italic">
-            "Sua reserva é protegida pela Nera. Facilitamos sua conexão com os melhores profissionais de beleza."
+            "Na Nera, você agenda com confiança. Profissionais verificadas e atendimento de alto padrão."
           </p>
         </div>
       </div>

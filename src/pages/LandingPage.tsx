@@ -16,6 +16,9 @@ export default function LandingPage() {
       <nav className="flex items-center justify-between px-6 py-8 max-w-7xl mx-auto w-full relative z-20">
         <Logo />
         <div className="flex items-center gap-8">
+          <Link to="/profissionais" className="hidden md:block text-[11px] font-medium text-brand-stone uppercase tracking-[0.15em] hover:text-brand-ink transition-colors">
+            Encontrar Profissionais
+          </Link>
           <Link to="/login" className="text-[11px] font-medium text-brand-stone uppercase tracking-[0.15em] hover:text-brand-ink transition-colors">
             Entrar
           </Link>
@@ -45,8 +48,8 @@ export default function LandingPage() {
               </h1>
               
               <p className="text-brand-stone text-lg md:text-xl max-w-2xl mb-12 leading-relaxed font-light">
-                O sistema central para profissionais de beleza com atendimento em domicílio. 
-                Reservas inteligentes, zero WhatsApp, zero falta.
+                Sua agenda inteligente que elimina o caos do WhatsApp e profissionaliza 
+                seu faturamento com reservas automáticas e zero faltas.
               </p>
               
               <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
@@ -205,32 +208,57 @@ export default function LandingPage() {
                     className="w-full"
                   >
                     {/* Simulated Header */}
-                    <div className="h-64 bg-brand-linen flex items-center justify-center relative overflow-hidden">
-                      <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-brand-ink/80 to-transparent">
-                        <h3 className="text-white font-serif text-2xl">Helena Prado</h3>
-                        <p className="text-white/60 text-[10px] uppercase tracking-widest">Nail Designer & Estética</p>
+                    <div className="h-72 relative overflow-hidden">
+                      <img 
+                        src="https://i.imgur.com/gBdf3tO.png" 
+                        alt="Helena Prado"
+                        className="w-full h-full object-cover object-[center_25%]"
+                      />
+                      {/* Editorial Overlay */}
+                      <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-brand-ink/40 to-transparent z-10" />
+                      <div className="absolute inset-x-0 bottom-0 p-8 pt-20 bg-gradient-to-t from-brand-ink/95 via-brand-ink/60 to-transparent z-10">
+                        <h3 className="text-white font-serif text-[28px] leading-tight mb-1">Helena Prado</h3>
+                        <p className="text-white/70 text-[10px] uppercase tracking-[0.25em] font-bold">Design de sobrancelhas</p>
                       </div>
                     </div>
 
                     {/* Simulated Content */}
-                    <div className="p-6 bg-brand-parchment space-y-6">
-                      <div className="space-y-2">
-                        <div className="w-full h-1 bg-brand-mist/30 rounded-full" />
-                        <div className="w-2/3 h-1 bg-brand-mist/30 rounded-full" />
+                    <div className="p-8 bg-brand-white space-y-8 relative z-20 -mt-2">
+                      <div className="flex items-center gap-4 py-3 border-b border-brand-mist/10">
+                        <div className="flex items-center gap-1.5">
+                          <Star size={11} className="text-brand-terracotta fill-brand-terracotta" />
+                          <span className="text-[11px] font-bold text-brand-ink">4.9</span>
+                        </div>
+                        <div className="w-px h-3 bg-brand-mist/30" />
+                        <span className="text-[10px] text-brand-stone font-bold uppercase tracking-[0.2em] opacity-80">+150 atendimentos</span>
                       </div>
 
                       <div className="space-y-4">
-                        {[1, 2, 3, 4].map(i => (
-                          <div key={i} className="p-4 bg-white rounded-2xl border border-brand-mist flex justify-between items-center">
-                            <div>
-                                <div className="w-24 h-2 bg-brand-ink/10 rounded-full mb-2" />
-                                <div className="w-12 h-1.5 bg-brand-mist/50 rounded-full" />
-                            </div>
-                            <div className="w-10 h-10 rounded-xl bg-brand-linen flex items-center justify-center text-brand-terracotta">
-                                <Star size={12} fill="currentColor" />
-                            </div>
+                        <div className="p-5 bg-white rounded-2xl border border-brand-mist/40 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] flex justify-between items-center group transition-all active:scale-[0.98]">
+                          <div>
+                            <div className="text-[12px] font-bold text-brand-ink uppercase tracking-tight">Design de sobrancelhas personalizado</div>
+                            <div className="text-[10px] text-brand-terracotta font-bold uppercase mt-1.5">R$ 80</div>
                           </div>
-                        ))}
+                          <div className="w-8 h-8 rounded-full bg-brand-linen flex items-center justify-center">
+                            <ChevronRight size={14} className="text-brand-terracotta" />
+                          </div>
+                        </div>
+                        
+                        <div className="p-5 bg-white rounded-2xl border border-brand-mist/40 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] flex justify-between items-center group transition-all active:scale-[0.98]">
+                          <div>
+                            <div className="text-[12px] font-bold text-brand-ink uppercase tracking-tight">Brow Lamination</div>
+                            <div className="text-[10px] text-brand-terracotta font-bold uppercase mt-1.5">R$ 150</div>
+                          </div>
+                          <div className="w-8 h-8 rounded-full bg-brand-linen flex items-center justify-center">
+                            <ChevronRight size={14} className="text-brand-terracotta" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-6 pb-4">
+                        <div className="w-full bg-brand-ink text-white py-5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.25em] text-center shadow-[0_20px_40px_-12px_rgba(18,17,17,0.3)]">
+                          Agendar horário
+                        </div>
                       </div>
                     </div>
                   </motion.div>
@@ -288,7 +316,12 @@ export default function LandingPage() {
                 <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 0</div>
                 <div className="text-brand-stone text-sm font-light mb-8">Plano gratuito para começar com teste sem risco. Sem cartão de crédito.</div>
                 <ul className="space-y-3 mb-10">
-                  {['Vitrine pública premium', 'Agendamentos mensais', 'Email para a cliente', 'Link para bio'].map(f => (
+                  {[
+                    'Perfil digital premium (foto, bio e serviços)', 
+                    'Até 15 agendamentos por mês', 
+                    'Aprovação manual (seu filtro)', 
+                    'Link direto para bio'
+                  ].map(f => (
                     <li key={f} className="text-sm text-brand-stone font-light flex items-center gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
                     </li>
@@ -320,20 +353,27 @@ export default function LandingPage() {
               </div>
 
               {/* PRO */}
-              <div className="card-refined p-10 border-brand-terracotta/20">
+              <div 
+                className="rounded-[32px] p-12 lg:p-14 border-2 border-[#C49A7A] shadow-[0_24px_60px_rgba(91,52,35,0.16)] bg-[#F3EDE7] relative"
+              >
                 <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">Pro</div>
                 <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 89</div>
                 <div className="text-brand-stone text-sm font-light mb-8">por mês</div>
-                <ul className="space-y-3 mb-10">
+                <ul className="space-y-4 mb-10">
                   {['Tudo do Essencial', 'Cupons de desconto', 'Relatório mensal PDF', 'Link de indicação premiado', 'Badge Pro Nera na vitrine', 'Suporte prioritário'].map(f => (
-                    <li key={f} className="text-sm text-brand-stone font-light flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
+                    <li key={f} className="text-sm text-brand-stone font-bold flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />
+                      <span className="uppercase tracking-tight">{f}</span>
                     </li>
                   ))}
                 </ul>
-                <Link to="/register" className="block text-center border border-brand-mist py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:bg-brand-linen transition-all">
+                <Link 
+                  to="/register" 
+                  className="block text-center bg-brand-terracotta text-white py-5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg hover:bg-brand-sienna transition-all"
+                >
                   Quero o Pro
                 </Link>
+                <p className="text-[9px] text-brand-stone/60 font-bold uppercase tracking-[0.2em] text-center mt-6">Posicionamento de elite</p>
               </div>
             </div>
           </div>
@@ -398,6 +438,9 @@ export default function LandingPage() {
           <Logo variant="dark" className="mb-12" />
           
           <div className="flex gap-10 mb-12">
+            <Link to="/profissionais" className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/50 hover:text-brand-white transition-colors">
+              Diretório
+            </Link>
             {['Termos', 'Privacidade', 'Suporte', 'Instagram'].map((item) => (
               <Link key={item} to="#" className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20 hover:text-brand-white transition-colors">
                 {item}

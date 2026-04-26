@@ -7,6 +7,7 @@ import {
   useLocation
 } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider, useAuth } from './AuthContext';
 import AppLoadingScreen from './components/AppLoadingScreen';
 
@@ -26,7 +27,9 @@ import ReviewPage from './pages/ReviewPage';
 import BookingResponsePage from './pages/BookingResponsePage';
 import PendingRequestsPage from './pages/PendingRequestsPage';
 import ManageBookingPage from './pages/ManageBookingPage';
+import CouponsPage from './pages/CouponsPage';
 import WhatsAppSimulator from './pages/WhatsAppSimulator';
+import DirectoryPage from './pages/DirectoryPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -67,68 +70,77 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/p/:slug" element={<PublicProfile />} />
-            <Route path="/reserva/:id/gerenciar" element={<ManageBookingPage />} />
-            <Route path="/r/:token" element={<ManageBookingPage />} />
-            <Route path="/review/:token" element={<ReviewPage />} />
-            <Route path="/booking-request/:appointmentId/respond" element={<BookingResponsePage />} />
-            <Route path="/onboarding" element={
-              <PrivateRoute>
-                <OnboardingPage />
-              </PrivateRoute>
-            } />
-            
-            <Route path="/dashboard" element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            } />
-            <Route path="/agenda" element={
-              <PrivateRoute>
-                <AgendaPage />
-              </PrivateRoute>
-            } />
-            <Route path="/planos" element={
-              <PrivateRoute>
-                <PlansPage />
-              </PrivateRoute>
-            } />
-            <Route path="/pedidos" element={
-              <PrivateRoute>
-                <PendingRequestsPage />
-              </PrivateRoute>
-            } />
-            <Route path="/clients" element={
-              <PrivateRoute>
-                <ClientsPage />
-              </PrivateRoute>
-            } />
-            <Route path="/services" element={
-              <PrivateRoute>
-                <ServicesPage />
-              </PrivateRoute>
-            } />
-            <Route path="/profile" element={
-              <PrivateRoute>
-                <ProfilePage />
-              </PrivateRoute>
-            } />
-            <Route path="/admin/whatsapp-test" element={
-              <PrivateRoute>
-                <WhatsAppSimulator />
-              </PrivateRoute>
-            } />
-          </Routes>
-          <Toaster position="top-center" richColors />
-        </div>
-      </Router>
-    </AuthProvider>
+    <HelmetProvider>
+      <AuthProvider>
+        <Router>
+          <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
+            <Routes>
+              {/* ... routes ... */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/p/:slug" element={<PublicProfile />} />
+              <Route path="/reserva/:id/gerenciar" element={<ManageBookingPage />} />
+              <Route path="/r/:token" element={<ManageBookingPage />} />
+              <Route path="/profissionais" element={<DirectoryPage />} />
+              <Route path="/review/:token" element={<ReviewPage />} />
+              <Route path="/booking-request/:appointmentId/respond" element={<BookingResponsePage />} />
+              <Route path="/onboarding" element={
+                <PrivateRoute>
+                  <OnboardingPage />
+                </PrivateRoute>
+              } />
+              
+              <Route path="/dashboard" element={
+                <PrivateRoute>
+                  <Dashboard />
+                </PrivateRoute>
+              } />
+              <Route path="/agenda" element={
+                <PrivateRoute>
+                  <AgendaPage />
+                </PrivateRoute>
+              } />
+              <Route path="/planos" element={
+                <PrivateRoute>
+                  <PlansPage />
+                </PrivateRoute>
+              } />
+              <Route path="/pedidos" element={
+                <PrivateRoute>
+                  <PendingRequestsPage />
+                </PrivateRoute>
+              } />
+              <Route path="/clients" element={
+                <PrivateRoute>
+                  <ClientsPage />
+                </PrivateRoute>
+              } />
+              <Route path="/services" element={
+                <PrivateRoute>
+                  <ServicesPage />
+                </PrivateRoute>
+              } />
+              <Route path="/cupons" element={
+                <PrivateRoute>
+                  <CouponsPage />
+                </PrivateRoute>
+              } />
+              <Route path="/profile" element={
+                <PrivateRoute>
+                  <ProfilePage />
+                </PrivateRoute>
+              } />
+              <Route path="/admin/whatsapp-test" element={
+                <PrivateRoute>
+                  <WhatsAppSimulator />
+                </PrivateRoute>
+              } />
+            </Routes>
+            <Toaster position="top-center" richColors />
+          </div>
+        </Router>
+      </AuthProvider>
+    </HelmetProvider>
   );
 }

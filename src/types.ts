@@ -1,3 +1,15 @@
+import { Timestamp, FieldValue } from 'firebase/firestore';
+
+export interface AddressData {
+  street: string;
+  number: string;
+  complement?: string;
+  neighborhood: string;
+  city: string;
+  state?: string;
+  reference?: string;
+}
+
 export interface Service {
   id: string;
   name: string;
@@ -31,6 +43,16 @@ export interface ProfessionalIdentity {
   serviceStyle: string[]; // e.g., ["Delicada e detalhista", "Rápida e eficiente"]
   differentials: string[]; // e.g., ["Pontualidade", "Biossegurança"]
   attendsAt: 'studio' | 'home' | 'hybrid';
+}
+
+export interface PlanFeatures {
+  unlimitedBookings: boolean;
+  whatsappNotifications: boolean;
+  advancedDashboard: boolean;
+  waitlist: boolean;
+  antiNoShow: boolean;
+  coupons: boolean;
+  analytics: boolean;
 }
 
 export interface UserProfile {
@@ -92,6 +114,13 @@ export interface UserProfile {
   
   onboardingCompleted?: boolean;
   onboardingStep?: number;
+  avatarSkipped?: boolean;
+  monthlyRevenueGoal?: number;
+  indexable?: boolean;
+  planRank?: number;
+  averageRating?: number;
+  totalReviews?: number;
+  topTags?: string[];
   
   waitlistMode?: 'auto' | 'manual';
   callmebotApiKey?: string;
@@ -103,6 +132,8 @@ export interface UserProfile {
   planExpiresAt?: string; // ISO date
   trialStartedAt?: string;
   referralCode?: string; // código único de indicação
+  referredBy?: string;   // código de quem indicou este usuário
+  credits?: number;      // créditos acumulados em reais
   updatedAt: string;
 
   // --- LEGACY FIELDS FOR COMPATIBILITY ---
@@ -151,14 +182,8 @@ export interface Appointment {
   locationType: 'studio' | 'home';
   locationDetail?: string; // neighborhood or address
   neighborhood?: string;
-  address?: string | {
-    street: string;
-    number: string;
-    complement?: string;
-    neighborhood: string;
-    city: string;
-    reference?: string;
-  };
+  /** @deprecated Use object structure for address instead of plain string. Use parseAddress helper. */
+  address?: AddressData | string;
   
   status: 'pending' | 'accepted' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'cancelled_by_professional' | 'completed' | 'expired';
   notes?: string;
@@ -195,8 +220,8 @@ export interface Appointment {
   couponId?: string;
   appliedCouponCode?: string;
 
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: Timestamp | Date | string | FieldValue;
+  updatedAt?: Timestamp | Date | string | FieldValue;
 }
 
 export interface BlockedSchedule {

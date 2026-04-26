@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { ShieldCheck, Zap, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award } from 'lucide-react';
+import { ShieldCheck, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
 import PremiumButton from '../PremiumButton';
@@ -32,7 +32,10 @@ export const PublicHero = ({
   const [showLocationModal, setShowLocationModal] = useState(false);
   const firstName = profile.name.split(' ')[0];
   const lastName = profile.name.split(' ').slice(1).join(' ');
-  const tagline = getProfileHeroCopy(profile.professionalIdentity?.mainSpecialty || profile.specialty);
+  const tagline = getProfileHeroCopy(
+    profile.professionalIdentity?.mainSpecialty || profile.specialty,
+    profile.slug || profile.uid
+  );
 
   return (
     <section className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2 overflow-hidden bg-brand-parchment">
@@ -61,9 +64,30 @@ export const PublicHero = ({
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-4">
               <div className="w-8 h-px bg-brand-terracotta" />
-              <span className="text-[11px] font-light uppercase tracking-[0.2em] text-brand-stone">
+              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-ink">
                 {profile.headline || profile.specialty}
               </span>
+            </div>
+
+            {/* Social Proof Mini Badges */}
+            <div className="flex flex-wrap gap-4 pt-2">
+              <div className="flex items-center gap-1.5">
+                <Star size={12} className="text-brand-terracotta fill-brand-terracotta" />
+                <span className="text-[10px] font-bold text-brand-ink">{stats?.averageRating || 4.9}</span>
+                <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Avaliação</span>
+              </div>
+              <div className="w-px h-3 bg-brand-mist/50 my-auto" />
+              <div className="flex items-center gap-1.5">
+                <Users size={12} className="text-brand-terracotta" />
+                <span className="text-[10px] font-bold text-brand-ink">+{stats?.totalCompletedBookings || 150}</span>
+                <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Atendimentos</span>
+              </div>
+              <div className="w-px h-3 bg-brand-mist/50 my-auto" />
+              <div className="flex items-center gap-1.5">
+                <Award size={12} className="text-brand-terracotta" />
+                <span className="text-[10px] font-bold text-brand-ink">{profile.professionalIdentity?.yearsExperience || '8'} anos</span>
+                <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Experiência</span>
+              </div>
             </div>
 
             <div className="flex flex-col gap-3">
@@ -121,43 +145,6 @@ export const PublicHero = ({
                 </button>
               )}
             </div>
-
-            {((stats && (stats.totalCompletedBookings > 10 || stats.averageRating > 4)) || profile.waitlistMode === 'auto' || profile.professionalIdentity?.yearsExperience) && (
-              <div className="flex flex-wrap gap-3">
-                {stats?.totalCompletedBookings && stats.totalCompletedBookings > 10 && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
-                    <Users size={12} className="text-brand-terracotta" />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                      +{stats.totalCompletedBookings} atendimentos
-                    </span>
-                  </div>
-                )}
-                {stats?.averageRating && stats.averageRating >= 4.5 && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
-                    <Star size={12} className="text-brand-terracotta fill-brand-terracotta" />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                      {stats.averageRating.toFixed(1)} nota média
-                    </span>
-                  </div>
-                )}
-                {profile.waitlistMode === 'auto' && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-linen border border-brand-terracotta/20 rounded-full shadow-sm">
-                    <Zap size={12} className="text-brand-terracotta" />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                      Confirmação imediata
-                    </span>
-                  </div>
-                )}
-                {profile.professionalIdentity?.yearsExperience && (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-brand-white border border-brand-mist rounded-full shadow-sm">
-                    <Award size={12} className="text-brand-terracotta" />
-                    <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                      {profile.professionalIdentity.yearsExperience} anos exp.
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {nextSlot ? (
@@ -205,27 +192,32 @@ export const PublicHero = ({
             {heroBio || profile.bio || (profile.specialty ? `Especialista em ${profile.specialty} com foco em excelência e bem-estar.` : 'Atendimento personalizado com foco em resultados de alta qualidade.')}
           </p>
 
-          <div className="flex flex-wrap items-center gap-6">
-            <PremiumButton
-              onClick={() => isAgendaFull ? onWaitlistClick?.() : onBookingClick(services[0])}
-              variant="terracotta"
-              className="px-10 py-5 text-[10px] tracking-[0.22em] shadow-xl"
-            >
-              {isAgendaFull ? 'Entrar na lista de espera' : 'Reservar agora'}
-              <ChevronRight size={14} className="ml-2" />
-            </PremiumButton>
-
-            {profile.instagram && (
-              <a
-                href={`https://instagram.com/${profile.instagram.replace('@', '')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2.5 text-[10px] font-medium uppercase tracking-[0.15em] text-brand-stone hover:text-brand-ink transition-colors group"
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-6">
+              <PremiumButton
+                onClick={() => isAgendaFull ? onWaitlistClick?.() : onBookingClick(services[0])}
+                variant="terracotta"
+                className="px-10 py-5 text-[10px] tracking-[0.22em] shadow-xl"
               >
-                <Instagram size={16} />
-                <span className="border-b border-transparent group-hover:border-brand-stone transition-all">Ver Instagram</span>
-              </a>
-            )}
+                {isAgendaFull ? 'Entrar na lista de espera' : 'Agendar horário'}
+                <ChevronRight size={14} className="ml-2" />
+              </PremiumButton>
+
+              {profile.instagram && (
+                <a
+                  href={`https://instagram.com/${profile.instagram.replace('@', '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2.5 text-[10px] font-medium uppercase tracking-[0.15em] text-brand-stone hover:text-brand-ink transition-colors group"
+                >
+                  <Instagram size={16} />
+                  <span className="border-b border-transparent group-hover:border-brand-stone transition-all">Ver Instagram</span>
+                </a>
+              )}
+            </div>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-40 ml-2">
+              Leva menos de 30 segundos
+            </p>
           </div>
         </motion.div>
       </div>
@@ -247,12 +239,22 @@ export const PublicHero = ({
           </svg>
 
           <div className="relative z-0">
-             <img
-              src={profile.avatar}
-              alt={profile.name}
-              className="w-full aspect-[3/4] object-cover rounded-[48px_48px_48px_12px] shadow-2xl filter saturate-[0.85] hover:saturate-100 transition-[filter] duration-1000"
-              referrerPolicy="no-referrer"
-            />
+             {profile.avatar ? (
+              <img
+                src={profile.avatar}
+                alt={profile.name}
+                className="w-full aspect-[3/4] object-cover rounded-[48px_48px_48px_12px] shadow-2xl filter saturate-[0.85] hover:saturate-100 transition-[filter] duration-1000"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full aspect-[3/4] rounded-[48px_48px_48px_12px] shadow-2xl bg-gradient-to-br from-[#A85C3A] via-[#B86C4A] to-[#C47A5A] flex items-center justify-center relative overflow-hidden group">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.1),transparent)]" />
+                <span className="text-brand-white font-serif text-8xl opacity-50 select-none drop-shadow-2xl relative z-10 transition-transform duration-700 group-hover:scale-110">
+                  {profile.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </span>
+                <div className="absolute inset-0 border border-white/10 rounded-[48px_48px_48px_12px]" />
+              </div>
+            )}
             
             {/* Polaroid Badge */}
             <div className="absolute -bottom-6 left-0 right-0 bg-brand-white border border-brand-mist rounded-b-xl shadow-lg p-5 flex items-center justify-between z-20">

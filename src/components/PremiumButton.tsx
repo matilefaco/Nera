@@ -1,7 +1,9 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useState } from 'react';
+import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import UpgradeModal from './UpgradeModal';
 
 interface PremiumButtonProps {
   children: React.ReactNode;
@@ -12,6 +14,7 @@ interface PremiumButtonProps {
   loading?: boolean;
   loadingText?: string;
   type?: 'button' | 'submit' | 'reset';
+  feature?: 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics';
 }
 
 const PremiumButton = ({ 
@@ -22,8 +25,24 @@ const PremiumButton = ({
   disabled, 
   loading, 
   loadingText,
-  type = 'button'
+  type = 'button',
+  feature
 }: PremiumButtonProps) => {
+  const { features } = usePlanFeatures();
+  const [showUpgrade, setShowUpgrade] = useState(false);
+
+  // Check if feature is locked
+  const isLocked = feature ? !features[feature] : false;
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (isLocked) {
+      e.preventDefault();
+      setShowUpgrade(true);
+      return;
+    }
+    onClick?.();
+  };
+
   const variants = {
     primary: "bg-brand-ink text-brand-white hover:bg-brand-ink/90",
     secondary: "bg-brand-linen text-brand-ink hover:bg-brand-mist/50",
@@ -34,25 +53,41 @@ const PremiumButton = ({
   };
 
   return (
-    <motion.button
-      whileHover={!disabled && !loading ? { scale: 1.02 } : {}}
-      whileTap={!disabled && !loading ? { scale: 0.98 } : {}}
-      onClick={onClick}
-      disabled={disabled || loading}
-      type={type}
-      className={cn(
-        "px-10 py-5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed",
-        variants[variant],
-        className
+    <>
+      <motion.button
+        whileHover={!disabled && !loading ? { scale: 1.02 } : {}}
+        whileTap={!disabled && !loading ? { scale: 0.98 } : {}}
+        onClick={handleClick}
+        disabled={disabled || loading}
+        type={type}
+        className={cn(
+          "px-10 py-5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed",
+          isLocked && "opacity-80 border-dashed",
+          variants[variant],
+          className
+        )}
+      >
+        {loading ? (
+          <>
+            <Loader2 className="animate-spin" size={16} />
+            <span>{loadingText || 'Carregando...'}</span>
+          </>
+        ) : (
+          <>
+            {isLocked && <Lock size={14} className="text-brand-terracotta" />}
+            {children}
+          </>
+        )}
+      </motion.button>
+
+      {feature && (
+        <UpgradeModal 
+          open={showUpgrade} 
+          onClose={() => setShowUpgrade(false)} 
+          feature={feature}
+        />
       )}
-    >
-      {loading ? (
-        <>
-          <Loader2 className="animate-spin" size={16} />
-          <span>{loadingText || 'Carregando...'}</span>
-        </>
-      ) : children}
-    </motion.button>
+    </>
   );
 };
 

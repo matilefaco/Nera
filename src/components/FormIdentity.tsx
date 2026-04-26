@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Camera, Sparkles, X } from 'lucide-react';
+import { User, Camera, Sparkles, X, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, cleanWhatsapp, formatWhatsappDisplay } from '../lib/utils';
 
@@ -27,6 +27,10 @@ export interface FormIdentityProps {
   setInstagram?: (val: string) => void;
   slug?: string;
   setSlug?: (val: string) => void;
+  slugStatus?: 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid';
+  slugMessage?: string;
+  slugSuggestions?: string[];
+  onSelectSuggestion?: (val: string) => void;
   differentials?: string[];
   setDifferentials?: (val: string[]) => void;
   availableDifferentials?: string[];
@@ -77,6 +81,10 @@ export const FormIdentity = ({
   setInstagram,
   slug,
   setSlug,
+  slugStatus = 'idle',
+  slugMessage,
+  slugSuggestions = [],
+  onSelectSuggestion,
   differentials,
   setDifferentials,
   availableDifferentials = [],
@@ -375,7 +383,7 @@ export const FormIdentity = ({
           )}
 
           {(slug !== undefined && setSlug) && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {showLabels && (
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
                   Link Personalizado (Slug) <span className="text-brand-terracotta">*</span>
@@ -383,9 +391,11 @@ export const FormIdentity = ({
               )}
               <div className={cn(
                 "flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border transition-all",
-                errors.slug ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                slugStatus === 'available' ? "border-green-200 ring-1 ring-green-100" :
+                slugStatus === 'unavailable' || slugStatus === 'invalid' || errors.slug ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
+                "border-brand-mist"
               )}>
-                <span className="text-brand-stone text-xs ml-1">nera.app/p/</span>
+                <span className="text-brand-stone text-xs ml-1">usenera.com/p/</span>
                 <input 
                   type="text" 
                   value={slug} 
@@ -393,7 +403,51 @@ export const FormIdentity = ({
                   placeholder="seu-nome"
                   className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs"
                 />
+                {slugStatus === 'checking' && (
+                  <motion.div 
+                    animate={{ rotate: 360 }} 
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                    className="mr-1"
+                  >
+                    <Sparkles size={14} className="text-brand-stone opacity-40" />
+                  </motion.div>
+                )}
+                {slugStatus === 'available' && (
+                  <CheckCircle2 size={16} className="text-green-500 mr-1" />
+                )}
+                {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
+                  <X size={16} className="text-brand-terracotta mr-1" />
+                )}
               </div>
+              
+              {slugMessage && (
+                <p className={cn(
+                  "text-[10px] font-medium ml-1 flex items-center gap-1.5",
+                  slugStatus === 'available' ? "text-green-600" : "text-brand-terracotta"
+                )}>
+                  {slugStatus === 'available' ? <CheckCircle2 size={12} /> : <X size={12} />}
+                  {slugMessage}
+                </p>
+              )}
+
+              {slugStatus === 'unavailable' && slugSuggestions.length > 0 && (
+                <div className="space-y-2 pt-2 ml-1">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone italic">Sugestões disponíveis:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {slugSuggestions.map(suggestion => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => onSelectSuggestion?.(suggestion)}
+                        className="px-3 py-1.5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <FormError message={errors.slug} />
             </div>
           )}
