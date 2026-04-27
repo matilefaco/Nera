@@ -1,14 +1,14 @@
 import express from "express";
-import { db } from "../firebaseAdmin.ts";
+import { db } from "../firebaseAdmin";
 import { 
   callNvidiaAI, 
   aiRateLimit, 
   RATE_LIMIT_WINDOW, 
   MAX_REQUESTS, 
   getServiceDescriptionWithFallback 
-} from "../utils.ts";
-import { checkPlanFeature } from "../middleware/planMiddleware.ts";
-import { generateMonthlyReportPDF } from "../reports/monthlyReport.ts";
+} from "../utils";
+import { checkPlanFeature } from "../middleware/planMiddleware";
+import { generateMonthlyReportPDF } from "../reports/monthlyReport";
 
 const router = express.Router();
 

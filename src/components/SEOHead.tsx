@@ -10,8 +10,8 @@ interface SEOHeadProps {
 }
 
 export default function SEOHead({ title, description, image, url, canonical }: SEOHeadProps) {
-  const currentUrl = url || typeof window !== 'undefined' ? window.location.href : 'https://usenera.com';
-  const defaultImage = 'https://usenera.com/images/og-default.jpg';
+  const currentUrl = url || (typeof window !== 'undefined' ? window.location.href : 'https://usenera.com');
+  const defaultImage = 'https://usenera.com/og-default.png';
   const ogImage = image || defaultImage;
 
   return (

@@ -1,6 +1,19 @@
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
-import firebaseConfig from "../firebase-applet-config.json" with { type: "json" };
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Load firebase config manually to avoid problematic JSON import syntax in some environments
+const getFirebaseConfig = () => {
+  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (!fs.existsSync(firebaseConfigPath)) {
+    console.error(`[FIREBASE ADMIN] firebase-applet-config.json not found at ${firebaseConfigPath}`);
+    return null;
+  }
+  return JSON.parse(fs.readFileSync(firebaseConfigPath, "utf-8"));
+};
+
 import { GoogleAuth } from "google-auth-library";
 
 // Diagnostic for Runtime Identity
@@ -24,6 +37,11 @@ export let defaultDb: admin.firestore.Firestore;
 
 export const initFirebase = async () => {
   try {
+    const firebaseConfig = getFirebaseConfig();
+    if (!firebaseConfig) {
+      throw new Error("Missing firebase-applet-config.json");
+    }
+
     const identity = await getRuntimeIdentity();
     console.log(`[FIREBASE ADMIN] Runtime Identity:`, identity);
     console.log(`[FIREBASE ADMIN] Target Project: ${firebaseConfig.projectId}`);

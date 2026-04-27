@@ -192,6 +192,51 @@ export default function Dashboard() {
     };
   }, [analyticsEvents, appointments]);
 
+  const confirmedAppointments = useMemo(() => 
+    appointments.filter(a => a.status === 'confirmed'),
+    [appointments]
+  );
+
+  const monthlyStats = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const monthlyApps = appointments.filter(a => {
+      if (!a.date) return false;
+      const d = new Date(a.date + 'T12:00:00');
+      return d.getMonth() === currentMonth && 
+             d.getFullYear() === currentYear && 
+             (a.status === 'confirmed' || a.status === 'completed');
+    });
+
+    const clients = new Set(monthlyApps.map(a => 
+      a.clientWhatsapp?.replace(/\D/g, '') || a.clientEmail || a.clientName
+    ));
+
+    return {
+      count: monthlyApps.length,
+      clientsCount: clients.size
+    };
+  }, [appointments]);
+
+  const daysSinceLastAppointment = useMemo(() => {
+    const completedOrConfirmed = appointments
+      .filter(a => (a.status === 'confirmed' || a.status === 'completed') && a.date)
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    if (completedOrConfirmed.length === 0) return null;
+
+    const lastDate = new Date(completedOrConfirmed[0].date + 'T12:00:00');
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    
+    const diffTime = today.getTime() - lastDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays >= 0 ? diffDays : null;
+  }, [appointments]);
+
   const getContextualTip = () => {
     if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
     if (confirmedToday.length === 0) return 'Nenhuma reserva hoje. Que tal compartilhar seu link nos Stories para atrair clientes?';
@@ -614,7 +659,7 @@ export default function Dashboard() {
         title="Sua central de operações"
         description="Aqui você vê todos os agendamentos, receita e ações rápidas. Tudo que você precisa para o dia a dia está nesta página."
       />
-      <div className="p-6 md:p-12 max-w-2xl mx-auto w-full space-y-10">
+      <div className="p-6 md:p-12 pb-32 max-w-2xl mx-auto w-full space-y-10">
         
         {/* Avatar Skipped Reminder Banner */}
         {profile?.avatarSkipped && !profile?.avatar && (
@@ -736,10 +781,11 @@ export default function Dashboard() {
             )}
           >
             Geral
-            {pendingCount > 0 && (
-              <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-            )}
-            {inactiveClientsCount > 0 && activeTab !== 'geral' && (
+            {pendingCount > 0 ? (
+              <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 bg-red-500 text-white rounded-full text-[8px] font-bold animate-pulse">
+                {pendingCount}
+              </span>
+            ) : inactiveClientsCount > 0 && (
               <span className="w-1.5 h-1.5 bg-brand-terracotta rounded-full" />
             )}
           </button>
@@ -754,16 +800,183 @@ export default function Dashboard() {
           </button>
         </div>
 
-        {/* INSIGHTS MESSAGE */}
+        {/* INSIGHTS CONTENT */}
         {activeTab === "insights" && (
-          <div className="flex flex-col items-center justify-center py-20 text-center gap-4 bg-brand-white rounded-[40px] border border-brand-mist border-dashed">
-            <div className="p-4 bg-brand-linen rounded-full text-brand-terracotta">
-              <Sparkles size={32} />
-            </div>
-            <div>
-              <h3 className="text-xl font-serif text-brand-ink italic">Insights em breve.</h3>
-              <p className="text-sm text-brand-stone max-w-xs mt-2">Estamos preparando análises inteligentes para ajudar seu negócio a crescer.</p>
-            </div>
+          <div className="flex flex-col gap-8">
+            {/* Header com Status do Plano */}
+            <section className="px-6 mt-4">
+              <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-serif text-brand-ink italic">
+                    {features.advancedDashboard 
+                      ? "Performance completa dos últimos 30 dias."
+                      : "Você já pode acompanhar visitas e cliques. 🔒 Insights completos estão no Plano Pro."}
+                  </p>
+                  {!features.advancedDashboard && (
+                    <Link to="/planos" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
+                      Fazer Upgrade
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Growth Dashboard: KPIs de Conversão e Insights */}
+            {growthMetrics && (
+              <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-10 relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-brand-linen pb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                      <TrendingUp size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
+                        Growth Dashboard
+                      </h3>
+                      <p className="text-sm font-serif text-brand-ink italic">Sua performance de conversão</p>
+                    </div>
+                  </div>
+                  <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
+                    <span className="px-3 py-1.5 bg-brand-white rounded-full shadow-sm text-brand-ink">30 Dias</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas 30d</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
+                      <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
+                    <p className="text-2xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Taxa de Conversão</p>
+                    <div className="flex items-center gap-2">
+                        {features.advancedDashboard ? (
+                          <>
+                            <p className="text-2xl font-serif text-brand-ink">{growthMetrics.convRate.toFixed(1)}%</p>
+                            <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-2xl font-serif text-brand-mist">---</p>
+                            <Lock size={12} className="text-brand-mist" />
+                          </>
+                        )}
+                      </div>
+                      {!features.advancedDashboard && (
+                        <p className="text-[7px] text-brand-stone font-medium uppercase tracking-widest">Disponível no plano Pro</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Origem Principal</p>
+                      <div className="flex items-center gap-2">
+                        {features.advancedDashboard ? (
+                          <>
+                            <div className="w-4 h-4 rounded bg-brand-linen flex items-center justify-center">
+                              {growthMetrics.mainOrigin === 'Instagram' ? <Instagram size={10} /> : <Share2 size={10} />}
+                            </div>
+                            <p className="text-2xl font-serif text-brand-ink">{growthMetrics.mainOrigin}</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-2xl font-serif text-brand-mist">---</p>
+                            <Lock size={12} className="text-brand-mist" />
+                          </>
+                        )}
+                      </div>
+                      {!features.advancedDashboard && (
+                        <p className="text-[7px] text-brand-stone font-medium uppercase tracking-widest">Disponível no plano Pro</p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-brand-linen">
+                    <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                      <div className="flex items-center gap-2 mb-3 text-brand-stone">
+                        {features.advancedDashboard ? <Sparkles size={14} /> : <Lock size={14} className="text-brand-mist" />}
+                        <span className="text-[8px] font-bold uppercase tracking-widest">Serviço Campeão</span>
+                      </div>
+                      {features.advancedDashboard ? (
+                        <p className="text-sm font-serif text-brand-ink leading-tight">{growthMetrics.topService}</p>
+                      ) : (
+                        <div className="space-y-1">
+                          <p className="text-sm font-serif text-brand-mist">---</p>
+                          <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                      <div className="flex items-center gap-2 mb-3 text-brand-stone">
+                        {features.advancedDashboard ? <Clock size={14} /> : <Lock size={14} className="text-brand-mist" />}
+                        <span className="text-[8px] font-bold uppercase tracking-widest">Horário + Vendido</span>
+                      </div>
+                      {features.advancedDashboard ? (
+                        <p className="text-sm font-serif text-brand-ink">{growthMetrics.bestTime}</p>
+                      ) : (
+                        <div className="space-y-1">
+                          <p className="text-sm font-serif text-brand-mist">---</p>
+                          <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                      <div className="flex items-center gap-2 mb-3 text-brand-stone">
+                        {features.advancedDashboard ? <Sun size={14} /> : <Lock size={14} className="text-brand-mist" />}
+                        <span className="text-[8px] font-bold uppercase tracking-widest">Dia mais fraco</span>
+                      </div>
+                      {features.advancedDashboard ? (
+                        <p className="text-sm font-serif text-brand-ink">{growthMetrics.weakestDay}</p>
+                      ) : (
+                        <div className="space-y-1">
+                          <p className="text-sm font-serif text-brand-mist">---</p>
+                          <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AI Insights */}
+                  <AnimatePresence>
+                    {!insightDismissed && (
+                      <motion.div 
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="bg-brand-linen/40 p-6 rounded-[32px] border border-brand-mist/30 flex items-start gap-4 overflow-hidden relative"
+                      >
+                        {!features.advancedDashboard && (
+                          <div className="absolute inset-0 z-10 bg-brand-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-4">
+                            <Lock size={16} className="text-brand-terracotta mb-2" />
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">Bloqueado</p>
+                            <p className="text-[9px] text-brand-stone font-light">Growth Insights é exclusivo do Plano Pro</p>
+                            <Link to="/planos" className="mt-2 text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Fazer Upgrade</Link>
+                          </div>
+                        )}
+                        <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm border border-brand-mist/20">
+                          <Zap size={20} />
+                        </div>
+                        <div className="flex-1 pr-8">
+                          <h4 className="text-xs font-bold text-brand-ink uppercase tracking-widest mb-1">Dica de Performance</h4>
+                          <p className="text-xs text-brand-stone font-light leading-relaxed italic">
+                            {growthMetrics.growthInsight}
+                          </p>
+                        </div>
+                        <button 
+                          onClick={() => setInsightDismissed(true)}
+                          className="absolute top-6 right-6 p-1 text-brand-stone hover:text-brand-ink"
+                        >
+                          <X size={14} />
+                        </button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </section>
+              )}
           </div>
         )}
 
@@ -791,6 +1004,16 @@ export default function Dashboard() {
 
             {/* Resumo Financeiro Hoje */}
             <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
+              {confirmedToday.length === 0 && (
+                <div className="mb-6 pb-6 border-b border-brand-linen">
+                  <p className="text-sm font-serif text-brand-ink italic">Dia tranquilo até agora — vamos preencher?</p>
+                  {daysSinceLastAppointment !== null && (
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mt-2">
+                      Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-8 divide-x divide-brand-linen">
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Faturamento Hoje</p>
@@ -843,21 +1066,334 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="bg-brand-white p-12 rounded-[40px] border border-brand-mist border-dashed text-center">
-                  <p className="text-brand-stone italic text-sm mb-6">Nenhum agendamento para hoje ainda.</p>
-                  <button 
-                    onClick={() => setIsShareModalOpen(true)}
-                    className="px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-md"
-                  >
-                    Compartilhar link profissional
-                  </button>
+                  <h4 className="font-serif text-2xl text-brand-ink mb-2">Hoje ainda está livre</h4>
+                  <p className="text-brand-stone italic text-sm mb-8">Aproveite para movimentar sua agenda:</p>
+                  
+                  <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                    <button 
+                      onClick={() => setIsShareModalOpen(true)}
+                      className="w-full py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-md group"
+                    >
+                      Atrair clientes agora →
+                    </button>
+                    <Link 
+                      to="/clients"
+                      className="w-full py-4 bg-brand-linen text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-mist transition-all text-center"
+                    >
+                      Ver clientes
+                    </Link>
+                    <Link 
+                      to="/services"
+                      className="w-full py-4 bg-brand-white border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all text-center"
+                    >
+                      Criar serviço
+                    </Link>
+                  </div>
                 </div>
               )}
             </section>
           </div>
         )}
 
-        {/* GERAL CONTENT (Old content) */}
+        {/* GERAL CONTENT (Resumo do Mês + Blocos Estratégicos) */}
         {activeTab === "geral" && (
+          <div className="flex flex-col gap-8">
+            {/* Indicadores do Mês (Sem receita duplicada) */}
+            <section className="px-6 mt-4">
+              <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Agendamentos</p>
+                    <p className="text-xl font-serif text-brand-ink">{monthlyStats.count || 0}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Clientes</p>
+                    <p className="text-xl font-serif text-brand-ink">{monthlyStats.clientsCount || 0}</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Avaliações</p>
+                    <p className="text-xl font-serif text-brand-ink">{profile?.totalReviews || 0}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Próximas Ações */}
+            <section className="px-6">
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setIsDashboardBlockOpen(true)}
+                  className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col items-start gap-2 text-left"
+                >
+                  <Clock size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Bloquear horário</span>
+                </button>
+                <Link to="/clients" className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2">
+                  <Users size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Novo cliente</span>
+                </Link>
+                <Link to="/services" className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2">
+                  <Plus size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Novo serviço</span>
+                </Link>
+                <a 
+                  href={buildWhatsappLink(profile?.whatsapp || '')} 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2"
+                >
+                  <MessageCircle size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">WhatsApp</span>
+                </a>
+              </div>
+            </section>
+
+            {/* Faturamento Semanal */}
+            <section className="px-6">
+              <div className="flex flex-col gap-4">
+                {user && (
+                  <WeeklyRevenueSummary 
+                    appointments={appointments || []} 
+                    profile={profile}
+                    userId={user.uid}
+                    hideTodayFlow={true}
+                  />
+                )}
+              </div>
+            </section>
+
+            {/* Status do Negócio (Compacto) */}
+            <section className="px-6">
+              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                      <Zap size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
+                        Status do negócio
+                      </h3>
+                      <p className="text-sm font-serif text-brand-ink italic">Fluxo e operação</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-6">
+                  {/* Waitlist Status */}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Lista de Espera</span>
+                      {waitlist && waitlist.length > 0 ? (
+                        <button onClick={() => setIsWaitlistModalOpen(true)} className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver {waitlist.length}</button>
+                      ) : (
+                        <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-40">Vazia</span>
+                      )}
+                    </div>
+                    {waitlist && waitlist.length > 0 && (
+                      <div className="bg-brand-parchment/30 p-4 rounded-2xl border border-brand-mist/50">
+                        <p className="text-[10px] text-brand-ink leading-tight font-medium">
+                          {waitlist[0].clientName} aguarda por {waitlist[0].period === 'any' ? 'um horário' : waitlist[0].period}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Blocked Status */}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between border-t border-brand-linen pt-6">
+                      <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Bloqueios</span>
+                      {blockedSchedules && blockedSchedules.length > 0 ? (
+                        <button onClick={() => setIsDashboardBlockOpen(true)} className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Gerenciar</button>
+                      ) : (
+                        <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-40">Nenhum</span>
+                      )}
+                    </div>
+                    {blockedSchedules && blockedSchedules.length > 0 && (
+                      <div className="bg-brand-parchment/30 p-4 rounded-2xl border border-brand-mist/50">
+                        <p className="text-[10px] text-brand-ink leading-tight font-medium">
+                          Indisponível {blockedSchedules[0].date === getTodayLocale() ? 'hoje' : formatDateKey(parseLocalDate(blockedSchedules[0].date))} às {blockedSchedules[0].startTime}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Retention Status */}
+                  <div className="flex flex-col gap-4 border-t border-brand-linen pt-6">
+                    {inactiveClientsCount > 0 ? (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Clientes há +30 dias sem voltar</p>
+                            <p className="text-[11px] text-brand-stone italic">{inactiveClientsCount} {inactiveClientsCount === 1 ? 'pronta' : 'prontas'} para retorno</p>
+                          </div>
+                          <Link to="/clients" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver todas</Link>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          {inactiveClients.slice(0, 2).map((client, idx) => (
+                            <div key={idx} className="bg-brand-parchment/10 p-4 rounded-2xl border border-brand-mist flex items-center justify-between gap-4">
+                              <div className="flex-1">
+                                <p className="text-[11px] font-bold text-brand-ink">{client.clientName || client.name}</p>
+                                <p className="text-[9px] text-brand-stone italic">Não volta desde {client.lastDate?.split('-').reverse().join('/')}</p>
+                              </div>
+                              {idx === 0 && (client.clientWhatsapp || client.whatsapp) && (
+                                <button 
+                                  onClick={() => {
+                                    const firstName = (client.clientName || client.name).split(' ')[0];
+                                    const msg = `Oi ${firstName} ✨ Saudades! Notamos que faz um tempinho que você não vem nos visitar. Que tal garantir um horário agora?`;
+                                    window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || '', msg), '_blank');
+                                  }}
+                                  className="bg-[#25D366] text-white p-2 rounded-lg hover:scale-105 transition-transform"
+                                  title="Enviar mensagem"
+                                >
+                                  <MessageCircle size={14} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex gap-2">
+                          <Link 
+                            to="/clients" 
+                            className="flex-1 py-3 bg-brand-linen text-brand-ink rounded-xl text-[9px] font-bold uppercase tracking-widest text-center hover:bg-brand-mist transition-colors"
+                          >
+                            Ver clientes
+                          </Link>
+                          {inactiveClients.length > 0 && (inactiveClients[0].clientWhatsapp || inactiveClients[0].whatsapp) && (
+                            <button 
+                              onClick={() => {
+                                const client = inactiveClients[0];
+                                const firstName = (client.clientName || client.name).split(' ')[0];
+                                const msg = `Oi ${firstName} ✨ Saudades! Notamos que faz um tempinho que você não vem nos visitar. Que tal garantir um horário agora?`;
+                                window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || '', msg), '_blank');
+                              }}
+                              className="flex-1 py-3 bg-brand-ink text-brand-white rounded-xl text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-colors"
+                            >
+                              Enviar mensagem
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Retenção: ok</span>
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                      </div>
+                    )}
+                  </div>
+
+                  {!(waitlist && waitlist.length > 0) && !(blockedSchedules && blockedSchedules.length > 0) && inactiveClientsCount === 0 && (
+                    <div className="pt-4 text-center">
+                      <p className="text-sm font-serif text-brand-stone italic">Tudo em dia por aqui.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* WhatsApp Section */}
+            <section className="px-6">
+              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative overflow-hidden">
+                {!features.whatsappNotifications && (
+                  <div className="absolute inset-0 z-20 bg-brand-white/40 backdrop-blur-[2px] flex items-center justify-center p-8 text-center">
+                    <div className="bg-brand-white p-8 rounded-[32px] shadow-2xl border border-brand-mist max-w-sm">
+                      <div className="w-12 h-12 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <Star size={24} />
+                      </div>
+                      <h4 className="text-xl font-serif text-brand-ink mb-2">WhatsApp Pro</h4>
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest font-bold mb-6">Recurso Exclusivo</p>
+                      <Link to="/planos">
+                        <PremiumButton variant="terracotta" className="w-full">Fazer Upgrade</PremiumButton>
+                      </Link>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-[#25D366]/10 text-[#25D366] rounded-xl">
+                      <MessageCircle size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
+                        WhatsApp Inteligente
+                      </h3>
+                      <p className="text-sm font-serif text-brand-ink italic">Automação de mensagens</p>
+                    </div>
+                  </div>
+                  <Link 
+                    to="/perfil" 
+                    className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
+                  >
+                    Configurar
+                  </Link>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-2 h-2 rounded-full",
+                        profile?.whatsapp ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-brand-stone/30"
+                      )} />
+                      <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">
+                        {profile?.whatsapp ? 'WhatsApp Conectado' : 'WhatsApp não configurado'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-brand-stone italic font-medium">
+                      {profile?.whatsapp || '---'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-brand-white border border-brand-mist rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Zap size={14} className={profile?.whatsappNotificationsEnabled ? "text-[#25D366]" : "text-brand-stone/30"} />
+                        <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Confirmações</span>
+                      </div>
+                      <span className={cn(
+                        "text-[8px] font-bold uppercase px-2 py-0.5 rounded-full",
+                        profile?.whatsappNotificationsEnabled ? "bg-green-50 text-green-600" : "bg-brand-parchment text-brand-stone"
+                      )}>
+                        {profile?.whatsappNotificationsEnabled ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </div>
+                    <div className="p-4 bg-brand-white border border-brand-mist rounded-2xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Clock size={14} className={profile?.whatsappNotificationsEnabled ? "text-[#25D366]" : "text-brand-stone/30"} />
+                        <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Lembretes</span>
+                      </div>
+                      <span className={cn(
+                        "text-[8px] font-bold uppercase px-2 py-0.5 rounded-full",
+                        profile?.whatsappNotificationsEnabled ? "bg-green-50 text-green-600" : "bg-brand-parchment text-brand-stone"
+                      )}>
+                        {profile?.whatsappNotificationsEnabled ? 'Ativo' : 'Inativo'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {!profile?.whatsapp && (
+                    <div className="text-center py-4 px-6 bg-brand-linen/30 rounded-2xl border border-dashed border-brand-terracotta/30">
+                      <p className="text-[10px] text-brand-ink italic mb-3">Conecte o WhatsApp para automatizar confirmações e lembretes.</p>
+                      <Link to="/perfil">
+                        <button className="text-[9px] font-bold uppercase tracking-widest bg-brand-terracotta text-white px-4 py-2 rounded-full hover:scale-105 transition-transform">
+                          Configurar WhatsApp
+                        </button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+
+          </div>
+        )}
+
+        {/* GERAL CONTENT (Temporarily Deactivated) */}
+        {false && activeTab === "geral" && (
           <>
             <div className="flex flex-col gap-8">
           <ActivationChecklist 
@@ -866,162 +1402,6 @@ export default function Dashboard() {
             services={services}
             onShareClick={() => setIsShareModalOpen(true)}
           />
-
-          {/* Growth Dashboard: KPIs de Conversão e Insights */}
-          {growthMetrics && (
-            <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-10 relative overflow-hidden mt-8">
-              <div className="flex items-center justify-between border-b border-brand-linen pb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
-                    <TrendingUp size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
-                      Growth Dashboard
-                    </h3>
-                    <p className="text-sm font-serif text-brand-ink italic">Sua performance de conversão</p>
-                  </div>
-                </div>
-                <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
-                  <span className="px-3 py-1.5 bg-brand-white rounded-full shadow-sm text-brand-ink">30 Dias</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
-                <div className="space-y-1">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas 30d</p>
-                  <div className="flex items-baseline gap-2">
-                    <p className="text-2xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
-                    <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
-                  <p className="text-2xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Taxa de Conversão</p>
-                  <div className="flex items-center gap-2">
-                      {features.advancedDashboard ? (
-                        <>
-                          <p className="text-2xl font-serif text-brand-ink">{growthMetrics.convRate.toFixed(1)}%</p>
-                          <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-2xl font-serif text-brand-mist">---</p>
-                          <Lock size={12} className="text-brand-mist" />
-                        </>
-                      )}
-                    </div>
-                    {!features.advancedDashboard && (
-                      <p className="text-[7px] text-brand-stone font-medium uppercase tracking-widest">Disponível no plano Pro</p>
-                    )}
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Origem Principal</p>
-                    <div className="flex items-center gap-2">
-                      {features.advancedDashboard ? (
-                        <>
-                          <div className="w-4 h-4 rounded bg-brand-linen flex items-center justify-center">
-                            {growthMetrics.mainOrigin === 'Instagram' ? <Instagram size={10} /> : <Share2 size={10} />}
-                          </div>
-                          <p className="text-2xl font-serif text-brand-ink">{growthMetrics.mainOrigin}</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-2xl font-serif text-brand-mist">---</p>
-                          <Lock size={12} className="text-brand-mist" />
-                        </>
-                      )}
-                    </div>
-                    {!features.advancedDashboard && (
-                      <p className="text-[7px] text-brand-stone font-medium uppercase tracking-widest">Disponível no plano Pro</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-brand-linen">
-                  <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                    <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                      {features.advancedDashboard ? <Sparkles size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                      <span className="text-[8px] font-bold uppercase tracking-widest">Serviço Campeão</span>
-                    </div>
-                    {features.advancedDashboard ? (
-                      <p className="text-sm font-serif text-brand-ink leading-tight">{growthMetrics.topService}</p>
-                    ) : (
-                      <div className="space-y-1">
-                        <p className="text-sm font-serif text-brand-mist">---</p>
-                        <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                    <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                      {features.advancedDashboard ? <Clock size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                      <span className="text-[8px] font-bold uppercase tracking-widest">Horário + Vendido</span>
-                    </div>
-                    {features.advancedDashboard ? (
-                      <p className="text-sm font-serif text-brand-ink">{growthMetrics.bestTime}</p>
-                    ) : (
-                      <div className="space-y-1">
-                        <p className="text-sm font-serif text-brand-mist">---</p>
-                        <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                    <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                      {features.advancedDashboard ? <Sun size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                      <span className="text-[8px] font-bold uppercase tracking-widest">Dia mais fraco</span>
-                    </div>
-                    {features.advancedDashboard ? (
-                      <p className="text-sm font-serif text-brand-ink">{growthMetrics.weakestDay}</p>
-                    ) : (
-                      <div className="space-y-1">
-                        <p className="text-sm font-serif text-brand-mist">---</p>
-                        <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* AI Insights */}
-                <AnimatePresence>
-                  {!insightDismissed && (
-                    <motion.div 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-brand-linen/40 p-6 rounded-[32px] border border-brand-mist/30 flex items-start gap-4 overflow-hidden relative"
-                    >
-                      {!features.advancedDashboard && (
-                        <div className="absolute inset-0 z-10 bg-brand-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-4">
-                          <Lock size={16} className="text-brand-terracotta mb-2" />
-                          <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">Bloqueado</p>
-                          <p className="text-[9px] text-brand-stone font-light">Growth Insights é exclusivo do Plano Pro</p>
-                        </div>
-                      )}
-                      <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm border border-brand-mist/20">
-                        <Zap size={20} />
-                      </div>
-                      <div className="flex-1 pr-8">
-                        <h4 className="text-xs font-bold text-brand-ink uppercase tracking-widest mb-1">Dica de Performance</h4>
-                        <p className="text-xs text-brand-stone font-light leading-relaxed italic">
-                          {growthMetrics.growthInsight}
-                        </p>
-                      </div>
-                      <button 
-                        onClick={() => setInsightDismissed(true)}
-                        className="absolute top-6 right-6 p-1 text-brand-stone hover:text-brand-ink"
-                      >
-                        <X size={14} />
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </section>
-            )}
 
         {/* HOJE CONTENT */}
             {/* 1. Hoje Financeiro (Simple Card) */}
@@ -1394,120 +1774,6 @@ export default function Dashboard() {
             </motion.section>
           )}
         </AnimatePresence>
-
-        {/* WhatsApp Inteligente: Ações Rápidas de Venda e Confirmação */}
-        <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm space-y-8 relative overflow-hidden">
-          {!features.whatsappNotifications && (
-            <div className="absolute inset-0 z-20 bg-brand-white/40 backdrop-blur-[2px] flex items-center justify-center p-8 text-center">
-              <div className="bg-brand-white p-8 rounded-[32px] shadow-2xl border border-brand-mist max-w-sm">
-                <div className="w-12 h-12 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Star size={24} />
-                </div>
-                <h4 className="text-xl font-serif text-brand-ink mb-2">WhatsApp Pro</h4>
-                <p className="text-[10px] text-brand-stone uppercase tracking-widest font-bold mb-6">Recurso Exclusivo</p>
-                <Link to="/planos">
-                  <PremiumButton variant="terracotta" className="w-full">Fazer Upgrade</PremiumButton>
-                </Link>
-              </div>
-            </div>
-          )}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#25D366]/10 text-[#25D366] rounded-xl">
-                <MessageCircle size={20} />
-              </div>
-              <div>
-                <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
-                  WhatsApp Inteligente
-                </h3>
-                <p className="text-sm font-serif text-brand-ink italic">Ações rápidas de reconexão</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Action 1: Confirm Tomorrow */}
-            <div className="bg-brand-linen/30 p-6 rounded-3xl border border-brand-mist/40 flex flex-col justify-between gap-6 hover:border-[#25D366] transition-colors group">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-[#25D366]">
-                  <Calendar size={14} />
-                  <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Confirmar amanhã</span>
-                </div>
-                <p className="text-xs text-brand-ink font-serif italic">
-                  {unconfirmedTomorrow.length > 0 
-                    ? `Você tem ${unconfirmedTomorrow.length} cliente${unconfirmedTomorrow.length > 1 ? 's' : ''} que ainda não confirmaram para amanhã.`
-                    : "Todos os clientes de amanhã já confirmaram presença."}
-                </p>
-              </div>
-              
-              <button 
-                disabled={unconfirmedTomorrow.length === 0}
-                onClick={() => {
-                  const first = unconfirmedTomorrow[0];
-                  const msg = `Oi ${first.clientName.split(' ')[0]} 💛 passando para confirmar nosso horário de amanhã às ${first.time}. Posso contar com você?`;
-                  window.open(buildWhatsappLink(first.clientWhatsapp || '', msg), '_blank');
-                }}
-                className="w-full py-4 bg-brand-white border border-brand-mist rounded-2xl text-[9px] font-bold uppercase tracking-widest text-brand-ink group-hover:bg-[#25D366] group-hover:text-white group-hover:border-[#25D366] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {unconfirmedTomorrow.length > 0 ? "Confirmar Próximo" : "Tudo Confirmado"}
-              </button>
-            </div>
-
-            {/* Action 2: Reativar Sumidas */}
-            <div className="bg-brand-linen/30 p-6 rounded-3xl border border-brand-mist/40 flex flex-col justify-between gap-6 hover:border-brand-terracotta transition-colors group">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-brand-terracotta">
-                  <Star size={14} />
-                  <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Reativar clientes</span>
-                </div>
-                <p className="text-xs text-brand-ink font-serif italic">
-                  {inactiveClientsCount > 0 
-                    ? `${inactiveClientsCount} clientes valiosas estão há mais de 30 dias sem voltar.`
-                    : "Nenhuma cliente sumida identificada no momento."}
-                </p>
-              </div>
-              
-              <button 
-                disabled={inactiveClientsCount === 0}
-                onClick={() => {
-                  const first = inactiveClients[0];
-                  const clientName = first.clientName || first.name;
-                  const firstName = clientName.split(' ')[0];
-                  const msg = `Oi ${firstName} ✨ Notamos que faz um tempinho que você não vem nos visitar. Que tal garantir um horário para renovar seu autocuidado?`;
-                  window.open(buildWhatsappLink(first.clientWhatsapp || first.whatsapp || '', msg), '_blank');
-                }}
-                className="w-full py-4 bg-brand-white border border-brand-mist rounded-2xl text-[9px] font-bold uppercase tracking-widest text-brand-ink group-hover:bg-brand-terracotta group-hover:text-white group-hover:border-brand-terracotta transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Gerar Convite
-              </button>
-            </div>
-
-            {/* Action 3: Horário Vago */}
-            <div className="bg-brand-linen/30 p-6 rounded-3xl border border-brand-mist/40 flex flex-col justify-between gap-6 hover:border-brand-ink transition-colors group">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-brand-ink">
-                  <Zap size={14} />
-                  <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Vaga de última hora</span>
-                </div>
-                <p className="text-xs text-brand-ink font-serif italic">
-                  Abriu um espaço na sua agenda hoje? Avise suas clientes mais fiéis agora mesmo.
-                </p>
-              </div>
-              
-              <button 
-                onClick={() => {
-                  // This usually goes to the last active or best clients
-                  const msg = `Oi! Passando para avisar que tive uma desistência e acabou de abrir uma vaga para HOJE. Caso queira aproveitar, me avisa! 💋`;
-                  // Open broad share or specific link if we had a target
-                  window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
-                }}
-                className="w-full py-4 bg-brand-white border border-brand-mist rounded-2xl text-[9px] font-bold uppercase tracking-widest text-brand-ink group-hover:bg-brand-ink group-hover:text-white group-hover:border-brand-ink transition-all flex items-center justify-center gap-2"
-              >
-                Divulgar Vaga
-              </button>
-            </div>
-          </div>
-        </section>
 
         {/* 4. PRÓXIMOS AGENDAMENTOS */}
         <section>
@@ -2108,7 +2374,7 @@ export default function Dashboard() {
 
       {/* 9. PRIMEIRA EXPERIÊNCIA / HINT (Se não houver bloqueios ativos) */}
       {blockedSchedules.length === 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
           <motion.div 
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

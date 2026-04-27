@@ -1,6 +1,6 @@
 import express from "express";
 import { google } from "googleapis";
-import { db } from "../firebaseAdmin.ts";
+import { db } from "../firebaseAdmin";
 
 const router = express.Router();
 

@@ -1,6 +1,6 @@
 import express from "express";
 import admin from "firebase-admin";
-import { db } from "../firebaseAdmin.ts";
+import { db } from "../firebaseAdmin";
 import { 
   sendProfessionalNewBookingEmail,
   sendBookingPendingEmail,
@@ -11,8 +11,8 @@ import {
   sendReviewRequestEmail,
   sendConfirmationRequest24hEmail,
   sendRetentionEmail
-} from "../emails/sendEmail.ts";
-import { sendWhatsApp, handleInboundMessage } from "../services/whatsappService.ts";
+} from "../emails/sendEmail";
+import { sendWhatsApp, handleInboundMessage } from "../services/whatsappService";
 import webpush from "web-push";
 
 const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
@@ -61,9 +61,9 @@ import {
   buildWaitlistInviteMessage, 
   buildCancellationMessage, 
   buildReviewRequestMessage 
-} from "../services/whatsappMessages.ts";
-import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.ts";
-import { checkPlanFeature } from "../middleware/planMiddleware.ts";
+} from "../services/whatsappMessages";
+import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils";
+import { checkPlanFeature } from "../middleware/planMiddleware";
 
 const router = express.Router();
 

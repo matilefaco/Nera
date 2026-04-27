@@ -146,6 +146,15 @@ export default function App() {
                   <ReferralsPage />
                 </PrivateRoute>
               } />
+              
+              {/* Fallback for unmatched routes */}
+              <Route path="*" element={
+                <div className="flex flex-col items-center justify-center min-h-screen text-center p-4">
+                  <h1 className="text-4xl font-serif text-brand-stone mb-4">404</h1>
+                  <p className="text-brand-stone/60 mb-8">Página não encontrada no React SPA.</p>
+                  <a href="/" className="px-6 py-2 bg-brand-rose text-white rounded-full">Voltar ao início</a>
+                </div>
+              } />
             </Routes>
             <Toaster position="top-center" richColors />
           </div>

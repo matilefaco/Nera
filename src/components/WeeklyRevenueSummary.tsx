@@ -16,9 +16,16 @@ interface WeeklyRevenueSummaryProps {
   profile: UserProfile | null;
   userId: string;
   showOnlyToday?: boolean;
+  hideTodayFlow?: boolean;
 }
 
-export default function WeeklyRevenueSummary({ appointments, profile, userId, showOnlyToday = false }: WeeklyRevenueSummaryProps) {
+export default function WeeklyRevenueSummary({ 
+  appointments, 
+  profile, 
+  userId, 
+  showOnlyToday = false,
+  hideTodayFlow = false
+}: WeeklyRevenueSummaryProps) {
   const [isSettingGoal, setIsSettingGoal] = useState(false);
   const [goalValue, setGoalValue] = useState(profile?.monthlyRevenueGoal?.toString() || '');
 
@@ -235,8 +242,8 @@ export default function WeeklyRevenueSummary({ appointments, profile, userId, sh
         </div>
       )}
 
-      {/* Today's Timeline (Hidden if showOnlyToday is true, because Dashboard handles it) */}
-      {!showOnlyToday && (
+      {/* Today's Timeline (Hidden if showOnlyToday or hideTodayFlow is true) */}
+      {!showOnlyToday && !hideTodayFlow && (
         <div className="space-y-6">
           <div className="flex items-center justify-between px-1">
             <h3 className="font-serif text-xl text-brand-ink italic">Fluxo de Hoje</h3>

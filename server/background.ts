@@ -1,8 +1,8 @@
 import admin from "firebase-admin";
-import { db } from "./firebaseAdmin.ts";
-import { sendBookingConfirmedEmail } from "./emails/sendEmail.ts";
-import { markEmailSent } from "./utils.ts";
-import { createGoogleCalendarEvent } from "./routes/calendarRoutes.ts";
+import { db } from "./firebaseAdmin";
+import { sendBookingConfirmedEmail } from "./emails/sendEmail";
+import { markEmailSent } from "./utils";
+import { createGoogleCalendarEvent } from "./routes/calendarRoutes";
 
 const emailQueue: string[] = [];
 let isProcessingQueue = false;
@@ -94,6 +94,10 @@ const processEmailQueue = async () => {
 };
 
 export const setupBackgroundTriggers = () => {
+  if (!db) {
+    console.error('[AUTO CONFIRM EMAIL] DB not initialized. Skipping listener setup.');
+    return;
+  }
   console.log('[AUTO CONFIRM EMAIL] Initializing background listener for appointments...');
   
   // Guard to avoid sending emails for existing historical confirmed bookings on cold start

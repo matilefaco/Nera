@@ -1,4 +1,4 @@
-import { db } from "../firebaseAdmin.ts";
+import { db } from "../firebaseAdmin";
 import { PlanFeatures } from "../../src/types";
 
 export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
