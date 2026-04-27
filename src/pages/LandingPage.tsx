@@ -189,79 +189,29 @@ export default function LandingPage() {
               <div className="relative">
                 {/* Phone Mockup */}
                 <motion.div 
-                  initial={{ opacity: 0, y: 50 }}
+                  initial={{ opacity: 0, y: 40 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
-                  className="relative mx-auto w-[320px] h-[640px] bg-brand-ink rounded-[60px] border-[8px] border-brand-ink shadow-[0_50px_100px_-20px_rgba(0,0,0,0.3)] overflow-hidden"
+                  transition={{ duration: 0.9 }}
+                  className="relative mx-auto w-[320px] h-[640px] bg-brand-ink rounded-[52px] p-2 shadow-2xl ring-1 ring-black/10 overflow-hidden"
                 >
-                  {/* Notch */}
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-7 bg-brand-ink rounded-b-3xl z-30" />
-                  
-                  {/* Simulated Content Scroll */}
-                  <motion.div 
-                    animate={{ y: [0, -400, 0] }}
-                    transition={{ 
-                      duration: 20, 
-                      repeat: Infinity, 
-                      ease: "linear"
-                    }}
-                    className="w-full"
-                  >
-                    {/* Simulated Header */}
-                    <div className="h-72 relative overflow-hidden">
-                      <img 
-                        src="https://i.imgur.com/gBdf3tO.png" 
-                        alt="Helena Prado"
-                        className="w-full h-full object-cover object-[center_25%]"
-                      />
-                      {/* Editorial Overlay */}
-                      <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-brand-ink/40 to-transparent z-10" />
-                      <div className="absolute inset-x-0 bottom-0 p-8 pt-20 bg-gradient-to-t from-brand-ink/95 via-brand-ink/60 to-transparent z-10">
-                        <h3 className="text-white font-serif text-[28px] leading-tight mb-1">Helena Prado</h3>
-                        <p className="text-white/70 text-[10px] uppercase tracking-[0.25em] font-bold">Design de sobrancelhas</p>
-                      </div>
-                    </div>
-
-                    {/* Simulated Content */}
-                    <div className="p-8 bg-brand-white space-y-8 relative z-20 -mt-2">
-                      <div className="flex items-center gap-4 py-3 border-b border-brand-mist/10">
-                        <div className="flex items-center gap-1.5">
-                          <Star size={11} className="text-brand-terracotta fill-brand-terracotta" />
-                          <span className="text-[11px] font-bold text-brand-ink">4.9</span>
-                        </div>
-                        <div className="w-px h-3 bg-brand-mist/30" />
-                        <span className="text-[10px] text-brand-stone font-bold uppercase tracking-[0.2em] opacity-80">+150 atendimentos</span>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="p-5 bg-white rounded-2xl border border-brand-mist/40 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] flex justify-between items-center group transition-all active:scale-[0.98]">
-                          <div>
-                            <div className="text-[12px] font-bold text-brand-ink uppercase tracking-tight">Design de sobrancelhas personalizado</div>
-                            <div className="text-[10px] text-brand-terracotta font-bold uppercase mt-1.5">R$ 80</div>
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-brand-linen flex items-center justify-center">
-                            <ChevronRight size={14} className="text-brand-terracotta" />
-                          </div>
-                        </div>
-                        
-                        <div className="p-5 bg-white rounded-2xl border border-brand-mist/40 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.1)] flex justify-between items-center group transition-all active:scale-[0.98]">
-                          <div>
-                            <div className="text-[12px] font-bold text-brand-ink uppercase tracking-tight">Brow Lamination</div>
-                            <div className="text-[10px] text-brand-terracotta font-bold uppercase mt-1.5">R$ 150</div>
-                          </div>
-                          <div className="w-8 h-8 rounded-full bg-brand-linen flex items-center justify-center">
-                            <ChevronRight size={14} className="text-brand-terracotta" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-6 pb-4">
-                        <div className="w-full bg-brand-ink text-white py-5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.25em] text-center shadow-[0_20px_40px_-12px_rgba(18,17,17,0.3)]">
-                          Agendar horário
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
+                  <div className="w-full h-full bg-white rounded-[40px] overflow-hidden relative">
+                    {/* Notch Overlay */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-brand-ink rounded-b-2xl z-50 pointer-events-none" />
+                    
+                    {/* Real Preview Iframe */}
+                    <iframe 
+                      src="/p/helena-prado" 
+                      title="Preview do Nera"
+                      loading="lazy"
+                      className="w-[375px] h-[667px] origin-top-left pointer-events-none border-none select-none"
+                      style={{ 
+                        transform: 'scale(0.81)', // Escale 375 para ~304 (dentro do 320p)
+                        width: '375px',
+                        height: '790px' // Expand height so we can see more content
+                      }}
+                    />
+                  </div>
                 </motion.div>
 
                 {/* Floating Elements */}
@@ -309,13 +259,14 @@ export default function LandingPage() {
               </h2>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {/* GRATUITO */}
-              <div className="card-refined p-10">
-                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">Gratuito</div>
-                <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 0</div>
-                <div className="text-brand-stone text-sm font-light mb-8">Plano gratuito para começar com teste sem risco. Sem cartão de crédito.</div>
-                <ul className="space-y-3 mb-10">
+              <div className="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+                {/* GRATUITO */}
+                <div className="card-refined p-10 flex flex-col h-full">
+                  <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">Gratuito</div>
+                  <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 0</div>
+                  <div className="text-brand-stone text-sm font-light mb-1">Plano gratuito para começar com teste sem risco. Sem cartão de crédito.</div>
+                  <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest mb-8 italic">Ideal para começar</div>
+                  <ul className="space-y-3 mb-10 flex-1">
                   {[
                     'Perfil digital premium (foto, bio e serviços)', 
                     'Até 15 agendamentos por mês', 
@@ -333,47 +284,56 @@ export default function LandingPage() {
               </div>
 
               {/* ESSENCIAL */}
-              <div className="bg-brand-ink rounded-[32px] p-10 relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="bg-brand-terracotta text-white text-[8px] font-bold uppercase tracking-[0.2em] px-4 py-1.5 rounded-full">Mais popular</span>
-                </div>
+              <div className="bg-brand-ink rounded-[32px] p-10 relative flex flex-col h-full">
                 <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">Essencial</div>
                 <div className="text-[52px] font-serif font-normal text-brand-white leading-none mb-2">R$ 49</div>
                 <div className="text-brand-stone text-sm font-light mb-8">por mês · cancele quando quiser</div>
-                <ul className="space-y-3 mb-10">
+                <ul className="space-y-3 mb-10 flex-1">
                   {['Agendamentos ilimitados', 'Notificações WhatsApp', 'Lista de espera', 'Bloqueio de horários', 'Lembrete 24h anti-no-show', 'Histórico de clientes'].map(f => (
                     <li key={f} className="text-sm text-brand-white/70 font-light flex items-center gap-3">
                       <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
                     </li>
                   ))}
                 </ul>
-                <Link to="/register" className="block text-center bg-brand-terracotta text-white py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-sienna transition-all">
-                  Começar grátis por 30 dias
+                <Link to="/register?plan=essencial" className="block text-center bg-brand-terracotta text-white py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-sienna transition-all">
+                  Testar Essencial por 30 dias
                 </Link>
               </div>
 
-              {/* PRO */}
+                {/* PRO */}
               <div 
-                className="rounded-[32px] p-12 lg:p-14 border-2 border-[#C49A7A] shadow-[0_24px_60px_rgba(91,52,35,0.16)] bg-[#F3EDE7] relative"
+                className="rounded-[32px] p-12 lg:p-14 border border-[#C49A7A] shadow-[0_64px_100px_rgba(91,52,35,0.25)] bg-[#F2E8DF] relative transition-all hover:translate-y-[-8px] hover:shadow-[0_80px_120px_rgba(91,52,35,0.3)] group scale-[1.02] z-10 flex flex-col h-full"
               >
-                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">Pro</div>
-                <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 89</div>
-                <div className="text-brand-stone text-sm font-light mb-8">por mês</div>
-                <ul className="space-y-4 mb-10">
-                  {['Tudo do Essencial', 'Cupons de desconto', 'Relatório mensal PDF', 'Link de indicação premiado', 'Badge Pro Nera na vitrine', 'Suporte prioritário'].map(f => (
-                    <li key={f} className="text-sm text-brand-stone font-bold flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />
-                      <span className="uppercase tracking-tight">{f}</span>
+                <div className="absolute top-0 right-10 -translate-y-1/2 bg-brand-terracotta text-white px-4 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-widest shadow-lg">
+                  Recomendado para quem quer crescer
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.35em] text-brand-terracotta mb-6 block">Plano Pro</div>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-[52px] font-serif font-normal text-brand-ink leading-none">R$ 89</span>
+                  <span className="text-xs text-brand-stone font-bold uppercase tracking-widest">/mês</span>
+                </div>
+                <div className="text-brand-stone/60 text-[10px] font-bold uppercase tracking-widest mb-8">Ferramentas completas para crescer mais rápido</div>
+                <ul className="space-y-4 mb-10 flex-1">
+                  {[
+                    'Tudo do Essencial, com recursos para crescer mais rápido', 
+                    'Cupons de desconto', 
+                    'Relatório mensal em PDF', 
+                    'Link de indicação premiado', 
+                    'Badge Pro Nera na vitrine', 
+                    'Suporte prioritário'
+                  ].map((f, i) => (
+                    <li key={f} className={`text-[13px] text-brand-ink font-medium flex items-center gap-4 ${i === 0 ? 'text-brand-terracotta font-bold' : ''}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0 ${i === 0 ? 'animate-pulse' : ''}`} />
+                      <span className="tracking-tight">{f}</span>
                     </li>
                   ))}
                 </ul>
                 <Link 
-                  to="/register" 
-                  className="block text-center bg-brand-terracotta text-white py-5 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] shadow-lg hover:bg-brand-sienna transition-all"
+                  to="/register?plan=pro" 
+                  className="block text-center bg-brand-terracotta text-white py-5 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] shadow-[0_12px_24px_rgba(168,92,58,0.3)] hover:bg-brand-sienna hover:shadow-xl transition-all"
                 >
-                  Quero o Pro
+                  Começar como Pro
                 </Link>
-                <p className="text-[9px] text-brand-stone/60 font-bold uppercase tracking-[0.2em] text-center mt-6">Posicionamento de elite</p>
               </div>
             </div>
           </div>

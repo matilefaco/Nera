@@ -19,11 +19,48 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [manualReferralCode, setManualReferralCode] = useState(searchParams.get('ref') || '');
+  const selectedPlan = searchParams.get('plan');
+
+    const handlePostRegisterCheckout = async (user: User, email: string) => {
+    if (!selectedPlan || (selectedPlan !== 'essencial' && selectedPlan !== 'pro')) {
+      navigate('/onboarding');
+      return;
+    }
+
+    console.log('[SIGNUP FLOW DEBUG] selectedPlan:', selectedPlan);
+    console.log('[SIGNUP FLOW DEBUG] user.uid exists:', !!user.uid);
+    console.log('[SIGNUP FLOW DEBUG] user.email exists:', !!user.email);
+
+    try {
+      const response = await fetch('/api/plans/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan: selectedPlan,
+          professionalId: user.uid,
+          email: email,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        const errorMsg = data.details || data.error || 'Erro ao iniciar checkout do plano selecionado.';
+        console.error('[SIGNUP FLOW ERROR] Server response:', errorMsg);
+        toast.error(errorMsg, { duration: 6000 });
+        navigate('/onboarding');
+      }
+    } catch (err: any) {
+      console.error('[SIGNUP FLOW FETCH ERROR]:', err);
+      toast.error('Erro de conexão ao iniciar checkout.');
+      navigate('/onboarding');
+    }
+  };
 
   const handleGoogleRegister = async () => {
     setLoading(true);
     console.log('[SIGNUP FLOW] Starting with Google');
-    let createdUser: User | null = null;
     try {
       if (auth.currentUser) {
         await signOut(auth);
@@ -32,7 +69,6 @@ export default function RegisterPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      createdUser = user;
       console.log('[SIGNUP FLOW] Auth success (Google):', user.uid);
       
       const slug = generateSlug(user.displayName || 'profissional');
@@ -65,11 +101,11 @@ export default function RegisterPage() {
       toast.success('Que prazer ter você conosco! Bem-vinda à Nera.', {
         icon: <Sparkles className="text-brand-terracotta" size={18} />
       });
-      setTimeout(() => navigate('/onboarding'), 500);
+      
+      await handlePostRegisterCheckout(user, user.email || '');
 
     } catch (error: any) {
       console.error('[SIGNUP FLOW] Fatal error:', error);
-      console.error('[SIGNUP FLOW] Error Code:', error.code);
       toast.error(`${getHumanError(error)} (${error.code || 'unknown'})`);
     } finally {
       setLoading(false);
@@ -82,7 +118,6 @@ export default function RegisterPage() {
     
     setLoading(true);
     console.log('[SIGNUP FLOW] Starting manual flow for:', email);
-    let createdUser: User | null = null;
     
     try {
       if (auth.currentUser) {
@@ -91,7 +126,6 @@ export default function RegisterPage() {
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      createdUser = user;
       console.log('[SIGNUP FLOW] Auth success:', user.uid);
       
       try {
@@ -121,17 +155,8 @@ export default function RegisterPage() {
           createdAt: new Date().toISOString()
         });
         console.log('[SIGNUP FLOW] Firestore profile creation success');
-      } catch (firestoreError) {
+      } catch (firestoreError: any) {
         console.error('[SIGNUP FLOW] Firestore creation failed:', firestoreError);
-        if (createdUser) {
-          try {
-            console.log('[SIGNUP FLOW] Rolling back auth user...');
-            await createdUser.delete();
-            console.log('[SIGNUP FLOW] Rollback success');
-          } catch (deleteError) {
-            console.error('[SIGNUP FLOW] Rollback failed:', deleteError);
-          }
-        }
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
@@ -140,11 +165,11 @@ export default function RegisterPage() {
       toast.success('Perfil criado com sucesso. Vamos começar?', {
         icon: <Sparkles className="text-brand-terracotta" size={18} />
       });
-      setTimeout(() => navigate('/onboarding'), 500);
+      
+      await handlePostRegisterCheckout(user, email);
 
     } catch (error: any) {
       console.error('[SIGNUP FLOW] Manual registration error:', error);
-      console.error('[SIGNUP FLOW] Error Code:', error.code);
       toast.error(`${getHumanError(error)} (${error.code || 'unknown'})`);
     } finally {
       setLoading(false);
@@ -201,7 +226,11 @@ export default function RegisterPage() {
 
         <div className="text-center mb-10">
           <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Crie sua presença profissional</h2>
-          <p className="text-brand-stone text-sm font-light">Comece sua página de agendamento em minutos. <br/> Você começará no plano <span className="font-medium text-brand-terracotta">Gratuito</span>.</p>
+          {selectedPlan === 'essencial' || selectedPlan === 'pro' ? (
+            <p className="text-brand-stone text-sm font-light">Prepare-se para o próximo nível. <br/> Você selecionou o plano <span className="font-semibold text-brand-terracotta capitalize">{selectedPlan}</span>.</p>
+          ) : (
+            <p className="text-brand-stone text-sm font-light">Comece sua página de agendamento em minutos. <br/> Você começará no plano <span className="font-medium text-brand-terracotta">Gratuito</span>.</p>
+          )}
         </div>
 
         <form onSubmit={handleRegister} className="space-y-5 mb-10">

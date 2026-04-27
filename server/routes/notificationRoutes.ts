@@ -13,6 +13,47 @@ import {
   sendRetentionEmail
 } from "../emails/sendEmail.ts";
 import { sendWhatsApp, handleInboundMessage } from "../services/whatsappService.ts";
+import webpush from "web-push";
+
+const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+
+if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    'mailto:contato@usenera.com',
+    VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY
+  );
+}
+
+export async function sendPushToUser(professionalId: string, payload: any) {
+  try {
+    const subscriptionsSnap = await db.collection('users').doc(professionalId).collection('push_subscriptions').get();
+    
+    if (subscriptionsSnap.empty) {
+      console.log(`[PUSH] No subscriptions found for professional ${professionalId}`);
+      return;
+    }
+
+    const notificationPayload = JSON.stringify(payload);
+
+    const promises = subscriptionsSnap.docs.map(doc => {
+      const subscription = doc.data().subscription;
+      return webpush.sendNotification(subscription, notificationPayload).catch(err => {
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          console.log(`[PUSH] Subscription expired or removed for ${doc.id}`);
+          return doc.ref.delete();
+        }
+        console.error(`[PUSH] Error sending to ${doc.id}:`, err);
+      });
+    });
+
+    await Promise.all(promises);
+  } catch (error) {
+    console.error(`[PUSH] Error in sendPushToUser:`, error);
+  }
+}
+
 import { 
   buildNewBookingMessageForPro, 
   buildBookingConfirmedMessageForClient, 
@@ -200,8 +241,88 @@ router.get("/debug-whatsapp", async (req, res) => {
     zapiClientToken: !!process.env.ZAPI_CLIENT_TOKEN,
     zapiBaseUrl: !!process.env.ZAPI_BASE_URL,
     metaAccessToken: !!process.env.META_ACCESS_TOKEN,
-    phoneNumberId: !!process.env.WHATSAPP_PHONE_NUMBER_ID
+    phoneNumberId: !!process.env.WHATSAPP_PHONE_NUMBER_ID,
+    vapidPublicPresent: !!VAPID_PUBLIC_KEY,
+    vapidPrivatePresent: !!VAPID_PRIVATE_KEY
   });
+});
+
+router.post("/push/subscribe", async (req, res) => {
+  const { subscription, userId, userAgent } = req.body;
+  const authHeader = req.headers.authorization;
+
+  console.log("[PUSH SUBSCRIBE] START");
+  console.log("[PUSH SUBSCRIBE] uid:", userId);
+  console.log("[PUSH SUBSCRIBE] endpoint:", subscription?.endpoint);
+  console.log("[PUSH SUBSCRIBE] keys:", subscription?.keys);
+  console.log("[PUSH SUBSCRIBE] Auth Header present:", !!authHeader);
+
+  if (!subscription || !userId) {
+    console.error("[PUSH SUBSCRIBE] Missing subscription or userId");
+    return res.status(400).json({ error: "Missing subscription or userId" });
+  }
+
+  const endpoint = subscription.endpoint;
+  const keys = subscription.keys;
+
+  if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
+    console.error("[PUSH SUBSCRIBE] Invalid subscription structure:", JSON.stringify(subscription));
+    return res.status(400).json({ error: "Invalid subscription structure: missing endpoint or keys (p256dh/auth)" });
+  }
+
+  try {
+    const subscriptionId = Buffer.from(endpoint).toString('base64').substring(0, 50).replace(/[^a-zA-Z0-9]/g, '');
+    console.log("[PUSH SUBSCRIBE] Derived SubscriptionId:", subscriptionId);
+    console.log("[PUSH SUBSCRIBE] saving at:", `users/${userId}/push_subscriptions/${subscriptionId}`);
+
+    const docRef = db.collection('users').doc(userId).collection('push_subscriptions').doc(subscriptionId);
+    
+    const dataToSave = {
+      subscription: {
+        endpoint: endpoint,
+        keys: {
+          p256dh: keys.p256dh,
+          auth: keys.auth
+        }
+      },
+      userAgent: userAgent || req.headers['user-agent'] || 'unknown',
+      lastActive: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+
+    const docSnap = await docRef.get();
+    if (!docSnap.exists) {
+      (dataToSave as any).createdAt = admin.firestore.FieldValue.serverTimestamp();
+    }
+
+    // Save to user subcollection
+    await docRef.set(dataToSave, { merge: true });
+
+    // VERIFICATION: Check if saved
+    const savedDoc = await docRef.get();
+    if (!savedDoc.exists) {
+      console.error("[PUSH SUBSCRIBE] Verification failed: Document was not saved in users collection");
+      throw new Error("Subscription não foi salva no Firestore (users collection)");
+    }
+
+    // DEBUG COLLECTION: Save to a root level collection for easier debugging
+    console.log("[PUSH SUBSCRIBE] saving to debug collection at:", `push_subscriptions_debug/${subscriptionId}`);
+    await db.collection('push_subscriptions_debug').doc(subscriptionId).set({
+      ...dataToSave,
+      userId,
+      verified: true
+    }, { merge: true });
+
+    console.log("[PUSH SUBSCRIBE] SAVED OK for user", userId);
+    res.status(201).json({ 
+      success: true, 
+      subscriptionId,
+      path: `users/${userId}/push_subscriptions/${subscriptionId}`
+    });
+  } catch (error: any) {
+    console.error("[PUSH SUBSCRIBE] CRITICAL ERROR:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, res) => {
@@ -275,6 +396,16 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
           type: 'professional_new_booking'
         });
       }
+
+      // Trigger Web Push Notification
+      await sendPushToUser(professionalId, {
+        title: "Nova reserva!",
+        body: `${clientName} quer ${serviceName} em ${date} às ${time}`,
+        icon: "/icon-192.png",
+        data: {
+          url: "/pedidos"
+        }
+      });
 
       return res.json({ success: true });
     }

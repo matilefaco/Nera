@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
-import { ShieldCheck, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award } from 'lucide-react';
+import { ShieldCheck, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award, MessageCircle } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
 import PremiumButton from '../PremiumButton';
@@ -17,6 +17,7 @@ interface PublicHeroProps {
   stats?: { averageRating: number; totalCompletedBookings: number } | null;
   isAgendaFull?: boolean;
   onWaitlistClick?: () => void;
+  totalWeeklySlots?: number | null;
 }
 
 export const PublicHero = ({ 
@@ -27,15 +28,46 @@ export const PublicHero = ({
   heroBio,
   stats,
   isAgendaFull,
-  onWaitlistClick
+  onWaitlistClick,
+  totalWeeklySlots
 }: PublicHeroProps) => {
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const [showInterestPopup, setShowInterestPopup] = useState(false);
+  const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
+  
   const firstName = profile.name.split(' ')[0];
   const lastName = profile.name.split(' ').slice(1).join(' ');
+  const initials = profile.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrollY(window.scrollY);
+      
+      // Dynamic logic for interest popup similar to PublicProfile
+      const docHeight = document.documentElement.scrollHeight;
+      const winHeight = window.innerHeight;
+      const scrollPercent = window.scrollY / (docHeight - winHeight);
+      
+      if (scrollPercent > 0.8 && !showInterestPopup && !interestPopupDismissed) {
+        setShowInterestPopup(true);
+      }
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [showInterestPopup, interestPopupDismissed]);
+
   const tagline = getProfileHeroCopy(
     profile.professionalIdentity?.mainSpecialty || profile.specialty,
     profile.slug || profile.uid
   );
+
+  const interestPopupText = (() => {
+    if (totalWeeklySlots === 0) return "A agenda está fechada. Você pode entrar na lista de espera.";
+    if (totalWeeklySlots !== null && totalWeeklySlots <= 5) return `Restam apenas ${totalWeeklySlots} vaga${totalWeeklySlots === 1 ? "" : "s"} esta semana.`;
+    if (totalWeeklySlots !== null && totalWeeklySlots <= 10) return `A agenda de ${firstName} está quase cheia esta semana.`;
+    return `A agenda da ${firstName} costuma fechar rápido esta semana.`;
+  })();
 
   return (
     <section className="relative min-h-screen grid grid-cols-1 lg:grid-cols-2 overflow-hidden bg-brand-parchment">
@@ -225,10 +257,11 @@ export const PublicHero = ({
       {/* Visual Side */}
       <div className="relative flex items-center justify-center p-8 md:p-16 lg:p-24 order-1 lg:order-2 bg-brand-parchment lg:bg-transparent min-h-[70vh] lg:min-h-screen">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.2, ease: "easeOut" }}
-          className="relative w-full max-w-[420px] animate-drift"
+           initial={{ opacity: 0, scale: 0.95, y: 20 }}
+           animate={{ opacity: 1, scale: 1, y: 0 }}
+           transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+           style={scrollY > 0 && typeof window !== 'undefined' && window.innerWidth >= 1024 ? { transform: `translateY(${scrollY * 0.08}px)` } : {}}
+           className="relative w-full max-w-[420px]"
         >
           {/* Organic Border SVG */}
           <svg className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)] z-10 pointer-events-none overflow-visible" viewBox="0 0 420 560" preserveAspectRatio="none">
@@ -247,10 +280,10 @@ export const PublicHero = ({
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="w-full aspect-[3/4] rounded-[48px_48px_48px_12px] shadow-2xl bg-gradient-to-br from-[#A85C3A] via-[#B86C4A] to-[#C47A5A] flex items-center justify-center relative overflow-hidden group">
+              <div className="w-full aspect-[3/4] rounded-[48px_48px_48px_12px] shadow-2xl bg-gradient-to-br from-[#A85C3A] to-[#C47A5A] flex items-center justify-center relative overflow-hidden group border border-brand-mist/20">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.1),transparent)]" />
-                <span className="text-brand-white font-serif text-8xl opacity-50 select-none drop-shadow-2xl relative z-10 transition-transform duration-700 group-hover:scale-110">
-                  {profile.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                <span className="text-white font-serif text-6xl select-none drop-shadow-2xl relative z-10 transition-transform duration-700 group-hover:scale-110">
+                  {initials}
                 </span>
                 <div className="absolute inset-0 border border-white/10 rounded-[48px_48px_48px_12px]" />
               </div>
@@ -272,6 +305,57 @@ export const PublicHero = ({
           </div>
         </motion.div>
       </div>
+
+      {/* Interest Popup */}
+      <AnimatePresence>
+        {showInterestPopup && (
+          <div className="fixed bottom-8 left-6 right-6 md:left-auto md:right-10 md:w-96 z-[400]">
+            <motion.div 
+              initial={{ y: 100, opacity: 0, scale: 0.9 }} 
+              animate={{ y: 0, opacity: 1, scale: 1 }} 
+              exit={{ y: 100, opacity: 0, scale: 0.9 }} 
+              className="bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10"
+            >
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl" />
+              <button 
+                onClick={() => { setShowInterestPopup(false); setInterestPopupDismissed(true); }} 
+                className="absolute top-6 right-6 p-1 text-white/40 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
+                  <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/60">
+                    Horário disponível
+                  </span>
+                </div>
+                <h3 className="text-xl font-serif mb-2 leading-tight">
+                  Ainda está pensando?
+                </h3>
+                <p className="text-xs text-white/60 font-light mb-8 leading-relaxed">
+                  {interestPopupText}
+                </p>
+                <div className="flex flex-col gap-3">
+                  <PremiumButton 
+                    variant="terracotta" 
+                    className="w-full py-4 text-[10px]" 
+                    onClick={() => { 
+                      setShowInterestPopup(false); 
+                      isAgendaFull ? onWaitlistClick?.() : onBookingClick();
+                    }}
+                  >
+                    {isAgendaFull ? 'Entrar na lista de espera' : 'Reservar agora'}
+                  </PremiumButton>
+                  <a href={`https://wa.me/${profile.whatsapp?.replace(/\D/g, '')}`} target="_blank" className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">
+                    <MessageCircle size={14} /> Falar no WhatsApp
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {showLocationModal && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">

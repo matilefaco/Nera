@@ -18,6 +18,7 @@ import AppLayout from '../components/AppLayout';
 import PremiumButton from '../components/PremiumButton';
 import { formatCurrency, cn } from '../lib/utils';
 import { toast } from 'sonner';
+import { FirstVisitTip } from '../components/FirstVisitTip';
 
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
@@ -45,6 +46,8 @@ export default function CouponsPage() {
   const [maxUses, setMaxUses] = useState('');
   const [expiresAt, setExpiresAt] = useState('');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [serviceRestriction, setServiceRestriction] = useState<'all' | 'specific'>('all');
+  const [perClientLimit, setPerClientLimit] = useState<1 | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
@@ -99,7 +102,8 @@ export default function CouponsPage() {
         usedCount: 0,
         expiresAt: expiresAt || null,
         active: true,
-        serviceIds: selectedServices.length > 0 ? selectedServices : null,
+        applicableServiceIds: serviceRestriction === 'specific' ? selectedServices : [],
+        perClientLimit,
         createdAt: serverTimestamp()
       });
 
@@ -121,6 +125,8 @@ export default function CouponsPage() {
     setMaxUses('');
     setExpiresAt('');
     setSelectedServices([]);
+    setServiceRestriction('all');
+    setPerClientLimit(null);
   };
 
   const toggleCouponStatus = async (coupon: Coupon) => {
@@ -147,6 +153,11 @@ export default function CouponsPage() {
 
   return (
     <AppLayout activeRoute="coupons">
+      <FirstVisitTip 
+        pageKey="coupons"
+        title="Cupons e descontos"
+        description="Crie códigos promocionais para datas especiais ou para fidelizar clientes. Você controla o valor e a validade."
+      />
       <div className="max-w-5xl mx-auto px-6 py-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
@@ -249,26 +260,38 @@ export default function CouponsPage() {
                         </p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-brand-mist/30">
-                        <div className="space-y-1">
-                          <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Usos</span>
-                          <p className="text-xs font-medium text-brand-ink">
-                            {coupon.usedCount} {coupon.maxUses ? `/ ${coupon.maxUses}` : 'ilimitados'}
-                          </p>
+                      <div className="space-y-4 pt-4 border-t border-brand-mist/30">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Usos</span>
+                            <p className="text-xs font-medium text-brand-ink">
+                              {coupon.usedCount} {coupon.maxUses ? `/ ${coupon.maxUses}` : 'ilimitados'}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Validade</span>
+                            <p className="text-xs font-medium text-brand-ink">
+                              {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString('pt-BR') : 'Sem expiração'}
+                            </p>
+                          </div>
                         </div>
-                        <div className="space-y-1">
-                          <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Validade</span>
-                          <p className="text-xs font-medium text-brand-ink">
-                            {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString('pt-BR') : 'Sem expiração'}
-                          </p>
-                        </div>
-                      </div>
 
-                      <div className="space-y-1">
-                        <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Serviços</span>
-                        <p className="text-[10px] text-brand-stone italic truncate">
-                          {coupon.serviceIds ? `Aplicável a ${coupon.serviceIds.length} serviços` : 'Válido para todos os serviços'}
-                        </p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Serviços</span>
+                            <p className="text-[10px] text-brand-stone italic truncate">
+                              {coupon.applicableServiceIds && coupon.applicableServiceIds.length > 0 
+                                ? `Válido p/ ${coupon.applicableServiceIds.length} serviços` 
+                                : 'Todos os serviços'}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Limite por Cliente</span>
+                            <p className="text-[10px] text-brand-stone italic">
+                              {coupon.perClientLimit === 1 ? '1 vez por cliente' : 'Ilimitado'}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -416,14 +439,65 @@ export default function CouponsPage() {
                         className="w-full px-6 py-4 bg-brand-white border border-brand-mist rounded-2xl text-xs outline-none focus:ring-1 focus:ring-brand-ink"
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Limite por Cliente</label>
+                      <div className="flex bg-brand-white p-1 rounded-2xl border border-brand-mist">
+                        <button 
+                          type="button" 
+                          onClick={() => setPerClientLimit(null)}
+                          className={cn(
+                            "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                            perClientLimit === null ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                          )}
+                        >
+                          Ilimitado
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => setPerClientLimit(1)}
+                          className={cn(
+                            "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                            perClientLimit === 1 ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                          )}
+                        >
+                          1 por cliente
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
                     <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Serviços Aplicáveis</label>
+                    
+                    <div className="flex bg-brand-white p-1 rounded-2xl border border-brand-mist mb-4">
+                      <button 
+                        type="button" 
+                        onClick={() => setServiceRestriction('all')}
+                        className={cn(
+                          "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                          serviceRestriction === 'all' ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                        )}
+                      >
+                        Todos os Serviços
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setServiceRestriction('specific')}
+                        className={cn(
+                          "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                          serviceRestriction === 'specific' ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                        )}
+                      >
+                        Serviços Específicos
+                      </button>
+                    </div>
+
+                    {serviceRestriction === 'specific' && (
                     <div className="p-6 bg-brand-white border border-brand-mist rounded-3xl space-y-4">
                       <div className="flex items-center justify-between pb-4 border-b border-brand-mist/50">
                         <p className="text-[10px] text-brand-stone font-light italic">
-                          Selecione os serviços que podem usar este cupom. Se nenhum for selecionado, valerá para todos.
+                          Selecione os serviços que podem usar este cupom.
                         </p>
                         {selectedServices.length > 0 && (
                           <button 
@@ -460,12 +534,16 @@ export default function CouponsPage() {
                               )}>
                                 {isSelected && <Check size={10} className="text-white" />}
                               </div>
-                              <span className="text-[11px] font-medium text-brand-ink truncate">{service.name}</span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-[11px] font-medium text-brand-ink truncate">{service.name}</span>
+                                <span className="text-[9px] text-brand-stone font-bold">{formatCurrency(service.price)}</span>
+                              </div>
                             </button>
                           );
                         })}
                       </div>
                     </div>
+                    )}
                   </div>
 
                   <div className="pt-6">

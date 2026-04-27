@@ -17,10 +17,12 @@ router.post("/save", async (req, res) => {
   }
 
   try {
+    console.log("[PROFILE SAVE] Starting transaction for UID:", uid, "Slug:", slug);
     const result = await db.runTransaction(async (transaction) => {
       const slugRef = db.collection("slugs").doc(slug);
       const userRef = db.collection("users").doc(uid);
 
+      console.log("[PROFILE SAVE TX] Fetching slug and user documents...");
       const slugDoc = await transaction.get(slugRef);
       const userSnap = await transaction.get(userRef);
 
@@ -28,6 +30,7 @@ router.post("/save", async (req, res) => {
       if (slugDoc.exists) {
         const ownerId = slugDoc.data()?.uid;
         if (ownerId !== uid) {
+          console.warn("[PROFILE SAVE TX] Slug collision:", slug, "belongs to", ownerId);
           throw new Error("Este link já está sendo usado por outra profissional.");
         }
       }
@@ -36,17 +39,20 @@ router.post("/save", async (req, res) => {
       const userData = userSnap.exists ? userSnap.data() : null;
       const currentSlug = userData?.slug;
       if (currentSlug && currentSlug !== slug) {
+        console.log("[PROFILE SAVE TX] Releasing old slug:", currentSlug);
         const oldSlugRef = db.collection("slugs").doc(currentSlug);
         transaction.delete(oldSlugRef);
       }
 
       // 3. Claim the slug
+      console.log("[PROFILE SAVE TX] Claiming slug:", slug);
       transaction.set(slugRef, { 
         uid, 
         claimedAt: admin.firestore.FieldValue.serverTimestamp() 
       });
 
       // 4. Update the profile
+      console.log("[PROFILE SAVE TX] Updating user info for:", uid);
       const finalProfileData = {
         ...profileData,
         slug,
@@ -56,8 +62,7 @@ router.post("/save", async (req, res) => {
 
       // 5. Handle Services if provided
       if (Array.isArray(services) && services.length > 0) {
-        // We delete old services and add new ones, or just add new ones?
-        // To be safe in transaction, we'll just add the provided ones
+        console.log("[PROFILE SAVE TX] Adding", services.length, "services");
         for (const service of services) {
           const serviceRef = db.collection("services").doc();
           transaction.set(serviceRef, {
@@ -69,9 +74,11 @@ router.post("/save", async (req, res) => {
         }
       }
 
+      console.log("[PROFILE SAVE TX] Transaction logic completed successfully");
       return { success: true, slug };
     });
 
+    console.log("[PROFILE SAVE] Transaction committed successfully for UID:", uid);
     res.json(result);
   } catch (err: any) {
     console.error("[PROFILE SAVE ERROR]", err.message);

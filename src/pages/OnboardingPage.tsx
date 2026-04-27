@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay } from '../lib/utils';
+import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
@@ -44,6 +44,31 @@ const IDENTITY_DIFFERENTIALS = [
   'Técnica avançada'
 ];
 
+const CopyLinkButton = ({ slug }: { slug: string }) => {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = () => {
+    navigator.clipboard.writeText(`https://nera.app/p/${slug}`);
+    setCopied(true);
+    toast.success('Link copiado!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <button 
+      onClick={handleCopy}
+      className="flex flex-col items-center gap-4 p-8 bg-brand-parchment rounded-[32px] border border-brand-mist hover:bg-brand-linen transition-all group"
+    >
+      <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center text-brand-ink border border-brand-mist group-hover:scale-110 transition-transform">
+        {copied ? <CheckCircle2 size={24} className="text-green-500" /> : <Copy size={24} />}
+      </div>
+      <span className="text-[10px] font-medium uppercase tracking-widest">
+        {copied ? 'Copiado! ✓' : 'Copiar Link'}
+      </span>
+    </button>
+  );
+};
+
 const EXPERIENCE_OPTIONS = [
   { label: '1-2 anos', value: '1-2' },
   { label: '3-5 anos', value: '3-5' },
@@ -53,6 +78,7 @@ const EXPERIENCE_OPTIONS = [
 export default function OnboardingPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const TOTAL_STEPS = 5;
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -78,11 +104,18 @@ export default function OnboardingPage() {
     serviceAreas, setServiceAreas,
     pricingStrategy, setPricingStrategy,
     differentials: selectedDifferentials, setDifferentials: setSelectedDifferentials,
+    paymentMethods, setPaymentMethods,
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,
     avatarSkipped, setAvatarSkipped
   } = useProfileForm(profile);
+
+  const [instagramConfirmed, setInstagramConfirmed] = useState(false);
+  const instagramStatus = useMemo(() => {
+    if (!instagram) return 'idle';
+    return INSTAGRAM_REGEX.test(instagram) ? 'valid' : 'invalid';
+  }, [instagram]);
 
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const prevNameRef = useRef(name);
@@ -172,7 +205,7 @@ export default function OnboardingPage() {
 
   // Step 3: Services
   const [services, setServices] = useState<{name: string, duration: string, price: string, description: string}[]>([
-    { name: '', duration: '60', price: '', description: '' }
+    { name: '', duration: '', price: '', description: '' }
   ]);
 
   const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
@@ -257,6 +290,7 @@ export default function OnboardingPage() {
       bio,
       headline,
       serviceMode,
+      paymentMethods,
       onboardingStep: nextStepNum,
       workingHours: {
         startTime,
@@ -341,6 +375,7 @@ export default function OnboardingPage() {
       const errors: Record<string, string> = {};
       if (!name.trim()) errors.name = 'O nome é obrigatório';
       if (!specialty.trim()) errors.specialty = 'Informe sua especialidade';
+      if (paymentMethods.length === 0) errors.paymentMethods = 'Selecione ao menos uma forma de pagamento';
       
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
@@ -359,6 +394,12 @@ export default function OnboardingPage() {
       if (!city.trim()) errors.city = 'Informe sua cidade';
       if (!neighborhood.trim()) errors.neighborhood = 'Informe seu bairro';
       
+      // WhatsApp validation
+      const cleanPhone = cleanWhatsapp(whatsapp);
+      if (cleanPhone.length < 10) {
+        errors.whatsapp = 'Número inválido. Verifique o DDD e o número.';
+      }
+
       if (serviceMode !== 'home') {
         if (!studioAddress.street.trim()) errors.studioStreet = 'Informe a rua';
         if (!studioAddress.number.trim()) errors.studioNumber = 'Informe o número';
@@ -375,13 +416,14 @@ export default function OnboardingPage() {
       const newServiceErrors = services.map(s => {
         const errs: any = {};
         if (!s.name.trim()) errs.name = 'Informe o nome do serviço';
+        if (!s.duration || Number(s.duration) <= 0) errs.duration = 'Informe a duração';
         if (!s.price.trim()) errs.price = 'Informe o preço';
         return Object.keys(errs).length > 0 ? errs : null;
       });
 
       if (newServiceErrors.some(e => e !== null)) {
         setServicesErrors(newServiceErrors);
-        toast.error('Verifique os campos das suas experiências.');
+        toast.error('Informe a duração dos seus serviços para continuar.');
         return;
       }
     }
@@ -472,11 +514,14 @@ export default function OnboardingPage() {
     
     setLoading(true);
     setIsFinalizing(true);
-    console.log('[ONBOARDING] starting finalization via API');
+    console.log('[ONBOARDING] Starting finalization via API. Data:', { 
+      uid: user.uid, 
+      slug, 
+      name, 
+      onboardingCompleted: true 
+    });
 
     try {
-      console.log('[ONBOARDING] Preparing final data...');
-      
       const activeServices = services.filter(s => s.name.trim() !== '' && s.price);
       
       const profileData: Partial<UserProfile> = {
@@ -486,6 +531,7 @@ export default function OnboardingPage() {
         neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
         slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         whatsapp: cleanWhatsapp(whatsapp),
+        paymentMethods,
         bio: bio.trim(),
         headline: headline.trim(),
         instagram: instagram.trim().replace('@', ''),
@@ -493,12 +539,12 @@ export default function OnboardingPage() {
         serviceMode,
         serviceAreaType,
         studioAddress: removeEmptyFields({
-          street: studioAddress.street.trim(),
-          number: studioAddress.number.trim(),
-          complement: studioAddress.complement.trim(),
-          neighborhood: studioAddress.neighborhood.trim(),
-          city: studioAddress.city.trim() || city.trim(),
-          reference: studioAddress.reference.trim()
+          street: (studioAddress.street || '').trim(),
+          number: (studioAddress.number || '').trim(),
+          complement: (studioAddress.complement || '').trim(),
+          neighborhood: (studioAddress.neighborhood || '').trim(),
+          city: (studioAddress.city || city || '').trim(),
+          reference: (studioAddress.reference || '').trim()
         }),
         serviceAreas: serviceAreas.map(area => ({
           name: area.name.trim(),
@@ -530,12 +576,9 @@ export default function OnboardingPage() {
         description: (service.description || '').trim()
       }));
 
-      // Use the new API for transactional save
       const response = await fetch('/api/profile/save', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid: user.uid,
           profileData,
@@ -544,53 +587,48 @@ export default function OnboardingPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao publicar seu perfil.');
+        let errorMsg = 'Erro ao publicar seu perfil.';
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.error || errorMsg;
+        } catch (e) {
+          console.error('[ONBOARDING] Server returned non-JSON error:', response.status);
+          errorMsg = `Erro do servidor (${response.status})`;
+        }
+        throw new Error(errorMsg);
       }
 
-      console.log('[ONBOARDING] Transactional save completed');
+      console.log('[ONBOARDING] Transactional save completed successfully');
       setStep(6);
-      setIsFinalizing(false); 
     } catch (error: any) {
       console.error('[ONBOARDING ERROR] Finalization failed:', error);
-      if (error instanceof z.ZodError) {
-        const errors: Record<string, string> = {};
-        error.issues.forEach((issue) => {
-          if (issue.path && issue.path.length > 0) {
-            errors[issue.path[0].toString()] = issue.message;
-          }
-        });
-        setFormErrors(errors);
-        toast.error('Verifique os campos da sua vitrine.');
-        setIsFinalizing(false);
-        return;
-      }
       toast.error(getHumanError(error));
-      setIsFinalizing(false);
     } finally {
+      setIsFinalizing(false);
       setLoading(false);
     }
   };
 
   const completeOnboarding = async () => {
-    console.log('[ONBOARDING] completeOnboarding triggered');
-    if (!user || isFinalizing) {
-      return;
-    }
+    console.log('[ONBOARDING] completeOnboarding triggered. Navigating to dashboard.');
+    if (!user) return;
     
     setIsFinalizing(true);
     try {
-      console.log('[ONBOARDING] Final step: setting onboardingCompleted = true');
+      // Ensure onboardingCompleted is set via local state for UI consistency
+      // The API already set it in Firestore, but we confirm here
+      console.log('[ONBOARDING] Final check before dashboard...');
       await saveProfilePartial(user.uid, { 
         onboardingCompleted: true,
-        indexable: true,
-        planRank: profile?.planRank || 0
+        onboardingStep: 6
       });
-      console.log('[ONBOARDING] Success. Navigating to dashboard');
+      console.log('[ONBOARDING] Navigation starting...');
       navigate('/dashboard');
     } catch (error) {
       console.error('[ONBOARDING ERROR] final step failed:', error);
-      toast.error(getHumanError(error));
+      // Even if this partial save fails, we should try to navigate if handleFinish worked
+      navigate('/dashboard');
+    } finally {
       setIsFinalizing(false);
     }
   };
@@ -741,7 +779,7 @@ export default function OnboardingPage() {
 
   if (authLoading) return <AppLoadingScreen />;
 
-  const progress = (step / 6) * 100;
+  const progress = (step / (TOTAL_STEPS + 1)) * 100;
 
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col">
@@ -754,10 +792,10 @@ export default function OnboardingPage() {
             transition={{ duration: 0.5 }}
           />
         </div>
-        {step <= 5 && (
+        {step <= TOTAL_STEPS && (
           <div className="py-3 px-6 flex justify-center items-center">
             <p className="text-[10px] text-brand-stone font-semibold uppercase tracking-[0.2em]">
-              Passo {step} de 5 <span className="mx-2 text-brand-mist">•</span> {stepDescriptions[step - 1]}
+              Passo {step} de {TOTAL_STEPS} <span className="mx-2 text-brand-mist">•</span> {stepDescriptions[step - 1]}
             </p>
           </div>
         )}
@@ -808,12 +846,19 @@ export default function OnboardingPage() {
                 isGeneratingBio={isGeneratingContent}
                 selectedBioStyle={selectedBioStyle}
                 setSelectedBioStyle={setSelectedBioStyle}
+                paymentMethods={paymentMethods}
+                setPaymentMethods={setPaymentMethods}
+                instagram={instagram}
+                setInstagram={setInstagram}
+                instagramStatus={instagramStatus}
+                instagramConfirmed={instagramConfirmed}
+                setInstagramConfirmed={setInstagramConfirmed}
                 errors={formErrors}
               />
 
               <button 
                 onClick={nextStep}
-                disabled={!name || !specialty || !slug || uploadingImage || isSavingStep || slugStatus !== 'available'}
+                disabled={!name || !specialty || !slug || uploadingImage || isSavingStep || slugStatus !== 'available' || paymentMethods.length === 0}
                 className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
               >
                 {isSavingStep || uploadingImage ? (
@@ -886,16 +931,73 @@ export default function OnboardingPage() {
 
                   <div className="space-y-2">
                     <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>
-                    <div className="flex items-center gap-2 bg-brand-parchment p-4 rounded-[20px] border border-brand-mist shadow-sm">
-                      <span className="text-brand-stone text-sm">@</span>
+                    <div className={cn(
+                      "flex items-center gap-2 bg-brand-parchment p-4 rounded-[20px] border transition-all",
+                      instagramStatus === 'valid' ? "border-green-200 ring-1 ring-green-100" :
+                      instagramStatus === 'invalid' ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
+                      "border-brand-mist shadow-sm"
+                    )}>
+                      <span className="text-brand-stone text-sm ml-1">@</span>
                       <input 
                         type="text" 
                         value={instagram} 
-                        onChange={(e) => setInstagram(e.target.value.replace(/@/g, ''))} 
+                        onChange={(e) => setInstagram(normalizeInstagram(e.target.value))} 
                         placeholder="seu.usuario" 
-                        className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-sm" 
+                        className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-sm placeholder:font-light" 
                       />
+                      <AnimatePresence mode="wait">
+                        {instagramStatus === 'valid' && (
+                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                            <CheckCircle2 size={18} className="text-green-500 mr-1" />
+                          </motion.div>
+                        )}
+                        {instagramStatus === 'invalid' && (
+                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                            <X size={18} className="text-brand-terracotta mr-1" />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
+
+                    {instagramStatus === 'invalid' && (
+                      <p className="text-[10px] text-brand-terracotta font-medium ml-1 flex items-center gap-1.5">
+                        <AlertCircle size={12} />
+                        Use apenas letras, números, ponto e underline
+                      </p>
+                    )}
+
+                    {instagramStatus === 'valid' && (
+                      <div className="space-y-3 pt-1 ml-1">
+                        <div className="space-y-1">
+                          <a 
+                            href={`https://instagram.com/${instagram}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-xs text-brand-terracotta underline flex items-center gap-1.5"
+                          >
+                            Confirmar: @{instagram} ↗
+                          </a>
+                          <p className="text-[10px] text-brand-stone font-light italic">
+                            Clique para confirmar que é o seu perfil
+                          </p>
+                        </div>
+                        
+                        <label className="flex items-center gap-2.5 cursor-pointer group">
+                          <div className="relative flex items-center justify-center">
+                            <input 
+                              type="checkbox" 
+                              checked={instagramConfirmed} 
+                              onChange={(e) => setInstagramConfirmed(e.target.checked)}
+                              className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all"
+                            />
+                            <CheckCircle2 size={10} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                          </div>
+                          <span className="text-[10px] text-brand-stone font-medium uppercase tracking-wider group-hover:text-brand-ink transition-colors">
+                            Confirmei que o perfil acima é o meu
+                          </span>
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -940,6 +1042,7 @@ export default function OnboardingPage() {
                 services={services}
                 setServices={setServices}
                 errors={servicesErrors}
+                workingHours={{ startTime, endTime }}
               />
 
               <div className="flex gap-4">
@@ -1082,10 +1185,15 @@ export default function OnboardingPage() {
                 isGeneratingBio={isGeneratingContent}
                 selectedBioStyle={selectedBioStyle}
                 setSelectedBioStyle={setSelectedBioStyle}
+                paymentMethods={paymentMethods}
+                setPaymentMethods={setPaymentMethods}
                 whatsapp={whatsapp}
                 setWhatsapp={setWhatsapp}
                 instagram={instagram}
                 setInstagram={setInstagram}
+                instagramStatus={instagramStatus}
+                instagramConfirmed={instagramConfirmed}
+                setInstagramConfirmed={setInstagramConfirmed}
                 showLabels={true}
                 errors={formErrors}
               />
@@ -1256,18 +1364,7 @@ export default function OnboardingPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <button 
-                    onClick={() => {
-                      navigator.clipboard.writeText(`https://nera.app/p/${slug}`);
-                      toast.success('Link copiado.');
-                    }}
-                    className="flex flex-col items-center gap-4 p-8 bg-brand-parchment rounded-[32px] border border-brand-mist hover:bg-brand-linen transition-all group"
-                  >
-                    <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center text-brand-ink border border-brand-mist group-hover:scale-110 transition-transform">
-                      <Copy size={24} />
-                    </div>
-                    <span className="text-[10px] font-medium uppercase tracking-widest">Copiar Link</span>
-                  </button>
+                  <CopyLinkButton slug={slug} />
                   <button 
                     onClick={() => {
                       const text = `Olá! Agora você pode agendar seus horários comigo diretamente pelo meu link: https://nera.app/p/${slug} ✨`;

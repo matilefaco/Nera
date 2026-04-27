@@ -21,6 +21,7 @@ export function usePlanFeatures() {
     antiNoShow: activePlan === 'pro',
     coupons: activePlan === 'essencial' || activePlan === 'pro',
     analytics: activePlan === 'pro',
+    reports: activePlan === 'pro',
   };
 
   const isPremium = () => activePlan !== 'free';

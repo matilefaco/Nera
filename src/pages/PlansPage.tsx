@@ -92,10 +92,11 @@ export default function PlansPage() {
             <div className="flex-1">
               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-stone block mb-2">Plano Atual</span>
               <h3 className="text-2xl font-serif text-brand-ink mb-2 italic">Gratuito</h3>
-              <div className="flex items-baseline gap-1 mb-8">
+              <div className="flex items-baseline gap-1 mb-2">
                 <span className="text-4xl font-serif text-brand-ink">R$ 0</span>
                 <span className="text-xs text-brand-stone uppercase tracking-widest font-bold">/mês</span>
               </div>
+              <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest italic mb-6">Ideal para começar</div>
 
               <div className="space-y-4 mb-10">
                 {[
@@ -167,7 +168,7 @@ export default function PlansPage() {
               variant={profile?.plan === 'essencial' ? 'secondary' : 'primary'}
               disabled={profile?.plan === 'essencial'}
             >
-              {profile?.plan === 'essencial' ? 'Plano Atual' : 'Começar Essencial'}
+              {profile?.plan === 'essencial' ? 'Plano Atual' : 'Testar Essencial por 30 dias'}
             </PremiumButton>
           </motion.div>
 
@@ -175,41 +176,41 @@ export default function PlansPage() {
           <motion.div 
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="p-1 rounded-[40px] shadow-[0_40px_80px_-15px_rgba(139,92,71,0.2)] relative overflow-hidden border-2 border-brand-terracotta/30 bg-brand-parchment"
+            className="p-1.5 rounded-[40px] shadow-[0_64px_100px_rgba(91,52,35,0.25)] relative overflow-hidden border-2 border-[#C49A7A] bg-[#F2E8DF] scale-[1.02] z-10"
           >
             <div className="absolute top-0 right-0 p-6 z-10">
-              <div className="bg-brand-terracotta text-white text-[8px] font-bold uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">Premium Elite</div>
+              <div className="bg-brand-terracotta text-white text-[8px] font-bold uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg">Recomendado para quem quer crescer</div>
             </div>
 
             <div className="bg-[#F3EDE7] p-12 lg:p-14 rounded-[38px] h-full flex flex-col border border-white/50 relative">
               {/* Subtle Decorative Gradient */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-terracotta/10 rounded-full blur-3xl -mr-32 -mt-32" />
+              <div className="absolute top-0 right-0 w-80 h-80 bg-brand-terracotta/10 rounded-full blur-3xl -mr-40 -mt-40" />
               
               <div className="flex-1 relative z-10">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta block">Nera Elite</span>
-                  <Sparkles size={14} className="text-brand-terracotta fill-brand-terracotta/20" />
+                  <Sparkles size={16} className="text-brand-terracotta fill-brand-terracotta/20 animate-pulse" />
                 </div>
                 <h3 className="text-4xl font-serif text-brand-ink mb-3 italic">Plano Pro</h3>
-                <div className="flex items-baseline gap-1 mb-12">
-                  <span className="text-6xl font-serif text-brand-ink tracking-tight">R$ 99</span>
-                  <span className="text-base text-brand-stone uppercase tracking-widest font-bold">,90/mês</span>
+                <div className="flex items-baseline gap-1 mb-8">
+                  <span className="text-5xl font-serif text-brand-ink tracking-tight">R$ 99</span>
+                  <span className="text-lg text-brand-stone uppercase tracking-widest font-bold">,90/mês</span>
                 </div>
 
-                <div className="space-y-6 mb-16">
+                <div className="space-y-4 mb-12">
                   {[
-                    'Tudo do Plano Essencial',
+                    'Tudo do Essencial, com recursos para crescer mais rápido',
                     'Dashboard Avançado (Gráficos)',
                     'Lista de Espera Inteligente',
                     'Analytics de Atendimento',
                     'Anti No-Show Automático',
                     'Suporte prioritário 24/7'
-                  ].map(item => (
+                  ].map((item, idx) => (
                     <div key={item} className="flex items-center gap-4">
-                      <div className="w-6 h-6 rounded-full bg-brand-terracotta flex items-center justify-center text-white shadow-md ring-4 ring-brand-terracotta/10">
-                        <Check size={14} />
+                      <div className={`w-5 h-5 rounded-full bg-brand-terracotta flex items-center justify-center text-white shadow-sm ring-4 ring-brand-terracotta/10 ${idx === 0 ? 'animate-bounce-subtle' : ''}`}>
+                        <Check size={12} />
                       </div>
-                      <span className="text-[12px] font-extrabold text-brand-ink uppercase tracking-tight">{item}</span>
+                      <span className={`text-[12px] font-bold text-brand-ink uppercase tracking-tight ${idx === 0 ? 'text-brand-terracotta' : ''}`}>{item}</span>
                     </div>
                   ))}
                 </div>
@@ -218,14 +219,12 @@ export default function PlansPage() {
               <PremiumButton 
                 onClick={() => handleUpgrade('pro')}
                 loading={loadingPlan === 'pro'}
-                className="w-full py-7 text-[12px] shadow-2xl"
+                className="w-full py-6 text-[12px] shadow-2xl hover:scale-[1.02] transition-transform active:scale-[0.98]"
                 variant={profile?.plan === 'pro' ? 'secondary' : 'terracotta'}
                 disabled={profile?.plan === 'pro'}
               >
-                {profile?.plan === 'pro' ? 'Plano Ativado' : 'Seja Pro agora'}
+                {profile?.plan === 'pro' ? 'Plano Ativado' : 'Começar como Pro'}
               </PremiumButton>
-
-              <p className="text-[10px] text-brand-stone/80 font-bold uppercase tracking-[0.3em] text-center mt-8">Gestão completa e sem limites</p>
             </div>
           </motion.div>
         </div>
@@ -257,13 +256,27 @@ export default function PlansPage() {
               </div>
 
               <div className="bg-brand-white p-6 rounded-3xl border border-brand-mist shadow-sm space-y-6 w-full md:w-auto md:min-w-[300px]">
-                <div className="flex justify-between items-center px-2">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Créditos Acumulados</span>
-                  <span className="text-lg font-serif text-brand-terracotta">{formatCurrency(profile?.credits || 0)}</span>
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center px-2">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Créditos Acumulados</span>
+                    <span className="text-lg font-serif text-brand-terracotta">{formatCurrency(profile?.credits || 0)}</span>
+                  </div>
+                  {(profile?.credits || 0) > 0 && (
+                    <div className="px-2 py-1.5 bg-green-50 rounded-lg border border-green-100">
+                      <p className="text-[9px] text-green-700 font-medium leading-tight">
+                        Seu próximo upgrade terá desconto automático de {formatCurrency(profile?.credits || 0)}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[8px] font-bold uppercase tracking-widest text-brand-mist ml-1">Seu Código</label>
+                  <div className="flex justify-between items-end px-1">
+                    <label className="text-[8px] font-bold uppercase tracking-widest text-brand-mist">Seu Código</label>
+                    <Link to="/indicacoes" className="text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-terracotta transition-colors">
+                      Ver indicações →
+                    </Link>
+                  </div>
                   <div className="flex items-center gap-2 p-4 bg-brand-parchment rounded-2xl border border-brand-mist font-mono text-sm tracking-widest text-brand-ink">
                     {profile?.referralCode || '------'}
                   </div>

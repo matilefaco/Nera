@@ -323,14 +323,50 @@ export default function BookingModal({ profile, services, onClose, open, initial
         return;
       }
       if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
-        setCouponError('Este cupom atingiu o limite de usos.'); 
+        setCouponError('Este cupom esgotado.'); 
         setAppliedCoupon(null);
         return;
       }
-      if (coupon.serviceIds && selectedService && !coupon.serviceIds.includes(selectedService.id)) {
+      
+      // Applicable Services Check
+      const applicableIds = coupon.applicableServiceIds || coupon.serviceIds || [];
+      if (applicableIds.length > 0 && selectedService && !applicableIds.includes(selectedService.id)) {
         setCouponError('Este cupom não é válido para o serviço selecionado.');
         setAppliedCoupon(null);
         return;
+      }
+
+      // Per-Client Limit Check
+      if (coupon.perClientLimit === 1) {
+        const appointmentsRef = collection(db, 'appointments');
+        const cleanPhone = clientPhone.replace(/\D/g, '');
+        const cleanEmail = clientEmail.trim().toLowerCase();
+
+        // Check if client info is present
+        if (!cleanPhone && !cleanEmail) {
+           setCouponError('Preencha seu nome, WhatsApp e e-mail antes de aplicar o cupom.');
+           setAppliedCoupon(null);
+           return;
+        }
+
+        const q = query(
+          appointmentsRef,
+          where('professionalId', '==', profile.uid),
+          where('appliedCouponCode', '==', coupon.code),
+          where('status', 'in', ['pending', 'confirmed', 'completed'])
+        );
+        
+        const snap = await getDocs(q);
+        const alreadyUsed = snap.docs.some(doc => {
+          const data = doc.data();
+          return data.clientWhatsapp === cleanPhone || data.clientEmail === cleanEmail;
+        });
+
+        if (alreadyUsed) {
+          setCouponError('Você já utilizou este cupom.');
+          setAppliedCoupon(null);
+          return;
+        }
       }
 
       setAppliedCoupon(coupon);

@@ -30,6 +30,7 @@ export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
         antiNoShow: activePlan === 'pro',
         coupons: activePlan === 'essencial' || activePlan === 'pro',
         analytics: activePlan === 'pro',
+        reports: activePlan === 'pro',
       };
 
       if (!features[featureName]) {

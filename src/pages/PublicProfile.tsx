@@ -27,6 +27,9 @@ import { ExpertIntro } from '../components/public/ExpertIntro';
 import { PaymentMethods } from '../components/public/PaymentMethods';
 import SEOHead from '../components/SEOHead';
 
+const isDev = import.meta.env.DEV;
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 // --- Static Mock Data for Example Profile ---
 const MOCK_PROFILE: UserProfile = {
   uid: 'mock-helena',
@@ -261,7 +264,7 @@ export default function PublicProfile() {
             const servicesSnapshot = await getDocs(servicesQ);
             setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
           } catch (e) {
-            console.warn("[PublicProfile] Failed to fetch services silently:", e);
+            devLog("[PublicProfile] Failed to fetch services silently:", e);
           }
 
           // 2. Stats
@@ -271,7 +274,7 @@ export default function PublicProfile() {
               setStats(statsDoc.docs[0].data());
             }
           } catch (e) {
-            console.warn("[PublicProfile] Failed to fetch stats silently:", e);
+            devLog("[PublicProfile] Failed to fetch stats silently:", e);
           }
 
           // 3. Reviews
@@ -285,7 +288,7 @@ export default function PublicProfile() {
             const reviewsSnapshot = await getDocs(reviewsQ);
             setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review)));
           } catch (e) {
-            console.warn("[PublicProfile] Failed to fetch reviews silently:", e);
+            devLog("[PublicProfile] Failed to fetch reviews silently:", e);
           }
 
           // 4. Portfolio (Legacy subcollection fallback)
@@ -303,7 +306,7 @@ export default function PublicProfile() {
                 setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
               }
             } catch (e) {
-              console.warn("[PublicProfile] Failed to fetch legacy portfolio silently:", e);
+              devLog("[PublicProfile] Failed to fetch legacy portfolio silently:", e);
             }
           }
         } else {
@@ -343,7 +346,7 @@ export default function PublicProfile() {
           }
         }
       } catch (e) {
-        console.warn("Waitlist check failed", e);
+        devLog("Waitlist check failed", e);
       }
     }
     checkWaitlist();
@@ -353,7 +356,7 @@ export default function PublicProfile() {
     const findAvailabilityData = async () => {
       if (!profile?.uid || !profile?.workingHours || services.length === 0) return;
       
-      console.log(`[NEXT_SLOT] Starting calculation for pro: ${profile.uid}`);
+      devLog(`[NEXT_SLOT] Starting calculation for pro: ${profile.uid}`);
       
       try {
         const now = new Date();
@@ -439,7 +442,7 @@ export default function PublicProfile() {
             blockedSchedules
           });
 
-          console.log(`[BADGE DEBUG] Final Verification for ${result.date}: ${verificationSlots.length} slots found.`);
+          devLog(`[BADGE DEBUG] Final Verification for ${result.date}: ${verificationSlots.length} slots found.`);
           
           if (verificationSlots.length === 0) {
             console.error(`[BADGE BUG] Badge attempted to show unavailable slot for ${result.date} ${result.time}. Agenda shows 0 slots.`);
@@ -447,20 +450,20 @@ export default function PublicProfile() {
             setTotalWeeklySlots(0);
             setIsAgendaFull(true);
           } else {
-            console.log(`[BADGE DEBUG] Success: Badge showing confirmed slot ${result.time} on ${result.date}`);
+            devLog(`[BADGE DEBUG] Success: Badge showing confirmed slot ${result.time} on ${result.date}`);
             setNextSlot({ date: result.date, time: result.time });
             setTotalWeeklySlots(result.totalWeeklySlots);
             setIsAgendaFull(result.totalWeeklySlots === 0);
           }
         } else {
-          console.log(`[BADGE DEBUG] No slots found in the next 14 days`);
+          devLog(`[BADGE DEBUG] No slots found in the next 14 days`);
           setTotalWeeklySlots(0);
           setIsAgendaFull(true);
         }
         
-        console.log(`[NEXT_SLOT] Calculation finished.`);
+        devLog(`[NEXT_SLOT] Calculation finished.`);
       } catch (e) {
-        console.warn("[NEXT_SLOT] Failed to find availability data:", e);
+        devLog("[NEXT_SLOT] Failed to find availability data:", e);
       }
     };
     
@@ -509,17 +512,26 @@ export default function PublicProfile() {
         url={`https://usenera.com/p/${profile.slug}`}
       />
 
-      {/* Back to Home Link for Demo Purposes */}
+      {/* Demo Banner */}
       {(slug === 'helena-prado' || slug === 'exemplo') && (
-        <div className="bg-brand-parchment/50 border-b border-brand-mist/20 py-2 px-6">
-          <div className="max-w-7xl mx-auto">
+        <div className="sticky top-0 z-[200] bg-brand-ink text-white/70 py-3 px-6 border-b border-white/5">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
             <Link 
               to="/" 
-              className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand- ink transition-colors group"
+              className="inline-flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors group"
             >
-              <ArrowLeft size={12} className="group-hover:-translate-x-1 transition-transform" />
+              <ArrowLeft size={10} className="group-hover:-translate-x-1 transition-transform" />
               Voltar
             </Link>
+            
+            <p className="text-[10px] md:text-[11px] font-light tracking-wide text-center flex-1">
+              Esta é uma página de demonstração do Nera. 
+              <Link to="/register" className="text-brand-terracotta font-bold hover:underline ml-1">
+                Crie a sua agora de forma gratuita →
+              </Link>
+            </p>
+
+            <div className="w-12 md:hidden" /> {/* Spacer for balance */}
           </div>
         </div>
       )}
@@ -561,6 +573,7 @@ export default function PublicProfile() {
         heroBio={heroBio}
         stats={stats}
         isAgendaFull={urgencyInfo?.isAgendaFull}
+        totalWeeklySlots={totalWeeklySlots}
         onWaitlistClick={() => setIsWaitlistOpen(true)}
         onBookingClick={(s) => { 
           if (urgencyInfo?.isAgendaFull) {
@@ -722,52 +735,6 @@ export default function PublicProfile() {
         open={isWaitlistOpen} 
         onClose={() => setIsWaitlistOpen(false)} 
       />
-
-      <AnimatePresence>
-        {showInterestPopup && !isBookingModalOpen && (
-          <div className="fixed bottom-8 left-6 right-6 md:left-auto md:right-10 md:w-96 z-[400]">
-            <motion.div initial={{ y: 100, opacity: 0, scale: 0.9 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ y: 100, opacity: 0, scale: 0.9 }} className="bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10">
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl" />
-              <button onClick={() => { setShowInterestPopup(false); setInterestPopupDismissed(true); }} className="absolute top-6 right-6 p-1 text-white/40 hover:text-white transition-colors">
-                <X size={18} />
-              </button>
-              <div className="relative z-10">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
-                  <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-white/60">
-                    Horário disponível
-                  </span>
-                </div>
-                <h3 className="text-xl font-serif mb-2 leading-tight">
-                  Ainda está pensando?
-                </h3>
-                <p className="text-xs text-white/60 font-light mb-8 leading-relaxed">
-                  A agenda da {profile?.name.split(' ')[0]} costuma fechar rápido esta semana.
-                </p>
-                <div className="flex flex-col gap-3">
-                  <PremiumButton 
-                    variant="terracotta" 
-                    className="w-full py-4 text-[10px]" 
-                    onClick={() => { 
-                      setShowInterestPopup(false); 
-                      if (urgencyInfo?.isAgendaFull) {
-                        setIsWaitlistOpen(true);
-                      } else {
-                        setIsBookingModalOpen(true); 
-                      }
-                    }}
-                  >
-                    {urgencyInfo?.isAgendaFull ? 'Entrar na lista de espera' : 'Reservar agora'}
-                  </PremiumButton>
-                  <a href={buildWhatsappLink(profile?.whatsapp)} target="_blank" className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">
-                    <MessageCircle size={14} /> Falar no WhatsApp
-                  </a>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

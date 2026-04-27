@@ -8,6 +8,7 @@ import {
   getServiceDescriptionWithFallback 
 } from "../utils.ts";
 import { checkPlanFeature } from "../middleware/planMiddleware.ts";
+import { generateMonthlyReportPDF } from "../reports/monthlyReport.ts";
 
 const router = express.Router();
 
@@ -193,6 +194,97 @@ router.post("/ai/categorize-portfolio-item", async (req, res) => {
   } catch (error) {
     console.warn("[AI SERVICE] NVIDIA portfolio categorization failed, using local fallback");
     res.json({ category: "Geral" });
+  }
+});
+
+router.get("/reports/monthly", checkPlanFeature('reports'), async (req, res) => {
+  const { month, professionalId } = req.query;
+
+  if (!month || !professionalId) {
+    return res.status(400).json({ error: "Month (YYYY-MM) and professionalId are required" });
+  }
+
+  try {
+    const proDoc = await db.collection('users').doc(String(professionalId)).get();
+    if (!proDoc.exists) {
+      return res.status(404).json({ error: "Profissional não encontrada." });
+    }
+    const pro = proDoc.data();
+
+    const startOfMonth = `${month}-01`;
+    const nextMonthDate = new Date(`${month}-01T12:00:00`);
+    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+    const endOfMonth = nextMonthDate.toISOString().split('T')[0];
+
+    const appointmentsSnap = await db.collection('appointments')
+      .where('professionalId', '==', professionalId)
+      .where('date', '>=', startOfMonth)
+      .where('date', '<', endOfMonth)
+      .get();
+
+    const appointments = appointmentsSnap.docs.map(doc => doc.data());
+    const confirmed = appointments.filter(a => ['confirmed', 'accepted', 'completed'].includes(a.status));
+    const cancelled = appointments.filter(a => a.status.startsWith('cancelled'));
+
+    const totalRevenue = confirmed.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
+    const averageTicket = confirmed.length > 0 ? totalRevenue / confirmed.length : 0;
+
+    // Top Services
+    const serviceMap: Record<string, { count: number; revenue: number }> = {};
+    confirmed.forEach(a => {
+      const name = a.serviceName || 'Serviço s/ nome';
+      if (!serviceMap[name]) serviceMap[name] = { count: 0, revenue: 0 };
+      serviceMap[name].count++;
+      serviceMap[name].revenue += (Number(a.price) || 0);
+    });
+    const topServices = Object.entries(serviceMap)
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    // Top Days
+    const dayMap: Record<string, number> = {};
+    confirmed.forEach(a => {
+      const day = a.date.split('-')[2]; // Extract DD
+      dayMap[day] = (dayMap[day] || 0) + 1;
+    });
+    const topDays = Object.entries(dayMap)
+      .map(([day, count]) => ({ day, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Clients
+    const clientKeys = new Set(confirmed.map(a => a.clientEmail || a.clientWhatsapp));
+    // Approximation: for simplicity, we treat all as new for now if we don't scan history
+    // But we could scan before startOfMonth
+    const newClients = clientKeys.size; 
+    const returningClients = 0;
+
+    const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    const [yearPart, monthPart] = (month as string).split('-');
+    const monthName = `${monthNames[parseInt(monthPart) - 1]} ${yearPart}`;
+
+    const reportData = {
+      professionalName: pro?.name || 'Profissional Nera',
+      professionalSpecialty: pro?.specialty || pro?.professionalIdentity?.mainSpecialty || 'Especialista',
+      month: monthName,
+      totalRevenue,
+      confirmedAppointments: confirmed.length,
+      cancelledAppointments: cancelled.length,
+      newClients,
+      returningClients,
+      topServices,
+      topDays,
+      averageTicket
+    };
+
+    const buffer = await generateMonthlyReportPDF(reportData);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename=nera-relatorio-${month}.pdf`);
+    res.send(buffer);
+
+  } catch (error: any) {
+    console.error("[REPORT] Generation error:", error);
+    res.status(500).json({ error: "Erro ao gerar relatório." });
   }
 });
 

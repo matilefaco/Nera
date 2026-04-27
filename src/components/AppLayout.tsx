@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  Calendar, Users, LogOut, 
+  Calendar, Users, LogOut, Gift,
   Settings, List, TrendingUp, User, ChevronDown, Shield, Key, Tag
 } from 'lucide-react';
 import { auth, db } from '../firebase';
@@ -87,6 +87,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     { title: 'Clientes', icon: Users, path: '/clients', id: 'clients' },
     { title: 'Serviços', icon: List, path: '/services', id: 'services' },
     { title: 'Cupons', icon: Tag, path: '/cupons', id: 'coupons' },
+    { title: 'Indicações', icon: Gift, path: '/indicacoes', id: 'referrals' },
     { title: 'Perfil', icon: Settings, path: '/profile', id: 'profile' },
   ];
 

@@ -10,11 +10,12 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { formatCurrency, getHumanError } from '../lib/utils';
+import { formatCurrency, getHumanError, cn } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
 import { UserProfile } from '../types';
 import { generateServiceDescription } from '../services/aiService';
+import { FirstVisitTip } from '../components/FirstVisitTip';
 
 export default function ServicesPage() {
   const { user, profile } = useAuth();
@@ -27,10 +28,11 @@ export default function ServicesPage() {
   
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [duration, setDuration] = useState('60');
+  const [duration, setDuration] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showCustomDuration, setShowCustomDuration] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -179,6 +181,7 @@ export default function ServicesPage() {
     setDuration(service.duration.toString());
     setPrice(service.price.toString());
     setCategory(service.category);
+    setShowCustomDuration(![30, 45, 60, 90, 120].includes(Number(service.duration)));
     setIsModalOpen(true);
   };
 
@@ -187,13 +190,19 @@ export default function ServicesPage() {
     setEditingId(null);
     setName('');
     setDescription('');
-    setDuration('60');
+    setDuration('');
     setPrice('');
     setCategory('');
+    setShowCustomDuration(false);
   };
 
   return (
     <AppLayout activeRoute="services">
+      <FirstVisitTip 
+        pageKey="services"
+        title="Seus serviços"
+        description="Cadastre tudo o que você oferece. Use a nossa IA para criar descrições que vendem mais."
+      />
       <div className="p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-8 mb-16">
           <div>
@@ -348,14 +357,74 @@ export default function ServicesPage() {
                     <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que torna este serviço especial?" className="w-full px-5 sm:px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink h-24 sm:h-28 resize-none transition-all font-light text-sm min-w-0 box-border" />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Duração (min)</label>
-                      <div className="relative">
-                        <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
-                        <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm min-w-0" required />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">
+                        Duração do Atendimento <span className="text-brand-terracotta">*</span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {[30, 45, 60, 90, 120].map(d => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={() => {
+                              setDuration(d.toString());
+                              setShowCustomDuration(false);
+                            }}
+                            className={cn(
+                              "px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all",
+                              Number(duration) === d && !showCustomDuration
+                                ? "bg-brand-terracotta border-brand-terracotta text-brand-white shadow-md"
+                                : "border-brand-mist text-brand-stone hover:border-brand-ink"
+                            )}
+                          >
+                            {d} min
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomDuration(!showCustomDuration)}
+                          className={cn(
+                            "px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all",
+                            showCustomDuration
+                              ? "bg-brand-ink border-brand-ink text-brand-white"
+                              : "border-brand-mist text-brand-stone hover:border-brand-ink shadow-sm"
+                          )}
+                        >
+                          {showCustomDuration ? 'Voltar' : '+ Outro'}
+                        </button>
                       </div>
+
+                      <AnimatePresence>
+                        {showCustomDuration && (
+                          <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="relative"
+                          >
+                            <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
+                            <input 
+                              type="number" 
+                              value={duration} 
+                              onChange={(e) => setDuration(e.target.value)} 
+                              placeholder="60" 
+                              className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm min-w-0" 
+                              required 
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {Number(duration) > 0 && profile?.workingHours && (
+                        <div className="bg-brand-linen/40 p-3 rounded-2xl border border-dashed border-brand-mist/50">
+                          <p className="text-[9px] text-brand-stone font-medium uppercase tracking-wider leading-relaxed">
+                            {Math.floor(((Number(profile.workingHours.endTime.split(':')[0]) * 60 + Number(profile.workingHours.endTime.split(':')[1])) - (Number(profile.workingHours.startTime.split(':')[0]) * 60 + Number(profile.workingHours.startTime.split(':')[1]))) / Number(duration))} atendimentos possíveis por dia.
+                          </p>
+                        </div>
+                      )}
                     </div>
+
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Preço (R$)</label>
                       <div className="relative">

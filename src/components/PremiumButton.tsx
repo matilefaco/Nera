@@ -14,7 +14,7 @@ interface PremiumButtonProps {
   loading?: boolean;
   loadingText?: string;
   type?: 'button' | 'submit' | 'reset';
-  feature?: 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics';
+  feature?: 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics' | 'reports';
 }
 
 const PremiumButton = ({ 

@@ -34,7 +34,7 @@ const IDENTITY_DIFFERENTIALS = [
   'Experiência comprovada'
 ];
 
-const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'];
+const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
 
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
@@ -478,7 +478,7 @@ export default function ProfilePage() {
 
   return (
     <AppLayout activeRoute="profile">
-      <div className="p-6 md:p-12 max-w-5xl mx-auto w-full">
+      <div className="p-6 md:p-12 pb-[100px] md:pb-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Meu Perfil Profissional</h1>
@@ -489,30 +489,25 @@ export default function ProfilePage() {
           </Link>
         </header>
 
-        {profileCompleteness < 100 && (
-          <div className="mb-12 p-8 bg-brand-white border border-brand-mist rounded-[40px] shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone">
-                Progresso do seu perfil
+        {profileCompleteness < 100 ? (
+          <div className="mb-8 p-4 bg-brand-linen rounded-2xl border border-brand-mist/50">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
+                Perfil {profileCompleteness}% completo
               </span>
-              <span className="text-[12px] font-bold text-brand-terracotta">{profileCompleteness}%</span>
+              <span className="text-[10px] text-brand-stone italic">Quase lá!</span>
             </div>
-            <div className="w-full h-2 bg-brand-mist rounded-full overflow-hidden mb-4">
+            <div className="w-full h-1.5 bg-brand-white rounded-full overflow-hidden">
               <div 
-                className="h-full bg-brand-terracotta rounded-full transition-all duration-700 ease-out"
+                className="h-full bg-brand-terracotta rounded-full transition-all duration-700"
                 style={{ width: `${profileCompleteness}%` }}
               />
             </div>
-            {profileCompleteness < 100 && (
-              <p className="text-[10px] text-brand-stone font-light leading-relaxed max-w-lg">
-                Para atrair mais clientes, seu perfil precisa estar completo: {' '}
-                {!profile?.avatar ? <span className="font-medium text-brand-terracotta">Adicione uma foto. </span> : ''}
-                {!profile?.bio ? <span className="font-medium text-brand-terracotta">Escreva sua bio. </span> : ''}
-                {(profile?.portfolio?.length || 0) < 3 ? <span className="font-medium text-brand-terracotta">Suba 3 fotos na galeria. </span> : ''}
-                {!profile?.instagram ? <span className="font-medium text-brand-terracotta">Conecte seu Instagram. </span> : ''}
-                {!profile?.professionalIdentity?.yearsExperience ? <span className="font-medium text-brand-terracotta">Informe sua experiência. </span> : ''}
-              </p>
-            )}
+          </div>
+        ) : (
+          <div className="mb-8 flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full w-fit border border-green-100">
+            <CheckCircle2 size={16} />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Perfil completo!</span>
           </div>
         )}
 
@@ -547,10 +542,11 @@ export default function ProfilePage() {
                 <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Exiba fotos do seu trabalho</p>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {portfolio.map((item, idx) => (
                   <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
                     <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" alt={`Portfolio ${idx}`} />
+                    
                     <div className="absolute inset-0 bg-brand-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-3 backdrop-blur-[2px]">
                       <input 
                         type="text" 
@@ -573,19 +569,21 @@ export default function ProfilePage() {
                         className="w-full bg-brand-white/10 border border-brand-white/20 rounded-lg px-2 py-1.5 text-[10px] text-brand-white placeholder:text-brand-white/50 outline-none text-center mb-3 font-light"
                         placeholder="Categoria"
                       />
+                    </div>
+
+                    {!item.isUploading && (
                       <button 
                         type="button"
                         onClick={() => item.id && removePortfolioImage(item.id)}
                         disabled={deletingId === item.id}
-                        className="w-8 h-8 bg-brand-white text-brand-terracotta rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
+                        className="absolute top-2 right-2 p-2 bg-white text-red-500 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 disabled:opacity-50 z-20"
                       >
                         {deletingId === item.id ? (
-                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                            <Sparkles size={14} />
-                          </motion.div>
-                        ) : <X size={14} />}
+                          <RefreshCw size={14} className="animate-spin" />
+                        ) : <Trash2 size={14} />}
                       </button>
-                    </div>
+                    )}
+
                     {item.isUploading && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
@@ -802,13 +800,13 @@ export default function ProfilePage() {
 
               <div className="space-y-4">
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
-                <div className="flex justify-between gap-1">
+                <div className="flex flex-wrap gap-2">
                   {WEEKDAYS.map((day, idx) => (
                     <button 
                       key={idx}
                       type="button"
                       onClick={() => toggleDay(idx)}
-                      className={`w-9 h-9 md:w-10 md:h-10 rounded-full font-medium text-[10px] transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone border border-brand-mist hover:border-brand-stone'}`}
+                      className={`min-w-[44px] h-[44px] flex-1 sm:flex-none rounded-full font-medium text-[10px] transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone border border-brand-mist hover:border-brand-stone'}`}
                     >
                       {day}
                     </button>
@@ -816,7 +814,7 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 py-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
                 <div className="space-y-2 min-w-0">
                   <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início</label>
                   <input 
@@ -947,6 +945,18 @@ export default function ProfilePage() {
             </div>
           </div>
         </form>
+
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-brand-mist md:hidden z-50">
+          <button 
+            type="button"
+            onClick={handleSave} 
+            disabled={loading}
+            className="w-full py-4 bg-brand-ink text-white rounded-full text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
+          >
+            {loading ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+            {loading ? "Salvando..." : "Salvar Alterações"}
+          </button>
+        </div>
       </div>
     </AppLayout>
   );

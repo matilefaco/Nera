@@ -3,7 +3,7 @@ import { useAuth } from '../AuthContext';
 import { usePlanFeatures } from './usePlanFeatures';
 import { Appointment } from '../types';
 
-export type UpgradeFeature = 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics';
+export type UpgradeFeature = 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics' | 'reports';
 
 export function useUpgradeTriggers(appointments: Appointment[] = []) {
   const { profile } = useAuth();

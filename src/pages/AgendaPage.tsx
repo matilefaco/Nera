@@ -23,6 +23,7 @@ import { AnimatePresence } from 'motion/react';
 import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 import WaitlistCentralModal from '../components/WaitlistCentralModal';
 import QuickBlockModal from '../components/QuickBlockModal';
+import { FirstVisitTip } from '../components/FirstVisitTip';
 
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
@@ -446,6 +447,11 @@ export default function AgendaPage() {
 
   return (
     <AppLayout activeRoute="agenda">
+      <FirstVisitTip 
+        pageKey="agenda"
+        title="Sua agenda visual"
+        description="Veja e gerencie todos os agendamentos em formato de calendário. Clique em qualquer horário para ver os detalhes."
+      />
       <div className="p-5 md:p-12 max-w-2xl mx-auto w-full">
         
         {/* 1. HEADER LIMPO */}

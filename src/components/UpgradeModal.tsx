@@ -7,7 +7,7 @@ import { formatCurrency } from '../lib/utils';
 interface UpgradeModalProps {
   open: boolean;
   onClose: () => void;
-  feature?: 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics';
+  feature?: 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics' | 'reports';
   count?: number;
   totalClients?: number;
   averageTicket?: number;
@@ -67,6 +67,12 @@ export default function UpgradeModal({
           title: "Inteligência de Dados",
           desc: "Saiba exatamente quem são suas clientes VIP e quem está em risco.",
           limit: "Decisões precisas, lucro garantido"
+        };
+      case 'reports':
+        return {
+          title: "Relatórios Profissionais",
+          desc: "Gere documentos em PDF com sua performance mensal e top serviços.",
+          limit: "Sua gestão elevada ao nível Pro"
         };
       case 'unlimitedBookings':
       default:

@@ -53,6 +53,7 @@ export interface PlanFeatures {
   antiNoShow: boolean;
   coupons: boolean;
   analytics: boolean;
+  reports: boolean;
 }
 
 export interface UserProfile {
@@ -272,7 +273,8 @@ export interface Coupon {
   usedCount: number;
   expiresAt?: string; // ISO date
   active: boolean;
-  serviceIds?: string[]; // null = todos os serviços
+  applicableServiceIds?: string[]; // vazio = todos os serviços
+  perClientLimit?: 1 | null;
   createdAt: any;
 }
 

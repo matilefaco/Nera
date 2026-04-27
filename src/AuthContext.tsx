@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { UserProfile } from './types';
 
 interface AuthContextType {
@@ -9,6 +9,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   isAuthReady: boolean;
+  refreshProfile: () => Promise<UserProfile | null>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   isAuthReady: false,
+  refreshProfile: async () => null,
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -23,6 +25,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
+
+  const refreshProfile = async () => {
+    if (!auth.currentUser) return null;
+    const { getDoc } = await import('firebase/firestore');
+    const docRef = doc(db, 'users', auth.currentUser.uid);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data() as UserProfile;
+      setProfile(data);
+      return data;
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    if (user && profile && !profile.referralCode) {
+      console.log('[AuthContext] Generating referralCode for user:', user.uid);
+      const code = user.uid.slice(0, 8).toUpperCase();
+      updateDoc(doc(db, 'users', user.uid), { referralCode: code })
+        .catch(err => console.error('[AuthContext] Error saving referralCode:', err));
+    }
+  }, [user, profile]);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
@@ -85,7 +109,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isAuthReady }}>
+    <AuthContext.Provider value={{ user, profile, loading, isAuthReady, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

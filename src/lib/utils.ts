@@ -380,3 +380,24 @@ export function parseAddress(address: AddressData | string): AddressData {
   
   return address;
 }
+
+/**
+ * Normalizes an Instagram handle by removing URLs, @ symbols, spacing, 
+ * accents and invalid characters. Converts to lowercase and caps at 30 chars.
+ */
+export function normalizeInstagram(value: string): string {
+  if (!value) return '';
+  // Remove "https://instagram.com/" and variations
+  let clean = value.replace(/^(https?:\/\/)?(www\.)?instagram\.com\//i, '');
+  // Remove "@" from start
+  clean = clean.replace(/^@/, '');
+  // Remove spaces, accents and invalid characters
+  clean = clean.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Remove accents
+  clean = clean.replace(/[^a-zA-Z0-9._]/g, '');
+  // Convert to lowercase
+  clean = clean.toLowerCase();
+  // Limit to 30 characters
+  return clean.substring(0, 30);
+}
+
+export const INSTAGRAM_REGEX = /^[a-zA-Z0-9._]{1,30}$/;

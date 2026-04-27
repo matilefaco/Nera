@@ -95,7 +95,7 @@ export default function ManageBookingPage() {
 
       console.log(`[BOOKING_MANAGEMENT] Fetching via API for: ${lookupKey}`);
       try {
-        const response = await fetch(`/api/reservation/${lookupKey}`);
+        const response = await fetch(`/api/profile/reservation/${lookupKey}`);
         
         if (!response.ok) {
           console.error('[BOOKING_MANAGEMENT] API fetch failed');
@@ -269,7 +269,7 @@ export default function ManageBookingPage() {
             <p className="text-[9px] font-mono text-brand-stone">API Status: <span className="text-brand-terracotta">{diagnosticResults.apiStatus} ({diagnosticResults.apiStatusText})</span></p>
             
             <p className="text-[9px] text-brand-stone/60 italic pt-2 leading-relaxed">
-              * O link foi consultado via backend /api/reservation/:slug. Se retornou 404, o manageSlug não está indexado ou o documento na coleção 'reservation_links' ainda não foi criado.
+              * O link foi consultado via backend /api/profile/reservation/:slug. Se retornou 404, o manageSlug não está indexado ou o documento na coleção 'reservation_links' ainda não foi criado.
             </p>
           </div>
         )}

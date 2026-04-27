@@ -38,7 +38,7 @@ async function startServer() {
   // API Routes registration
   app.use("/api", bookingRoutes);
   app.use("/api", notificationRoutes);
-  app.use("/api", profileRoutes);
+  app.use("/api/profile", profileRoutes);
   app.use("/api/plans", planRoutes);
   app.use("/api", analyticsRoutes);
   app.use("/api/calendar", calendarRoutes);

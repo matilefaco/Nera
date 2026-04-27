@@ -1,7 +1,7 @@
 import React from 'react';
-import { User, Camera, Sparkles, X, CheckCircle2 } from 'lucide-react';
+import { User, Camera, Sparkles, X, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, cleanWhatsapp, formatWhatsappDisplay } from '../lib/utils';
+import { cn, cleanWhatsapp, formatWhatsappDisplay, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
 
 export interface FormIdentityProps {
   name: string;
@@ -25,6 +25,9 @@ export interface FormIdentityProps {
   setWhatsapp?: (val: string) => void;
   instagram?: string;
   setInstagram?: (val: string) => void;
+  instagramStatus?: 'idle' | 'valid' | 'invalid';
+  instagramConfirmed?: boolean;
+  setInstagramConfirmed?: (val: boolean) => void;
   slug?: string;
   setSlug?: (val: string) => void;
   slugStatus?: 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid';
@@ -34,6 +37,9 @@ export interface FormIdentityProps {
   differentials?: string[];
   setDifferentials?: (val: string[]) => void;
   availableDifferentials?: string[];
+  
+  paymentMethods?: string[];
+  setPaymentMethods?: (val: string[]) => void;
   
   title?: string;
   subtitle?: string;
@@ -79,6 +85,9 @@ export const FormIdentity = ({
   setWhatsapp,
   instagram,
   setInstagram,
+  instagramStatus = 'idle',
+  instagramConfirmed,
+  setInstagramConfirmed,
   slug,
   setSlug,
   slugStatus = 'idle',
@@ -88,6 +97,8 @@ export const FormIdentity = ({
   differentials,
   setDifferentials,
   availableDifferentials = [],
+  paymentMethods,
+  setPaymentMethods,
   title,
   subtitle,
   showLabels = true,
@@ -369,16 +380,75 @@ export const FormIdentity = ({
           {(instagram !== undefined && setInstagram) && (
             <div className="space-y-2">
               {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>}
-              <div className="flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border border-brand-mist shadow-sm">
+              <div className={cn(
+                "flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border transition-all",
+                instagramStatus === 'valid' ? "border-green-200 ring-1 ring-green-100" :
+                instagramStatus === 'invalid' ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
+                "border-brand-mist shadow-sm"
+              )}>
                 <span className="text-brand-stone text-xs ml-1">@</span>
                 <input 
                   type="text" 
                   value={instagram} 
-                  onChange={(e) => setInstagram(e.target.value.replace(/@/g, ''))} 
+                  onChange={(e) => setInstagram(normalizeInstagram(e.target.value))} 
                   placeholder="seu.usuario" 
-                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs" 
+                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs placeholder:font-light" 
                 />
+                <AnimatePresence mode="wait">
+                  {instagramStatus === 'valid' && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                      <CheckCircle2 size={16} className="text-green-500 mr-1" />
+                    </motion.div>
+                  )}
+                  {instagramStatus === 'invalid' && (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
+                      <X size={16} className="text-brand-terracotta mr-1" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
+
+              {instagramStatus === 'invalid' && (
+                <p className="text-[10px] text-brand-terracotta font-medium ml-1 flex items-center gap-1.5">
+                  <AlertCircle size={12} />
+                  Use apenas letras, números, ponto e underline
+                </p>
+              )}
+
+              {instagramStatus === 'valid' && (
+                <div className="space-y-3 pt-1 ml-1">
+                  <div className="space-y-1">
+                    <a 
+                      href={`https://instagram.com/${instagram}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-brand-terracotta underline flex items-center gap-1.5"
+                    >
+                      Confirmar: @{instagram} ↗
+                    </a>
+                    <p className="text-[10px] text-brand-stone font-light italic">
+                      Clique para confirmar que é o seu perfil
+                    </p>
+                  </div>
+                  
+                  {setInstagramConfirmed && (
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
+                      <div className="relative flex items-center justify-center">
+                        <input 
+                          type="checkbox" 
+                          checked={instagramConfirmed} 
+                          onChange={(e) => setInstagramConfirmed(e.target.checked)}
+                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all"
+                        />
+                        <CheckCircle2 size={10} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                      </div>
+                      <span className="text-[10px] text-brand-stone font-medium uppercase tracking-wider group-hover:text-brand-ink transition-colors">
+                        Confirmei que o perfil acima é o meu
+                      </span>
+                    </label>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -449,6 +519,45 @@ export const FormIdentity = ({
               )}
               
               <FormError message={errors.slug} />
+            </div>
+          )}
+
+          {(paymentMethods !== undefined && setPaymentMethods) && (
+            <div className="space-y-4 pt-4 border-t border-brand-mist/30">
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                  Formas de pagamento aceitas <span className="text-brand-terracotta">*</span>
+                </label>
+                <p className="text-[10px] text-brand-stone font-light ml-1">
+                  Selecione ao menos uma opção para suas clientes saberem como pagar.
+                </p>
+              </div>
+              
+              <div className="flex flex-wrap gap-2">
+                {['PIX', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro', 'Transferência'].map(method => (
+                  <button
+                    key={method}
+                    type="button"
+                    onClick={() => {
+                      if (paymentMethods.includes(method)) {
+                        setPaymentMethods(paymentMethods.filter(m => m !== method));
+                      } else {
+                        setPaymentMethods([...paymentMethods, method]);
+                      }
+                    }}
+                    className={cn(
+                      "px-5 py-2.5 rounded-full text-[10px] font-bold tracking-wider transition-all border uppercase",
+                      paymentMethods.includes(method)
+                        ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
+                        : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                    )}
+                  >
+                    {method}
+                    {paymentMethods.includes(method) && <CheckCircle2 size={12} className="inline ml-1.5" />}
+                  </button>
+                ))}
+              </div>
+              <FormError message={errors.paymentMethods} />
             </div>
           )}
         </div>

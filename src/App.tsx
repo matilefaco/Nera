@@ -30,6 +30,9 @@ import ManageBookingPage from './pages/ManageBookingPage';
 import CouponsPage from './pages/CouponsPage';
 import WhatsAppSimulator from './pages/WhatsAppSimulator';
 import DirectoryPage from './pages/DirectoryPage';
+import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
+import CheckoutCanceledPage from './pages/CheckoutCanceledPage';
+import ReferralsPage from './pages/ReferralsPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -134,6 +137,13 @@ export default function App() {
               <Route path="/admin/whatsapp-test" element={
                 <PrivateRoute>
                   <WhatsAppSimulator />
+                </PrivateRoute>
+              } />
+              <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+              <Route path="/checkout/canceled" element={<CheckoutCanceledPage />} />
+              <Route path="/indicacoes" element={
+                <PrivateRoute>
+                  <ReferralsPage />
                 </PrivateRoute>
               } />
             </Routes>
