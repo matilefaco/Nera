@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
+import { useAuth } from '../AuthContext';
 
 interface SharingPreviewSectionProps {
   profile: UserProfile;
@@ -22,6 +23,15 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSavingSuccess, setShowSavingSuccess] = useState(false);
+
+  useEffect(() => {
+    setFormData({
+      ogTitle: profile.ogTitle || '',
+      ogDescription: profile.ogDescription || '',
+      ogImageUrl: profile.ogImageUrl || profile.avatar || '',
+      ogCtaText: profile.ogCtaText || '',
+    });
+  }, [profile.ogTitle, profile.ogDescription, profile.ogImageUrl, profile.avatar, profile.ogCtaText]);
 
   // Fallbacks for preview
   const previewTitle = formData.ogTitle || `${profile.name} | ${profile.category || profile.specialty || "Profissional Nera"}`;

@@ -96,6 +96,9 @@ export default function Dashboard() {
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
+  const [blockTipDismissed, setBlockTipDismissed] = useState(() => {
+    return localStorage.getItem("nera_block_tip_dismissed") === "true";
+  });
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [unconfirmedTomorrow, setUnconfirmedTomorrow] = useState<Appointment[]>([]);
   const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
@@ -2392,12 +2395,12 @@ export default function Dashboard() {
       />
 
       {/* 9. PRIMEIRA EXPERIÊNCIA / HINT (Se não houver bloqueios ativos) */}
-      {blockedSchedules.length === 0 && (
+      {!blockTipDismissed && blockedSchedules.length === 0 && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
           <motion.div 
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="bg-brand-ink text-white p-4 rounded-2xl shadow-xl border border-white/10 flex items-center gap-4"
+            className="bg-brand-ink text-white p-4 rounded-2xl shadow-xl border border-white/10 flex items-center gap-4 relative pr-12"
           >
             <div className="w-8 h-8 bg-brand-terracotta rounded-full flex items-center justify-center shrink-0">
               <Lock size={16} />
@@ -2406,7 +2409,17 @@ export default function Dashboard() {
               <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5">Dica Profissional</p>
               <p className="text-[11px] text-white/70 leading-tight">Vai viajar ou descansar? Use o <span className="text-white font-bold">Bloquear Agenda</span> para evitar reservas indevidas.</p>
             </div>
-            <button onClick={() => setIsQuickBlockOpen(true)} className="p-2 hover:bg-white/10 rounded-full">
+            <button 
+              onClick={() => {
+                localStorage.setItem("nera_block_tip_dismissed", "true");
+                setBlockTipDismissed(true);
+              }} 
+              className="absolute top-2 right-2 p-2 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
+              title="Fechar dica"
+            >
+              <X size={14} />
+            </button>
+            <button onClick={() => setIsQuickBlockOpen(true)} className="p-2 hover:bg-white/10 rounded-full text-white/60">
               <ChevronRight size={18} />
             </button>
           </motion.div>
