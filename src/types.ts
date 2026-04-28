@@ -67,6 +67,7 @@ export interface UserProfile {
   bio?: string; // Top-level official (removed from professionalIdentity)
   headline?: string; // Top-level official (removed from professionalIdentity)
   specialty?: string;
+  category?: string;
   city?: string;
   neighborhood?: string;
   

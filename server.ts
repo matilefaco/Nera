@@ -97,10 +97,30 @@ export async function createServerApp() {
       const { slug } = req.params;
       const data = await getProfileOgData(slug);
       
+      // Sanitize profile for debugging (remove PII)
+      const sanitizedProf = data ? {
+        name: data.prof.name,
+        slug: data.prof.slug,
+        category: data.prof.category,
+        specialty: data.prof.specialty,
+        bio: data.prof.bio,
+        headline: data.prof.headline,
+        avatar: data.prof.avatar,
+        photoUrl: data.prof.photoUrl,
+        ogTitle: data.prof.ogTitle,
+        ogDescription: data.prof.ogDescription,
+        ogImageUrl: data.prof.ogImageUrl,
+        ogCtaText: data.prof.ogCtaText,
+        ogUpdatedAt: data.prof.ogUpdatedAt,
+        instagram: data.prof.instagram,
+        city: data.prof.city,
+        neighborhood: data.prof.neighborhood
+      } : null;
+
       const debugInfo = {
         slug,
         found: !!data,
-        rawUser: data?.prof,
+        rawUser: sanitizedProf,
         finalTags: data ? {
           title: data.title,
           imageUrl: data.imageUrl,

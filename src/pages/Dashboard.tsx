@@ -184,6 +184,10 @@ export default function Dashboard() {
     const weakestDayIndex = Object.entries(dayCounts).sort((a: any, b: any) => a[1] - b[1])[0]?.[0];
     const weakestDay = weakestDayIndex ? dayNames[parseInt(weakestDayIndex)] : '-';
 
+    const growthInsight = convRate > 5 
+      ? "Sua conversão está acima da média! Tente aumentar sua vitrine com mais fotos para converter ainda mais."
+      : "Seu volume de visitas é bom, mas a conversão pode melhorar. Ajuste os nomes dos seus serviços para torná-los mais atraentes.";
+
     return {
       visits7d,
       visits30d,
@@ -192,6 +196,7 @@ export default function Dashboard() {
       topService,
       bestTime,
       weakestDay,
+      growthInsight,
       mainOrigin: mainOrigin === 'instagram' ? 'Instagram' : mainOrigin === 'direct' ? 'Direto' : 'Outros'
     };
   }, [analyticsEvents, appointments]);
@@ -816,180 +821,200 @@ export default function Dashboard() {
         {/* INSIGHTS CONTENT */}
         {activeTab === "insights" && (
           <div className="flex flex-col gap-8">
-            {/* Header com Status do Plano */}
-            <section className="px-6 mt-4">
-              <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-serif text-brand-ink italic">
-                    {features.advancedDashboard 
-                      ? "Performance completa dos últimos 30 dias."
-                      : "Você já pode acompanhar visitas e cliques. 🔒 Insights completos estão no Plano Pro."}
-                  </p>
-                  {!features.advancedDashboard && (
-                    <Link to="/planos" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
-                      Fazer Upgrade
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* Growth Dashboard: KPIs de Conversão e Insights */}
-            {growthMetrics && (
-              <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-10 relative overflow-hidden">
-                <div className="flex items-center justify-between border-b border-brand-linen pb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
-                      <TrendingUp size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
-                        Growth Dashboard
-                      </h3>
-                      <p className="text-sm font-serif text-brand-ink italic">Sua performance de conversão</p>
-                    </div>
-                  </div>
-                  <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
-                    <span className="px-3 py-1.5 bg-brand-white rounded-full shadow-sm text-brand-ink">30 Dias</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas 30d</p>
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-2xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
-                      <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
-                    <p className="text-2xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Taxa de Conversão</p>
-                    <div className="flex items-center gap-2">
-                        {features.advancedDashboard ? (
-                          <>
-                            <p className="text-2xl font-serif text-brand-ink">{growthMetrics.convRate.toFixed(1)}%</p>
-                            <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-2xl font-serif text-brand-mist">---</p>
-                            <Lock size={12} className="text-brand-mist" />
-                          </>
-                        )}
+            {/* Componente Interno para Métricas Bloqueadas */}
+            {(() => {
+              const LockedMetric = ({ value, label, locked, icon: Icon }: { value: any, label: string, locked: boolean, icon?: any }) => (
+                <div className="space-y-1">
+                  <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">{label}</p>
+                  <div className="flex items-center gap-2">
+                    {locked ? (
+                      <div className="flex items-center gap-2 group relative cursor-help">
+                        <p className="text-2xl font-serif text-brand-mist">---</p>
+                        <div className="flex items-center gap-1">
+                          <Lock size={12} className="text-brand-mist" />
+                          <Link 
+                            to="/planos" 
+                            className="p-1 hover:bg-brand-linen rounded-full transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ChevronRight size={10} className="text-brand-terracotta" />
+                          </Link>
+                        </div>
+                        <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-brand-ink text-white text-[7px] font-bold uppercase tracking-widest rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30">
+                          Disponível no Plano Pro
+                        </div>
                       </div>
-                      {!features.advancedDashboard && (
-                        <p className="text-[7px] text-brand-stone font-medium uppercase tracking-widest">Disponível no plano Pro</p>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Origem Principal</p>
+                    ) : (
                       <div className="flex items-center gap-2">
-                        {features.advancedDashboard ? (
-                          <>
-                            <div className="w-4 h-4 rounded bg-brand-linen flex items-center justify-center">
-                              {growthMetrics.mainOrigin === 'Instagram' ? <Instagram size={10} /> : <Share2 size={10} />}
-                            </div>
-                            <p className="text-2xl font-serif text-brand-ink">{growthMetrics.mainOrigin}</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-2xl font-serif text-brand-mist">---</p>
-                            <Lock size={12} className="text-brand-mist" />
-                          </>
-                        )}
+                         {Icon && <div className="w-4 h-4 rounded bg-brand-linen flex items-center justify-center"><Icon size={10} /></div>}
+                         <p className="text-2xl font-serif text-brand-ink">{value}</p>
                       </div>
-                      {!features.advancedDashboard && (
-                        <p className="text-[7px] text-brand-stone font-medium uppercase tracking-widest">Disponível no plano Pro</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-brand-linen">
-                    <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                      <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                        {features.advancedDashboard ? <Sparkles size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                        <span className="text-[8px] font-bold uppercase tracking-widest">Serviço Campeão</span>
-                      </div>
-                      {features.advancedDashboard ? (
-                        <p className="text-sm font-serif text-brand-ink leading-tight">{growthMetrics.topService}</p>
-                      ) : (
-                        <div className="space-y-1">
-                          <p className="text-sm font-serif text-brand-mist">---</p>
-                          <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                      <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                        {features.advancedDashboard ? <Clock size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                        <span className="text-[8px] font-bold uppercase tracking-widest">Horário + Vendido</span>
-                      </div>
-                      {features.advancedDashboard ? (
-                        <p className="text-sm font-serif text-brand-ink">{growthMetrics.bestTime}</p>
-                      ) : (
-                        <div className="space-y-1">
-                          <p className="text-sm font-serif text-brand-mist">---</p>
-                          <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                      <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                        {features.advancedDashboard ? <Sun size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                        <span className="text-[8px] font-bold uppercase tracking-widest">Dia mais fraco</span>
-                      </div>
-                      {features.advancedDashboard ? (
-                        <p className="text-sm font-serif text-brand-ink">{growthMetrics.weakestDay}</p>
-                      ) : (
-                        <div className="space-y-1">
-                          <p className="text-sm font-serif text-brand-mist">---</p>
-                          <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Disponível no plano Pro</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* AI Insights */}
-                  <AnimatePresence>
-                    {!insightDismissed && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="bg-brand-linen/40 p-6 rounded-[32px] border border-brand-mist/30 flex items-start gap-4 overflow-hidden relative"
-                      >
-                        {!features.advancedDashboard && (
-                          <div className="absolute inset-0 z-10 bg-brand-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-4">
-                            <Lock size={16} className="text-brand-terracotta mb-2" />
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">Bloqueado</p>
-                            <p className="text-[9px] text-brand-stone font-light">Growth Insights é exclusivo do Plano Pro</p>
-                            <Link to="/planos" className="mt-2 text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Fazer Upgrade</Link>
-                          </div>
-                        )}
-                        <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm border border-brand-mist/20">
-                          <Zap size={20} />
-                        </div>
-                        <div className="flex-1 pr-8">
-                          <h4 className="text-xs font-bold text-brand-ink uppercase tracking-widest mb-1">Dica de Performance</h4>
-                          <p className="text-xs text-brand-stone font-light leading-relaxed italic">
-                            {growthMetrics.growthInsight}
-                          </p>
-                        </div>
-                        <button 
-                          onClick={() => setInsightDismissed(true)}
-                          className="absolute top-6 right-6 p-1 text-brand-stone hover:text-brand-ink"
-                        >
-                          <X size={14} />
-                        </button>
-                      </motion.div>
                     )}
-                  </AnimatePresence>
-                </section>
-              )}
+                  </div>
+                </div>
+              );
+
+              return (
+                <>
+                  {/* Header com Status do Plano */}
+                  <section className="px-6 mt-4">
+                    <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-serif text-brand-ink italic">
+                          {features.advancedDashboard 
+                            ? "Performance completa dos últimos 30 dias."
+                            : "Vendo quantas pessoas visitaram sua vitrine. 🔒 Acesse insights completos no Plano Pro."}
+                        </p>
+                        {!features.advancedDashboard && (
+                          <Link to="/planos" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
+                            Fazer Upgrade
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Growth Dashboard: KPIs de Conversão e Insights */}
+                  {growthMetrics && (
+                    <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-10 relative overflow-hidden">
+                      <div className="flex items-center justify-between border-b border-brand-linen pb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                            <TrendingUp size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
+                              Growth Dashboard
+                            </h3>
+                            <p className="text-sm font-serif text-brand-ink italic">Sua performance de conversão</p>
+                          </div>
+                        </div>
+                        <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
+                          <span className="px-3 py-1.5 bg-brand-white rounded-full shadow-sm text-brand-ink">30 Dias</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas 30d</p>
+                          <div className="flex items-baseline gap-2">
+                            <p className="text-2xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
+                            <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
+                          <p className="text-2xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
+                        </div>
+                        
+                        <LockedMetric 
+                          label="Taxa de Conversão" 
+                          value={`${growthMetrics.convRate.toFixed(1)}%`} 
+                          locked={!features.advancedDashboard} 
+                        />
+                        
+                        <LockedMetric 
+                          label="Origem Principal" 
+                          value={growthMetrics.mainOrigin} 
+                          locked={!features.advancedDashboard}
+                          icon={growthMetrics.mainOrigin === 'Instagram' ? Instagram : Share2}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-brand-linen">
+                        <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                          <div className="flex items-center gap-2 mb-3 text-brand-stone">
+                            {features.advancedDashboard ? <Sparkles size={14} /> : <Lock size={14} className="text-brand-mist" />}
+                            <span className="text-[8px] font-bold uppercase tracking-widest">Serviço Campeão</span>
+                          </div>
+                          {features.advancedDashboard ? (
+                            <p className="text-sm font-serif text-brand-ink leading-tight">{growthMetrics.topService}</p>
+                          ) : (
+                            <div className="space-y-1">
+                              <p className="text-sm font-serif text-brand-mist">---</p>
+                              <div className="flex items-center gap-1">
+                                <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Plano Pro</p>
+                                <Link to="/planos"><ChevronRight size={10} className="text-brand-terracotta" /></Link>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                          <div className="flex items-center gap-2 mb-3 text-brand-stone">
+                            {features.advancedDashboard ? <Clock size={14} /> : <Lock size={14} className="text-brand-mist" />}
+                            <span className="text-[8px] font-bold uppercase tracking-widest">Horário + Vendido</span>
+                          </div>
+                          {features.advancedDashboard ? (
+                            <p className="text-sm font-serif text-brand-ink">{growthMetrics.bestTime}</p>
+                          ) : (
+                            <div className="space-y-1">
+                              <p className="text-sm font-serif text-brand-mist">---</p>
+                              <div className="flex items-center gap-1">
+                                <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Plano Pro</p>
+                                <Link to="/planos"><ChevronRight size={10} className="text-brand-terracotta" /></Link>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+                          <div className="flex items-center gap-2 mb-3 text-brand-stone">
+                            {features.advancedDashboard ? <Sun size={14} /> : <Lock size={14} className="text-brand-mist" />}
+                            <span className="text-[8px] font-bold uppercase tracking-widest">Dia mais fraco</span>
+                          </div>
+                          {features.advancedDashboard ? (
+                            <p className="text-sm font-serif text-brand-ink">{growthMetrics.weakestDay}</p>
+                          ) : (
+                            <div className="space-y-1">
+                              <p className="text-sm font-serif text-brand-mist">---</p>
+                              <div className="flex items-center gap-1">
+                                <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Plano Pro</p>
+                                <Link to="/planos"><ChevronRight size={10} className="text-brand-terracotta" /></Link>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* AI Insights */}
+                      <AnimatePresence>
+                        {!insightDismissed && (
+                          <motion.div 
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="bg-brand-linen/40 p-6 rounded-[32px] border border-brand-mist/30 flex items-start gap-4 overflow-hidden relative"
+                          >
+                            {!features.advancedDashboard && (
+                              <div className="absolute inset-0 z-10 bg-brand-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-4">
+                                <Lock size={16} className="text-brand-terracotta mb-2" />
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">Bloqueado</p>
+                                <p className="text-[9px] text-brand-stone font-light">Growth Insights é exclusivo do Plano Pro</p>
+                                <Link to="/planos" className="mt-2 text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Fazer Upgrade</Link>
+                              </div>
+                            )}
+                            <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm border border-brand-mist/20">
+                              <Zap size={20} />
+                            </div>
+                            <div className="flex-1 pr-8">
+                              <h4 className="text-xs font-bold text-brand-ink uppercase tracking-widest mb-1">Dica de Performance</h4>
+                              <p className="text-xs text-brand-stone font-light leading-relaxed italic">
+                                {growthMetrics.growthInsight}
+                              </p>
+                            </div>
+                            <button 
+                              onClick={() => setInsightDismissed(true)}
+                              className="absolute top-6 right-6 p-1 text-brand-stone hover:text-brand-ink"
+                            >
+                              <X size={14} />
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </section>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
