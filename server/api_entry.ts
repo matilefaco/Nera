@@ -12,5 +12,6 @@ export const api = onRequest({
   minInstances: 0,
 }, async (req, res) => {
   const app = await createServerApp();
-  return app(req, res);
+  // The app is an express instance, we just pass the req/res to it.
+  app(req, res);
 });
