@@ -270,6 +270,24 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "type", "createdAt"]
+    },
+    "Alert": {
+      "title": "Alert",
+      "description": "Alertas e notificações internas para a profissional",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "type": { "type": "string", "enum": ["last_minute_cancellation"] },
+        "appointmentId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "scheduledTime": { "type": "string" },
+        "hoursUntil": { "type": "number" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "type", "read", "createdAt"]
     }
   },
   "firestore": {
@@ -332,6 +350,10 @@
     "/billing_logs/{logId}": {
       "schema": "BillingLog",
       "description": "Histórico de faturamento e pagamentos"
+    },
+    "/alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "Alertas internos para profissionais"
     }
   }
 }

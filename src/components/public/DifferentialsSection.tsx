@@ -17,7 +17,7 @@ export const DifferentialsSection = ({ differentials }: DifferentialsSectionProp
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta"
+            className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--theme-accent,var(--color-brand-terracotta))]"
           >
             Excelência em cada detalhe
           </motion.span>
@@ -51,9 +51,9 @@ export const DifferentialsSection = ({ differentials }: DifferentialsSectionProp
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.1 }}
-                className="group p-8 bg-brand-parchment/30 border border-brand-mist rounded-[32px] hover:border-brand-terracotta/30 hover:bg-brand-white transition-all cursor-default"
+                className="group p-8 bg-brand-parchment/30 border border-brand-mist rounded-[32px] hover:border-[var(--theme-accent,var(--color-brand-terracotta))]/30 hover:bg-brand-white transition-all cursor-default"
               >
-                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand-terracotta mb-6 border border-brand-mist group-hover:bg-brand-terracotta group-hover:text-brand-white transition-all shadow-sm">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-[var(--theme-accent,var(--color-brand-terracotta))] mb-6 border border-brand-mist group-hover:bg-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:text-brand-white transition-all shadow-sm">
                   {display.icon}
                 </div>
                 <h4 className="text-lg font-serif text-brand-ink mb-2">

@@ -27,7 +27,7 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta"
+            className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--theme-accent,var(--color-brand-terracotta))]"
           >
             Próximos horários
           </motion.span>
@@ -65,8 +65,8 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
                 "flex-shrink-0 w-24 md:w-full p-4 rounded-[28px] border flex flex-col items-center gap-3 transition-all",
                 day.status === 'closed' 
                   ? "bg-brand-linen/40 border-brand-mist/50 opacity-60 cursor-not-allowed"
-                  : "bg-brand-white border-brand-mist hover:border-brand-terracotta active:scale-95 shadow-sm hover:shadow-md",
-                day.date === availability[0].date && day.status !== 'closed' && "ring-1 ring-brand-terracotta/20"
+                  : "bg-brand-white border-brand-mist hover:border-[var(--theme-accent,var(--color-brand-terracotta))] active:scale-95 shadow-sm hover:shadow-md",
+                day.date === availability[0].date && day.status !== 'closed' && "ring-1 ring-[var(--theme-accent,var(--color-brand-terracotta))]/20"
               )}
             >
               <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">
@@ -84,7 +84,7 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
                 )}
                 {day.status === 'low' && (
                   <>
-                    <span className="text-[8px] font-bold text-brand-terracotta uppercase tracking-wider">Poucas vagas</span>
+                    <span className="text-[8px] font-bold text-[var(--theme-accent,var(--color-brand-terracotta))] uppercase tracking-wider">Poucas vagas</span>
                     <span className="text-[10px] text-brand-stone font-light">{day.slotsCount === 1 ? '1 horário' : `${day.slotsCount} horários`}</span>
                   </>
                 )}
@@ -106,7 +106,7 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
         </div>
         
         <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-brand-stone/60 uppercase tracking-widest">
-           <Calendar size={12} className="text-brand-terracotta" />
+           <Calendar size={12} className="text-[var(--theme-accent,var(--color-brand-terracotta))]" />
            <span>Clique em um dia para ver os horários exatos</span>
         </div>
       </div>

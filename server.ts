@@ -53,6 +53,24 @@ export async function createServerApp() {
   app.use("/api/calendar", calendarRoutes);
   app.use("/api/slug", slugRoutes);
 
+  // Pre-load the index.html template for SSR performance
+  // In production, read from dist/index.html. In dev, from the root index.html.
+  const indexPath = process.env.NODE_ENV === "production" 
+    ? path.join(process.cwd(), "dist", "index.html")
+    : path.join(process.cwd(), "index.html");
+
+  let cachedIndexHtml = "";
+  try {
+    if (fs.existsSync(indexPath)) {
+      cachedIndexHtml = fs.readFileSync(indexPath, "utf-8");
+      console.log(`[SSR] index.html template loaded in memory from ${indexPath}`);
+    } else {
+      console.warn(`[SSR] index.html not found at ${indexPath} during startup. Will retry on first request.`);
+    }
+  } catch (err) {
+    console.error(`[SSR] Failed to read index.html during startup:`, err);
+  }
+
   // Helper to fetch profile and prepare OG data
   async function getProfileOgData(slug: string) {
     const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
@@ -181,17 +199,20 @@ export async function createServerApp() {
         return next();
       }
 
-      // In production, read from dist/index.html. In dev, from the root index.html.
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+      let html = cachedIndexHtml;
 
-      if (!fs.existsSync(indexPath)) {
-        console.error("SSR PROFILE: index.html not found at", indexPath);
-        return next();
+      // Lazy load if cache is empty (e.g. build finished after server started)
+      if (!html) {
+        if (fs.existsSync(indexPath)) {
+          html = fs.readFileSync(indexPath, "utf-8");
+          cachedIndexHtml = html; // Cache it for subsequent requests
+        }
       }
 
-      let html = fs.readFileSync(indexPath, "utf-8");
+      if (!html) {
+        console.error("SSR PROFILE: index.html template still not available");
+        return next();
+      }
 
       const metaTags = `
   <!-- SSR META TAGS START -->

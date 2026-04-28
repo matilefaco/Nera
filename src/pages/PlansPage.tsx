@@ -7,6 +7,7 @@ import PremiumButton from '../components/PremiumButton';
 import { useAuth } from '../AuthContext';
 import { formatCurrency } from '../lib/utils';
 import { toast } from 'sonner';
+import { PLANS } from '../config/plans';
 
 export default function PlansPage() {
   const navigate = useNavigate();
@@ -62,9 +63,13 @@ export default function PlansPage() {
     }
   };
 
+  const freePlan = PLANS.find(p => p.id === 'free')!;
+  const essencialPlan = PLANS.find(p => p.id === 'essencial')!;
+  const proPlan = PLANS.find(p => p.id === 'pro')!;
+
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto py-12 px-6">
+      <div className="max-w-6xl mx-auto py-12 px-6 pb-32 md:pb-12">
         <header className="mb-16 flex flex-col items-center text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -90,27 +95,21 @@ export default function PlansPage() {
             className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm flex flex-col"
           >
             <div className="flex-1">
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-stone block mb-2">Plano Atual</span>
-              <h3 className="text-2xl font-serif text-brand-ink mb-2 italic">Gratuito</h3>
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-stone block mb-2">{profile?.plan === 'free' ? 'Plano Atual' : 'Free'}</span>
+              <h3 className="text-2xl font-serif text-brand-ink mb-2 italic">{freePlan.name}</h3>
               <div className="flex items-baseline gap-1 mb-2">
-                <span className="text-4xl font-serif text-brand-ink">R$ 0</span>
-                <span className="text-xs text-brand-stone uppercase tracking-widest font-bold">/mês</span>
+                <span className="text-4xl font-serif text-brand-ink">R$ {freePlan.price}</span>
+                <span className="text-xs text-brand-stone uppercase tracking-widest font-bold">{freePlan.priceDescriptor}</span>
               </div>
-              <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest italic mb-6">Ideal para começar</div>
+              <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest italic mb-6">{freePlan.tagline}</div>
 
               <div className="space-y-4 mb-10">
-                {[
-                  'Perfil digital premium (foto, bio e serviços)',
-                  'Até 15 agendamentos por mês',
-                  'Aprovação manual (seu filtro)',
-                  'Email para clientes',
-                  'Links para Instagram'
-                ].map(item => (
-                  <div key={item} className="flex items-center gap-3">
+                {freePlan.features.map(feat => (
+                  <div key={feat.text} className="flex items-center gap-3">
                     <div className="w-5 h-5 rounded-full bg-brand-linen flex items-center justify-center text-brand-stone">
                       <Check size={12} />
                     </div>
-                    <span className="text-xs font-medium text-brand-stone uppercase tracking-tight">{item}</span>
+                    <span className="text-xs font-medium text-brand-stone uppercase tracking-tight">{feat.text}</span>
                   </div>
                 ))}
               </div>
@@ -133,29 +132,22 @@ export default function PlansPage() {
 
             <div className="flex-1 relative z-10">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta block">Professional</span>
+                <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta block">{essencialPlan.tagline}</span>
                 <Zap size={12} className="text-brand-terracotta fill-brand-terracotta/20" />
               </div>
-              <h3 className="text-2xl font-serif text-white mb-2 italic">Essencial</h3>
+              <h3 className="text-2xl font-serif text-white mb-2 italic">{essencialPlan.name}</h3>
               <div className="flex items-baseline gap-1 mb-8">
-                <span className="text-4xl font-serif text-white">R$ 49</span>
-                <span className="text-xs text-white/40 uppercase tracking-widest font-bold">,90/mês</span>
+                <span className="text-4xl font-serif text-white">R$ {essencialPlan.price}</span>
+                <span className="text-xs text-white/40 uppercase tracking-widest font-bold">{essencialPlan.priceDescriptor}</span>
               </div>
 
               <div className="space-y-4 mb-10">
-                {[
-                  'Agendamentos Ilimitados',
-                  'Prioridade na Vitrine Nera',
-                  'Faturamento e Métricas base',
-                  'Sem cobrança de comissão',
-                  'WhatsApp Notifications',
-                  'Cupons de Desconto'
-                ].map(item => (
-                  <div key={item} className="flex items-center gap-3">
+                {essencialPlan.features.map(feat => (
+                  <div key={feat.text} className="flex items-center gap-3">
                     <div className="w-5 h-5 rounded-full bg-brand-terracotta flex items-center justify-center text-white">
                       <Check size={12} />
                     </div>
-                    <span className="text-xs font-medium text-white/80 uppercase tracking-tight">{item}</span>
+                    <span className="text-xs font-medium text-white/80 uppercase tracking-tight">{feat.text}</span>
                   </div>
                 ))}
               </div>
@@ -168,7 +160,7 @@ export default function PlansPage() {
               variant={profile?.plan === 'essencial' ? 'secondary' : 'primary'}
               disabled={profile?.plan === 'essencial'}
             >
-              {profile?.plan === 'essencial' ? 'Plano Atual' : 'Testar Essencial por 15 dias'}
+              {profile?.plan === 'essencial' ? 'Plano Atual' : essencialPlan.cta}
             </PremiumButton>
             <p className="text-[10px] text-white/30 text-center mt-3 font-medium uppercase tracking-widest">
               Sem cobrança imediata. Cancele a qualquer momento.
@@ -191,29 +183,24 @@ export default function PlansPage() {
               
               <div className="flex-1 relative z-10">
                 <div className="flex items-center gap-2 mb-4">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta block">Nera Elite</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta block">{proPlan.tagline}</span>
                   <Sparkles size={16} className="text-brand-terracotta fill-brand-terracotta/20 animate-pulse" />
                 </div>
-                <h3 className="text-4xl font-serif text-brand-ink mb-3 italic">Plano Pro</h3>
+                <h3 className="text-4xl font-serif text-brand-ink mb-3 italic">{proPlan.name}</h3>
                 <div className="flex items-baseline gap-1 mb-8">
-                  <span className="text-5xl font-serif text-brand-ink tracking-tight">R$ 99</span>
-                  <span className="text-lg text-brand-stone uppercase tracking-widest font-bold">,90/mês</span>
+                  <span className="text-5xl font-serif text-brand-ink tracking-tight">R$ {proPlan.price}</span>
+                  <span className="text-lg text-brand-stone uppercase tracking-widest font-bold">{proPlan.priceDescriptor}</span>
                 </div>
 
                 <div className="space-y-4 mb-12">
-                  {[
-                    'Tudo do Essencial, com recursos para crescer mais rápido',
-                    'Dashboard Avançado (Gráficos)',
-                    'Lista de Espera Inteligente',
-                    'Analytics de Atendimento',
-                    'Anti No-Show Automático',
-                    'Suporte prioritário 24/7'
-                  ].map((item, idx) => (
-                    <div key={item} className="flex items-center gap-4">
-                      <div className={`w-5 h-5 rounded-full bg-brand-terracotta flex items-center justify-center text-white shadow-sm ring-4 ring-brand-terracotta/10 ${idx === 0 ? 'animate-bounce-subtle' : ''}`}>
+                  {proPlan.features.map((feat, idx) => (
+                    <div key={feat.text} className="flex items-center gap-4">
+                      <div className={`w-5 h-5 rounded-full bg-brand-terracotta flex items-center justify-center text-white shadow-sm ring-4 ring-brand-terracotta/10 ${feat.isHighlight ? 'animate-bounce-subtle' : ''}`}>
                         <Check size={12} />
                       </div>
-                      <span className={`text-[12px] font-bold text-brand-ink uppercase tracking-tight ${idx === 0 ? 'text-brand-terracotta' : ''}`}>{item}</span>
+                      <span className={`text-[12px] font-bold text-brand-ink uppercase tracking-tight ${feat.isHighlight ? 'text-brand-terracotta' : ''}`}>
+                        {feat.text}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -226,10 +213,10 @@ export default function PlansPage() {
                 variant={profile?.plan === 'pro' ? 'secondary' : 'terracotta'}
                 disabled={profile?.plan === 'pro'}
               >
-                {profile?.plan === 'pro' ? 'Plano Ativado' : 'Começar como Pro'}
+                {profile?.plan === 'pro' ? 'Plano Ativado' : proPlan.cta}
               </PremiumButton>
               <p className="text-[10px] text-brand-stone/50 text-center mt-4 font-bold uppercase tracking-widest">
-                15 dias grátis • Sem cobrança imediata
+                {proPlan.trialDays} dias grátis • Sem cobrança imediata
               </p>
             </div>
           </motion.div>

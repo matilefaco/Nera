@@ -7,12 +7,13 @@ import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } 
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
-  RefreshCw, CheckCircle2, AlertCircle, Trash2
+  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay } from '../lib/utils';
+import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp } from '../lib/utils';
+import { THEMES, getTheme } from '../lib/themes';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
 import AppLoadingScreen from '../components/AppLoadingScreen';
@@ -20,6 +21,9 @@ import { FormIdentity } from '../components/FormIdentity';
 import { FormLocation } from '../components/FormLocation';
 import { analyzePortfolio } from '../services/aiService';
 import { useProfileForm } from '../hooks/useProfileForm';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import UpgradeModal from '../components/UpgradeModal';
+import PremiumButton from '../components/PremiumButton';
 
 const IDENTITY_DIFFERENTIALS = [
   'Pontualidade',
@@ -85,8 +89,26 @@ export default function ProfilePage() {
     paymentMethods, setPaymentMethods,
     antiNoShowEnabled, setAntiNoShowEnabled,
     advancePaymentRequired, setAdvancePaymentRequired,
-    delayTolerance, setDelayTolerance
+    delayTolerance, setDelayTolerance,
+    profileTheme, setProfileTheme
   } = useProfileForm(profile);
+
+  const { plan, allowedThemes } = usePlanFeatures();
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<'analytics' | 'advancedDashboard' | 'unlimitedBookings' | 'whatsappNotifications' | 'waitlist' | 'antiNoShow' | 'coupons' | 'reports'>('advancedDashboard');
+
+  const isThemeLocked = (variant: string) => {
+    return !allowedThemes.includes(variant);
+  };
+
+  const handleThemeClick = (variant: string) => {
+    if (isThemeLocked(variant)) {
+      setUpgradeFeature('advancedDashboard'); // Themes are part of advanced branding/dashboard features
+      setIsUpgradeModalOpen(true);
+      return;
+    }
+    setProfileTheme({ variant: variant as any });
+  };
 
   const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
   const [googleCalendarEnabled, setGoogleCalendarEnabled] = useState(false);
@@ -236,7 +258,11 @@ export default function ProfilePage() {
     if (!name.trim()) errors.name = 'O nome é obrigatório';
     if (!specialty.trim()) errors.specialty = 'Informe sua especialidade';
     if (!slug.trim()) errors.slug = 'O link da página é obrigatório';
-    if (!whatsapp.trim()) errors.whatsapp = 'O WhatsApp é obrigatório';
+    if (!whatsapp.trim()) {
+      errors.whatsapp = 'O WhatsApp é obrigatório';
+    } else if (!isValidWhatsapp(whatsapp)) {
+      errors.whatsapp = 'Número inválido. Use (DD) 9XXXX-XXXX';
+    }
     if (!city.trim()) errors.city = 'Informe sua cidade';
     if (!neighborhood.trim()) errors.neighborhood = 'Informe seu bairro';
 
@@ -291,6 +317,7 @@ export default function ProfilePage() {
         serviceAreas: sanitizedAreas,
         pricingStrategy,
         avatar,
+        profileTheme,
         paymentMethods: paymentMethods.length > 0 ? paymentMethods : undefined,
         antiNoShowEnabled,
         advancePaymentRequired,
@@ -478,7 +505,7 @@ export default function ProfilePage() {
 
   return (
     <AppLayout activeRoute="profile">
-      <div className="p-6 md:p-12 pb-[100px] md:pb-12 max-w-5xl mx-auto w-full">
+      <div className="p-6 md:p-12 pb-32 md:pb-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Meu Perfil Profissional</h1>
@@ -490,16 +517,21 @@ export default function ProfilePage() {
         </header>
 
         {profileCompleteness < 100 ? (
-          <div className="mb-8 p-4 bg-brand-linen rounded-2xl border border-brand-mist/50">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
-                Perfil {profileCompleteness}% completo
-              </span>
-              <span className="text-[10px] text-brand-stone italic">Quase lá!</span>
+          <div className="mb-8 p-6 bg-brand-linen rounded-3xl border border-brand-mist/50">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
+                  Perfil {profileCompleteness}% completo
+                </span>
+                <p className="text-[10px] text-brand-stone font-light italic mt-1 leading-none">
+                  Complete seu perfil para atrair e converter mais clientes.
+                </p>
+              </div>
+              <span className="text-[10px] text-brand-terracotta font-bold uppercase animate-pulse">Quase lá!</span>
             </div>
-            <div className="w-full h-1.5 bg-brand-white rounded-full overflow-hidden">
+            <div className="w-full h-1.5 bg-brand-white rounded-full overflow-hidden shadow-inner">
               <div 
-                className="h-full bg-brand-terracotta rounded-full transition-all duration-700"
+                className="h-full bg-brand-terracotta rounded-full transition-all duration-1000 ease-out shadow-sm"
                 style={{ width: `${profileCompleteness}%` }}
               />
             </div>
@@ -576,7 +608,7 @@ export default function ProfilePage() {
                         type="button"
                         onClick={() => item.id && removePortfolioImage(item.id)}
                         disabled={deletingId === item.id}
-                        className="absolute top-2 right-2 p-2 bg-white text-red-500 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 disabled:opacity-50 z-20"
+                        className="absolute top-2 right-2 p-2 bg-white text-red-500 rounded-full shadow-lg opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 disabled:opacity-50 z-20"
                       >
                         {deletingId === item.id ? (
                           <RefreshCw size={14} className="animate-spin" />
@@ -648,6 +680,65 @@ export default function ProfilePage() {
                 showLabels={true}
                 errors={formErrors}
               />
+            </div>
+
+            {/* Estilo da vitrine */}
+            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
+              <div className="pt-2">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="p-2 bg-brand-terracotta/10 rounded-xl">
+                    <Sparkles size={20} className="text-brand-terracotta" />
+                  </div>
+                  <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone">
+                    Estilo da sua vitrine
+                  </h3>
+                </div>
+
+                <p className="text-xs text-brand-stone font-light mb-6">Escolha o tema visual que melhor representa sua marca.</p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                  {Object.entries(THEMES).map(([variant, theme]) => {
+                    const locked = isThemeLocked(variant);
+                    return (
+                      <button
+                        key={variant}
+                        type="button"
+                        onClick={() => handleThemeClick(variant)}
+                        className={cn(
+                          "flex flex-col items-center gap-3 p-4 rounded-3xl border transition-all relative overflow-hidden group",
+                          profileTheme.variant === variant 
+                            ? "border-brand-ink bg-brand-linen/30 shadow-sm"
+                            : "border-brand-mist bg-white hover:border-brand-stone",
+                          locked && "opacity-80"
+                        )}
+                      >
+                        <div 
+                          className="w-12 h-12 rounded-full shadow-inner border border-black/5 relative"
+                          style={{ backgroundColor: theme.primary }}
+                        >
+                          {locked && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/20 rounded-full backdrop-blur-[1px]">
+                              <Lock size={14} className="text-white" />
+                            </div>
+                          )}
+                        </div>
+                        <span className={cn(
+                          "text-[9px] font-bold uppercase tracking-widest text-center leading-tight",
+                          profileTheme.variant === variant ? "text-brand-ink" : "text-brand-stone"
+                        )}>
+                          {theme.name.split(' ')[0]}
+                        </span>
+                        
+                        {profileTheme.variant === variant && (
+                          <div className="absolute top-2 right-2 bg-brand-ink text-white rounded-full p-1">
+                            <CheckCircle2 size={10} />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Anti No-Show Section */}
@@ -957,6 +1048,12 @@ export default function ProfilePage() {
             {loading ? "Salvando..." : "Salvar Alterações"}
           </button>
         </div>
+
+        <UpgradeModal 
+          open={isUpgradeModalOpen}
+          onClose={() => setIsUpgradeModalOpen(false)}
+          feature={upgradeFeature}
+        />
       </div>
     </AppLayout>
   );

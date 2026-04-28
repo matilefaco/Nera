@@ -54,7 +54,7 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
                   "px-6 py-2.5 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] transition-all border",
                   activeCategory === cat 
                     ? "bg-brand-ink text-brand-white border-brand-ink shadow-lg" 
-                    : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-terracotta hover:text-brand-terracotta"
+                    : "bg-brand-white text-brand-stone border-brand-mist hover:border-[var(--theme-accent,var(--color-brand-terracotta))] hover:text-[var(--theme-accent,var(--color-brand-terracotta))]"
                 )}
               >
                 {cat === 'all' ? 'Todos' : cat}
@@ -93,7 +93,7 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
 
                 {/* Always visible category chip */}
                 {item.category && (
-                  <div className="absolute top-4 left-4 z-10 px-4 py-1.5 bg-brand-ink/30 backdrop-blur-md border border-white/10 rounded-full text-[8px] font-bold uppercase tracking-widest text-white transition-colors group-hover:bg-brand-terracotta group-hover:border-transparent">
+                  <div className="absolute top-4 left-4 z-10 px-4 py-1.5 bg-brand-ink/30 backdrop-blur-md border border-white/10 rounded-full text-[8px] font-bold uppercase tracking-widest text-white transition-colors group-hover:bg-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:border-transparent">
                     {item.category}
                   </div>
                 )}

@@ -34,6 +34,7 @@ import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCanceledPage from './pages/CheckoutCanceledPage';
 import ReferralsPage from './pages/ReferralsPage';
 import WhatsAppHistoryPage from './pages/WhatsAppHistoryPage';
+import FinancialPage from './pages/FinancialPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -118,6 +119,11 @@ export default function App() {
               <Route path="/clients" element={
                 <PrivateRoute>
                   <ClientsPage />
+                </PrivateRoute>
+              } />
+              <Route path="/financeiro" element={
+                <PrivateRoute>
+                  <FinancialPage />
                 </PrivateRoute>
               } />
               <Route path="/services" element={

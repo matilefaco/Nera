@@ -9,11 +9,11 @@ import {
   User, MapPin, Home, Building2, Briefcase, 
   Clock, DollarSign, Instagram, MessageCircle, 
   CheckCircle2, ArrowRight, ArrowLeft, Sparkles,
-  Camera, Plus, X, Globe, Copy, Share2, ExternalLink, AlertCircle
+  Camera, Plus, X, Globe, Copy, Share2, ExternalLink, AlertCircle, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
+import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
@@ -395,9 +395,8 @@ export default function OnboardingPage() {
       if (!neighborhood.trim()) errors.neighborhood = 'Informe seu bairro';
       
       // WhatsApp validation
-      const cleanPhone = cleanWhatsapp(whatsapp);
-      if (cleanPhone.length < 10) {
-        errors.whatsapp = 'Número inválido. Verifique o DDD e o número.';
+      if (!isValidWhatsapp(whatsapp)) {
+        errors.whatsapp = 'Número inválido. Use um formato brasileiro: (DDD) 9XXXX-XXXX';
       }
 
       if (serviceMode !== 'home') {
@@ -416,14 +415,14 @@ export default function OnboardingPage() {
       const newServiceErrors = services.map(s => {
         const errs: any = {};
         if (!s.name.trim()) errs.name = 'Informe o nome do serviço';
-        if (!s.duration || Number(s.duration) <= 0) errs.duration = 'Informe a duração';
+        if (!s.duration || Number(s.duration) <= 0) errs.duration = 'Selecione a duração. Ela define os horários disponíveis para suas clientes.';
         if (!s.price.trim()) errs.price = 'Informe o preço';
         return Object.keys(errs).length > 0 ? errs : null;
       });
 
       if (newServiceErrors.some(e => e !== null)) {
         setServicesErrors(newServiceErrors);
-        toast.error('Informe a duração dos seus serviços para continuar.');
+        toast.error('Preencha os dados dos seus serviços para continuar.');
         return;
       }
     }
@@ -476,8 +475,8 @@ export default function OnboardingPage() {
       if (slug.length < 3) errors.slug = 'O link deve ter pelo menos 3 caracteres';
       
       // WhatsApp validation
-      if (!whatsapp || cleanWhatsapp(whatsapp).length < 10) {
-        toast.error('Informe seu WhatsApp — você receberá os agendamentos por lá.');
+      if (!whatsapp || !isValidWhatsapp(whatsapp)) {
+        toast.error('Informe um WhatsApp válido (Ex: 11 99999-9999)');
         return;
       }
 
@@ -779,6 +778,43 @@ export default function OnboardingPage() {
 
   if (authLoading) return <AppLoadingScreen />;
 
+  const qualityIssues = useMemo(() => {
+    const issues = [];
+
+    const servicesWithoutDuration = services.filter(
+      s => !s.duration || Number(s.duration) === 0
+    );
+
+    if (servicesWithoutDuration.length > 0) {
+      issues.push({
+        type: "warning",
+        message: `${servicesWithoutDuration.length} serviço(s) sem duração. Sua agenda pode abrir horários incorretos.`,
+        action: "Corrigir serviços",
+        link: 3,
+      });
+    }
+
+    if (!avatar && !avatarSkipped) {
+      issues.push({
+        type: "info",
+        message: "Perfis com foto recebem mais agendamentos.",
+        action: "Adicionar foto",
+        link: 1,
+      });
+    }
+
+    if (!bio || bio.length < 30) {
+      issues.push({
+        type: "info",
+        message: "Adicione uma bio para as clientes conhecerem seu trabalho.",
+        action: "Editar bio",
+        link: 1,
+      });
+    }
+
+    return issues;
+  }, [services, avatar, avatarSkipped, bio]);
+
   const progress = (step / (TOTAL_STEPS + 1)) * 100;
 
   return (
@@ -920,8 +956,13 @@ export default function OnboardingPage() {
                     <input 
                       type="tel" 
                       value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 
-                      onChange={(e) => setWhatsapp(cleanWhatsapp(e.target.value))} 
-                      placeholder="(00) 00000-0000" 
+                      onChange={(e) => {
+                        const cleaned = cleanWhatsapp(e.target.value);
+                        if (cleaned.length <= 11) {
+                          setWhatsapp(cleaned);
+                        }
+                      }} 
+                      placeholder="(11) 99999-9999" 
                       className={cn(
                         "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
                         formErrors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
@@ -1234,6 +1275,41 @@ export default function OnboardingPage() {
                 </div>
                 <div className="bg-brand-terracotta px-4 py-2 rounded-full text-[8px] font-medium uppercase tracking-widest relative z-10">Preview</div>
               </div>
+
+              {qualityIssues.length > 0 && (
+                <div className="p-5 bg-amber-50 rounded-[32px] border border-amber-100 mb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-3 ml-1">
+                    Antes de publicar
+                  </p>
+                  <ul className="space-y-4">
+                    {qualityIssues.map((issue, i) => (
+                      <li key={i} className="flex flex-col gap-2 text-[11px]">
+                        <div className="flex items-start gap-2.5 text-brand-ink/80">
+                          <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                          <span className="leading-relaxed font-medium">{issue.message}</span>
+                        </div>
+                        {issue.link && (
+                          <button
+                            onClick={() => {
+                              if (typeof issue.link === 'number') {
+                                setStep(issue.link);
+                              } else {
+                                navigate(issue.link);
+                              }
+                            }}
+                            className="self-start text-[10px] font-bold text-brand-terracotta underline ml-6"
+                          >
+                            {issue.action}
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[9px] text-brand-stone/60 mt-4 italic ml-1">
+                    Você pode publicar assim mesmo e corrigir depois.
+                  </p>
+                </div>
+              )}
 
               {/* Revision Checklist */}
               <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm space-y-6">

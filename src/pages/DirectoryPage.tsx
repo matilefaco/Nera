@@ -15,6 +15,7 @@ import { db } from '../firebase';
 import { UserProfile } from '../types';
 import Logo from '../components/Logo';
 import { formatCurrency, cn } from '../lib/utils';
+import { SERVICE_MODES as SERVICE_MODE_COPY } from '../lib/copy';
 import SEOHead from '../components/SEOHead';
 
 const SPECIALTIES = [
@@ -23,9 +24,9 @@ const SPECIALTIES = [
 
 const SERVICE_MODES = [
   { id: 'all', label: 'Todos' },
-  { id: 'home', label: 'Domicílio' },
-  { id: 'studio', label: 'Estúdio' },
-  { id: 'hybrid', label: 'Híbrido' }
+  { id: 'home', label: SERVICE_MODE_COPY.home.shortLabel },
+  { id: 'studio', label: SERVICE_MODE_COPY.studio.shortLabel },
+  { id: 'hybrid', label: SERVICE_MODE_COPY.hybrid.shortLabel }
 ];
 
 export default function DirectoryPage() {
@@ -258,13 +259,15 @@ export default function DirectoryPage() {
                     )}
 
                     <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
-                      <div className="bg-brand-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-sm">
-                        <div className="flex items-center gap-1 text-brand-terracotta">
-                          <Star size={10} fill="currentColor" />
-                          <span className="text-[10px] font-black">{pro.averageRating || '5.0'}</span>
-                          <span className="text-[9px] text-brand-mist font-medium">({pro.totalReviews || 0})</span>
+                      {pro.averageRating && pro.averageRating > 0 && (
+                        <div className="bg-brand-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-sm">
+                          <div className="flex items-center gap-1 text-brand-terracotta">
+                            <Star size={10} fill="currentColor" />
+                            <span className="text-[10px] font-black">{pro.averageRating.toFixed(1)}</span>
+                            <span className="text-[9px] text-brand-mist font-medium">({pro.totalReviews || 0})</span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
 

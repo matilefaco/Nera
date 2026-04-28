@@ -8,6 +8,7 @@ import {
   Plus, X, Camera, ChevronDown, ArrowRight, Star, CheckCircle2, Users, MapPin, Home, Award, ArrowLeft
 } from 'lucide-react';
 import { formatCurrency, cn, buildWhatsappLink, splitSmartBio } from '../lib/utils';
+import { getTheme } from '../lib/themes';
 import { toast } from 'sonner';
 import Logo from '../components/Logo';
 import PremiumButton from '../components/PremiumButton';
@@ -487,6 +488,8 @@ export default function PublicProfile() {
 
   if (loading) return <PublicProfileSkeleton />;
   
+  const theme = getTheme(profile?.profileTheme?.variant);
+
   if (!profile) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-10 border border-brand-mist shadow-sm">
@@ -504,7 +507,16 @@ export default function PublicProfile() {
   );
 
   return (
-    <div className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10">
+    <div 
+      className="min-h-screen bg-brand-parchment flex flex-col selection:bg-brand-terracotta/10"
+      style={{
+        '--theme-primary': theme.primary,
+        '--theme-accent': theme.accent,
+        '--theme-accent-rgb': theme.accentRGB,
+        '--theme-background': theme.background,
+        '--theme-border': theme.border,
+      } as React.CSSProperties}
+    >
       <SEOHead 
         title={`${profile.name} | ${profile.specialty || 'Profissional Nera'}`}
         description={profile.bio || `Agende um horário com ${profile.name}, especialista em beleza.`}

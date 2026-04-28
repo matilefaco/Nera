@@ -35,6 +35,7 @@ export function useProfileForm(profile: UserProfile | null) {
   const [workingDays, setWorkingDays] = useState<number[]>(profile?.workingHours?.workingDays || profile?.workingDays || [1, 2, 3, 4, 5]);
   const [startTime, setStartTime] = useState(profile?.workingHours?.startTime || profile?.startTime || '09:00');
   const [endTime, setEndTime] = useState(profile?.workingHours?.endTime || profile?.endTime || '18:00');
+  const [profileTheme, setProfileTheme] = useState<{ variant: "terracotta" | "rose" | "sage" | "navy" | "plum" }>(profile?.profileTheme || { variant: 'terracotta' });
   const [avatarSkipped, setAvatarSkipped] = useState(profile?.avatarSkipped || false);
 
   // Sincronizar quando profile mudar
@@ -56,6 +57,7 @@ export function useProfileForm(profile: UserProfile | null) {
       setNeighborhood(profile.neighborhood || '');
       setServiceMode(profile.serviceMode || 'studio');
       setAvatarSkipped(profile.avatarSkipped || false);
+      setProfileTheme(profile.profileTheme || { variant: 'terracotta' });
       setStudioAddress(profile.studioAddress || {
         street: '',
         number: '',
@@ -108,6 +110,7 @@ export function useProfileForm(profile: UserProfile | null) {
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,
-    avatarSkipped, setAvatarSkipped
+    avatarSkipped, setAvatarSkipped,
+    profileTheme, setProfileTheme
   };
 }

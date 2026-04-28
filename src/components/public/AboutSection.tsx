@@ -40,14 +40,14 @@ export const AboutSection = ({ profile, aboutBio }: AboutSectionProps) => {
           viewport={{ once: true }}
           className="space-y-8"
         >
-          <span className="label-text text-brand-terracotta">A Profissional</span>
+          <span className="label-text text-[var(--theme-accent,var(--color-brand-terracotta))]">A Profissional</span>
           
           <h2 className="heading-section text-brand-ink">
             Beleza que<br />
             <em className="font-serif italic text-brand-stone">pertence a você</em>
           </h2>
 
-          <p className="body-text text-brand-stone border-l-2 border-brand-blush pl-8">
+          <p className="body-text text-brand-stone border-l-2 border-[var(--theme-primary,var(--color-brand-terracotta))]/20 pl-8">
             {displayBio}
           </p>
 

@@ -11,7 +11,7 @@ import {
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp, Heart,
   ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
-  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone
+  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -20,6 +20,7 @@ import {
   generateWaitlistInviteMessage, cn, formatDateKey, parseLocalDate 
 } from '../lib/utils';
 import { getClientScore } from '../lib/clientUtils';
+import HelpTooltip from '../components/HelpTooltip';
 import Logo from '../components/Logo';
 import { Appointment, WaitlistEntry, BlockedSchedule, AnalyticsEvent, Service, WhatsAppLog } from '../types';
 import { AnimatePresence } from 'motion/react';
@@ -46,7 +47,7 @@ type DashboardTab = "hoje" | "geral" | "insights" | "divulgacao";
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const { features } = usePlanFeatures();
+  const { features, plan } = usePlanFeatures();
   
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
     const saved = localStorage.getItem("nera_dashboard_tab");
@@ -112,6 +113,32 @@ export default function Dashboard() {
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const qAlerts = query(
+      collection(db, 'alerts'),
+      where('professionalId', '==', user.uid),
+      where('read', '==', false),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubAlerts = onSnapshot(qAlerts, (snap) => {
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setAlerts(docs);
+    });
+
+    return () => unsubAlerts();
+  }, [user]);
+
+  const handleMarkAlertRead = async (alertId: string) => {
+    try {
+      await updateDoc(doc(db, 'alerts', alertId), { read: true });
+    } catch (err) {
+      console.error('Failed to mark alert as read:', err);
+    }
+  };
 
   // Triggers handled by hook
 
@@ -162,8 +189,18 @@ export default function Dashboard() {
     }, {});
     const mainOrigin = Object.entries(origins).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || 'Direto';
 
-    // Best service
-  const services = appointments.reduce((acc: any, curr) => {
+    // Best service (Current month performance)
+    const currentMonthForTop = now.getMonth();
+    const currentYearForTop = now.getFullYear();
+    const monthlyAppsForTop = appointments.filter(a => {
+      if (!a.date) return false;
+      const d = new Date(a.date + 'T12:00:00');
+      return d.getMonth() === currentMonthForTop && 
+             d.getFullYear() === currentYearForTop && 
+             ['confirmed', 'completed', 'accepted'].includes(a.status);
+    });
+
+    const services = monthlyAppsForTop.reduce((acc: any, curr) => {
       acc[curr.serviceName] = (acc[curr.serviceName] || 0) + 1;
       return acc;
     }, {});
@@ -231,6 +268,36 @@ export default function Dashboard() {
       count: monthlyApps.length,
       clientsCount: clients.size
     };
+  }, [appointments]);
+
+  const servicesByMonth = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const monthlyApps = appointments.filter(a => {
+      if (!a.date) return false;
+      const d = new Date(a.date + 'T12:00:00');
+      return d.getMonth() === currentMonth && 
+             d.getFullYear() === currentYear && 
+             ['confirmed', 'completed', 'accepted'].includes(a.status);
+    });
+
+    const statsMap: Record<string, { count: number, revenue: number }> = {};
+    
+    monthlyApps.forEach(appt => {
+      const name = appt.serviceName;
+      if (!statsMap[name]) {
+        statsMap[name] = { count: 0, revenue: 0 };
+      }
+      statsMap[name].count += 1;
+      statsMap[name].revenue += (appt.price || 0) + (appt.travelFee || 0);
+    });
+
+    return Object.entries(statsMap)
+      .map(([name, data]) => ({ name, ...data }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
   }, [appointments]);
 
   const daysSinceLastAppointment = useMemo(() => {
@@ -770,17 +837,17 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <span className={cn(
                   "text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full",
-                  profile?.plan === 'pro' || profile?.plan === 'essencial' 
+                  plan === 'pro' || plan === 'essencial' 
                     ? "text-green-600 bg-green-50 border border-green-200" 
                     : "text-brand-stone"
                 )}>
                   Plano {
-                    profile?.plan === 'pro' ? 'Pro' : 
-                    profile?.plan === 'essencial' ? 'Essencial' : 
+                    plan === 'pro' ? 'Pro' : 
+                    plan === 'essencial' ? 'Essencial' : 
                     'Gratuito'
                   }
                 </span>
-                {(profile?.plan === 'free' || !profile?.plan) && (
+                {(plan === 'free') && (
                   <Link to="/planos" className="text-[9px] text-brand-terracotta border border-brand-terracotta/20 px-2 py-0.5 rounded-full hover:bg-brand-terracotta hover:text-white transition-all uppercase tracking-widest font-bold">
                     Upgrade
                   </Link>
@@ -923,8 +990,9 @@ export default function Dashboard() {
                             <TrendingUp size={20} />
                           </div>
                           <div>
-                            <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
+                            <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
                               Growth Dashboard
+                              <HelpTooltip content="Dados da sua vitrine: visitas, cliques e conversão em reservas." />
                             </h3>
                             <p className="text-sm font-serif text-brand-ink italic">Sua performance de conversão</p>
                           </div>
@@ -1052,6 +1120,84 @@ export default function Dashboard() {
                       </AnimatePresence>
                     </section>
                   )}
+
+                  {/* Serviços do Mês Ranking */}
+                  <div className="px-6">
+                    <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative overflow-hidden">
+                      {!features.advancedDashboard && (
+                        <div className="absolute inset-0 z-20 bg-brand-white/70 backdrop-blur-[2px] flex items-center justify-center p-8 text-center">
+                          <div className="bg-brand-white/95 p-6 rounded-[32px] shadow-xl border border-brand-mist max-w-[220px]">
+                            <div className="w-10 h-10 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center mx-auto mb-3">
+                              <Lock size={18} />
+                            </div>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-1">Ranking de Serviços</p>
+                            <p className="text-[9px] text-brand-stone font-light mb-4">Insights detalhados estão disponíveis apenas no Plano Pro</p>
+                            <Link to="/planos">
+                              <PremiumButton variant="terracotta" className="w-full !py-2 !text-[8px]">Ver Planos</PremiumButton>
+                            </Link>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                            <Sparkles size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
+                              Serviços do mês
+                              <HelpTooltip content="Ranking dos 5 serviços mais reservados e realizados no mês atual." />
+                            </h3>
+                            <p className="text-sm font-serif text-brand-ink italic">Sua performance por serviço</p>
+                          </div>
+                        </div>
+                        <div className="bg-brand-parchment px-3 py-1 rounded-full border border-brand-mist/50">
+                          <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">
+                            {new Date().toLocaleDateString('pt-BR', { month: 'long' })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {servicesByMonth.length > 0 ? (
+                        <div className="space-y-6">
+                          {servicesByMonth.map((s, idx) => (
+                            <div key={s.name} className="space-y-2">
+                              <div className="flex justify-between items-end">
+                                <div className="flex-1 min-w-0 pr-4">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="w-4 h-4 bg-brand-parchment rounded flex items-center justify-center text-[9px] font-bold text-brand-stone">{idx + 1}</span>
+                                    <p className="text-[11px] font-bold text-brand-ink truncate">
+                                      {s.name}
+                                    </p>
+                                  </div>
+                                  <p className="text-[9px] text-brand-stone uppercase tracking-widest font-medium pl-6">
+                                    {s.count} {s.count === 1 ? 'reserva' : 'reservas'} • {formatCurrency(s.revenue)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="h-1.5 w-full bg-brand-linen rounded-full overflow-hidden ml-6">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${(s.count / servicesByMonth[0].count) * 100}%` }}
+                                  className="h-full bg-brand-terracotta rounded-full transition-all duration-1000"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="py-10 text-center flex flex-col items-center">
+                          <div className="w-12 h-12 bg-brand-parchment rounded-full flex items-center justify-center text-brand-mist mb-4">
+                            <Info size={24} />
+                          </div>
+                          <p className="text-[11px] text-brand-stone italic max-w-[200px] mx-auto leading-relaxed">
+                            Quando houver reservas neste mês, seus serviços mais procurados aparecerão aqui.
+                          </p>
+                        </div>
+                      )}
+                    </section>
+                  </div>
                 </>
               );
             })()}
@@ -1116,6 +1262,48 @@ export default function Dashboard() {
               </motion.div>
             )}
 
+            {/* Last-Minute Cancellation Alerts */}
+            <AnimatePresence>
+              {alerts.map((alert) => (
+                <motion.div 
+                  key={alert.id}
+                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  className="bg-red-50 border border-red-200 p-4 rounded-3xl overflow-hidden shadow-sm"
+                >
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-600 shrink-0">
+                        <X size={20} />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-[11px] font-bold text-red-900 leading-tight">Cancelamento de última hora!</p>
+                        <p className="text-[10px] text-red-700 font-light mt-1">
+                          {alert.clientName} cancelou {alert.serviceName} às {alert.scheduledTime}. 
+                          <span className="font-bold ml-1">Faltavam apenas {alert.hoursUntil}h.</span>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 justify-end">
+                      <button 
+                        onClick={() => handleMarkAlertRead(alert.id)}
+                        className="px-4 py-2 bg-white border border-red-200 rounded-full text-[9px] font-bold uppercase tracking-widest text-red-700 hover:bg-red-100 transition-all"
+                      >
+                        Marcar como lido
+                      </button>
+                      <Link 
+                        to="/agenda" 
+                        className="px-4 py-2 bg-red-600 rounded-full text-[9px] font-bold uppercase tracking-widest text-white hover:bg-red-700 transition-all shadow-sm"
+                      >
+                        Ver agenda
+                      </Link>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
             {/* Pedidos Pendentes Alerta */}
             {pendingCount > 0 && (
               <motion.div 
@@ -1156,6 +1344,23 @@ export default function Dashboard() {
                   <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Agendamentos</p>
                   <p className="text-3xl font-serif text-brand-ink">{confirmedToday.length}</p>
                 </div>
+              </div>
+              
+              <div className="mt-6 pt-6 border-t border-brand-linen flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-brand-linen text-brand-terracotta rounded-xl flex items-center justify-center shrink-0">
+                    <DollarSign size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-serif text-brand-ink">Painel Financeiro</h4>
+                    <p className="text-[10px] text-brand-stone font-light italic">Histórico e exportação CSV</p>
+                  </div>
+                </div>
+                <Link to="/financeiro">
+                  <button className="px-5 py-2 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:scale-105 transition-all">
+                    Acessar
+                  </button>
+                </Link>
               </div>
             </div>
 
@@ -1246,6 +1451,32 @@ export default function Dashboard() {
         {/* GERAL CONTENT (Resumo do Mês + Blocos Estratégicos) */}
         {activeTab === "geral" && (
           <div className="flex flex-col gap-8">
+            {/* Financial Shortcut Card */}
+            <section className="px-6 mt-4">
+              <div className="bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-brand-terracotta/20 transition-colors" />
+                
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-brand-white/10 text-brand-linen rounded-2xl flex items-center justify-center shrink-0">
+                      <DollarSign size={28} />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-serif">Financeiro</h4>
+                      <p className="text-xs text-white/60 font-light italic mt-1 leading-relaxed">
+                        Ver receita, histórico mensal e exportar CSV.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <Link to="/financeiro" className="md:w-auto w-full">
+                    <button className="w-full px-8 py-4 bg-brand-terracotta text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-lg flex items-center justify-center gap-2">
+                      Abrir financeiro
+                    </button>
+                  </Link>
+                </div>
+              </div>
+            </section>
             {/* Indicadores do Mês (Sem receita duplicada) */}
             <section className="px-6 mt-4">
               <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
@@ -1331,7 +1562,10 @@ export default function Dashboard() {
                   {/* Waitlist Status */}
                   <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Lista de Espera</span>
+                      <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest flex items-center">
+                        Lista de Espera
+                        <HelpTooltip content="Clientes que pediram vaga quando sua agenda estava cheia. Avise quando abrir um horário." />
+                      </span>
                       {waitlist && waitlist.length > 0 ? (
                         <button onClick={() => setIsWaitlistModalOpen(true)} className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver {waitlist.length}</button>
                       ) : (
@@ -1468,8 +1702,9 @@ export default function Dashboard() {
                       )}
                     </div>
                     <div>
-                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
+                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
                         WhatsApp Inteligente
+                        <HelpTooltip content="Automações de confirmação, lembrete e reativação de clientes pelo WhatsApp." />
                       </h3>
                       <p className="text-sm font-serif text-brand-ink italic">Automação de mensagens</p>
                     </div>
@@ -1590,8 +1825,9 @@ export default function Dashboard() {
                       <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
                         <ShieldCheck size={18} />
                       </div>
-                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-amber-900">
+                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-amber-900 flex items-center">
                         Anti No-Show: Clientes de Amanhã
+                        <HelpTooltip content="Clientes com horário próximo que ainda não confirmaram. Envie lembretes para reduzir faltas." />
                       </h3>
                     </div>
                   </div>
@@ -1779,8 +2015,9 @@ export default function Dashboard() {
                   <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
                     <ShieldCheck size={20} />
                   </div>
-                  <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-amber-900">
+                  <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-amber-900 flex items-center">
                     Alerta Anti No-Show
+                    <HelpTooltip content="Clientes com horário próximo que ainda não confirmaram. Envie lembretes para reduzir faltas." />
                   </h3>
                 </div>
                 <span className="bg-amber-600 text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">
@@ -1961,8 +2198,8 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <Link to="/clients" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
-            Ver detalhes
+          <Link to="/financeiro" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
+            Ver detalhes financeiros
           </Link>
         </section>
 

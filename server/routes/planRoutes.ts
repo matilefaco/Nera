@@ -6,6 +6,8 @@ import Stripe from "stripe";
 
 const router = express.Router();
 
+const isDev = process.env.NODE_ENV !== "production";
+
 let stripeModule: Stripe | null = null;
 
 function getStripe() {
@@ -33,20 +35,14 @@ router.post("/create-checkout", async (req, res) => {
 
   try {
     const stripe = getStripe();
-    console.log("[CHECKOUT DEBUG] plan:", plan);
-    console.log("[CHECKOUT DEBUG] professionalId exists:", !!professionalId);
-    console.log("[CHECKOUT DEBUG] email exists:", !!email);
-    console.log("[CHECKOUT DEBUG] STRIPE_SECRET_KEY exists:", !!process.env.STRIPE_SECRET_KEY);
-    console.log("[CHECKOUT DEBUG] STRIPE_SECRET_KEY mode:", process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_") ? "test" : process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_") ? "live" : "invalid");
-    console.log("[CHECKOUT DEBUG] STRIPE_PRICE_ESSENCIAL exists:", !!process.env.STRIPE_PRICE_ESSENCIAL);
-    console.log("[CHECKOUT DEBUG] STRIPE_PRICE_PRO exists:", !!process.env.STRIPE_PRICE_PRO);
+    if (isDev) {
+      console.log("[DEV CHECKOUT] Initiating checkout session for plan:", plan);
+    }
     
     const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
-    console.log("[CHECKOUT DEBUG] selected priceId exists:", !!priceId);
-    console.log("[CHECKOUT DEBUG] selected priceId prefix valid:", priceId?.startsWith("price_"));
 
     if (!priceId) {
-      console.error("[CHECKOUT ERROR] Price ID missing for plan:", plan);
+      console.error("[CHECKOUT ERROR] Price ID not configured. Check environment variables.");
       return res.status(400).json({ error: `O plano ${plan} não está configurado corretamente (Price ID ausente). Por favor, contate o suporte.` });
     }
 
@@ -134,7 +130,9 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     const userId = session.client_reference_id;
     const plan = session.metadata?.plan || 'pro'; 
 
-    console.log(`[STRIPE WEBHOOK] Processing checkout.session.completed: session_id=${session.id}, userId=${userId}, plan=${plan}`);
+    if (isDev) {
+      console.log(`[DEV WEBHOOK] Processing checkout.session.completed for userId=${userId}, plan=${plan}`);
+    }
 
     if (!userId) {
       console.warn('[STRIPE WEBHOOK ERROR] Missing client_reference_id in session');
@@ -148,20 +146,20 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 
     try {
       const stripe = getStripe(); 
-      console.log(`[STRIPE WEBHOOK] Fetching subscription details for: ${session.subscription}`);
       const subscription = await stripe.subscriptions.retrieve(session.subscription as string) as any;
       const planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
-      console.log(`[STRIPE WEBHOOK] Subscription period end: ${planExpiresAt}`);
 
       const userRef = db.collection('users').doc(userId);
       const userDoc = await userRef.get();
       
       if (!userDoc.exists) {
-        console.warn(`[STRIPE WEBHOOK ERROR] User ${userId} not found in Firestore during checkout.session.completed`);
+        console.warn(`[STRIPE WEBHOOK ERROR] User context not found during checkout completion`);
         return res.status(404).json({ error: 'User not found' });
       }
 
-      console.log(`[STRIPE WEBHOOK] Found user: ${userDoc.data()?.email}. Updating plan to ${plan}...`);
+      if (isDev) {
+        console.log(`[DEV WEBHOOK] Updating plan for user ${userId} to ${plan}...`);
+      }
 
       const userData = userDoc.data();
       const referredBy = userData?.referredBy;
@@ -169,7 +167,6 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 
       // Handle Referral Reward (10 BRL)
       if (referredBy) {
-        console.log(`[REFERRAL] Processing reward for user ${userId} referred by ${referredBy}`);
         const referrerQuery = await db.collection('users').where('referralCode', '==', referredBy).limit(1).get();
         
         if (!referrerQuery.empty) {
@@ -205,12 +202,11 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
 
       if (creditsUsed) {
         updateData.credits = 0;
-        console.log(`[STRIPE WEBHOOK] Reset credits for user ${userId}`);
       }
 
       await userRef.update(updateData);
 
-      console.log(`[STRIPE WEBHOOK SUCCESS] User ${userId} (${userData?.email}) successfully upgraded to ${plan} until ${planExpiresAt}`);
+      console.log(`[STRIPE WEBHOOK SUCCESS] User successfully upgraded to ${plan}`);
 
     } catch (err: any) {
       console.error('[STRIPE WEBHOOK ERROR] Error processing checkout.session.completed:', err.message);
@@ -222,7 +218,9 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     const subscription = event.data.object as Stripe.Subscription;
     const customerId = subscription.customer as string;
 
-    console.log(`[STRIPE WEBHOOK] Received customer.subscription.trial_will_end for customer ${customerId}`);
+    if (isDev) {
+      console.log(`[DEV WEBHOOK] Trial strictly ending soon for customer ${customerId}`);
+    }
 
     try {
       const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
@@ -247,7 +245,7 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
             name: userData.name || 'Parceira Nera',
             trialEndAt: new Date(subscription.trial_end! * 1000).toISOString()
           });
-          console.log(`[STRIPE WEBHOOK SUCCESS] Trial warning email sent to ${userData.email}`);
+          console.log(`[STRIPE WEBHOOK SUCCESS] Trial warning email sent`);
         }
       }
     } catch (err: any) {
@@ -278,9 +276,9 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
           planExpiresAt: newExpiry.toISOString(),
           updatedAt: new Date().toISOString()
         });
-        console.log(`[STRIPE WEBHOOK SUCCESS] Plan renewed for customer ${customerId} until ${newExpiry.toISOString()}`);
+        console.log(`[STRIPE WEBHOOK SUCCESS] Plan successfully renewed`);
       } else {
-        console.warn(`[STRIPE WEBHOOK] User with stripeCustomerId ${customerId} not found for renewal`);
+        console.warn(`[STRIPE WEBHOOK] Customer for renewal not found in system`);
       }
     } catch (err: any) {
       console.error('[STRIPE WEBHOOK ERROR] Critical error processing invoice.paid:', err.message);
@@ -291,8 +289,6 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   if (event.type === 'customer.subscription.deleted') {
     const subscription = event.data.object as Stripe.Subscription;
     const customerId = subscription.customer;
-
-    console.log(`[STRIPE WEBHOOK] Received customer.subscription.deleted for customer ${customerId}`);
 
     try {
       const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
@@ -306,9 +302,9 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
           stripeSubscriptionId: null,
           updatedAt: new Date().toISOString()
         });
-        console.log(`[STRIPE WEBHOOK SUCCESS] Subscription deleted for customer ${customerId}, plan reset to free`);
+        console.log(`[STRIPE WEBHOOK SUCCESS] Subscription ended, plan reset to free`);
       } else {
-        console.warn(`[STRIPE WEBHOOK] User with stripeCustomerId ${customerId} not found for deletion`);
+        console.warn(`[STRIPE WEBHOOK] Customer for deletion not found in system`);
       }
     } catch (err: any) {
       console.error('[STRIPE WEBHOOK ERROR] Error deleting subscription:', err.message);

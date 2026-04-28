@@ -1,7 +1,8 @@
 import React from 'react';
-import { MapPin, Building2, Home, Briefcase, X } from 'lucide-react';
+import { MapPin, Building2, Home, Briefcase, X, MapPin as MapPinIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
+import { SERVICE_MODES } from '../lib/copy';
 
 export interface FormLocationProps {
   city: string;
@@ -149,46 +150,52 @@ export const FormLocation = ({
 
         <div className="space-y-4">
           {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Forma de Atendimento <span className="text-brand-terracotta">*</span></label>}
-          <div className="grid grid-cols-3 gap-3">
-            <button 
-              type="button"
-              onClick={() => setServiceMode('studio')}
-              className={cn(
-                "p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2",
-                serviceMode === 'studio' 
-                  ? 'border-brand-ink bg-brand-linen text-brand-ink' 
-                  : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'
-              )}
-            >
-              <Building2 size={24} />
-              <span className="text-[10px] font-medium uppercase tracking-widest">Seu Espaço</span>
-            </button>
-            <button 
-              type="button"
-              onClick={() => setServiceMode('home')}
-              className={cn(
-                "p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2",
-                serviceMode === 'home' 
-                  ? 'border-brand-ink bg-brand-linen text-brand-ink' 
-                  : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'
-              )}
-            >
-              <Home size={24} />
-              <span className="text-[10px] font-medium uppercase tracking-widest">Domicílio</span>
-            </button>
-            <button 
-              type="button"
-              onClick={() => setServiceMode('hybrid')}
-              className={cn(
-                "p-5 rounded-[24px] border transition-all flex flex-col items-center gap-2",
-                serviceMode === 'hybrid' 
-                  ? 'border-brand-ink bg-brand-linen text-brand-ink' 
-                  : 'border-brand-mist bg-brand-parchment text-brand-stone hover:border-brand-stone'
-              )}
-            >
-              <Briefcase size={24} />
-              <span className="text-[10px] font-medium uppercase tracking-widest">Híbrido</span>
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {(Object.entries(SERVICE_MODES) as [keyof typeof SERVICE_MODES, typeof SERVICE_MODES.studio][]).map(([key, info]) => {
+              const Icon = key === 'studio' ? Building2 : key === 'home' ? Home : Briefcase;
+              const isSelected = serviceMode === key;
+              
+              return (
+                <button 
+                  key={key}
+                  type="button"
+                  onClick={() => setServiceMode(key)}
+                  className={cn(
+                    "p-6 rounded-[32px] border transition-all flex flex-col items-start gap-4 text-left group relative overflow-hidden",
+                    isSelected 
+                      ? 'border-brand-ink bg-brand-linen text-brand-ink shadow-md' 
+                      : 'border-brand-mist bg-brand-white text-brand-stone hover:border-brand-stone'
+                  )}
+                >
+                  {isSelected && (
+                    <motion.div 
+                      layoutId="active-bg"
+                      className="absolute inset-0 bg-brand-ink/5"
+                    />
+                  )}
+                  
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-colors shrink-0",
+                    isSelected ? "bg-brand-ink text-white" : "bg-brand-parchment text-brand-stone group-hover:bg-brand-linen"
+                  )}>
+                    <Icon size={24} />
+                  </div>
+                  
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-widest block mb-1">{info.label}</span>
+                    <p className="text-[10px] font-light leading-relaxed opacity-70 italic">{info.description}</p>
+                  </div>
+
+                  {isSelected && (
+                    <div className="absolute top-4 right-4">
+                      <div className="w-5 h-5 bg-brand-ink text-white rounded-full flex items-center justify-center">
+                        <div className="w-2 h-2 rounded-full bg-white" />
+                      </div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 

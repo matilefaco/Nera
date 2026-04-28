@@ -46,7 +46,7 @@ const PremiumButton = ({
   const variants = {
     primary: "bg-brand-ink text-brand-white hover:bg-brand-ink/90",
     secondary: "bg-brand-linen text-brand-ink hover:bg-brand-mist/50",
-    terracotta: "bg-brand-terracotta text-brand-white hover:bg-brand-terracotta/90 premium-shadow",
+    terracotta: "bg-[var(--theme-accent,var(--color-brand-terracotta))] text-brand-white hover:opacity-90 transition-all premium-shadow",
     ink: "bg-brand-ink text-brand-white hover:bg-brand-ink/95 shadow-xl",
     linen: "bg-brand-linen text-brand-stone hover:text-brand-ink border border-brand-mist",
     outline: "bg-transparent border border-brand-mist text-brand-stone hover:border-brand-ink hover:text-brand-ink"

@@ -36,7 +36,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
     <section className="py-24 px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-16">
-          <span className="label-text text-brand-terracotta/60 mb-4 block">Segurança e Qualidade</span>
+          <span className="label-text text-[var(--theme-accent,var(--color-brand-terracotta))]/60 mb-4 block">Segurança e Qualidade</span>
           <h2 className="text-3xl font-serif text-brand-ink mb-4">Por que escolher a Nera?</h2>
           <div className="w-12 h-1 bg-brand-linen mx-auto rounded-full" />
         </div>
@@ -49,9 +49,9 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: idx * 0.1 }}
-              className="flex items-center gap-4 p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/40 hover:border-brand-terracotta/30 transition-all group"
+              className="flex items-center gap-4 p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/40 hover:border-[var(--theme-accent,var(--color-brand-terracotta))]/30 transition-all group"
             >
-              <div className="w-10 h-10 rounded-2xl bg-brand-white flex items-center justify-center text-brand-terracotta shadow-sm group-hover:scale-110 transition-transform">
+              <div className="w-10 h-10 rounded-2xl bg-brand-white flex items-center justify-center text-[var(--theme-accent,var(--color-brand-terracotta))] shadow-sm group-hover:scale-110 transition-transform">
                 {badge.icon}
               </div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-brand-stone leading-relaxed">

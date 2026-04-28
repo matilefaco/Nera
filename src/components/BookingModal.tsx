@@ -13,6 +13,7 @@ import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, Waitli
 import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage } from '../lib/utils';
 import { getAvailableSlots, canBookSlot } from '../lib/bookingUtils';
 import { toast } from 'sonner';
+import { SERVICE_MODES, getServiceModeShortLabel } from '../lib/copy';
 import PremiumButton from './PremiumButton';
 import WaitlistModal from './WaitlistModal';
 
@@ -754,13 +755,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       <div className="space-y-4">
                         <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Onde prefere o atendimento?</label>
                         <div className="grid grid-cols-2 gap-4">
-                          <button onClick={() => setBookingMode('studio')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all", bookingMode === 'studio' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone")}>
+                          <button onClick={() => setBookingMode('studio')} className={cn("flex flex-col items-start gap-2 p-5 rounded-3xl border transition-all", bookingMode === 'studio' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone")}>
                             <Building2 size={20} className={bookingMode === 'studio' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">No Estúdio</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest">{SERVICE_MODES.studio.shortLabel}</span>
                           </button>
-                          <button onClick={() => setBookingMode('home')} className={cn("flex items-center gap-4 p-5 rounded-2xl border transition-all", bookingMode === 'home' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone")}>
+                          <button onClick={() => setBookingMode('home')} className={cn("flex flex-col items-start gap-2 p-5 rounded-3xl border transition-all", bookingMode === 'home' ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist text-brand-stone")}>
                             <Home size={20} className={bookingMode === 'home' ? "text-brand-terracotta" : "text-brand-mist"} />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">Em Casa</span>
+                            <span className="text-[10px] font-bold uppercase tracking-widest">{SERVICE_MODES.home.shortLabel}</span>
                           </button>
                         </div>
                       </div>

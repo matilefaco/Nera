@@ -6,7 +6,7 @@ import { cn, formatCurrency } from '../../lib/utils';
 import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
 import PremiumButton from '../PremiumButton';
 import { UserProfile, Service } from '../../types';
-import { getProfileHeroCopy } from '../../lib/copy';
+import { getProfileHeroCopy, getServiceModeLabel } from '../../lib/copy';
 
 interface PublicHeroProps {
   profile: UserProfile;
@@ -14,7 +14,7 @@ interface PublicHeroProps {
   nextSlot: { date: string; time: string } | null;
   onBookingClick: (service?: Service) => void;
   heroBio?: string;
-  stats?: { averageRating: number; totalCompletedBookings: number } | null;
+  stats?: { averageRating: number; totalCompletedBookings: number; totalReviews?: number } | null;
   isAgendaFull?: boolean;
   onWaitlistClick?: () => void;
   totalWeeklySlots?: number | null;
@@ -95,48 +95,75 @@ export const PublicHero = ({
 
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <div className="w-8 h-px bg-brand-terracotta" />
+              <div className="w-8 h-px bg-[var(--theme-primary,var(--color-brand-terracotta))]" />
               <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-ink">
                 {profile.headline || profile.specialty}
               </span>
             </div>
 
             {/* Social Proof Mini Badges */}
-            <div className="flex flex-wrap gap-4 pt-2">
-              <div className="flex items-center gap-1.5">
-                <Star size={12} className="text-brand-terracotta fill-brand-terracotta" />
-                <span className="text-[10px] font-bold text-brand-ink">{stats?.averageRating || 4.9}</span>
-                <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Avaliação</span>
-              </div>
-              <div className="w-px h-3 bg-brand-mist/50 my-auto" />
-              <div className="flex items-center gap-1.5">
-                <Users size={12} className="text-brand-terracotta" />
-                <span className="text-[10px] font-bold text-brand-ink">+{stats?.totalCompletedBookings || 150}</span>
-                <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Atendimentos</span>
-              </div>
-              <div className="w-px h-3 bg-brand-mist/50 my-auto" />
-              <div className="flex items-center gap-1.5">
-                <Award size={12} className="text-brand-terracotta" />
-                <span className="text-[10px] font-bold text-brand-ink">{profile.professionalIdentity?.yearsExperience || '8'} anos</span>
-                <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Experiência</span>
-              </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
+              {(() => {
+                const showRating = stats && stats.averageRating > 0 && (stats.totalReviews || 0) > 0;
+                const showBookings = stats && stats.totalCompletedBookings > 0;
+                const showExperience = !!profile.professionalIdentity?.yearsExperience;
+                
+                const elements = [];
+                
+                if (showRating) {
+                  elements.push(
+                    <div key="rating" className="flex items-center gap-1.5">
+                      <Star size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))] fill-[var(--theme-primary,var(--color-brand-terracotta))]" />
+                      <span className="text-[10px] font-bold text-brand-ink">{stats?.averageRating}</span>
+                      <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Avaliação</span>
+                    </div>
+                  );
+                }
+                
+                if (showBookings) {
+                  elements.push(
+                    <div key="bookings" className="flex items-center gap-1.5">
+                      <Users size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
+                      <span className="text-[10px] font-bold text-brand-ink">+{stats?.totalCompletedBookings}</span>
+                      <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Atendimentos</span>
+                    </div>
+                  );
+                }
+                
+                if (showExperience) {
+                  elements.push(
+                    <div key="experience" className="flex items-center gap-1.5">
+                      <Award size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
+                      <span className="text-[10px] font-bold text-brand-ink">{profile.professionalIdentity?.yearsExperience} anos</span>
+                      <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Experiência</span>
+                    </div>
+                  );
+                }
+                
+                return elements.map((el, i) => (
+                  <React.Fragment key={i}>
+                    {el}
+                    {i < elements.length - 1 && <div className="w-px h-3 bg-brand-mist/50 my-auto hidden sm:block" />}
+                  </React.Fragment>
+                ));
+              })()}
             </div>
 
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3 text-brand-stone/60">
-                <MapPin size={14} className="text-brand-terracotta shrink-0" />
+                <MapPin size={14} className="text-[var(--theme-primary,var(--color-brand-terracotta))] shrink-0" />
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-ink">
                     {profile.serviceMode === 'home' ? (
-                      `Atendimento em Domicílio • ${profile.city}`
+                      `${getServiceModeLabel(profile.serviceMode)} • ${profile.city}`
                     ) : (
                       <>
                         {profile.studioAddress?.privacyMode === 'public_full' ? (
                           <>Estúdio em {profile.studioAddress.street}, {profile.studioAddress.number}</>
                         ) : (
-                          <>Estúdio em {profile.studioAddress?.neighborhood || profile.neighborhood || profile.city}</>
+                          <>{getServiceModeLabel(profile.serviceMode)} em {profile.studioAddress?.neighborhood || profile.neighborhood || profile.city}</>
                         )}
-                        {profile.serviceMode === 'hybrid' && ' • Domicílio'}
+                        {profile.serviceMode === 'hybrid' && ' (Inclui Domicílio)'}
                       </>
                     )}
                   </span>
@@ -166,12 +193,12 @@ export const PublicHero = ({
               {(profile.serviceMode === 'studio' || profile.serviceMode === 'hybrid') && (
                 <button 
                   onClick={() => setShowLocationModal(true)}
-                  className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:text-brand-sienna transition-colors group w-fit"
+                  className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-[var(--theme-primary,var(--color-brand-terracotta))] hover:opacity-80 transition-colors group w-fit"
                 >
-                  <div className="w-5 h-5 rounded-full border border-brand-terracotta/20 flex items-center justify-center group-hover:bg-brand-terracotta group-hover:text-brand-white transition-all">
+                  <div className="w-5 h-5 rounded-full border border-[var(--theme-primary,var(--color-brand-terracotta))]/20 flex items-center justify-center group-hover:bg-[var(--theme-primary,var(--color-brand-terracotta))] group-hover:text-brand-white transition-all">
                     <MapPin size={10} />
                   </div>
-                  <span className="border-b border-brand-terracotta/20 group-hover:border-brand-terracotta transition-all">
+                  <span className="border-b border-[var(--theme-primary,var(--color-brand-terracotta))]/20 group-hover:border-[var(--theme-primary,var(--color-brand-terracotta))] transition-all">
                     {profile.studioAddress?.privacyMode === 'public_full' ? 'Como chegar' : 'Ver localização'}
                   </span>
                 </button>
@@ -181,10 +208,14 @@ export const PublicHero = ({
 
           {nextSlot ? (
             <div className="flex flex-col gap-2">
-              <div className="inline-flex items-center gap-3 bg-brand-white border border-brand-mist px-5 py-3 rounded-full shadow-sm opacity-0 pointer-events-none hidden">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em]">
-                  Próximo horário: <span className="text-brand-terracotta">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="inline-flex items-center gap-3 bg-brand-white border border-brand-mist px-5 py-3 rounded-full shadow-sm w-fit"
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary,var(--color-brand-terracotta))] animate-pulse" />
+                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-ink">
+                  Próxima vaga: <span className="text-[var(--theme-primary,var(--color-brand-terracotta))]">
                     {(() => {
                       const today = getLocalDateStr();
                       const tomorrowDate = new Date();
@@ -194,22 +225,16 @@ export const PublicHero = ({
                       if (nextSlot.date === today) return `hoje às ${nextSlot.time}`;
                       if (nextSlot.date === tomorrow) return `amanhã às ${nextSlot.time}`;
                       
-                      // Format for date if further than tomorrow
                       const dateObj = parseLocalDate(nextSlot.date);
-                      const weekDay = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-')[0];
-                      const day = dateObj.getDate();
-                      return `${weekDay}, dia ${day} às ${nextSlot.time}`;
+                      const weekDay = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-')[0].split(',')[0];
+                      const day = String(dateObj.getDate()).padStart(2, '0');
+                      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                      
+                      return `${weekDay}, ${day}/${month} às ${nextSlot.time}`;
                     })()}
                   </span>
                 </span>
-              </div>
-              
-              {/* Texto Seguro Temporário */}
-              <div className="inline-flex items-center gap-3 bg-brand-linen/40 border border-brand-mist px-5 py-3 rounded-full shadow-sm">
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
-                  Consulte os próximos horários
-                </span>
-              </div>
+              </motion.div>
             </div>
           ) : isAgendaFull ? (
             <div className="inline-flex items-center gap-3 bg-brand-linen border border-brand-terracotta/20 px-5 py-3 rounded-full shadow-sm">
@@ -266,7 +291,7 @@ export const PublicHero = ({
           {/* Organic Border SVG */}
           <svg className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)] z-10 pointer-events-none overflow-visible" viewBox="0 0 420 560" preserveAspectRatio="none">
             <path
-              className="fill-none stroke-brand-terracotta/40 stroke-[1.5] animate-draw"
+              className="fill-none stroke-[var(--theme-primary,var(--color-brand-terracotta))]/40 stroke-[1.5] animate-draw"
               d="M12,48 Q8,12 48,8 L372,6 Q412,4 416,44 L418,512 Q420,552 380,556 L40,558 Q0,560 4,520 Z"
             />
           </svg>
@@ -289,14 +314,13 @@ export const PublicHero = ({
               </div>
             )}
             
-            {/* Polaroid Badge */}
-            <div className="absolute -bottom-6 left-0 right-0 bg-brand-white border border-brand-mist rounded-b-xl shadow-lg p-5 flex items-center justify-between z-20">
-              <span className="font-signature text-3xl text-brand-ink/70 leading-none">{firstName}</span>
-              <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.25em] text-brand-terracotta">
-                <div className="w-1 h-1 rounded-full bg-current" />
-                {profile.city} • {profile.neighborhood}
+              <div className="flex items-center justify-between p-5 flex-wrap gap-2 z-20">
+                <span className="font-signature text-3xl text-brand-ink/70 leading-none">{firstName}</span>
+                <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.25em] text-[var(--theme-accent,var(--color-brand-terracotta))]">
+                  <div className="w-1 h-1 rounded-full bg-current" />
+                  {profile.city} • {profile.neighborhood}
+                </div>
               </div>
-            </div>
 
             {/* Shield Badge */}
             <div className="absolute top-8 right-8 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-brand-mist/50 z-20">

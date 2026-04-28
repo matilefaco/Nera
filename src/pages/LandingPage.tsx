@@ -5,11 +5,16 @@ import {
   Smartphone, Star, ChevronRight, Check
 } from 'lucide-react';
 import Logo from '../components/Logo';
+import { PLANS } from '../config/plans';
 
 // Substituir por depoimentos reais antes de campanhas pagas.
 const TESTIMONIALS_PLACEHOLDER = true;
 
 export default function LandingPage() {
+  const freePlan = PLANS.find(p => p.id === 'free')!;
+  const essencialPlan = PLANS.find(p => p.id === 'essencial')!;
+  const proPlan = PLANS.find(p => p.id === 'pro')!;
+
   return (
     <div className="flex flex-col min-h-screen bg-brand-parchment">
       {/* Navigation */}
@@ -262,41 +267,36 @@ export default function LandingPage() {
               <div className="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
                 {/* GRATUITO */}
                 <div className="card-refined p-10 flex flex-col h-full">
-                  <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">Gratuito</div>
-                  <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ 0</div>
-                  <div className="text-brand-stone text-sm font-light mb-1">Plano gratuito para começar com teste sem risco. Sem cartão de crédito.</div>
-                  <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest mb-8 italic">Ideal para começar</div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">{freePlan.name}</div>
+                  <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ {freePlan.price}</div>
+                  <div className="text-brand-stone text-sm font-light mb-1">{freePlan.subtitle}</div>
+                  <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest mb-8 italic">{freePlan.tagline}</div>
                   <ul className="space-y-3 mb-10 flex-1">
-                  {[
-                    'Perfil digital premium (foto, bio e serviços)', 
-                    'Até 15 agendamentos por mês', 
-                    'Aprovação manual (seu filtro)', 
-                    'Link direto para bio'
-                  ].map(f => (
-                    <li key={f} className="text-sm text-brand-stone font-light flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
+                  {freePlan.features.map(f => (
+                    <li key={f.text} className="text-sm text-brand-stone font-light flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f.text}
                     </li>
                   ))}
                 </ul>
                 <Link to="/register" className="block text-center border border-brand-mist py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:bg-brand-linen transition-all">
-                  Criar conta grátis
+                  {freePlan.cta}
                 </Link>
               </div>
 
               {/* ESSENCIAL */}
               <div className="bg-brand-ink rounded-[32px] p-10 relative flex flex-col h-full">
-                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">Essencial</div>
-                <div className="text-[52px] font-serif font-normal text-brand-white leading-none mb-2">R$ 49</div>
-                <div className="text-brand-stone text-sm font-light mb-8">por mês · cancele quando quiser</div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">{essencialPlan.name}</div>
+                <div className="text-[52px] font-serif font-normal text-brand-white leading-none mb-2">R$ {essencialPlan.price}</div>
+                <div className="text-brand-stone text-sm font-light mb-8">{essencialPlan.subtitle}</div>
                 <ul className="space-y-3 mb-10 flex-1">
-                  {['Agendamentos ilimitados', 'Notificações WhatsApp', 'Lista de espera', 'Bloqueio de horários', 'Lembrete 24h anti-no-show', 'Histórico de clientes'].map(f => (
-                    <li key={f} className="text-sm text-brand-white/70 font-light flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f}
+                  {essencialPlan.features.map(f => (
+                    <li key={f.text} className="text-sm text-brand-white/70 font-light flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f.text}
                     </li>
                   ))}
                 </ul>
                 <Link to="/register?plan=essencial" className="block text-center bg-brand-terracotta text-white py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-sienna transition-all">
-                  Testar Essencial por 15 dias
+                  {essencialPlan.cta}
                 </Link>
               </div>
 
@@ -307,24 +307,17 @@ export default function LandingPage() {
                 <div className="absolute top-0 right-10 -translate-y-1/2 bg-brand-terracotta text-white px-4 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-widest shadow-lg">
                   Recomendado para quem quer crescer
                 </div>
-                <div className="text-[9px] font-bold uppercase tracking-[0.35em] text-brand-terracotta mb-6 block">Plano Pro</div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.35em] text-brand-terracotta mb-6 block">Plano {proPlan.name}</div>
                 <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-[52px] font-serif font-normal text-brand-ink leading-none">R$ 89</span>
-                  <span className="text-xs text-brand-stone font-bold uppercase tracking-widest">/mês</span>
+                  <span className="text-[52px] font-serif font-normal text-brand-ink leading-none">R$ {proPlan.price}</span>
+                  <span className="text-xs text-brand-stone font-bold uppercase tracking-widest">{proPlan.priceDescriptor}</span>
                 </div>
-                <div className="text-brand-stone/60 text-[10px] font-bold uppercase tracking-widest mb-8">Ferramentas completas para crescer mais rápido</div>
+                <div className="text-brand-stone/60 text-[10px] font-bold uppercase tracking-widest mb-8">{proPlan.subtitle}</div>
                 <ul className="space-y-4 mb-10 flex-1">
-                  {[
-                    'Tudo do Essencial, com recursos para crescer mais rápido', 
-                    'Cupons de desconto', 
-                    'Relatório mensal em PDF', 
-                    'Link de indicação premiado', 
-                    'Badge Pro Nera na vitrine', 
-                    'Suporte prioritário'
-                  ].map((f, i) => (
-                    <li key={f} className={`text-[13px] text-brand-ink font-medium flex items-center gap-4 ${i === 0 ? 'text-brand-terracotta font-bold' : ''}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0 ${i === 0 ? 'animate-pulse' : ''}`} />
-                      <span className="tracking-tight">{f}</span>
+                  {proPlan.features.map((f, i) => (
+                    <li key={f.text} className={`text-[13px] text-brand-ink font-medium flex items-center gap-4 ${f.isHighlight ? 'text-brand-terracotta font-bold' : ''}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0 ${f.isHighlight ? 'animate-pulse' : ''}`} />
+                      <span className="tracking-tight">{f.text}</span>
                     </li>
                   ))}
                 </ul>
@@ -332,7 +325,7 @@ export default function LandingPage() {
                   to="/register?plan=pro" 
                   className="block text-center bg-brand-terracotta text-white py-5 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] shadow-[0_12px_24px_rgba(168,92,58,0.3)] hover:bg-brand-sienna hover:shadow-xl transition-all"
                 >
-                  Começar como Pro
+                  {proPlan.cta}
                 </Link>
               </div>
             </div>

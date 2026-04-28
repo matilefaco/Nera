@@ -37,7 +37,15 @@ const FormError = ({ message }: { message?: string }) => (
   </AnimatePresence>
 );
 
-const DURATION_CHIPS = [30, 45, 60, 90, 120];
+const DURATION_OPTIONS = [
+  { label: '30 min', value: 30 },
+  { label: '45 min', value: 45 },
+  { label: '1h', value: 60 },
+  { label: '1h30', value: 90 },
+  { label: '2h', value: 120 },
+  { label: '2h30', value: 150 },
+  { label: '3h', value: 180 },
+];
 
 export const FormServices = ({
   services,
@@ -92,7 +100,8 @@ export const FormServices = ({
         {services.map((service, index) => {
           const durationVal = Number(service.duration) || 0;
           const slots = calculateSlots(durationVal);
-          const isDurationInvalid = errors[index]?.duration || (service.duration === "" && errors[index]?.name); // Simple heuristic for "tried to save"
+          const isCustom = !DURATION_OPTIONS.some(opt => opt.value === durationVal) && durationVal > 0;
+          const currentShowCustom = showCustom[index] ?? isCustom;
 
           return (
             <div key={index} className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative group overflow-hidden">
@@ -126,46 +135,46 @@ export const FormServices = ({
                   <FormError message={errors[index]?.name} />
                 </div>
 
-                <div className="md:col-span-1 space-y-3">
+                <div className="md:col-span-1 space-y-4">
                   <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">
                     Duração do Atendimento <span className="text-brand-terracotta">*</span>
                   </label>
                   
                   <div className="flex flex-wrap gap-2">
-                    {DURATION_CHIPS.map(d => (
+                    {DURATION_OPTIONS.map(opt => (
                       <button
-                        key={d}
+                        key={opt.value}
                         type="button"
                         onClick={() => {
-                          updateService(index, 'duration', d.toString());
+                          updateService(index, 'duration', opt.value.toString());
                           setShowCustom(prev => ({ ...prev, [index]: false }));
                         }}
                         className={cn(
                           "px-4 py-2.5 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all",
-                          durationVal === d && !showCustom[index]
-                            ? "bg-brand-terracotta border-brand-terracotta text-brand-white shadow-md"
+                          durationVal === opt.value && !currentShowCustom
+                            ? "bg-brand-terracotta border-brand-terracotta text-brand-white shadow-md font-extrabold"
                             : "border-brand-mist text-brand-stone hover:border-brand-ink"
                         )}
                       >
-                        {d} min
+                        {opt.label}
                       </button>
                     ))}
                     <button
                       type="button"
-                      onClick={() => setShowCustom(prev => ({ ...prev, [index]: !prev[index] }))}
+                      onClick={() => setShowCustom(prev => ({ ...prev, [index]: !currentShowCustom }))}
                       className={cn(
                         "px-4 py-2.5 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all",
-                        showCustom[index]
+                        currentShowCustom
                           ? "bg-brand-ink border-brand-ink text-brand-white"
                           : "border-brand-mist text-brand-stone hover:border-brand-ink"
                       )}
                     >
-                      {showCustom[index] ? 'Cancelar' : '+ Personalizado'}
+                      {currentShowCustom ? 'Voltar' : 'Personalizado'}
                     </button>
                   </div>
 
                   <AnimatePresence>
-                    {showCustom[index] && (
+                    {currentShowCustom && (
                       <motion.div 
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
@@ -175,9 +184,12 @@ export const FormServices = ({
                         <Clock className="absolute left-4 top-[22px] text-brand-mist/40" size={14} />
                         <input 
                           type="number" 
+                          min="15"
+                          max="480"
+                          step="15"
                           value={service.duration} 
                           onChange={(e) => updateService(index, 'duration', e.target.value)} 
-                          placeholder="Ex: 60 minutos"
+                          placeholder="Ex: 60"
                           className={cn(
                             "w-full pl-11 pr-12 py-3 bg-brand-parchment border rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                             errors[index]?.duration ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
@@ -188,20 +200,22 @@ export const FormServices = ({
                     )}
                   </AnimatePresence>
                   
-                  {errors[index]?.duration && <FormError message="Informe a duração. Ela define os horários disponíveis para suas clientes." />}
-
-                  {durationVal > 0 && (
-                    <motion.div 
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-brand-linen/40 p-4 rounded-3xl border border-dashed border-brand-mist/50 mt-4"
-                    >
-                      <p className="text-[10px] text-brand-stone font-medium leading-relaxed uppercase tracking-widest">
-                        Com <span className="text-brand-terracotta font-bold">{durationVal} min</span>, sua agenda abre vagas das <span className="text-brand-ink font-bold">{workingHours.startTime}</span> até as <span className="text-brand-ink font-bold">{workingHours.endTime}</span>. 
-                        Isso permite <span className="text-brand-terracotta font-bold">{slots} atendimentos</span> por dia.
-                      </p>
-                    </motion.div>
+                  {errors[index]?.duration && (
+                    <div className="mt-1">
+                      <FormError message="Selecione a duração. Ela define os horários disponíveis para suas clientes." />
+                    </div>
                   )}
+
+                  <div className="bg-brand-linen/40 p-5 rounded-3xl border border-dashed border-brand-mist/50 mt-4">
+                    <p className="text-[10px] text-brand-stone font-medium leading-relaxed uppercase tracking-widest mb-2">
+                       A duração define os horários disponíveis para suas clientes.
+                    </p>
+                    {durationVal > 0 && slots > 0 && (
+                      <p className="text-[10px] text-brand-stone font-light italic leading-relaxed">
+                        Com <span className="text-brand-terracotta font-bold">{durationVal} min</span> por atendimento, sua agenda permite até <span className="text-brand-terracotta font-bold">{slots} atendimentos</span> por dia.
+                      </p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="md:col-span-1 space-y-2">

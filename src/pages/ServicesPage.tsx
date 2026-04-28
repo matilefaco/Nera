@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc
 import { 
   Calendar, List, Plus, Trash2, Edit2, X, Clock, 
   DollarSign, Settings, Sparkles, ChevronRight, Info, Users,
-  Wand2, Loader2
+  Wand2, Loader2, AlertCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -33,6 +33,27 @@ export default function ServicesPage() {
   const [category, setCategory] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCustomDuration, setShowCustomDuration] = useState(false);
+  const [durationError, setDurationError] = useState(false);
+
+  const DURATION_OPTIONS = [
+    { label: '30 min', value: 30 },
+    { label: '45 min', value: 45 },
+    { label: '1h', value: 60 },
+    { label: '1h30', value: 90 },
+    { label: '2h', value: 120 },
+    { label: '2h30', value: 150 },
+    { label: '3h', value: 180 },
+  ];
+
+  const calculateSlots = (d: number) => {
+    if (!d || d <= 0 || !profile?.workingHours) return 0;
+    const start = profile.workingHours.startTime || '09:00';
+    const end = profile.workingHours.endTime || '18:00';
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    const total = (eh * 60 + em) - (sh * 60 + sm);
+    return Math.floor(total / d);
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -96,6 +117,14 @@ export default function ServicesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setDurationError(false);
+
+    if (!duration || Number(duration) <= 0) {
+      setDurationError(true);
+      toast.error('Selecione a duração do serviço.');
+      return;
+    }
+
     setLoading(true);
 
     const professionalId = user?.uid;
@@ -358,27 +387,27 @@ export default function ServicesPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                       <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">
                         Duração do Atendimento <span className="text-brand-terracotta">*</span>
                       </label>
                       <div className="flex flex-wrap gap-2">
-                        {[30, 45, 60, 90, 120].map(d => (
+                        {DURATION_OPTIONS.map(opt => (
                           <button
-                            key={d}
+                            key={opt.value}
                             type="button"
                             onClick={() => {
-                              setDuration(d.toString());
+                              setDuration(opt.value.toString());
                               setShowCustomDuration(false);
                             }}
                             className={cn(
                               "px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all",
-                              Number(duration) === d && !showCustomDuration
-                                ? "bg-brand-terracotta border-brand-terracotta text-brand-white shadow-md"
+                              Number(duration) === opt.value && !showCustomDuration
+                                ? "bg-brand-terracotta border-brand-terracotta text-brand-white shadow-md font-extrabold"
                                 : "border-brand-mist text-brand-stone hover:border-brand-ink"
                             )}
                           >
-                            {d} min
+                            {opt.label}
                           </button>
                         ))}
                         <button
@@ -391,7 +420,7 @@ export default function ServicesPage() {
                               : "border-brand-mist text-brand-stone hover:border-brand-ink shadow-sm"
                           )}
                         >
-                          {showCustomDuration ? 'Voltar' : '+ Outro'}
+                          {showCustomDuration ? 'Voltar' : 'Personalizado'}
                         </button>
                       </div>
 
@@ -406,23 +435,38 @@ export default function ServicesPage() {
                             <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
                             <input 
                               type="number" 
+                              min="15"
+                              max="480"
+                              step="15"
                               value={duration} 
                               onChange={(e) => setDuration(e.target.value)} 
                               placeholder="60" 
-                              className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm min-w-0" 
-                              required 
+                              className={cn(
+                                "w-full pl-11 pr-4 py-3 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm min-w-0",
+                                durationError ? "border-brand-terracotta" : "border-brand-mist"
+                              )}
                             />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-bold text-brand-stone uppercase tracking-widest">min</span>
                           </motion.div>
                         )}
                       </AnimatePresence>
 
-                      {Number(duration) > 0 && profile?.workingHours && (
-                        <div className="bg-brand-linen/40 p-3 rounded-2xl border border-dashed border-brand-mist/50">
-                          <p className="text-[9px] text-brand-stone font-medium uppercase tracking-wider leading-relaxed">
-                            {Math.floor(((Number(profile.workingHours.endTime.split(':')[0]) * 60 + Number(profile.workingHours.endTime.split(':')[1])) - (Number(profile.workingHours.startTime.split(':')[0]) * 60 + Number(profile.workingHours.startTime.split(':')[1]))) / Number(duration))} atendimentos possíveis por dia.
-                          </p>
+                      {durationError && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-brand-terracotta font-bold uppercase tracking-wider ml-1">
+                          <AlertCircle size={12} /> Selecione a duração. Ela define os horários disponíveis para suas clientes.
                         </div>
                       )}
+
+                      <div className="bg-brand-linen/40 p-4 rounded-3xl border border-dashed border-brand-mist/50">
+                        <p className="text-[9px] text-brand-stone font-medium uppercase tracking-wider leading-relaxed mb-1">
+                          A duração define os horários disponíveis para suas clientes.
+                        </p>
+                        {Number(duration) > 0 && (
+                          <p className="text-[9px] text-brand-stone font-light italic leading-relaxed">
+                            {calculateSlots(Number(duration))} atendimentos possíveis por dia.
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-2">

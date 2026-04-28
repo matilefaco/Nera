@@ -141,6 +141,9 @@ export interface UserProfile {
   referralCode?: string; // código único de indicação
   referredBy?: string;   // código de quem indicou este usuário
   credits?: number;      // créditos acumulados em reais
+  profileTheme?: {
+    variant: "terracotta" | "rose" | "sage" | "navy" | "plum";
+  };
   updatedAt: string;
 
   // --- LEGACY FIELDS FOR COMPATIBILITY ---

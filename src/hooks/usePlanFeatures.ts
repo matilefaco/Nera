@@ -1,28 +1,21 @@
 import { useAuth } from '../AuthContext';
 import { PlanFeatures } from '../types';
+import { PLAN_CONFIGS, PlanType } from '../constants/plans';
 
 export function usePlanFeatures() {
   const { profile } = useAuth();
   
-  const plan = profile?.plan || 'free';
+  const rawPlan = (profile?.plan || 'free').toLowerCase() as PlanType;
   const expiresAt = profile?.planExpiresAt;
   
   // Check if plan is expired
   const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
   
   // Effective plan
-  const activePlan = isExpired ? 'free' : plan;
+  const activePlan: PlanType = isExpired ? 'free' : (PLAN_CONFIGS[rawPlan] ? rawPlan : 'free');
 
-  const features: PlanFeatures = {
-    unlimitedBookings: activePlan === 'essencial' || activePlan === 'pro',
-    whatsappNotifications: activePlan === 'essencial' || activePlan === 'pro',
-    advancedDashboard: activePlan === 'pro',
-    waitlist: activePlan === 'pro',
-    antiNoShow: activePlan === 'pro',
-    coupons: activePlan === 'essencial' || activePlan === 'pro',
-    analytics: activePlan === 'pro',
-    reports: activePlan === 'pro',
-  };
+  const config = PLAN_CONFIGS[activePlan];
+  const features: PlanFeatures = config.features;
 
   const isPremium = () => activePlan !== 'free';
   const isProPlan = () => activePlan === 'pro';
@@ -33,5 +26,6 @@ export function usePlanFeatures() {
     isExpired,
     isPremium,
     isProPlan,
+    allowedThemes: config.themes,
   };
 }

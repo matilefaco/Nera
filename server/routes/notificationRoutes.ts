@@ -54,6 +54,67 @@ export async function sendPushToUser(professionalId: string, payload: any) {
   }
 }
 
+/**
+ * Creates an internal alert for last-minute cancellations (less than 2 hours).
+ */
+async function createLastMinuteAlert(payload: any) {
+  const { professionalId, clientName, serviceName, date, time, appointmentId } = payload;
+  const apptId = appointmentId || payload.id;
+
+  if (!professionalId || !date || !time || !apptId) {
+    console.log('[ALERT] Missing data for last-minute check:', { professionalId, date, time, apptId });
+    return;
+  }
+
+  try {
+    // Determine time difference
+    // Note: This assumes server time and appointment time are in the same relative timezone
+    const apptDate = new Date(`${date}T${time}`);
+    const now = new Date();
+    const diffMs = apptDate.getTime() - now.getTime();
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    console.log(`[ALERT] Cancellation check: ${diffHours.toFixed(2)}h until appointment ${apptId}`);
+
+    // If cancellation is within 2 hours of the appointment
+    if (diffHours > 0 && diffHours <= 2) {
+      const alertId = `last_minute_${apptId}`;
+      const alertRef = db.collection('alerts').doc(alertId);
+      
+      const alertSnap = await alertRef.get();
+      if (alertSnap.exists) {
+        console.log(`[ALERT] Alert already exists for ${apptId}`);
+        return;
+      }
+
+      await alertRef.set({
+        professionalId,
+        appointmentId: apptId,
+        type: 'last_minute_cancellation',
+        clientName: clientName || 'Cliente',
+        serviceName: serviceName || 'Serviço',
+        scheduledDate: date,
+        scheduledTime: time,
+        hoursUntil: Math.round(diffHours * 10) / 10,
+        read: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      console.log(`[ALERT] SUCCESS: Last-minute cancellation alert created for ${apptId}`);
+      
+      // Also trigger a push
+      await sendPushToUser(professionalId, {
+        title: "Cancelamento de última hora!",
+        body: `${clientName} cancelou ${serviceName} às ${time}.`,
+        icon: "/icon-192.png",
+        data: { url: "/dashboard" }
+      });
+    }
+  } catch (err) {
+    console.error('[ALERT] Error creating last-minute alert:', err);
+  }
+}
+
 import { 
   buildNewBookingMessageForPro, 
   buildBookingConfirmedMessageForClient, 
@@ -458,6 +519,10 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
 
     if (type === 'BOOKING_CANCELLED' || type === 'BOOKING_CANCELLED_BY_CLIENT') {
       const { professionalId, clientName, clientEmail, clientWhatsapp, serviceName, date, time, appointmentId, professionalSlug } = payload;
+      
+      // CREATE LAST MINUTE ALERT IF APPLICABLE
+      await createLastMinuteAlert(payload);
+
       const eventKeyPro = 'bookingCancelledProfessional';
       const eventKeyClient = 'bookingCancelledClient';
 

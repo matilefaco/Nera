@@ -176,20 +176,37 @@ export function cleanWhatsapp(raw: string): string {
 
 /**
  * Formats a numeric string into the "(XX) XXXXX-XXXX" pattern for display.
+ * Handles partial inputs gracefully.
  */
 export function formatWhatsappDisplay(raw: string): string {
   const cleaned = cleanWhatsapp(raw);
-  // Matches 11 digits: XX XXXXX XXXX
-  const match = cleaned.match(/^(\d{2})(\d{5})(\d{4})$/);
-  if (match) {
-    return `(${match[1]}) ${match[2]}-${match[3]}`;
-  }
-  // Matches 10 digits (no 9): XX XXXX XXXX
-  const matchShort = cleaned.match(/^(\d{2})(\d{4})(\d{4})$/);
-  if (matchShort) {
-    return `(${matchShort[1]}) ${matchShort[2]}-${matchShort[3]}`;
-  }
-  return raw;
+  const len = cleaned.length;
+
+  if (len === 0) return '';
+  if (len <= 2) return `(${cleaned}`;
+  if (len <= 6) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+  if (len <= 10) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+  return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7, 11)}`;
+}
+
+/**
+ * Validates if a string is a valid Brazilian WhatsApp number.
+ * Must have 10 or 11 digits and start with a valid Brazilian DDD.
+ */
+export function isValidWhatsapp(raw: string): boolean {
+  const cleaned = cleanWhatsapp(raw);
+  
+  // Basic length check
+  if (cleaned.length !== 10 && cleaned.length !== 11) return false;
+  
+  // DDD check (11 to 99)
+  const ddd = parseInt(cleaned.slice(0, 2));
+  if (isNaN(ddd) || ddd < 11 || ddd > 99) return false;
+  
+  // If 11 digits, must start with 9 after DDD (mobile convention)
+  if (cleaned.length === 11 && cleaned[2] !== '9') return false;
+  
+  return true;
 }
 
 /**

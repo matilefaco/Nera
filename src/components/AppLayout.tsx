@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Calendar, Users, LogOut, Gift,
-  Settings, List, TrendingUp, User, ChevronDown, Shield, Key, Tag
+  Settings, List, TrendingUp, User, ChevronDown, Shield, Key, Tag, DollarSign
 } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -85,6 +85,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
     { title: 'Painel', icon: TrendingUp, path: '/dashboard', id: 'dashboard' },
     { title: 'Agenda', icon: Calendar, path: '/agenda', id: 'agenda', hasBadge: true },
     { title: 'Clientes', icon: Users, path: '/clients', id: 'clients' },
+    { title: 'Financeiro', icon: DollarSign, path: '/financeiro', id: 'financial' },
     { title: 'Serviços', icon: List, path: '/services', id: 'services' },
     { title: 'Cupons', icon: Tag, path: '/cupons', id: 'coupons' },
     { title: 'Indicações', icon: Gift, path: '/indicacoes', id: 'referrals' },

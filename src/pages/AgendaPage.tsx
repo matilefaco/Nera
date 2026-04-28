@@ -6,13 +6,14 @@ import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, 
 import { 
   Calendar, Clock, MessageCircle, 
   CheckCircle2, ChevronLeft, ChevronRight, Plus, MapPin,
-  Users, List, Settings, Check, Sparkles, X, Lock, RefreshCw,
-  TrendingUp, Trash2, ArrowUpRight, Filter, MoreHorizontal,
+  Users, List, Settings, Check, Sparkles, X, Lock, RefreshCw, Star,
+  TrendingUp, Trash2, ArrowUpRight, Filter, MoreHorizontal, ArrowRight,
   CalendarCheck2, AlertCircle, Info, Share2, Search
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn, cleanWhatsapp } from '../lib/utils';
-import { getAvailableSlots, getDayAvailability } from '../lib/bookingUtils';
+import { getAvailableSlots as getAvailableSlotsOld, getDayAvailability } from '../lib/bookingUtils';
+import { getAvailableSlots, IntelligentFit } from '../utils/scheduleSuggestions';
 import PremiumButton from '../components/PremiumButton';
 import { toast } from 'sonner';
 import { Appointment } from '../types';
@@ -113,6 +114,7 @@ export default function AgendaPage() {
   const [manualDate, setManualDate] = useState(selectedDate);
   const [manualTime, setManualTime] = useState('');
   const [services, setServices] = useState<any[]>([]);
+  // Intelligent Fit State
   const [isCreating, setIsCreating] = useState(false);
   
   // Reserva Search
@@ -329,6 +331,34 @@ export default function AgendaPage() {
     }
   };
 
+  // Smart Suggestions
+  const recommendedSlots = React.useMemo(() => {
+    if (!manualService || !manualDate || !profile?.workingHours) return { bestSlot: null, otherSlots: [] };
+    const selectedSvc = services.find(s => s.id === manualService);
+    const duration = selectedSvc?.duration || 60;
+    
+    // Use the custom helper for Phase 2 (Ranking)
+    return getAvailableSlots({
+      date: manualDate,
+      serviceDuration: duration,
+      appointments: allAppointments,
+      blockedSchedules: allBlockedSchedules,
+      workingHours: profile.workingHours
+    });
+  }, [manualService, manualDate, allAppointments, allBlockedSchedules, profile, services]);
+
+  const handleApplyFit = (fit: IntelligentFit) => {
+    if (fit.type === 'adjustment' && fit.adjustment) {
+      toast.info(
+        `Oportunidade Nera: Mova ${fit.adjustment.clientName} das ${fit.adjustment.originalTime} para as ${fit.adjustment.newTime}. Isso liberará as ${fit.time} para este novo atendimento.`,
+        { duration: 8000 }
+      );
+    } else {
+      setManualTime(fit.time);
+      toast.success('Horário de encaixe selecionado!');
+    }
+  };
+
   const handleCreateManual = async () => {
     if (!user || !manualClient || !manualDate || !manualTime) {
       toast.error('Preencha nome da cliente, data e horário.');
@@ -528,31 +558,39 @@ export default function AgendaPage() {
       )}>
         
         {/* 1. HEADER LIMPO */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 mt-2">
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-serif text-brand-ink">
-              {view === 'day' ? (isSelectedDateToday ? 'Hoje' : formatLocalDate(selectedDate, { weekday: 'short', day: 'numeric', month: 'long' })) : 
-               view === 'week' ? `Semana de ${formatLocalDate(formatDateKey(weekStart), { day: 'numeric', month: 'short' })}` :
-               formatLocalDate(selectedDate, { month: 'long', year: 'numeric' })}
-            </h1>
+            <div className="flex flex-col">
+              <h1 className="text-lg font-serif text-brand-ink leading-tight">
+                {view === 'month' 
+                  ? formatLocalDate(selectedDate, { month: 'long', year: 'numeric' })
+                  : view === 'week' 
+                    ? `Semana de ${formatLocalDate(formatDateKey(weekStart), { day: 'numeric', month: 'short' })}`
+                    : formatLocalDate(selectedDate, { day: 'numeric', month: 'long' })
+                }
+              </h1>
+              {view === 'day' && isSelectedDateToday && (
+                <span className="text-[10px] text-brand-terracotta font-bold uppercase tracking-[0.2em] mt-0.5">Hoje</span>
+              )}
+            </div>
 
             {/* VIEW TOGGLE */}
-            <div className="flex bg-brand-linen p-1 rounded-full text-[9px] font-bold uppercase tracking-widest">
+            <div className="flex bg-brand-linen/50 p-1.5 rounded-2xl text-[9px] font-bold uppercase tracking-widest border border-brand-mist/20">
               <button 
                 onClick={() => setView('day')}
-                className={cn("px-4 py-1.5 rounded-full transition-all", view === 'day' ? "bg-brand-white shadow-sm text-brand-ink" : "text-brand-stone")}
+                className={cn("px-4 py-2 rounded-xl transition-all", view === 'day' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
               >
                 Dia
               </button>
               <button 
                 onClick={() => setView('week')}
-                className={cn("px-4 py-1.5 rounded-full transition-all", view === 'week' ? "bg-brand-white shadow-sm text-brand-ink" : "text-brand-stone")}
+                className={cn("px-4 py-2 rounded-xl transition-all", view === 'week' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
               >
                 Semana
               </button>
               <button 
                 onClick={() => setView('month')}
-                className={cn("px-4 py-1.5 rounded-full transition-all", view === 'month' ? "bg-brand-white shadow-sm text-brand-ink" : "text-brand-stone")}
+                className={cn("px-4 py-2 rounded-xl transition-all", view === 'month' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
               >
                 Mês
               </button>
@@ -562,19 +600,21 @@ export default function AgendaPage() {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => handleNavigate('prev')} 
-              className="p-2 hover:bg-brand-linen rounded-full text-brand-stone transition-colors"
+              className="w-10 h-10 bg-brand-white border border-brand-mist/50 flex items-center justify-center rounded-2xl text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm"
             >
               <ChevronLeft size={18} />
             </button>
-            <button 
-              onClick={setDateToToday}
-              className="px-4 py-2 bg-brand-linen text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all"
-            >
-              Hoje
-            </button>
+            {!isSelectedDateToday && (
+              <button 
+                onClick={setDateToToday}
+                className="px-5 py-2.5 bg-brand-linen/80 text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all border border-brand-terracotta/10"
+              >
+                Hoje
+              </button>
+            )}
             <button 
               onClick={() => handleNavigate('next')} 
-              className="p-2 hover:bg-brand-linen rounded-full text-brand-stone transition-colors"
+              className="w-10 h-10 bg-brand-white border border-brand-mist/50 flex items-center justify-center rounded-2xl text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm"
             >
               <ChevronRight size={18} />
             </button>
@@ -599,36 +639,23 @@ export default function AgendaPage() {
           </motion.div>
         )}
 
-        {/* 1.5 FIND RESERVATION CARD */}
-        <div className="bg-brand-linen/30 border border-brand-mist/50 rounded-[32px] p-6 mb-10">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-brand-white rounded-2xl flex items-center justify-center text-brand-terracotta shadow-sm">
-              <Search size={20} />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold text-brand-ink uppercase tracking-widest">Encontrar reserva</h3>
-              <p className="text-[10px] text-brand-stone font-light italic">Digite o código informado pela cliente.</p>
-            </div>
-          </div>
-          
-          <form onSubmit={handleCodeSearch} className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={searchCode}
-                onChange={(e) => setSearchCode(e.target.value)}
-                placeholder="Ex: NR-2026..."
-                className="w-full bg-brand-white border border-brand-mist rounded-2xl py-3.5 px-5 text-xs font-bold text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-terracotta/30 transition-all placeholder:text-brand-stone/40 font-mono uppercase"
-              />
-            </div>
-            <button 
-              type="submit"
-              disabled={isSearchingCode || !searchCode.trim()}
-              className="px-6 bg-brand-ink text-brand-white rounded-2xl text-[9px] font-bold uppercase tracking-widest hover:bg-brand-stone transition-all disabled:opacity-50 flex items-center gap-2"
-            >
-              {isSearchingCode ? <RefreshCw size={12} className="animate-spin" /> : 'Buscar'}
-            </button>
-          </form>
+        {/* 1.5 FIND RESERVATION BAR (Discrete) */}
+        <div className="bg-brand-linen/30 border border-brand-mist/30 rounded-[28px] p-2 mb-10 flex items-center gap-2 pr-4 pl-4 focus-within:ring-1 focus-within:ring-brand-terracotta/20 transition-all">
+          <Search size={16} className="text-brand-stone ml-1" />
+          <input
+            type="text"
+            value={searchCode}
+            onChange={(e) => setSearchCode(e.target.value)}
+            placeholder="Buscar reserva por código..."
+            className="flex-1 bg-transparent py-2 text-[11px] font-bold text-brand-ink focus:outline-none placeholder:text-brand-stone/40 uppercase tracking-widest"
+          />
+          <button 
+            onClick={handleCodeSearch}
+            disabled={isSearchingCode || !searchCode.trim()}
+            className="text-[9px] font-black uppercase tracking-widest text-brand-terracotta disabled:opacity-20"
+          >
+            {isSearchingCode ? <RefreshCw size={12} className="animate-spin" /> : 'Ir'}
+          </button>
         </div>
 
         {/* 2. RESUMO RÁPIDO (3 KPIs) */}
@@ -652,47 +679,20 @@ export default function AgendaPage() {
 
         {/* 3. TIMELINE DO DIA / WEEK VIEW / MONTH VIEW */}
         <div className="space-y-4 relative">
-          {/* Navigation Hint Tooltip (Discrete) */}
-          <AnimatePresence>
-            {showNavTip && view === 'week' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="absolute -top-12 left-1/2 -translate-x-1/2 z-50 bg-brand-ink text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-3 whitespace-nowrap md:hidden"
-              >
-                <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                  Deslize para ver outros dias <ChevronRight size={14} className="text-brand-terracotta" />
-                </span>
-                <button 
-                  onClick={() => {
-                    setShowNavTip(false);
-                    localStorage.setItem('nera_agenda_nav_tip_dismissed', 'true');
-                  }}
-                  className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
-                >
-                  <X size={10} />
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           {view === 'week' && (
             <WeekView 
               appointments={allAppointments}
               blockedSchedules={allBlockedSchedules}
               workingHours={profile?.workingHours || {}}
               weekStart={weekStart}
+              selectedDate={selectedDate}
               onSelectAppointment={(appt) => { setSelectedAppointment(appt); setIsDetailsOpen(true); }}
               onSelectSlot={(date, time) => {
                 setManualDate(date);
                 setManualTime(time);
                 setIsManualModalOpen(true);
               }}
-              onSelectDay={(date) => {
-                setSelectedDate(date);
-                setView('day');
-              }}
+              onSelectDay={(date) => setSelectedDate(formatDateKey(date))}
             />
           )}
 
@@ -785,7 +785,7 @@ export default function AgendaPage() {
       </div>
 
       {/* 6. BOTÃO FLUTUANTE FIXO (FAB) */}
-      <div className="fixed bottom-24 right-6 z-[100] md:bottom-12">
+      <div className="fixed bottom-28 right-6 z-[100] md:bottom-12">
         <AnimatePresence>
           {isFabOpen && (
             <motion.div 
@@ -958,6 +958,158 @@ export default function AgendaPage() {
                     className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
                   />
                 </div>
+
+                {manualService && manualDate && (
+                  <div className="pt-2 space-y-5">
+                    {(recommendedSlots.bestSlot || recommendedSlots.otherSlots.length > 0) ? (
+                      <>
+                        {recommendedSlots.bestSlot && (
+                          <motion.div 
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={cn(
+                              "relative overflow-hidden p-5 rounded-[28px] border-2 transition-all",
+                              manualTime === recommendedSlots.bestSlot.time 
+                                ? "bg-brand-ink border-brand-ink text-white shadow-xl shadow-brand-ink/20" 
+                                : "bg-brand-white border-brand-mist/30"
+                            )}
+                          >
+                            <div className="flex justify-between items-start mb-4">
+                              <div className="flex items-center gap-2">
+                                <div className={cn(
+                                  "w-8 h-8 rounded-xl flex items-center justify-center",
+                                  manualTime === recommendedSlots.bestSlot.time ? "bg-brand-parchment/20" : "bg-brand-linen/40"
+                                )}>
+                                  <Sparkles size={16} className={manualTime === recommendedSlots.bestSlot.time ? "text-brand-terracotta" : "text-brand-terracotta"} />
+                                </div>
+                                <div>
+                                  <p className={cn(
+                                    "text-[10px] font-bold uppercase tracking-[0.2em]",
+                                    manualTime === recommendedSlots.bestSlot.time ? "text-brand-parchment" : "text-brand-stone"
+                                  )}>Sugestão Nera</p>
+                                  <h4 className="text-sm font-serif italic">Melhor Encaixe</h4>
+                                </div>
+                              </div>
+                              {manualTime === recommendedSlots.bestSlot.time && (
+                                <motion.span 
+                                  initial={{ scale: 0 }}
+                                  animate={{ scale: 1 }}
+                                  className="bg-brand-terracotta text-white text-[8px] font-bold px-2 py-1 rounded-full uppercase tracking-widest"
+                                >
+                                  Selecionado
+                                </motion.span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className={cn(
+                                "text-3xl font-serif italic",
+                                manualTime === recommendedSlots.bestSlot.time ? "text-white" : "text-brand-ink"
+                              )}>
+                                {recommendedSlots.bestSlot.time}
+                              </span>
+                              <button
+                                onClick={() => setManualTime(recommendedSlots.bestSlot!.time)}
+                                className={cn(
+                                  "px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
+                                  manualTime === recommendedSlots.bestSlot.time 
+                                    ? "bg-brand-parchment text-brand-ink" 
+                                    : "bg-brand-ink text-white hover:bg-brand-stone"
+                                )}
+                              >
+                                {manualTime === recommendedSlots.bestSlot.time ? 'Horário Pronto' : 'Usar este horário'}
+                              </button>
+                            </div>
+
+                            {/* Background Decoration */}
+                            <Star className="absolute -bottom-2 -right-2 w-16 h-16 text-brand-terracotta/5 pointer-events-none" />
+                          </motion.div>
+                        )}
+
+                        {recommendedSlots.otherSlots.length > 0 && (
+                          <div className="px-1">
+                            <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-3 flex items-center gap-2">
+                              Manter Agenda Cheia <ArrowRight size={10} /> Outras opções
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {recommendedSlots.otherSlots.map(slot => (
+                                <button
+                                  key={slot.time}
+                                  onClick={() => setManualTime(slot.time)}
+                                  className={cn(
+                                    "px-4 py-3 rounded-2xl text-[11px] font-bold border transition-all",
+                                    manualTime === slot.time 
+                                      ? "bg-brand-ink text-white border-brand-ink" 
+                                      : "bg-brand-linen/30 text-brand-ink border-brand-mist/20 hover:border-brand-terracotta/40"
+                                  )}
+                                >
+                                  {slot.time}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* --- INTELLIGENT FITS SECTION --- */}
+                        {recommendedSlots.intelligentFits.filter(f => f.type === 'adjustment' || (f.type === 'direct' && f.time !== recommendedSlots.bestSlot?.time)).length > 0 && (
+                          <div className="pt-4 border-t border-brand-mist/20">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-4 flex items-center gap-2">
+                              <Sparkles size={12} className="text-brand-terracotta" /> Oportunidades de Encaixe
+                            </p>
+                            <div className="space-y-3">
+                              {recommendedSlots.intelligentFits.filter(f => f.type === 'adjustment' || (f.type === 'direct' && f.time !== recommendedSlots.bestSlot?.time)).map((fit, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleApplyFit(fit)}
+                                  className={cn(
+                                    "w-full p-4 rounded-2xl border transition-all text-left flex flex-col gap-1",
+                                    manualTime === fit.time 
+                                      ? "bg-brand-ink border-brand-ink text-white" 
+                                      : "bg-brand-linen/20 border-brand-mist/30 hover:border-brand-terracotta/40"
+                                  )}
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-xs font-bold leading-none">{fit.time}</span>
+                                    {fit.type === 'adjustment' ? (
+                                      <span className={cn(
+                                        "text-[8px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold",
+                                        manualTime === fit.time ? "bg-brand-terracotta text-white" : "bg-brand-terracotta/10 text-brand-terracotta"
+                                      )}>
+                                        Ajuste Inteligente
+                                      </span>
+                                    ) : (
+                                      <span className={cn(
+                                        "text-[8px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold",
+                                        manualTime === fit.time ? "bg-brand-parchment/20 text-brand-parchment" : "bg-brand-linen/40 text-brand-stone"
+                                      )}>
+                                        Encaixe Direto
+                                      </span>
+                                    )}
+                                  </div>
+                                  {fit.adjustment && (
+                                    <p className={cn(
+                                      "text-[9px] font-light italic",
+                                      manualTime === fit.time ? "text-brand-parchment/70" : "text-brand-stone"
+                                    )}>
+                                      Move {fit.adjustment.clientName} para {fit.adjustment.newTime}
+                                    </p>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="p-6 bg-brand-linen/20 rounded-[28px] border border-dashed border-brand-mist/50 flex flex-col items-center text-center gap-2">
+                        <AlertCircle size={20} className="text-brand-stone/40" />
+                        <p className="text-[10px] text-brand-stone font-light px-4">
+                          Nenhum horário disponível para este serviço hoje. Tente outro dia ou ajuste seus horários.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <button
                   onClick={handleCreateManual}

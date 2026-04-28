@@ -1,6 +1,8 @@
 import express from "express";
 import { db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
+import { isValidWhatsapp } from "../utils.js";
+import { PLAN_CONFIGS } from "../../src/constants/plans.js";
 
 const router = express.Router();
 
@@ -53,8 +55,30 @@ router.post("/save", async (req, res) => {
 
       // 4. Update the profile
       console.log("[PROFILE SAVE TX] Updating user info for:", uid);
+
+      // --- THEME VALIDATION (Security) ---
+      const userPlan = (userData?.plan || 'free').toLowerCase() as keyof typeof PLAN_CONFIGS;
+      const themeVariant = profileData?.profileTheme?.variant;
+      
+      // WhatsApp validation on backend
+      const whatsapp = profileData?.whatsapp;
+      if (whatsapp && !isValidWhatsapp(whatsapp)) {
+        console.warn(`[SECURITY] User ${uid} tried to save invalid WhatsApp: ${whatsapp}`);
+        throw new Error("O número de WhatsApp informado é inválido. Use um formato brasileiro (DDD + número).");
+      }
+
+      const config = PLAN_CONFIGS[userPlan] || PLAN_CONFIGS.free;
+      const allowed = config.themes;
+
+      let validatedTheme = profileData?.profileTheme;
+      if (themeVariant && !allowed.includes(themeVariant)) {
+        console.warn(`[THEME SECURITY] User ${uid} (${userPlan}) tried to use ${themeVariant}. Resetting to terracotta.`);
+        validatedTheme = { variant: 'terracotta' };
+      }
+
       const finalProfileData = {
         ...profileData,
+        profileTheme: validatedTheme,
         slug,
         updatedAt: new Date().toISOString()
       };

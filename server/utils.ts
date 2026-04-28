@@ -8,6 +8,28 @@ export function formatBRNumber(phone: string): string {
 }
 
 /**
+ * Validates if a string is a valid Brazilian WhatsApp number.
+ * Must have 10 or 11 digits and start with a valid Brazilian DDD.
+ */
+export function isValidWhatsapp(phone: string): boolean {
+  if (!phone) return false;
+  const cleaned = phone.replace(/\D/g, '');
+  
+  // Basic length check
+  if (cleaned.length !== 10 && cleaned.length !== 11) return false;
+  
+  // DDD check (11 to 99)
+  const ddd = parseInt(cleaned.slice(0, 2));
+  if (isNaN(ddd) || ddd < 11 || ddd > 99) return false;
+  
+  // If 11 digits, must start with 9 after DDD (mobile convention)
+  // Some old regions might not have 9, but for WhatsApp 11 digits is always mobile with 9.
+  if (cleaned.length === 11 && cleaned[2] !== '9') return false;
+  
+  return true;
+}
+
+/**
  * Unified Email Guard
  * Prevents duplicate emails for the same event on an appointment.
  */

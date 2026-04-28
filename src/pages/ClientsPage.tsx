@@ -33,7 +33,7 @@ export default function ClientsPage() {
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filterService, setFilterService] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<"all"|"active"|"inactive">("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -168,16 +168,56 @@ export default function ClientsPage() {
     }
   };
 
+  const segmentationThresholds = useMemo(() => {
+    if (clients.length === 0) return { threshold20: 0, avgTicket: 0 };
+    
+    const ltvs = clients.map(c => c.totalSpent).sort((a, b) => b - a);
+    const idx20 = Math.floor(ltvs.length * 0.2);
+    const threshold20 = ltvs[idx20] || 0;
+    
+    const totalLTV = ltvs.reduce((acc, val) => acc + val, 0);
+    const totalAppts = clients.reduce((acc, c) => acc + (c.confirmedAppointments || 0), 0);
+    const avgTicket = totalAppts > 0 ? totalLTV / totalAppts : 0;
+    
+    return { threshold20, avgTicket };
+  }, [clients]);
+
   const enrichedClients = useMemo(() => {
+    const today = new Date();
+    const last90Days = new Date();
+    last90Days.setDate(today.getDate() - 90);
+    const last90DaysStr = last90Days.toISOString().split('T')[0];
+
     return clients.map(c => {
       const clientAppts = appointments.filter(a => 
         (a.clientWhatsapp && a.clientWhatsapp === c.clientPhone) || 
         (a.clientEmail && a.clientEmail === c.clientEmail)
       );
+      
       const services = Array.from(new Set(clientAppts.map(a => a.serviceName)));
-      return { ...c, services };
+      const appts90 = clientAppts.filter(a => a.date >= last90DaysStr && ['confirmed', 'completed', 'paid'].includes(a.status)).length;
+      const daysSince = c.lastAppointmentDate ? getDaysSinceLastVisit(c.lastAppointmentDate) : 999;
+      
+      // Segmentation Logic
+      let segment = 'new';
+      
+      if (c.totalSpent >= segmentationThresholds.threshold20 || c.totalSpent >= (segmentationThresholds.avgTicket * 3)) {
+        segment = 'vip';
+      } else if (appts90 >= 3) {
+        segment = 'recurring';
+      } else if (daysSince > 60) {
+        segment = 'inactive';
+      } else if (daysSince >= 30) {
+        segment = 'at_risk';
+      } else if (c.confirmedAppointments > 1) {
+        segment = 'active';
+      } else {
+        segment = 'new';
+      }
+
+      return { ...c, services, segment, appts90, daysSince };
     });
-  }, [clients, appointments]);
+  }, [clients, appointments, segmentationThresholds]);
 
   const filteredClients = useMemo(() => {
     return enrichedClients
@@ -187,19 +227,18 @@ export default function ClientsPage() {
         
         const matchService = !filterService || (client.services && client.services.includes(filterService));
         
-        const matchStatus = filterStatus === "all" ||
-          (filterStatus === "active" && isActive(client)) ||
-          (filterStatus === "inactive" && !isActive(client));
+        const matchStatus = filterStatus === "all" || client.segment === filterStatus;
           
         return matchSearch && matchService && matchStatus;
       })
       .sort((a, b) => {
-        // Prioritize: VIP, then higher LTV, then frequent visitors
-        if (a.totalSpent >= 1000 && b.totalSpent < 1000) return -1;
-        if (b.totalSpent >= 1000 && a.totalSpent < 1000) return 1;
+        // Sort priority: Segment (VIP first), then LTV
+        const segmentWeight = { vip: 0, recurring: 1, active: 2, new: 3, at_risk: 4, inactive: 5 };
+        const weightA = (segmentWeight as any)[a.segment] ?? 10;
+        const weightB = (segmentWeight as any)[b.segment] ?? 10;
         
-        if (b.totalSpent !== a.totalSpent) return b.totalSpent - a.totalSpent;
-        return (b.confirmedAppointments || 0) - (a.confirmedAppointments || 0);
+        if (weightA !== weightB) return weightA - weightB;
+        return (b.totalSpent || 0) - (a.totalSpent || 0);
       });
   }, [enrichedClients, searchTerm, filterService, filterStatus]);
 
@@ -342,22 +381,25 @@ export default function ClientsPage() {
             )}
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             {/* Status Tabs */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {[
                 { id: 'all', label: 'Todas' },
-                { id: 'active', label: 'Ativas (último mês)' },
-                { id: 'inactive', label: 'Inativas (+30 dias)' }
+                { id: 'vip', label: 'VIP' },
+                { id: 'recurring', label: 'Recorrentes' },
+                { id: 'at_risk', label: 'Em Risco' },
+                { id: 'inactive', label: 'Inativas' },
+                { id: 'new', label: 'Novas' }
               ].map(f => (
                 <button
                   key={f.id}
                   onClick={() => setFilterStatus(f.id as any)}
                   className={cn(
-                    "px-6 py-3 rounded-2xl text-[9px] font-bold uppercase tracking-widest border transition-all",
+                    "px-6 py-3 rounded-2xl text-[9px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap",
                     filterStatus === f.id
                       ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
-                      : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
+                      : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink shadow-sm"
                   )}
                 >
                   {f.label}
@@ -365,36 +407,42 @@ export default function ClientsPage() {
               ))}
             </div>
 
-            {/* Service Chips */}
-            {uniqueServices.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                <button
-                  onClick={() => setFilterService(null)}
-                  className={cn(
-                    "px-5 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap transition-all",
-                    !filterService
-                      ? "bg-brand-terracotta text-white border-brand-terracotta"
-                      : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
-                  )}
-                >
-                  Todos os Serviços
-                </button>
-                {uniqueServices.map(service => (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
+                  Serviços Realizados
+                </span>
+              </div>
+              {uniqueServices.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                   <button
-                    key={service}
-                    onClick={() => setFilterService(service === filterService ? null : service)}
+                    onClick={() => setFilterService(null)}
                     className={cn(
                       "px-5 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap transition-all",
-                      filterService === service
+                      !filterService
                         ? "bg-brand-terracotta text-white border-brand-terracotta"
-                        : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
+                        : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink shadow-sm"
                     )}
                   >
-                    {service}
+                    Todos os Serviços
                   </button>
-                ))}
-              </div>
-            )}
+                  {uniqueServices.map(service => (
+                    <button
+                      key={service}
+                      onClick={() => setFilterService(service === filterService ? null : service)}
+                      className={cn(
+                        "px-5 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap transition-all",
+                        filterService === service
+                          ? "bg-brand-terracotta text-white border-brand-terracotta"
+                          : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink shadow-sm"
+                      )}
+                    >
+                      {service}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -419,24 +467,29 @@ export default function ClientsPage() {
                         <h4 className="font-serif text-lg md:text-xl text-brand-ink truncate">{client.clientName}</h4>
                         
                         {/* Intelligent Tags */}
-                        {client.totalSpent >= 1000 && (
+                        {client.segment === 'vip' && (
                           <div className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold flex items-center gap-1">
                             <Star size={8} className="fill-amber-600" /> VIP
                           </div>
                         )}
-                        {client.totalSpent > 2000 && (
-                          <div className="bg-brand-linen text-brand-ink px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold">
-                            MAIOR GASTO
+                        {client.segment === 'recurring' && (
+                          <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 text-[8px] font-bold">
+                            RECORRENTE
                           </div>
                         )}
-                        {client.confirmedAppointments >= 5 && (
-                          <div className="bg-brand-parchment text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold">
-                            VEIO {client.confirmedAppointments}X
+                        {client.segment === 'new' && (
+                          <div className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100 text-[8px] font-bold">
+                            NOVA
                           </div>
                         )}
-                        {getDaysSinceLastVisit(client.lastAppointmentDate) >= 30 && (
+                        {client.segment === 'at_risk' && (
+                          <div className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full border border-orange-100 text-[8px] font-bold">
+                            EM RISCO
+                          </div>
+                        )}
+                        {client.segment === 'inactive' && (
                           <div className="bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100 text-[8px] font-bold">
-                            SUMIU HÁ {getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS
+                            INATIVA
                           </div>
                         )}
                         {client.noShowCount > 0 && (
@@ -448,6 +501,7 @@ export default function ClientsPage() {
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] md:text-[10px] text-brand-stone font-medium uppercase tracking-widest">
                         <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.confirmedAppointments} visitas</span>
                         <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} LTV</span>
+                        {client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
                         <span className="italic text-brand-stone/60 truncate max-w-[200px]">
                           Último: {client.lastServiceName} ({new Date(client.lastAppointmentDate + 'T12:00:00').toLocaleDateString('pt-BR')})
                         </span>

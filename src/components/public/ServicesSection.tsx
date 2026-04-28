@@ -68,7 +68,7 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
             </div>
             
             <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/60 px-2">
-              <span className="w-1 h-1 rounded-full bg-brand-terracotta" />
+              <span className="w-1 h-1 rounded-full bg-[var(--theme-accent,var(--color-brand-terracotta))]" />
               {filteredServices.length} {filteredServices.length === 1 ? 'experiência disponível' : 'experiências disponíveis'} em {selectedCategory === 'Todos' ? 'todas as categorias' : selectedCategory}
             </div>
           </div>
@@ -98,7 +98,7 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
             >
               <div className="relative z-10 flex flex-col flex-1">
                 {!isCompact && i === 0 && selectedCategory === 'Todos' && (
-                  <span className="inline-block px-3 py-1 bg-brand-blush text-brand-terracotta text-[8px] font-bold uppercase tracking-[0.25em] rounded-full mb-6 max-w-fit">
+                  <span className="inline-block px-3 py-1 bg-brand-blush text-[var(--theme-accent,var(--color-brand-terracotta))] text-[8px] font-bold uppercase tracking-[0.25em] rounded-full mb-6 max-w-fit">
                     Mais procurado
                   </span>
                 )}
@@ -121,7 +121,7 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
                   )}
 
                   {isCompact && (
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta/80 mt-1">
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--theme-accent,var(--color-brand-terracotta))] mt-1">
                       {service.duration} min
                     </div>
                   )}
@@ -151,7 +151,7 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
                   <div className="font-serif text-xl border-b border-brand-mist/30 pb-0.5">
                     {formatCurrency(service.price)}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-brand-terracotta group-hover:translate-x-1 transition-transform">
+                  <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:translate-x-1 transition-transform">
                     Reservar
                     <ChevronRight size={12} />
                   </div>

@@ -21,7 +21,7 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
                 initial={{ opacity: 0, y: 10 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="text-[10px] font-bold uppercase tracking-[0.4em] text-brand-terracotta"
+                className="text-[10px] font-bold uppercase tracking-[0.4em] text-[var(--theme-accent,var(--color-brand-terracotta))]"
               >
                 Garantia de Qualidade
               </motion.span>
@@ -55,7 +55,7 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
             >
               {profile.professionalIdentity?.differentials?.map((diff, i) => (
                 <div key={i} className="bg-brand-linen/40 px-6 py-4 rounded-3xl flex items-center gap-3 border border-brand-mist/50">
-                  <div className="w-2 h-2 rounded-full bg-brand-terracotta" />
+                  <div className="w-2 h-2 rounded-full bg-[var(--theme-accent,var(--color-brand-terracotta))]" />
                   <div className="text-[11px] font-bold uppercase tracking-widest text-brand-ink">{diff}</div>
                 </div>
               ))}
@@ -66,7 +66,7 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4 }}
-              className="flex items-center justify-center gap-2 text-brand-terracotta/70 pt-4"
+              className="flex items-center justify-center gap-2 text-[var(--theme-accent,var(--color-brand-terracotta))]/70 pt-4"
             >
               <ShieldCheck size={14} />
               <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Profissional Certificada Nera</span>

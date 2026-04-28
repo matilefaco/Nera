@@ -21,7 +21,7 @@ export const FinalCTA = ({ onBookingClick, completedBookings }: FinalCTAProps) =
         viewport={{ once: true }}
         className="max-w-2xl mx-auto text-center relative z-10"
       >
-        <span className="label-text text-brand-terracotta opacity-80 mb-6 block">
+        <span className="label-text text-[var(--theme-accent,var(--color-brand-terracotta))] opacity-80 mb-6 block">
           Horários disponíveis
         </span>
         
@@ -34,7 +34,7 @@ export const FinalCTA = ({ onBookingClick, completedBookings }: FinalCTAProps) =
           <PremiumButton
             onClick={onBookingClick}
             variant="terracotta"
-            className="px-14 py-6 text-[11px] shadow-[0_16px_48px_rgba(168,92,58,0.45)]"
+            className="px-14 py-6 text-[11px] shadow-[0_16px_48px_rgba(var(--theme-accent-rgb),168,92,58,0.45)]"
           >
             Agendar meu horário
             <ChevronRight size={14} className="ml-2" />
