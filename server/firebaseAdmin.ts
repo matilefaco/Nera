@@ -57,23 +57,26 @@ export const initFirebase = async () => {
     db = getFirestore(firebaseConfig.firestoreDatabaseId);
     defaultDb = getFirestore(); // (default)
 
-    console.log(`[FIREBASE ADMIN] Testing database: ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
-    try {
-      await db.collection('appointments').limit(1).get();
-      console.log(`[FIRESTORE TEST] Success reading from ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
-    } catch (err: any) {
-      console.error(`[FIRESTORE TEST] Failed reading from database '${firebaseConfig.firestoreDatabaseId}':`, err.message);
-      
-      console.log(`[FIREBASE ADMIN] Attempting fallback to (default) database...`);
+    // Test database access asynchronously
+    (async () => {
+      console.log(`[FIREBASE ADMIN] Testing database: ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
       try {
-        await defaultDb.collection('appointments').limit(1).get();
-        console.log(`[FIRESTORE TEST] Success reading from (default) database!`);
-        console.warn(`[FIREBASE ADMIN] CRITICAL: Swapping 'db' instance to (default) because the configured one failed.`);
-        db = defaultDb; // SWAP for the entire application
-      } catch (defaultErr: any) {
-        console.error(`[FIRESTORE TEST] Failed reading from (default) database as well:`, defaultErr.message);
+        await db.collection('appointments').limit(1).get();
+        console.log(`[FIRESTORE TEST] Success reading from ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
+      } catch (err: any) {
+        console.error(`[FIRESTORE TEST] Failed reading from database '${firebaseConfig.firestoreDatabaseId}':`, err.message);
+        
+        console.log(`[FIREBASE ADMIN] Attempting fallback to (default) database...`);
+        try {
+          await defaultDb.collection('appointments').limit(1).get();
+          console.log(`[FIRESTORE TEST] Success reading from (default) database!`);
+          console.warn(`[FIREBASE ADMIN] CRITICAL: Swapping 'db' instance to (default) because the configured one failed.`);
+          db = defaultDb; // SWAP for the entire application
+        } catch (defaultErr: any) {
+          console.error(`[FIRESTORE TEST] Failed reading from (default) database as well:`, defaultErr.message);
+        }
       }
-    }
+    })();
   } catch (err: any) {
     console.error('[FIREBASE ADMIN] Critical Initialization Error:', err.message);
   }

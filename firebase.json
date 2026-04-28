@@ -9,22 +9,22 @@
     "rewrites": [
       {
         "source": "/debug-og/**",
-        "run": {
-          "serviceId": "ais-pre-63xlcjmrm7ywxwui656b4j-645724189341",
+        "function": {
+          "serviceId": "api",
           "region": "us-east1"
         }
       },
       {
         "source": "/p/**",
-        "run": {
-          "serviceId": "ais-pre-63xlcjmrm7ywxwui656b4j-645724189341",
+        "function": {
+          "serviceId": "api",
           "region": "us-east1"
         }
       },
       {
         "source": "/api/**",
-        "run": {
-          "serviceId": "ais-pre-63xlcjmrm7ywxwui656b4j-645724189341",
+        "function": {
+          "serviceId": "api",
           "region": "us-east1"
         }
       },
@@ -33,5 +33,23 @@
         "destination": "/index.html"
       }
     ]
+  },
+  "functions": [
+    {
+      "source": ".",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "dist",
+        "public"
+      ]
+    }
+  ],
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
   }
 }

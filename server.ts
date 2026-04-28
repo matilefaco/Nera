@@ -17,11 +17,16 @@ import slugRoutes from "./server/routes/slugRoutes";
 
 dotenv.config();
 
-async function startServer() {
+export async function createServerApp() {
   const app = express();
   const PORT = 3000;
 
   app.use(cors());
+
+  // Global Health Check (Early to pass Cloud Run health probes)
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok" });
+  });
 
   // Skip express.json for Stripe Webhook to preserve raw body
   app.use((req, res, next) => {
@@ -32,9 +37,12 @@ async function startServer() {
     }
   });
 
-  // Initialize Firebase and Background Triggers
-  await initFirebase();
-  setupBackgroundTriggers();
+  // Initialize Firebase and Background Triggers (Asyncly to not block startup)
+  initFirebase().then(() => {
+    setupBackgroundTriggers();
+  }).catch(err => {
+    console.error("[SERVER] Failed to initialize Firebase/Background:", err);
+  });
 
   // API Routes registration
   app.use("/api", bookingRoutes);
@@ -197,9 +205,7 @@ async function startServer() {
   });
 
   // Global Health Check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
-  });
+  // Already registered above
 
   // Vite middleware for development or Static server for production
   if (process.env.NODE_ENV !== "production") {
@@ -217,9 +223,18 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  return app;
 }
 
-startServer();
+// Standalone server start
+if (process.env.NODE_ENV === "production" || !process.env.FUNCTION_SIGNATURE_TYPE) {
+  createServerApp().then(app => {
+    const PORT = Number(process.env.PORT) || 3000;
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }).catch(err => {
+    console.error("CRITICAL SERVER STARTUP ERROR:", err);
+    process.exit(1);
+  });
+}
