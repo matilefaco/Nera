@@ -208,6 +208,7 @@ router.get("/test-whatsapp", async (req, res) => {
 
   try {
     const result = await sendWhatsApp(db, targetPhone, msg, { 
+      userId: 'system_test',
       type: `simulated_${eventType}`,
       metadata: { isSimulation: true }
     });
@@ -252,14 +253,34 @@ router.post("/push/subscribe", async (req, res) => {
   const authHeader = req.headers.authorization;
 
   console.log("[PUSH SUBSCRIBE] START");
-  console.log("[PUSH SUBSCRIBE] uid:", userId);
-  console.log("[PUSH SUBSCRIBE] endpoint:", subscription?.endpoint);
-  console.log("[PUSH SUBSCRIBE] keys:", subscription?.keys);
-  console.log("[PUSH SUBSCRIBE] Auth Header present:", !!authHeader);
+  console.log("[PUSH SUBSCRIBE] uid body:", userId);
 
   if (!subscription || !userId) {
     console.error("[PUSH SUBSCRIBE] Missing subscription or userId");
     return res.status(400).json({ error: "Missing subscription or userId" });
+  }
+
+  // Security check: Validate Firebase ID Token
+  let verifiedUid = "";
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split('Bearer ')[1];
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      verifiedUid = decodedToken.uid;
+      console.log("[PUSH SUBSCRIBE] Token verified for UID:", verifiedUid);
+    } catch (err) {
+      console.error("[PUSH SUBSCRIBE] Token verification failed:", err);
+      return res.status(401).json({ error: "Unauthorized: Invalid token" });
+    }
+  } else {
+    console.error("[PUSH SUBSCRIBE] Missing Authorization header");
+    return res.status(401).json({ error: "Unauthorized: Missing token" });
+  }
+
+  // Ensure body userId matches token UID
+  if (userId !== verifiedUid) {
+    console.error(`[PUSH SUBSCRIBE] UID mismatch. Body: ${userId}, Token: ${verifiedUid}`);
+    return res.status(403).json({ error: "Forbidden: UID mismatch" });
   }
 
   const endpoint = subscription.endpoint;
@@ -393,7 +414,9 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
         await sendWhatsApp(db, proPhone, msg, {
           appointmentId,
           userId: professionalId,
-          type: 'professional_new_booking'
+          type: 'professional_new_booking',
+          clientName,
+          clientWhatsapp
         });
       }
 
@@ -425,7 +448,9 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
         
         await sendWhatsApp(db, clientWhatsapp, msg, {
           userId: professionalId,
-          type: 'booking_rejected'
+          type: 'booking_rejected',
+          clientName,
+          clientWhatsapp
         });
       }
       return res.json({ success: true });
@@ -456,7 +481,9 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
           await sendWhatsApp(db, proPhone, msg, {
             appointmentId,
             userId: professionalId,
-            type: 'booking_cancelled_pro'
+            type: 'booking_cancelled_pro',
+            clientName,
+            clientWhatsapp
           });
         }
 
@@ -484,7 +511,9 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
           await sendWhatsApp(db, clientWhatsapp, msg, {
             appointmentId,
             userId: professionalId,
-            type: 'booking_cancelled_client'
+            type: 'booking_cancelled_client',
+            clientName,
+            clientWhatsapp
           });
         }
 
@@ -522,7 +551,9 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
         await sendWhatsApp(db, clientWhatsapp, msg, {
           appointmentId,
           userId: professionalId,
-          type: 'booking_confirmed_client'
+          type: 'booking_confirmed_client',
+          clientName,
+          clientWhatsapp
         });
       }
 
@@ -560,7 +591,12 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
                       `Para: *${newFormatted} às ${time}*\n\n` +
                       `O horário antigo foi liberado automaticamente. Confira no Dashboard: \n${baseUrl}/dashboard`;
 
-          await sendWhatsAppMeta(proPhone, msg);
+          await sendWhatsAppMeta(proPhone, msg, {
+            userId: professionalId,
+            clientName,
+            clientWhatsapp: payload.clientWhatsapp || '',
+            type: 'booking_rescheduled_pro'
+          });
         }
 
         if (clientEmail) {
@@ -600,7 +636,13 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
           linkAgendar: `${baseUrl}/p/exemplo?waitlist_invite=true&booking_id=${bookingId}`
         });
         
-        await sendWhatsAppMeta(clientWhatsapp, msg);
+        await sendWhatsAppMeta(clientWhatsapp, msg, {
+          userId: payload.professionalId, 
+          appointmentId: bookingId,
+          clientName,
+          clientWhatsapp,
+          type: 'waitlist_invitation'
+        });
       }
       return res.json({ success: true });
     }
@@ -615,7 +657,11 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
           const formattedDate = date.split('-').reverse().join('/');
           const msg = `Vaga na lista de espera! 🗓️\n\nO horário de ${time} (${formattedDate}) ficou disponível e ${candidateName} está aguardando.\n\nConfira no seu Dashboard: \n${baseUrl}/dashboard`;
           
-          await sendWhatsAppMeta(pro.whatsapp, msg);
+          await sendWhatsAppMeta(pro.whatsapp, msg, {
+            userId: professionalId,
+            clientName: candidateName,
+            type: 'waitlist_slot_opened'
+          });
         }
       }
       return res.json({ success: true });
@@ -689,7 +735,9 @@ router.get('/cron/reminders24h', async (req, res) => {
           const result = await sendWhatsApp(db, clientPhone, msg, {
             appointmentId: apptId,
             userId: appt.professionalId,
-            type: 'reminder_24h_client'
+            type: 'reminder_24h_client',
+            clientName: appt.clientName,
+            clientWhatsapp: clientPhone
           });
 
           if (result.success) {
@@ -707,7 +755,9 @@ router.get('/cron/reminders24h', async (req, res) => {
           await sendWhatsApp(db, proPhone, msg, {
             appointmentId: apptId,
             userId: appt.professionalId,
-            type: 'reminder_24h_pro'
+            type: 'reminder_24h_pro',
+            clientName: appt.clientName,
+            clientWhatsapp: clientPhone
           });
         }
 
@@ -796,7 +846,9 @@ router.get('/cron/reminders2h', async (req, res) => {
           const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {
             appointmentId: apptId,
             userId: appt.professionalId,
-            type: 'reminder_2h'
+            type: 'reminder_2h',
+            clientName: appt.clientName,
+            clientWhatsapp: appt.clientWhatsapp
           });
 
           if (result.success) {
@@ -864,7 +916,9 @@ router.get('/cron/review-requests', async (req, res) => {
         const result = await sendWhatsApp(db, clientPhone, msg, {
           appointmentId: apptId,
           userId: appt.professionalId,
-          type: 'review_request'
+          type: 'review_request',
+          clientName: appt.clientName,
+          clientWhatsapp: clientPhone
         });
         
         let sent = result.success;

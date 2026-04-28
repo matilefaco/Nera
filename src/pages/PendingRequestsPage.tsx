@@ -19,6 +19,8 @@ import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/ut
 import { getClientScore } from '../lib/clientUtils';
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import { Zap } from 'lucide-react';
 
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
@@ -34,6 +36,26 @@ export default function PendingRequestsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmRejectOpen, setIsConfirmRejectOpen] = useState(false);
   const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
+
+  const { isSubscribed, isSupported, requestPermission } = usePushNotifications();
+  const [isPushLoading, setIsPushLoading] = useState(false);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
+    return localStorage.getItem("nera_push_banner_dismissed_pending") === "true";
+  });
+
+  const handleEnablePushNotifications = async () => {
+    try {
+      setIsPushLoading(true);
+      const success = await requestPermission();
+      if (success) {
+        toast.success('Notificações ativadas!');
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsPushLoading(false);
+    }
+  };
 
   // Current time for "time since" updates
   const [now, setNow] = useState(new Date());
@@ -245,6 +267,49 @@ export default function PendingRequestsPage() {
             </div>
           </div>
         </header>
+
+        {/* Notificações Banner */}
+        {!isSubscribed && isSupported && !pushBannerDismissed && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-10 bg-brand-ink p-8 rounded-[40px] shadow-xl relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full blur-3xl -mr-16 -mt-16" />
+            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-5">
+                <div className="w-14 h-14 bg-brand-terracotta/20 text-brand-terracotta rounded-2xl flex items-center justify-center shrink-0">
+                  <Zap size={28} />
+                </div>
+                <div>
+                  <h4 className="text-base font-serif text-brand-white">Não perca nenhum pedido</h4>
+                  <p className="text-xs text-brand-parchment/60 font-light italic mt-1 leading-relaxed">
+                    Ative as notificações para ser avisada no celular quando chegar uma nova reserva.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-6">
+                <button
+                  onClick={handleEnablePushNotifications}
+                  disabled={isPushLoading}
+                  className="px-8 py-4 bg-brand-terracotta text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg flex items-center gap-2"
+                >
+                  {isPushLoading ? 'Ativando...' : 'Ativar notificações'}
+                </button>
+                <button 
+                  onClick={() => {
+                    setPushBannerDismissed(true);
+                    localStorage.setItem("nera_push_banner_dismissed_pending", "true");
+                  }}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand-parchment/30 hover:text-brand-parchment transition-colors"
+                >
+                  Depois
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-4">

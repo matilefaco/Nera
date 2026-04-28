@@ -20,6 +20,10 @@ import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
 import { AnimatePresence } from 'motion/react';
 
+import WeekView from '../components/WeekView';
+import DayView from '../components/DayView';
+import MonthView from '../components/MonthView';
+
 import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 import WaitlistCentralModal from '../components/WaitlistCentralModal';
 import QuickBlockModal from '../components/QuickBlockModal';
@@ -39,13 +43,21 @@ export default function AgendaPage() {
     openUpgradeModal
   } = useUpgradeTriggers();
 
-  const [searchParams] = useSearchParams();
+  const [view, setView] = useState<'month' | 'week' | 'day'>(() => {
+    const saved = localStorage.getItem('nera_agenda_view') as any;
+    if (saved) return saved;
+    return window.innerWidth < 768 ? 'day' : 'week';
+  });
+
+  const [searchParams, setSearchParams] = useSearchParams();
   const dateFromUrl = searchParams.get('date');
   const appointmentIdFromUrl = searchParams.get('appointment');
 
   const [appointments, setAppointments] = useState<any[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(dateFromUrl || getTodayLocale());
+  const [allAppointments, setAllAppointments] = useState<any[]>([]);
+  const [allBlockedSchedules, setAllBlockedSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(appointmentIdFromUrl);
 
@@ -56,6 +68,9 @@ export default function AgendaPage() {
   
   const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const [showNavTip, setShowNavTip] = useState(() => {
+    return localStorage.getItem('nera_agenda_nav_tip_dismissed') !== 'true';
+  });
 
   const [blockStartTime, setBlockStartTime] = useState('09:00');
   const [blockEndTime, setBlockEndTime] = useState('18:00');
@@ -227,6 +242,47 @@ export default function AgendaPage() {
       unsubBlocked();
     };
   }, [user, selectedDate]);
+
+  // Fetch all appointments for week/month view
+  useEffect(() => {
+    if (!user) return;
+    
+    // For week/month view, we might want a larger window, but let's stick to a reasonable range correctly filtered or just use the current selected month/week
+    const q = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', user.uid),
+      orderBy('time', 'asc')
+    );
+
+    const unsubAll = onSnapshot(q, (snapshot) => {
+      setAllAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const blockedRef = collection(db, 'blocked_schedules');
+    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', user.uid)), (snap) => {
+      setAllBlockedSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubAll();
+      unsubBlocked();
+    };
+  }, [user]);
+
+  // Save view preference
+  useEffect(() => {
+    localStorage.setItem('nera_agenda_view', view);
+  }, [view]);
+
+  // Calculate Week Start (Monday)
+  const weekStart = React.useMemo(() => {
+    const d = parseLocalDate(selectedDate);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const start = new Date(d.setDate(diff));
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }, [selectedDate]);
 
   // Calculate Open Slots (Official Availability Rule)
   const availability = React.useMemo(() => {
@@ -445,6 +501,20 @@ export default function AgendaPage() {
 
   const isSelectedDateToday = selectedDate === getTodayLocale();
 
+  const handleNavigate = (direction: 'prev' | 'next') => {
+    if (view === 'day') {
+      changeDate(direction === 'next' ? 1 : -1);
+    } else if (view === 'week') {
+      const d = parseLocalDate(selectedDate);
+      d.setDate(d.getDate() + (direction === 'next' ? 7 : -7));
+      setSelectedDate(formatDateKey(d));
+    } else if (view === 'month') {
+      const d = parseLocalDate(selectedDate);
+      d.setMonth(d.getMonth() + (direction === 'next' ? 1 : -1));
+      setSelectedDate(formatDateKey(d));
+    }
+  };
+
   return (
     <AppLayout activeRoute="agenda">
       <FirstVisitTip 
@@ -452,30 +522,58 @@ export default function AgendaPage() {
         title="Sua agenda visual"
         description="Veja e gerencie todos os agendamentos em formato de calendário. Clique em qualquer horário para ver os detalhes."
       />
-      <div className="p-5 md:p-12 max-w-2xl mx-auto w-full">
+      <div className={cn(
+        "p-5 md:p-12 w-full mx-auto transition-all",
+        view === 'month' ? "max-w-4xl" : "max-w-7xl"
+      )}>
         
         {/* 1. HEADER LIMPO */}
-        <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-3">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex items-center gap-4">
             <h1 className="text-lg font-serif text-brand-ink">
-              {isSelectedDateToday ? 'Hoje' : formatLocalDate(selectedDate, { weekday: 'short' })} · {formatLocalDate(selectedDate, { day: 'numeric', month: 'long' })}
+              {view === 'day' ? (isSelectedDateToday ? 'Hoje' : formatLocalDate(selectedDate, { weekday: 'short', day: 'numeric', month: 'long' })) : 
+               view === 'week' ? `Semana de ${formatLocalDate(formatDateKey(weekStart), { day: 'numeric', month: 'short' })}` :
+               formatLocalDate(selectedDate, { month: 'long', year: 'numeric' })}
             </h1>
+
+            {/* VIEW TOGGLE */}
+            <div className="flex bg-brand-linen p-1 rounded-full text-[9px] font-bold uppercase tracking-widest">
+              <button 
+                onClick={() => setView('day')}
+                className={cn("px-4 py-1.5 rounded-full transition-all", view === 'day' ? "bg-brand-white shadow-sm text-brand-ink" : "text-brand-stone")}
+              >
+                Dia
+              </button>
+              <button 
+                onClick={() => setView('week')}
+                className={cn("px-4 py-1.5 rounded-full transition-all", view === 'week' ? "bg-brand-white shadow-sm text-brand-ink" : "text-brand-stone")}
+              >
+                Semana
+              </button>
+              <button 
+                onClick={() => setView('month')}
+                className={cn("px-4 py-1.5 rounded-full transition-all", view === 'month' ? "bg-brand-white shadow-sm text-brand-ink" : "text-brand-stone")}
+              >
+                Mês
+              </button>
+            </div>
           </div>
+
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => changeDate(-1)} 
+              onClick={() => handleNavigate('prev')} 
               className="p-2 hover:bg-brand-linen rounded-full text-brand-stone transition-colors"
             >
               <ChevronLeft size={18} />
             </button>
             <button 
               onClick={setDateToToday}
-              className="px-3 py-1.5 bg-brand-linen text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all"
+              className="px-4 py-2 bg-brand-linen text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all"
             >
               Hoje
             </button>
             <button 
-              onClick={() => changeDate(1)} 
+              onClick={() => handleNavigate('next')} 
               className="p-2 hover:bg-brand-linen rounded-full text-brand-stone transition-colors"
             >
               <ChevronRight size={18} />
@@ -552,238 +650,76 @@ export default function AgendaPage() {
           </div>
         </div>
 
-        {/* 3. TIMELINE DO DIA */}
-        <div className="space-y-4">
-          <div className="flex flex-col gap-4 mb-2 px-1">
-            <div className="flex items-center gap-2">
-              <Clock size={14} className="text-brand-mist" />
-              <h3 className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Timeline do dia</h3>
-            </div>
-            
-            {/* Legenda visual */}
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-stone opacity-40" />
-                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Livre</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Pedido</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-ink" />
-                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Confirmado</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-stone/20" />
-                <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-brand-stone/60">Bloqueado</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-brand-white rounded-[32px] border border-brand-mist overflow-hidden divide-y divide-brand-parchment shadow-sm">
-            {timelineItems.length === 0 ? (
-              <div className="p-10 text-center">
-                <p className="text-sm font-serif text-brand-stone italic">Nenhuma atividade registrada.</p>
-                <div className="mt-4 flex justify-center">
-                  <PremiumButton onClick={() => setDateToToday()} variant="linen" className="text-[10px] py-4 px-8">Ir para hoje</PremiumButton>
-                </div>
-              </div>
-            ) : (
-              timelineItems.map((item, idx) => {
-                const [h, m] = item.time.split(':').map(Number);
-                const itemMinutes = h * 60 + m;
-                const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-                const isCurrent = isSelectedDateToday && Math.abs(itemMinutes - nowMinutes) < 15;
-
-                if (item.type === 'appointment') {
-                  const app = item.data;
-                  const isPending = app.status === 'pending';
-                  
-                  return (
-                    <div key={`appt-${app.id}`} className={cn(
-                      "p-5 flex items-center justify-between gap-4 transition-all group relative",
-                      isPending ? "bg-red-50/30" : "hover:bg-brand-parchment/30",
-                      isCurrent && "border-l-4 border-brand-terracotta bg-brand-linen/10"
-                    )}>
-                      {isCurrent && (
-                        <div className="absolute top-0 right-4 -translate-y-1/2">
-                          <span className="bg-brand-terracotta text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shadow-sm">
-                            Agora
-                          </span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs font-medium text-brand-stone w-10 shrink-0">{item.time}</span>
-                        <div className="min-w-0">
-                          <h4 className="text-sm font-medium text-brand-ink truncate">{app.clientName}</h4>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[9px] text-brand-stone font-medium uppercase tracking-widest truncate max-w-[120px]">
-                              {app.serviceName}
-                            </span>
-                            {isPending ? (
-                              <span className="text-[8px] font-bold text-red-500 uppercase tracking-widest flex items-center gap-1">
-                                <AlertCircle size={8} /> Pedido novo
-                              </span>
-                            ) : app.status === 'pending_conflict' ? (
-                              <span className="text-[8px] font-bold text-red-600 uppercase tracking-widest flex items-center gap-1">
-                                <AlertCircle size={8} /> Conflito detectado
-                              </span>
-                            ) : (
-                              <>
-                                {app.status === 'completed' ? (
-                                  <span className="text-[8px] font-bold text-brand-terracotta uppercase tracking-widest flex items-center gap-1">
-                                    Concluído
-                                  </span>
-                                ) : (
-                                  <span className={cn(
-                                    "text-[8px] font-bold uppercase tracking-widest",
-                                    "text-brand-stone opacity-60"
-                                  )}>
-                                    Confirmado
-                                  </span>
-                                )}
-                                {item.hasConflict && (
-                                  <span className="text-[8px] font-bold text-white bg-red-600 px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse">
-                                    Conflito de horário
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isPending ? (
-                          <>
-                            <button 
-                              onClick={() => handleRespond(app.id, 'confirmed', app)}
-                              className="px-3 py-1.5 bg-brand-ink text-brand-white rounded-lg text-[8px] font-bold uppercase tracking-widest hover:bg-brand-espresso"
-                            >
-                              Confirmar
-                            </button>
-                            <button 
-                              onClick={() => handleRespond(app.id, 'cancelled_by_professional', app)}
-                              className="p-1.5 bg-brand-parchment text-brand-stone rounded-lg hover:bg-red-50 hover:text-red-500"
-                            >
-                              <X size={14} />
-                            </button>
-                          </>
-                        ) : (
-                          <button 
-                            onClick={() => { setSelectedAppointment(app); setIsDetailsOpen(true); }}
-                            className="p-2 text-brand-stone hover:text-brand-ink transition-colors"
-                          >
-                            <Info size={16} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (item.type === 'block') {
-                  const block = item.data;
-                  const isBreak = block.reason === 'descanso' || block.reason?.toLowerCase().includes('intervalo') || block.reason?.toLowerCase().includes('pausa');
-                  
-                  return (
-                    <div key={`block-${block.id}`} className="p-5 flex items-center justify-between gap-4 bg-brand-parchment/20">
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs font-medium text-brand-stone w-10 shrink-0">{item.time}</span>
-                        <div>
-                          <p className="text-sm font-bold text-brand-ink italic">{isBreak ? 'Pausa' : 'Bloqueado'}</p>
-                          <p className="text-[9px] text-brand-stone/60 uppercase tracking-widest">{block.reason || 'Compromisso'}</p>
-                        </div>
-                      </div>
-                      <button 
-                        onClick={() => handleUnblockSchedule(block.id)}
-                        className="p-2 text-brand-stone opacity-40 hover:opacity-100 hover:text-brand-terracotta transition-all"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  );
-                }
-
-                if (item.type === 'free') {
-                  const now = new Date();
-                  const [h, m] = item.time.split(':').map(Number);
-                  const isPast = isSelectedDateToday && (h * 60 + m < now.getHours() * 60 + now.getMinutes());
-
-                  return (
-                    <div key={`free-${item.time}`} className={cn(
-                      "p-5 flex items-center justify-between gap-4 transition-colors relative",
-                      isPast ? "bg-brand-parchment/10 grayscale opacity-40" : "hover:bg-green-50/30",
-                      isCurrent && !isPast && "border-l-4 border-brand-terracotta bg-brand-linen/10"
-                    )}>
-                      {isCurrent && !isPast && (
-                         <div className="absolute top-0 right-4 -translate-y-1/2">
-                           <span className="bg-brand-terracotta text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest shadow-sm">
-                             Agora
-                           </span>
-                         </div>
-                      )}
-                      <div className="flex items-center gap-4">
-                        <span className="text-xs font-medium text-brand-stone w-10 shrink-0">{item.time}</span>
-                        <div>
-                          <p className="text-sm font-medium text-brand-stone">Livre</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 md:gap-3">
-                        {!isPast && (
-                          <div className="flex items-center gap-1">
-                            {/* LOCK: Quick Block */}
-                            <button 
-                              onClick={() => { 
-                                  setQuickBlockTime(item.time);
-                                  setIsQuickBlockOpen(true);
-                              }}
-                              className="p-2 text-brand-stone/40 hover:text-brand-terracotta transition-all"
-                              title="Bloqueio rápido"
-                            >
-                              <Lock size={14} />
-                            </button>
-
-                            {/* WAITLIST: Demand check */}
-                            <button 
-                              onClick={() => {
-                                if (checkFeatureAccess('waitlist')) {
-                                  setManualTime(item.time); // Pre-fill for 'onFit'
-                                  setIsWaitlistOpen(true);
-                                }
-                              }}
-                              className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
-                            >
-                              Espera
-                            </button>
-                          </div>
-                        )}
-                        
-                        {/* FILL: Manual entry */}
-                        <button 
-                          onClick={() => { 
-                            if (usageCount >= 15 && profile?.plan === 'free') {
-                              openUpgradeModal('unlimitedBookings');
-                              return;
-                            }
-                            setManualTime(item.time); 
-                            setManualDate(selectedDate); 
-                            setIsManualModalOpen(true); 
-                          }}
-                          className="px-4 py-1.5 border border-brand-mist bg-brand-white text-brand-stone rounded-lg text-[9px] font-bold uppercase tracking-widest hover:border-brand-ink hover:text-brand-ink"
-                        >
-                          Preencher
-                        </button>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return null;
-              })
+        {/* 3. TIMELINE DO DIA / WEEK VIEW / MONTH VIEW */}
+        <div className="space-y-4 relative">
+          {/* Navigation Hint Tooltip (Discrete) */}
+          <AnimatePresence>
+            {showNavTip && view === 'week' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="absolute -top-12 left-1/2 -translate-x-1/2 z-50 bg-brand-ink text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-3 whitespace-nowrap md:hidden"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                  Deslize para ver outros dias <ChevronRight size={14} className="text-brand-terracotta" />
+                </span>
+                <button 
+                  onClick={() => {
+                    setShowNavTip(false);
+                    localStorage.setItem('nera_agenda_nav_tip_dismissed', 'true');
+                  }}
+                  className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
+
+          {view === 'week' && (
+            <WeekView 
+              appointments={allAppointments}
+              blockedSchedules={allBlockedSchedules}
+              workingHours={profile?.workingHours || {}}
+              weekStart={weekStart}
+              onSelectAppointment={(appt) => { setSelectedAppointment(appt); setIsDetailsOpen(true); }}
+              onSelectSlot={(date, time) => {
+                setManualDate(date);
+                setManualTime(time);
+                setIsManualModalOpen(true);
+              }}
+              onSelectDay={(date) => {
+                setSelectedDate(date);
+                setView('day');
+              }}
+            />
+          )}
+
+          {view === 'day' && (
+            <DayView 
+              appointments={appointments}
+              blockedSchedules={blockedSchedules}
+              date={selectedDate}
+              onSelectAppointment={(appt) => { setSelectedAppointment(appt); setIsDetailsOpen(true); }}
+              onSelectSlot={(time) => {
+                setManualTime(time);
+                setIsManualModalOpen(true);
+              }}
+            />
+          )}
+
+          {view === 'month' && (
+            <MonthView 
+              currentDate={selectedDate}
+              appointments={allAppointments}
+              blockedSchedules={allBlockedSchedules}
+              onSelectDay={(date) => {
+                setSelectedDate(date);
+                setView('day');
+              }}
+            />
+          )}
         </div>
 
         {/* 4. BLOCO DE INFOS ADICIONAIS (PROAÇÃO) */}

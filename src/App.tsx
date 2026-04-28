@@ -33,6 +33,7 @@ import DirectoryPage from './pages/DirectoryPage';
 import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
 import CheckoutCanceledPage from './pages/CheckoutCanceledPage';
 import ReferralsPage from './pages/ReferralsPage';
+import WhatsAppHistoryPage from './pages/WhatsAppHistoryPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -144,6 +145,11 @@ export default function App() {
               <Route path="/indicacoes" element={
                 <PrivateRoute>
                   <ReferralsPage />
+                </PrivateRoute>
+              } />
+              <Route path="/whatsapp-history" element={
+                <PrivateRoute>
+                  <WhatsAppHistoryPage />
                 </PrivateRoute>
               } />
               

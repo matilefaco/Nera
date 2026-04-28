@@ -296,7 +296,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link to="/register?plan=essencial" className="block text-center bg-brand-terracotta text-white py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-sienna transition-all">
-                  Testar Essencial por 30 dias
+                  Testar Essencial por 15 dias
                 </Link>
               </div>
 

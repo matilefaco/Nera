@@ -168,8 +168,11 @@ export default function PlansPage() {
               variant={profile?.plan === 'essencial' ? 'secondary' : 'primary'}
               disabled={profile?.plan === 'essencial'}
             >
-              {profile?.plan === 'essencial' ? 'Plano Atual' : 'Testar Essencial por 30 dias'}
+              {profile?.plan === 'essencial' ? 'Plano Atual' : 'Testar Essencial por 15 dias'}
             </PremiumButton>
+            <p className="text-[10px] text-white/30 text-center mt-3 font-medium uppercase tracking-widest">
+              Sem cobrança imediata. Cancele a qualquer momento.
+            </p>
           </motion.div>
 
           {/* Plano Pro */}
@@ -225,6 +228,9 @@ export default function PlansPage() {
               >
                 {profile?.plan === 'pro' ? 'Plano Ativado' : 'Começar como Pro'}
               </PremiumButton>
+              <p className="text-[10px] text-brand-stone/50 text-center mt-4 font-bold uppercase tracking-widest">
+                15 dias grátis • Sem cobrança imediata
+              </p>
             </div>
           </motion.div>
         </div>

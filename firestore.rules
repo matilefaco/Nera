@@ -91,6 +91,14 @@ service cloud.firestore {
              data.totalAppointments is number && data.totalAppointments >= 0;
     }
 
+    function isValidWhatsAppLog(data) {
+      return data.keys().hasAll(['phone', 'message', 'status', 'createdAt', 'userId']) &&
+             data.userId == request.auth.uid &&
+             data.phone is string && data.phone.size() > 7 &&
+             data.message is string &&
+             data.status in ['pending', 'sent', 'failed'];
+    }
+
     // Profile Rules
     match /users/{userId} {
       allow read: if true; 
@@ -211,6 +219,19 @@ service cloud.firestore {
     match /reservation_links/{linkId} {
       allow read: if true; // Público para lookup instantâneo
       allow write: if isSignedIn(); // Apenas app via transação
+    }
+
+    match /whatsapp_logs/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Backend (service accounts) usually handles writes, but for client-side logging:
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidWhatsAppLog(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidWhatsAppLog(incoming());
+    }
+
+    match /billing_logs/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Writes are usually server-side, but allow creation if needed
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
     }
   }
 }

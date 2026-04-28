@@ -21,7 +21,7 @@ import {
 } from '../lib/utils';
 import { getClientScore } from '../lib/clientUtils';
 import Logo from '../components/Logo';
-import { Appointment, WaitlistEntry, BlockedSchedule, AnalyticsEvent, Service } from '../types';
+import { Appointment, WaitlistEntry, BlockedSchedule, AnalyticsEvent, Service, WhatsAppLog } from '../types';
 import { AnimatePresence } from 'motion/react';
 import AppLayout from '../components/AppLayout';
 import { ActivationChecklist } from '../components/ActivationChecklist';
@@ -96,6 +96,9 @@ export default function Dashboard() {
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
+    return localStorage.getItem("nera_push_banner_dismissed") === "true";
+  });
   const [blockTipDismissed, setBlockTipDismissed] = useState(() => {
     return localStorage.getItem("nera_block_tip_dismissed") === "true";
   });
@@ -108,6 +111,7 @@ export default function Dashboard() {
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
 
   // Triggers handled by hook
 
@@ -450,6 +454,19 @@ export default function Dashboard() {
       setServices(docs);
     });
 
+    // Query: WhatsApp Logs
+    const qWl = query(
+      collection(db, 'whatsapp_logs'),
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc'),
+      limit(5)
+    );
+
+    const unsubWl = onSnapshot(qWl, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
+      setWhatsappLogs(docs);
+    });
+
     return () => {
       unsubToday();
       unsubPending();
@@ -459,6 +476,7 @@ export default function Dashboard() {
       unsubBlocked();
       unsubInactive();
       unsubServices();
+      unsubWl();
     };
   }, [user, profile]);
 
@@ -567,12 +585,34 @@ export default function Dashboard() {
     }
   };
 
+  const isPastTime = (time: string): boolean => {
+    const [h, m] = time.split(":").map(Number);
+    const apptDate = new Date();
+    apptDate.setHours(h, m, 0);
+    // Mostrar botao a partir de 30 min depois do horario
+    const cutoff = new Date(apptDate.getTime() + 30 * 60 * 1000);
+    return new Date() >= cutoff;
+  };
+
+  const ongoingAppt = useMemo(() => {
+    if (activeTab !== 'hoje') return null;
+    const now = new Date();
+    return confirmedToday.find(appt => {
+      if (appt.status !== 'confirmed') return false;
+      const [h, m] = appt.time.split(':').map(Number);
+      const apptDate = new Date();
+      apptDate.setHours(h, m, 0);
+      const diff = (now.getTime() - apptDate.getTime()) / (1000 * 60);
+      return diff >= 0 && diff <= 90; // Active within 90 minutes of start
+    });
+  }, [confirmedToday, activeTab]);
+
   const handleComplete = async (id: string) => {
     setProcessingId(id);
     try {
       await updateAppointmentStatus(id, 'completed'); 
       setConfirmedId(id); // Re-using state for completion visual
-      toast.success('Experiência concluída e registrada.');
+      toast.success('Atendimento finalizado. Avaliação enviada para a cliente.');
       await new Promise(resolve => setTimeout(resolve, 800));
     } catch (error) {
       handleBookingError(error);
@@ -1030,6 +1070,52 @@ export default function Dashboard() {
         {/* HOJE SIMPLE VIEW */}
         {activeTab === "hoje" && (
           <div className="flex flex-col gap-8">
+            {/* Notificações Banner */}
+            {!isSubscribed && !pushBannerDismissed && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-brand-ink p-8 rounded-[40px] shadow-xl relative overflow-hidden group"
+              >
+                {/* Visual Background Element */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-brand-terracotta/20 transition-colors" />
+                
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-brand-terracotta/20 text-brand-terracotta rounded-2xl flex items-center justify-center shrink-0">
+                      <Zap size={28} />
+                    </div>
+                    <div>
+                      <h4 className="text-base font-serif text-brand-white">Ative notificações no celular</h4>
+                      <p className="text-xs text-white/60 font-light italic mt-1 leading-relaxed">
+                        Saiba instantaneamente quando chegar uma nova reserva, mesmo com o app fechado.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+                    <button
+                      onClick={handleEnablePushNotifications}
+                      disabled={isPushLoading}
+                      className="w-full sm:w-auto px-8 py-4 bg-brand-terracotta text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg flex items-center justify-center gap-2"
+                    >
+                      {isPushLoading ? 'Ativando...' : 'Ativar notificações'}
+                      {!isPushLoading && <CheckCircle2 size={14} />}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setPushBannerDismissed(true);
+                        localStorage.setItem("nera_push_banner_dismissed", "true");
+                      }}
+                      className="text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                    >
+                      Depois
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Pedidos Pendentes Alerta */}
             {pendingCount > 0 && (
               <motion.div 
@@ -1085,8 +1171,8 @@ export default function Dashboard() {
                     <div 
                       key={appt.id} 
                       className={cn(
-                        "bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex items-center justify-between group",
-                        appt.status === 'concluido' && "opacity-50"
+                        "bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex items-center justify-between group transition-all",
+                        appt.status === 'completed' && "bg-brand-linen opacity-80"
                       )}
                     >
                       <div className="flex items-center gap-5">
@@ -1099,15 +1185,30 @@ export default function Dashboard() {
                           <p className="text-xs text-brand-stone italic">{appt.serviceName}</p>
                           <span className={cn(
                             "text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block",
+                            appt.status === 'completed' ? "text-brand-terracotta bg-white" : 
                             ['confirmed', 'accepted'].includes(appt.status) ? "text-green-600 bg-green-50" : "text-brand-stone bg-brand-linen"
                           )}>
-                            {['confirmed', 'accepted'].includes(appt.status) ? 'Confirmado' : appt.status}
+                            {appt.status === 'completed' ? 'Concluído ✓' : 
+                             ['confirmed', 'accepted'].includes(appt.status) ? 'Confirmado' : appt.status}
                           </span>
                         </div>
                       </div>
-                      <Link to="/agenda" className="p-3 text-brand-stone hover:text-brand-terracotta">
-                        <ChevronRight size={18} />
-                      </Link>
+                      
+                      <div className="flex items-center gap-2">
+                        {appt.status === 'confirmed' && isPastTime(appt.time) && (
+                          <button
+                            onClick={() => handleComplete(appt.id)}
+                            disabled={processingId === appt.id}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-brand-terracotta text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all active:scale-95"
+                          >
+                            {processingId === appt.id ? "..." : "Finalizar"}
+                            <CheckCircle2 size={14} />
+                          </button>
+                        )}
+                        <Link to="/agenda" className="p-3 text-brand-stone hover:text-brand-terracotta">
+                          <ChevronRight size={18} />
+                        </Link>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1360,8 +1461,11 @@ export default function Dashboard() {
 
                 <div className="flex items-center justify-between mb-8">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#25D366]/10 text-[#25D366] rounded-xl">
+                    <div className="p-2 bg-[#25D366]/10 text-[#25D366] rounded-xl relative">
                       <MessageCircle size={20} />
+                      {profile?.whatsappNotificationsEnabled && (
+                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+                      )}
                     </div>
                     <div>
                       <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
@@ -1370,63 +1474,75 @@ export default function Dashboard() {
                       <p className="text-sm font-serif text-brand-ink italic">Automação de mensagens</p>
                     </div>
                   </div>
-                  <Link 
-                    to="/perfil" 
-                    className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
-                  >
-                    Configurar
-                  </Link>
+                  <div className="flex items-center gap-4">
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full",
+                      profile?.whatsappNotificationsEnabled ? "bg-green-50 text-green-600 border border-green-100" : "bg-gray-50 text-gray-400 border border-gray-100"
+                    )}>
+                      {profile?.whatsappNotificationsEnabled ? '● Ativo' : '● Inativo'}
+                    </span>
+                    <Link 
+                      to="/perfil" 
+                      className="p-2 hover:bg-brand-mist rounded-full transition-colors"
+                    >
+                      <Settings size={16} className="text-brand-stone" />
+                    </Link>
+                  </div>
                 </div>
 
                 <div className="space-y-6">
-                  <div className="flex items-center justify-between p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-2 h-2 rounded-full",
-                        profile?.whatsapp ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" : "bg-brand-stone/30"
-                      )} />
-                      <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">
-                        {profile?.whatsapp ? 'WhatsApp Conectado' : 'WhatsApp não configurado'}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-brand-stone italic font-medium">
-                      {profile?.whatsapp || '---'}
-                    </span>
-                  </div>
+                  <p className="text-xs text-brand-stone italic leading-relaxed">
+                    O Nera confirma e lembra suas clientes automaticamente, reduzindo faltas e seu trabalho manual.
+                  </p>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-brand-white border border-brand-mist rounded-2xl flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Zap size={14} className={profile?.whatsappNotificationsEnabled ? "text-[#25D366]" : "text-brand-stone/30"} />
-                        <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Confirmações</span>
-                      </div>
-                      <span className={cn(
-                        "text-[8px] font-bold uppercase px-2 py-0.5 rounded-full",
-                        profile?.whatsappNotificationsEnabled ? "bg-green-50 text-green-600" : "bg-brand-parchment text-brand-stone"
-                      )}>
-                        {profile?.whatsappNotificationsEnabled ? 'Ativo' : 'Inativo'}
-                      </span>
+                  <div className="bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
+                        Enviados recentemente
+                      </h4>
+                      <Link to="/whatsapp-history" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
+                        Ver histórico →
+                      </Link>
                     </div>
-                    <div className="p-4 bg-brand-white border border-brand-mist rounded-2xl flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Clock size={14} className={profile?.whatsappNotificationsEnabled ? "text-[#25D366]" : "text-brand-stone/30"} />
-                        <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Lembretes</span>
-                      </div>
-                      <span className={cn(
-                        "text-[8px] font-bold uppercase px-2 py-0.5 rounded-full",
-                        profile?.whatsappNotificationsEnabled ? "bg-green-50 text-green-600" : "bg-brand-parchment text-brand-stone"
-                      )}>
-                        {profile?.whatsappNotificationsEnabled ? 'Ativo' : 'Inativo'}
-                      </span>
+
+                    <div className="space-y-3">
+                      {whatsappLogs.length > 0 ? (
+                        whatsappLogs.map((log) => (
+                          <div key={log.id} className="flex items-center justify-between gap-3 bg-white/50 p-3 rounded-xl border border-brand-mist/30">
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className={cn(
+                                "w-1.5 h-1.5 rounded-full shrink-0",
+                                log.status === 'sent' ? 'bg-green-500' : log.status === 'failed' ? 'bg-red-500' : 'bg-gray-300'
+                              )} />
+                              <div className="overflow-hidden">
+                                <p className="text-[11px] font-bold text-brand-ink truncate">
+                                  {log.clientName || 'Cliente'}
+                                </p>
+                                <p className="text-[9px] text-brand-stone truncate italic">
+                                  {log.messagePreview || log.message.substring(0, 30)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-brand-stone font-medium text-right shrink-0">
+                              {log.status === 'sent' ? 'Enviado' : log.status === 'failed' ? 'Falha' : 'Pendente'}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6">
+                          <p className="text-[10px] text-brand-stone italic">Nenhuma mensagem automática enviada ainda.</p>
+                          <p className="text-[9px] text-gray-400 mt-1">Lembretes e confirmações aparecerão aqui.</p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {!profile?.whatsapp && (
-                    <div className="text-center py-4 px-6 bg-brand-linen/30 rounded-2xl border border-dashed border-brand-terracotta/30">
-                      <p className="text-[10px] text-brand-ink italic mb-3">Conecte o WhatsApp para automatizar confirmações e lembretes.</p>
+                    <div className="text-center py-6 px-6 bg-brand-linen/30 rounded-3xl border border-dashed border-brand-terracotta/30">
+                      <p className="text-[11px] text-brand-ink italic mb-3">Sincronize seu WhatsApp para ativar as automações.</p>
                       <Link to="/perfil">
-                        <button className="text-[9px] font-bold uppercase tracking-widest bg-brand-terracotta text-white px-4 py-2 rounded-full hover:scale-105 transition-transform">
-                          Configurar WhatsApp
+                        <button className="text-[9px] font-bold uppercase tracking-widest bg-brand-terracotta text-white px-6 py-2.5 rounded-full hover:scale-105 transition-transform shadow-sm">
+                          Conectar WhatsApp
                         </button>
                       </Link>
                     </div>
@@ -1592,65 +1708,6 @@ export default function Dashboard() {
             </button>
             
             <div className="h-4" /> {/* Spacer */}
-
-          {!isSupported ? (
-              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 bg-brand-linen text-brand-ink rounded-2xl flex items-center justify-center shrink-0">
-                    <Smartphone size={28} />
-                  </div>
-                  <div className="max-w-md">
-                    <h4 className="text-base font-serif text-brand-ink">Notificações disponíveis no app instalado</h4>
-                    <p className="text-xs text-brand-stone font-light italic mt-1 leading-relaxed">
-                      Para receber alertas de novas reservas no iPhone, abra o Nera pelo Safari, toque em Compartilhar e adicione à Tela de Início. Depois, entre pelo ícone instalado e ative as notificações.
-                    </p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => toast.info('Siga as instruções acima para ativar!')}
-                  className="px-8 py-4 bg-brand-linen text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-mist transition-colors shrink-0"
-                >
-                  Entendi
-                </button>
-              </div>
-            ) : (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col md:flex-row items-center justify-between gap-6"
-              >
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 bg-brand-linen text-brand-ink rounded-2xl flex items-center justify-center shrink-0">
-                    <Zap size={28} />
-                  </div>
-                  <div>
-                    <h4 className="text-base font-serif text-brand-ink">Receba novas reservas em tempo real</h4>
-                    <p className="text-xs text-brand-stone font-light italic mt-1">
-                      Ative as notificações para ser avisada assim que uma cliente fizer uma reserva.
-                    </p>
-                  </div>
-                </div>
-                
-                {isSubscribed ? (
-                  <div className="flex items-center gap-2 px-6 py-3 bg-green-50 text-green-600 rounded-full text-[10px] font-bold uppercase tracking-widest border border-green-100">
-                    <Check size={14} /> Notificações ativadas
-                  </div>
-                ) : permission === 'denied' ? (
-                  <div className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-600 rounded-full text-[10px] font-bold uppercase tracking-widest border border-red-100">
-                    <X size={14} /> Notificações bloqueadas no navegador
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleEnablePushNotifications}
-                    disabled={isPushLoading}
-                    className="px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-transform shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isPushLoading && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                    {isPushLoading ? 'Ativando...' : 'Ativar notificações'}
-                  </button>
-                )}
-              </motion.div>
-            )}
 
             <WeeklyRevenueSummary 
               appointments={appointments}
@@ -1929,7 +1986,7 @@ export default function Dashboard() {
           </div>
           <div className="bg-brand-white border border-brand-mist rounded-[24px] p-8">
             <p className="text-sm font-light text-brand-stone mb-6 leading-relaxed">
-              Indique uma colega profissional. Quando ela se cadastrar com seu link e usar por 30 dias, <strong className="text-brand-ink">você ganha 1 mês grátis</strong>.
+              Indique uma colega profissional. Quando ela se cadastrar com seu link e usar por 15 dias, <strong className="text-brand-ink">você ganha 1 mês grátis</strong>.
             </p>
             <div className="flex items-center gap-3 bg-brand-parchment border border-brand-mist rounded-2xl p-4">
               <span className="text-[11px] text-brand-stone font-mono truncate flex-1">{referralLink}</span>
@@ -2459,6 +2516,26 @@ export default function Dashboard() {
         totalClients={totalClientsCount}
         averageTicket={appointments.length > 0 ? monthlyRevenue / appointments.length : 0}
       />
+
+      {/* Floating Action Button for active appointment */}
+      {ongoingAppt && (
+        <div className="fixed bottom-24 right-6 md:hidden z-40">
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => handleComplete(ongoingAppt.id)}
+            disabled={processingId === ongoingAppt.id}
+            className="w-14 h-14 bg-brand-terracotta text-white rounded-full shadow-2xl flex items-center justify-center relative group"
+          >
+            <CheckCircle2 size={24} />
+            <div className="absolute right-full mr-3 bg-brand-ink text-white text-[10px] font-bold uppercase tracking-widest py-2 px-4 rounded-xl whitespace-nowrap opacity-0 transition-opacity pointer-events-none">
+              Finalizar {ongoingAppt.clientName.split(' ')[0]}
+            </div>
+          </motion.button>
+        </div>
+      )}
     </AppLayout>
   );
 }

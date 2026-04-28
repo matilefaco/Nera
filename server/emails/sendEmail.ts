@@ -658,3 +658,48 @@ export async function sendReferralRewardEmail(data: { referrerEmail: string, ref
   }
 }
 
+/**
+ * EVENT: trial_will_end
+ */
+export async function sendTrialWillEndEmail(data: { email: string, name: string, trialEndAt: string }) {
+  const { email, name, trialEndAt } = data;
+  logEmail('START', 'trial_will_end', { to: email });
+
+  const formattedDate = new Date(trialEndAt).toLocaleDateString('pt-BR', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  });
+
+  const html = `
+    <div style="font-family: serif; color: #1a1a1a; padding: 40px; background: #faf9f6; max-width: 600px; margin: 0 auto; border: 1px solid #e9e5db; border-radius: 30px;">
+      <h1 style="font-size: 24px; font-weight: normal; margin-bottom: 20px;">Olá, ${name}!</h1>
+      <p style="font-size: 16px; line-height: 1.6; color: #4a4a4a;">Passando para avisar que seu período de teste gratuito de 15 dias do Nera Pro está chegando ao fim.</p>
+      <div style="background: #e9e5db; padding: 30px; border-radius: 20px; margin: 30px 0; text-align: center;">
+        <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: #8c8c8c; display: block; margin-bottom: 8px;">O trial encerra em</span>
+        <h2 style="font-size: 24px; color: #a67c52; margin: 0;">${formattedDate}</h2>
+      </div>
+      <p style="font-size: 14px; color: #666; line-height: 1.6;">Se você não cadastrou um método de pagamento ou deseja cancelar, pode fazer isso a qualquer momento no seu Painel.</p>
+      <a href="${APP_URL}/dashboard" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-size: 14px; margin-top: 20px;">Ir para o Dashboard</a>
+      <p style="margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #e9e5db; pt-20px;">Equipe Nera</p>
+    </div>
+  `;
+
+  try {
+    const resend = getResendClient();
+    const { data: resendData, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [email],
+      subject: `Seu teste gratuito está terminando • Nera`,
+      html,
+    });
+    if (error) {
+      logEmail('ERROR', 'trial_will_end', { error });
+      return { success: false, error };
+    }
+    logEmail('SUCCESS', 'trial_will_end', { resendId: resendData?.id });
+    return { success: true, id: resendData?.id };
+  } catch (err: any) {
+    logEmail('ERROR', 'trial_will_end', { error: err.message });
+    return { success: false, error: err.message };
+  }
+}
+

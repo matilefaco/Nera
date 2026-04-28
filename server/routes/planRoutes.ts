@@ -1,7 +1,7 @@
 import express from "express";
 import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
-import { sendReferralRewardEmail } from "../emails/sendEmail.js";
+import { sendReferralRewardEmail, sendTrialWillEndEmail } from "../emails/sendEmail.js";
 import Stripe from "stripe";
 
 const router = express.Router();
@@ -65,6 +65,15 @@ router.post("/create-checkout", async (req, res) => {
       mode: "subscription",
       customer_email: email,
       client_reference_id: professionalId,
+      subscription_data: {
+        trial_period_days: 15,
+        trial_settings: {
+          end_behavior: {
+            missing_payment_method: "cancel"
+          }
+        }
+      },
+      payment_method_collection: "if_required",
       success_url: `${process.env.APP_URL}/checkout/success`,
       cancel_url: `${process.env.APP_URL}/checkout/canceled`,
       metadata: {
@@ -206,6 +215,43 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     } catch (err: any) {
       console.error('[STRIPE WEBHOOK ERROR] Error processing checkout.session.completed:', err.message);
       return res.status(500).json({ error: 'Internal processing error' });
+    }
+  }
+
+  if (event.type === 'customer.subscription.trial_will_end') {
+    const subscription = event.data.object as Stripe.Subscription;
+    const customerId = subscription.customer as string;
+
+    console.log(`[STRIPE WEBHOOK] Received customer.subscription.trial_will_end for customer ${customerId}`);
+
+    try {
+      const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+      if (!usersSnap.empty) {
+        const userDoc = usersSnap.docs[0];
+        const userData = userDoc.data();
+        const userId = userDoc.id;
+
+        // Log the event
+        await db.collection('billing_logs').add({
+          userId,
+          stripeCustomerId: customerId,
+          type: 'trial_will_end',
+          subscriptionId: subscription.id,
+          createdAt: new Date().toISOString()
+        });
+
+        // Send Email if available
+        if (userData?.email) {
+          await sendTrialWillEndEmail({
+            email: userData.email,
+            name: userData.name || 'Parceira Nera',
+            trialEndAt: new Date(subscription.trial_end! * 1000).toISOString()
+          });
+          console.log(`[STRIPE WEBHOOK SUCCESS] Trial warning email sent to ${userData.email}`);
+        }
+      }
+    } catch (err: any) {
+      console.error('[STRIPE WEBHOOK ERROR] Error handling trial_will_end:', err.message);
     }
   }
 

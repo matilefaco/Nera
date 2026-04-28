@@ -31,13 +31,42 @@ export default function ClientsPage() {
   } = useUpgradeTriggers();
 
   const [clients, setClients] = useState<ClientSummary[]>([]);
-  const [search, setSearch] = useState('');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [filterService, setFilterService] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<"all"|"active"|"inactive">("all");
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'active' | 'inactive' | 'risk' | 'vip' | 'em_risco_real'>('all');
   const [isMigrating, setIsMigrating] = useState(false);
+
+  // Fetch appointments to get unique services and enrich client data
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', user.uid)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const appts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+      setAppointments(appts);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const uniqueServices = useMemo(() => {
+    const s = new Set<string>();
+    appointments.forEach(a => {
+      if (a.serviceName) s.add(a.serviceName);
+    });
+    return Array.from(s).sort();
+  }, [appointments]);
+
+  const isActive = (c: ClientSummary) => {
+    if (!c.lastAppointmentDate) return false;
+    return getDaysSinceLastVisit(c.lastAppointmentDate) <= 30;
+  };
 
   // Helper to calculate days since last visit
   const getDaysSinceLastVisit = (dateStr: string) => {
@@ -139,24 +168,30 @@ export default function ClientsPage() {
     }
   };
 
-  const filteredClients = useMemo(() => {
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const fortyFiveDaysAgo = new Date(today.getTime() - 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const sixtyDaysAgo = new Date(today.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const enrichedClients = useMemo(() => {
+    return clients.map(c => {
+      const clientAppts = appointments.filter(a => 
+        (a.clientWhatsapp && a.clientWhatsapp === c.clientPhone) || 
+        (a.clientEmail && a.clientEmail === c.clientEmail)
+      );
+      const services = Array.from(new Set(clientAppts.map(a => a.serviceName)));
+      return { ...c, services };
+    });
+  }, [clients, appointments]);
 
-    return clients
-      .filter(c => 
-        (c.clientName || '').toLowerCase().includes(search.toLowerCase()) || 
-        (c.clientPhone || '').includes(search)
-      )
-      .filter(c => {
-        if (filter === 'active') return c.lastAppointmentDate >= thirtyDaysAgo;
-        if (filter === 'inactive') return c.lastAppointmentDate < thirtyDaysAgo && c.lastAppointmentDate >= sixtyDaysAgo;
-        if (filter === 'risk') return c.lastAppointmentDate < sixtyDaysAgo;
-        if (filter === 'em_risco_real') return c.lastAppointmentDate < fortyFiveDaysAgo; // New logic for "Em Risco"
-        if (filter === 'vip') return c.totalSpent >= 1000;
-        return true;
+  const filteredClients = useMemo(() => {
+    return enrichedClients
+      .filter(client => {
+        const matchSearch = (client.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                            (client.clientPhone || '').includes(searchTerm);
+        
+        const matchService = !filterService || (client.services && client.services.includes(filterService));
+        
+        const matchStatus = filterStatus === "all" ||
+          (filterStatus === "active" && isActive(client)) ||
+          (filterStatus === "inactive" && !isActive(client));
+          
+        return matchSearch && matchService && matchStatus;
       })
       .sort((a, b) => {
         // Prioritize: VIP, then higher LTV, then frequent visitors
@@ -166,7 +201,7 @@ export default function ClientsPage() {
         if (b.totalSpent !== a.totalSpent) return b.totalSpent - a.totalSpent;
         return (b.confirmedAppointments || 0) - (a.confirmedAppointments || 0);
       });
-  }, [clients, search, filter]);
+  }, [enrichedClients, searchTerm, filterService, filterStatus]);
 
   if (loading && clients.length === 0) {
     return (
@@ -215,7 +250,7 @@ export default function ClientsPage() {
                 <p className="text-white/60 text-xs font-light">Um convite personalizado pode recuperar até {formatCurrency(clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).reduce((acc, curr) => acc + (curr.totalSpent / curr.confirmedAppointments || 0), 0))} em faturamento hoje.</p>
               </div>
               <button 
-                onClick={() => setFilter('inactive')}
+                onClick={() => setFilterStatus('inactive')}
                 className="px-8 py-4 bg-brand-terracotta text-white rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg whitespace-nowrap"
               >
                 Reativar agora
@@ -244,20 +279,38 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        {/* Search & Filters */}
+        {/* Search & Advanced Filters */}
         <div className="space-y-6 mb-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
               <input 
                 type="text" 
-                placeholder="Nome ou WhatsApp..." 
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar cliente..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-16 pr-6 py-6 bg-brand-white rounded-[28px] border border-brand-mist outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light shadow-sm text-sm"
               />
             </div>
             
+            {(filterService || filterStatus !== 'all' || searchTerm) && (
+              <div className="flex items-center justify-between px-2">
+                <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
+                  {filteredClients.length} de {clients.length} clientes
+                </span>
+                <button 
+                  onClick={() => {
+                    setFilterService(null);
+                    setFilterStatus('all');
+                    setSearchTerm('');
+                  }}
+                  className="flex items-center gap-1 text-[10px] font-bold text-brand-terracotta uppercase tracking-widest hover:underline ml-4"
+                >
+                  <X size={12} /> Limpar filtros
+                </button>
+              </div>
+            )}
+
             {clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length > 0 && (
               <PremiumButton
                 onClick={() => {
@@ -289,28 +342,59 @@ export default function ClientsPage() {
             )}
           </div>
 
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { id: 'all', label: 'Todos' },
-              { id: 'vip', label: 'VIP' },
-              { id: 'active', label: 'Recentes' },
-              { id: 'inactive', label: 'Há 30+ dias' },
-              { id: 'risk', label: 'Há 60+ dias' },
-              { id: 'em_risco_real', label: 'Em Risco' }
-            ].map(f => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id as any)}
-                className={cn(
-                  "px-6 py-3 rounded-2xl text-[9px] font-bold uppercase tracking-widest border transition-all",
-                  filter === f.id
-                    ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
-                    : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
+          <div className="space-y-4">
+            {/* Status Tabs */}
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { id: 'all', label: 'Todas' },
+                { id: 'active', label: 'Ativas (último mês)' },
+                { id: 'inactive', label: 'Inativas (+30 dias)' }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setFilterStatus(f.id as any)}
+                  className={cn(
+                    "px-6 py-3 rounded-2xl text-[9px] font-bold uppercase tracking-widest border transition-all",
+                    filterStatus === f.id
+                      ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
+                      : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Service Chips */}
+            {uniqueServices.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                <button
+                  onClick={() => setFilterService(null)}
+                  className={cn(
+                    "px-5 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap transition-all",
+                    !filterService
+                      ? "bg-brand-terracotta text-white border-brand-terracotta"
+                      : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
+                  )}
+                >
+                  Todos os Serviços
+                </button>
+                {uniqueServices.map(service => (
+                  <button
+                    key={service}
+                    onClick={() => setFilterService(service === filterService ? null : service)}
+                    className={cn(
+                      "px-5 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap transition-all",
+                      filterService === service
+                        ? "bg-brand-terracotta text-white border-brand-terracotta"
+                        : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
+                    )}
+                  >
+                    {service}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

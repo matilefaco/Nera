@@ -293,6 +293,24 @@ export interface AnalyticsEvent {
   timestamp: any;
 }
 
+export interface WhatsAppLog {
+  id: string;
+  userId: string;
+  phone: string;
+  clientName?: string;
+  clientWhatsapp?: string;
+  message: string;
+  messagePreview?: string;
+  messageType?: string;
+  status: 'sent' | 'failed' | 'pending';
+  error?: string;
+  appointmentId?: string;
+  idempotencyKey?: string;
+  createdAt: any;
+  sentAt?: any;
+  updatedAt?: any;
+}
+
 export interface ClientSummary {
   id: string; // professionalId_clientKey
   professionalId: string;

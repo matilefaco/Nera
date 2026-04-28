@@ -1,13 +1,10 @@
 import { db } from "./firebaseAdmin.js";
 import admin from "firebase-admin";
+import { logWhatsAppMessage, normalizePhone } from "./services/whatsappService.js";
 
 // Helper to format Brazilian phone numbers for WhatsApp Cloud API
 export function formatBRNumber(phone: string): string {
-  let cleaned = phone.replace(/\D/g, '');
-  if (cleaned.length === 10 || cleaned.length === 11) {
-    return '55' + cleaned;
-  }
-  return cleaned;
+  return normalizePhone(phone);
 }
 
 /**
@@ -45,7 +42,7 @@ export async function markEmailSent(appointmentId: string, eventKey: string) {
 }
 
 // WhatsApp Notification Handler (Official Meta Cloud API)
-export async function sendWhatsAppMeta(to: string, message: string) {
+export async function sendWhatsAppMeta(to: string, message: string, metadata: { userId?: string, appointmentId?: string, type?: string, clientName?: string, clientWhatsapp?: string } = {}) {
   const accessToken = process.env.META_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
@@ -56,6 +53,22 @@ export async function sendWhatsAppMeta(to: string, message: string) {
 
   const formattedTo = formatBRNumber(to);
   const url = `https://graph.facebook.com/v22.0/${phoneNumberId}/messages`;
+
+  // Idempotency: skip logging if userId is missing (e.g. system internal tests)
+  let logId = null;
+  if (metadata.userId) {
+    logId = await logWhatsAppMessage(db, {
+      userId: metadata.userId,
+      phone: formattedTo,
+      message,
+      type: metadata.type || 'meta_official',
+      status: 'pending',
+      appointmentId: metadata.appointmentId,
+      clientName: metadata.clientName,
+      clientWhatsapp: metadata.clientWhatsapp,
+      metadata
+    });
+  }
 
   try {
     const resp = await fetch(url, {
@@ -73,9 +86,42 @@ export async function sendWhatsAppMeta(to: string, message: string) {
         }
       })
     });
-    return resp.ok;
-  } catch (err) {
+
+    if (resp.ok) {
+      if (logId && metadata.userId) {
+        await logWhatsAppMessage(db, {
+          userId: metadata.userId,
+          phone: formattedTo,
+          message,
+          status: 'sent',
+          metaResponse: await resp.json()
+        });
+      }
+      return true;
+    } else {
+      const errorText = await resp.text();
+      if (logId && metadata.userId) {
+        await logWhatsAppMessage(db, {
+          userId: metadata.userId,
+          phone: formattedTo,
+          message,
+          status: 'failed',
+          error: errorText
+        });
+      }
+      return false;
+    }
+  } catch (err: any) {
     console.warn('[WhatsApp-Meta] Request failed:', err);
+    if (logId && metadata.userId) {
+      await logWhatsAppMessage(db, {
+        userId: metadata.userId,
+        phone: formattedTo,
+        message,
+        status: 'failed',
+        error: err.message
+      });
+    }
     return false;
   }
 }

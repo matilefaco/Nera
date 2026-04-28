@@ -2,8 +2,10 @@ import admin from "firebase-admin";
 
 interface WhatsAppMetadata {
   appointmentId?: string;
-  userId?: string;
+  userId: string; // Required for logging and filtering
   type?: string;
+  clientName?: string;
+  clientWhatsapp?: string;
   idempotencyKey?: string;
   [key: string]: any;
 }
@@ -11,12 +13,15 @@ interface WhatsAppMetadata {
 interface WhatsAppLog {
   id: string;
   phone: string;
+  clientName?: string;
+  clientWhatsapp?: string;
   message: string;
-  type?: string;
+  messagePreview?: string;
+  messageType?: string;
   status: 'pending' | 'sent' | 'failed';
   error?: string;
   appointmentId?: string;
-  userId?: string;
+  userId: string;
   createdAt: admin.firestore.Timestamp | admin.firestore.FieldValue;
   sentAt?: admin.firestore.Timestamp | admin.firestore.FieldValue;
   metadata?: any;
@@ -95,13 +100,78 @@ export function validateBrazilPhone(phone: string): boolean {
 }
 
 /**
+ * Unified logger for WhatsApp messages
+ */
+export async function logWhatsAppMessage(
+  db: admin.firestore.Firestore,
+  data: {
+    userId: string;
+    phone: string;
+    message: string;
+    type?: string;
+    status: 'pending' | 'sent' | 'failed';
+    error?: string;
+    appointmentId?: string;
+    clientName?: string;
+    clientWhatsapp?: string;
+    idempotencyKey?: string;
+    metadata?: any;
+    zapiResponse?: any;
+    metaResponse?: any;
+  }
+) {
+  const normalizedPhone = normalizePhone(data.phone);
+  const idempotencyKey = data.idempotencyKey || `${normalizedPhone}_${Buffer.from(data.message).toString('base64').substring(0, 32)}`;
+  
+  const logId = data.idempotencyKey ? 
+    (await db.collection('whatsapp_logs').where('idempotencyKey', '==', data.idempotencyKey).limit(1).get()).docs[0]?.id : 
+    null;
+
+  if (logId) {
+    const updateData: any = {
+      status: data.status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    };
+    if (data.status === 'sent') updateData.sentAt = admin.firestore.FieldValue.serverTimestamp();
+    if (data.error) updateData.error = data.error;
+    if (data.zapiResponse) updateData.zapiResponse = data.zapiResponse;
+    if (data.metaResponse) updateData.metaResponse = data.metaResponse;
+    
+    await db.collection('whatsapp_logs').doc(logId).update(updateData);
+    return logId;
+  } else {
+    const logRef = db.collection('whatsapp_logs').doc();
+    const logData: any = {
+      id: logRef.id,
+      phone: normalizedPhone,
+      clientName: data.clientName || null,
+      clientWhatsapp: data.clientWhatsapp || normalizedPhone,
+      message: data.message,
+      messagePreview: data.message.substring(0, 100) + (data.message.length > 100 ? '...' : ''),
+      messageType: data.type || 'generic',
+      status: data.status,
+      appointmentId: data.appointmentId || null,
+      userId: data.userId,
+      idempotencyKey,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      metadata: data.metadata || {}
+    };
+    if (data.status === 'sent') logData.sentAt = admin.firestore.FieldValue.serverTimestamp();
+    if (data.error) logData.error = data.error;
+    
+    await logRef.set(logData);
+    return logRef.id;
+  }
+}
+
+/**
  * Sends a WhatsApp message via Z-API
  */
 export async function sendWhatsApp(
   db: admin.firestore.Firestore,
   phone: string,
   message: string,
-  metadata: WhatsAppMetadata = {}
+  metadata: WhatsAppMetadata
 ) {
   const instanceId = process.env.ZAPI_INSTANCE_ID;
   const token = process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN;
@@ -133,21 +203,18 @@ export async function sendWhatsApp(
       return { success: true, duplicate: true, logId: recentLogs.docs[0].id };
     }
 
-    const logRef = db.collection('whatsapp_logs').doc();
-    const logData: any = {
-      id: logRef.id,
+    const logId = await logWhatsAppMessage(db, {
+      userId: metadata.userId,
       phone: normalizedPhone,
       message,
-      type: metadata.type || 'generic',
+      type: metadata.type,
+      clientName: metadata.clientName,
+      clientWhatsapp: metadata.clientWhatsapp,
+      appointmentId: metadata.appointmentId,
       status: 'pending',
-      appointmentId: metadata.appointmentId || null,
-      userId: metadata.userId || null,
       idempotencyKey,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      metadata: metadata || {}
-    };
-
-    await logRef.set(logData);
+      metadata
+    });
 
     let lastError = null;
     const MAX_RETRIES = 1;
@@ -172,12 +239,15 @@ export async function sendWhatsApp(
 
         if (response.ok) {
           const result = await response.json();
-          await logRef.update({
+          await logWhatsAppMessage(db, {
+            userId: metadata.userId,
+            phone: normalizedPhone,
+            message,
             status: 'sent',
-            sentAt: admin.firestore.FieldValue.serverTimestamp(),
+            idempotencyKey,
             zapiResponse: result
           });
-          return { success: true, logId: logRef.id };
+          return { success: true, logId };
         } else {
           const errorBody = await response.text();
           throw new Error(`Z-API Error ${response.status}: ${errorBody}`);
@@ -191,7 +261,14 @@ export async function sendWhatsApp(
       }
     }
 
-    await logRef.update({ status: 'failed', error: lastError?.message || 'Unknown error' });
+    await logWhatsAppMessage(db, {
+      userId: metadata.userId,
+      phone: normalizedPhone,
+      message,
+      status: 'failed',
+      idempotencyKey,
+      error: lastError?.message || 'Unknown error'
+    });
     return { success: false, error: lastError?.message };
 
   } catch (err: any) {
@@ -277,7 +354,10 @@ export async function handleInboundMessage(db: admin.firestore.Firestore, phone:
         error: 'No active appointment found',
         diagnostics: { phoneVariations, totalFound: apptsSnap.docs.length }
       });
-      await sendWhatsApp(db, normalizedPhone, "Não encontrei um agendamento ativo vinculado a este número. Acesse sua página de agendamento ou fale com a profissional.");
+      await sendWhatsApp(db, normalizedPhone, "Não encontrei um agendamento ativo vinculado a este número. Acesse sua página de agendamento ou fale com a profissional.", {
+        userId: 'system',
+        type: 'inbound_error'
+      });
       return { success: false, reason: 'no_appointment' };
     }
 
@@ -289,7 +369,11 @@ export async function handleInboundMessage(db: admin.firestore.Firestore, phone:
     switch (intent) {
       case 'confirm':
         if (targetAppt.attendanceConfirmed) {
-          await sendWhatsApp(db, normalizedPhone, "Sua presença já estava confirmada ✨");
+          await sendWhatsApp(db, normalizedPhone, "Sua presença já estava confirmada ✨", {
+            userId: targetAppt.professionalId,
+            appointmentId: targetAppt.id,
+            type: 'inbound_confirm_duplicate'
+          });
         } else {
           await db.collection('appointments').doc(targetAppt.id).update({
             attendanceConfirmed: true,
@@ -298,7 +382,11 @@ export async function handleInboundMessage(db: admin.firestore.Firestore, phone:
             status: 'confirmed'
           });
           const formattedDate = targetAppt.date.split('-').reverse().join('/');
-          await sendWhatsApp(db, normalizedPhone, `Presença confirmada ✨\nTe esperamos no dia ${formattedDate} às ${targetAppt.time} 💛`);
+          await sendWhatsApp(db, normalizedPhone, `Presença confirmada ✨\nTe esperamos no dia ${formattedDate} às ${targetAppt.time} 💛`, {
+            userId: targetAppt.professionalId,
+            appointmentId: targetAppt.id,
+            type: 'inbound_confirm_success'
+          });
         }
         break;
 
@@ -308,7 +396,11 @@ export async function handleInboundMessage(db: admin.firestore.Firestore, phone:
           rescheduleRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
           rescheduleRequestedVia: 'whatsapp'
         });
-        await sendWhatsApp(db, normalizedPhone, `Claro ✨ Você pode escolher um novo horário aqui:\n${profileLink}\n\nAssim que remarcar, avisaremos por aqui.`);
+        await sendWhatsApp(db, normalizedPhone, `Claro ✨ Você pode escolher um novo horário aqui:\n${profileLink}\n\nAssim que remarcar, avisaremos por aqui.`, {
+          userId: targetAppt.professionalId,
+          appointmentId: targetAppt.id,
+          type: 'inbound_reschedule_link'
+        });
         break;
 
       case 'cancel':
@@ -318,7 +410,11 @@ export async function handleInboundMessage(db: admin.firestore.Firestore, phone:
           cancelledBy: 'client',
           cancelledVia: 'whatsapp'
         });
-        await sendWhatsApp(db, normalizedPhone, `Seu agendamento foi cancelado com sucesso. Se quiser, você pode agendar novamente por aqui:\n${profileLink}`);
+        await sendWhatsApp(db, normalizedPhone, `Seu agendamento foi cancelado com sucesso. Se quiser, você pode agendar novamente por aqui:\n${profileLink}`, {
+          userId: targetAppt.professionalId,
+          appointmentId: targetAppt.id,
+          type: 'inbound_cancel_confirmation'
+        });
         
         const proDoc = await db.collection('users').doc(targetAppt.professionalId).get();
         const proData = proDoc.data();
@@ -335,7 +431,11 @@ export async function handleInboundMessage(db: admin.firestore.Firestore, phone:
 
       case 'help':
       case 'unknown':
-        await sendWhatsApp(db, normalizedPhone, "Como posso te ajudar? ✨\n\nResponda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença");
+        await sendWhatsApp(db, normalizedPhone, "Como posso te ajudar? ✨\n\nResponda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença", {
+          userId: targetAppt?.professionalId || 'system',
+          appointmentId: targetAppt?.id,
+          type: 'inbound_help'
+        });
         break;
     }
 
@@ -353,5 +453,5 @@ export async function handleInboundMessage(db: admin.firestore.Firestore, phone:
  * Admin test function
  */
 export async function sendTestWhatsApp(db: admin.firestore.Firestore, phone: string, message: string) {
-  return sendWhatsApp(db, phone, message, { type: 'test' });
+  return sendWhatsApp(db, phone, message, { userId: 'admin', type: 'test' });
 }

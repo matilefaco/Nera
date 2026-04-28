@@ -221,9 +221,12 @@
       "properties": {
         "id": { "type": "string" },
         "phone": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientWhatsapp": { "type": "string" },
         "message": { "type": "string" },
-        "type": { "type": "string" },
-        "status": { "type": "string", "enum": ["pending", "sent", "failed"] },
+        "messagePreview": { "type": "string" },
+        "messageType": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "failed", "pending"] },
         "error": { "type": "string" },
         "appointmentId": { "type": "string" },
         "userId": { "type": "string" },
@@ -231,7 +234,7 @@
         "createdAt": { "type": "string", "format": "date-time" },
         "sentAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["phone", "message", "status", "createdAt"]
+      "required": ["phone", "message", "status", "createdAt", "userId"]
     },
     "WhatsAppInboundLog": {
       "title": "WhatsApp Inbound Log",
@@ -251,6 +254,22 @@
         "error": { "type": "string" }
       },
       "required": ["phone", "rawMessage", "status", "createdAt"]
+    },
+    "BillingLog": {
+      "title": "Billing Log",
+      "description": "Registros de eventos financeiros do Stripe",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "stripeCustomerId": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "subscriptionId": { "type": "string" },
+        "metadata": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "createdAt"]
     }
   },
   "firestore": {
@@ -309,6 +328,10 @@
     "/whatsapp_inbound_logs/{logId}": {
       "schema": "WhatsAppInboundLog",
       "description": "Logs de mensagens recebidas do WhatsApp"
+    },
+    "/billing_logs/{logId}": {
+      "schema": "BillingLog",
+      "description": "Histórico de faturamento e pagamentos"
     }
   }
 }
