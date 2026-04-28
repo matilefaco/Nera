@@ -3,17 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "server/api_entry.ts",
+  "main": "dist-server/server/api_entry.js",
   "engines": {
     "node": "22"
   },
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --outfile=dist/server.js --packages=external",
+    "build": "vite build && tsc -p tsconfig.server.json",
     "preview": "vite preview",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist dist-server",
     "lint": "tsc --noEmit",
-    "start": "node dist/server.js"
+    "start": "node dist-server/server.js"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
