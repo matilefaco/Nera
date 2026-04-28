@@ -9,24 +9,15 @@
     "rewrites": [
       {
         "source": "/debug-og/**",
-        "function": {
-          "serviceId": "api",
-          "region": "us-east1"
-        }
+        "function": "api"
       },
       {
         "source": "/p/**",
-        "function": {
-          "serviceId": "api",
-          "region": "us-east1"
-        }
+        "function": "api"
       },
       {
         "source": "/api/**",
-        "function": {
-          "serviceId": "api",
-          "region": "us-east1"
-        }
+        "function": "api"
       },
       {
         "source": "**",
