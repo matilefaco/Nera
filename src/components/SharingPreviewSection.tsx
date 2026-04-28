@@ -12,27 +12,37 @@ interface SharingPreviewSectionProps {
 }
 
 export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     ogTitle: profile.ogTitle || '',
     ogDescription: profile.ogDescription || '',
     ogImageUrl: profile.ogImageUrl || profile.avatar || '',
+    ogCtaText: profile.ogCtaText || '',
   });
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSavingSuccess, setShowSavingSuccess] = useState(false);
 
   // Fallbacks for preview
-  const previewTitle = formData.ogTitle || `${profile.name} | ${profile.specialty || "Profissional Nera"}`;
+  const previewTitle = formData.ogTitle || `${profile.name} | ${profile.category || profile.specialty || "Profissional Nera"}`;
   const previewDescription = formData.ogDescription || (profile.bio?.slice(0, 160) || `Agende um horário com ${profile.name} pelo Nera.`);
   const previewImage = formData.ogImageUrl || profile.avatar || "https://usenera.com/og-default.png";
   const profileUrl = `nera.app/p/${profile.slug}`;
 
   const handleSave = async () => {
-    if (!profile.uid) return;
+    const targetUid = user?.uid || profile.uid;
+    if (!targetUid) {
+      toast.error('Usuário não identificado.');
+      return;
+    }
+    
     setIsSaving(true);
     try {
-      await updateDoc(doc(db, 'users', profile.uid), {
-        ...formData,
+      await updateDoc(doc(db, 'users', targetUid), {
+        ogTitle: formData.ogTitle,
+        ogDescription: formData.ogDescription,
+        ogImageUrl: formData.ogImageUrl,
+        ogCtaText: formData.ogCtaText,
         ogUpdatedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -92,6 +102,18 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                   className="w-full px-4 py-3 bg-brand-linen/30 border border-brand-mist rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-terracotta text-sm resize-none"
                 />
                 <p className="text-[10px] text-brand-stone mt-1">Máximo 160 caracteres sugerido.</p>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-2 block">Texto de Chamada (CTA)</label>
+                <input
+                  type="text"
+                  value={formData.ogCtaText}
+                  onChange={(e) => setFormData(prev => ({ ...prev, ogCtaText: e.target.value }))}
+                  placeholder="Agende seu horário online"
+                  className="w-full px-4 py-3 bg-brand-linen/30 border border-brand-mist rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-terracotta text-sm"
+                />
+                <p className="text-[10px] text-brand-stone mt-1">Opcional. Ex: "Garanta sua vaga para essa semana!"</p>
               </div>
 
               <div>
@@ -166,9 +188,16 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                             </div>
                          </div>
                          
-                         <div className="pt-1 flex items-center justify-between gap-4">
+                         <div className="pt-1 flex flex-col gap-1">
                             <p className="text-[13px] text-[#111b21]">Confira meu novo site de agendamentos! ✨</p>
-                            <span className="text-[10px] text-[#667781] shrink-0 mt-2">12:45</span>
+                            {formData.ogCtaText && (
+                                <p className="text-[12px] text-brand-terracotta font-medium italic">
+                                    {formData.ogCtaText}
+                                </p>
+                            )}
+                            <div className="flex items-center justify-end">
+                                <span className="text-[10px] text-[#667781] shrink-0">12:45</span>
+                            </div>
                          </div>
                     </div>
                 </div>

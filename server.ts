@@ -76,7 +76,8 @@ export async function createServerApp() {
           title,
           imageUrl,
           description,
-          profileUrl
+          profileUrl,
+          ctaText: prof?.ogCtaText
         },
         env: {
           NODE_ENV: process.env.NODE_ENV,

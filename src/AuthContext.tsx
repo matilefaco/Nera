@@ -78,7 +78,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
           console.log('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());
           if (docSnap.exists()) {
-            setProfile(docSnap.data());
+            const data = docSnap.data() as UserProfile;
+            setProfile({ ...data, uid: docSnap.id });
           } else {
             console.log('[AuthContext] Profile document does not exist yet.');
             setProfile(null);
