@@ -226,17 +226,4 @@ export async function createServerApp() {
   return app;
 }
 
-// Standalone server start
-// We only listen if we are NOT in a Cloud Functions environment.
-// Cloud Functions defines FUNCTION_TARGET or FUNCTION_SIGNATURE_TYPE.
-if (!process.env.FUNCTION_TARGET && !process.env.FUNCTION_SIGNATURE_TYPE) {
-  createServerApp().then(app => {
-    const PORT = Number(process.env.PORT) || 3000;
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`Server running on http://localhost:${PORT}`);
-    });
-  }).catch(err => {
-    console.error("CRITICAL SERVER STARTUP ERROR:", err);
-    process.exit(1);
-  });
-}
+// No standalone listen here - moved to local-server.ts

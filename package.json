@@ -8,12 +8,12 @@
     "node": "22"
   },
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "tsx local-server.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "clean": "rm -rf dist dist-server",
     "lint": "tsc --noEmit",
-    "start": "node dist-server/server.js"
+    "start": "node dist-server/local-server.js"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
