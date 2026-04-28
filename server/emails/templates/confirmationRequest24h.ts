@@ -1,4 +1,4 @@
-import { buildEmailBase, buildEmailCard } from '../../../src/services/emailBuilder.js';
+import { buildEmailBase, buildEmailCard } from '../../services/emailBuilder.js';
 
 interface ConfirmationRequest24hData {
   clientName: string;

@@ -1,4 +1,4 @@
-import { buildEmailBase, COLORS, FONTS } from '../../../src/services/emailBuilder.js';
+import { buildEmailBase, COLORS, FONTS } from '../../services/emailBuilder.js';
 
 interface PasswordResetData {
   resetUrl: string;

@@ -1,4 +1,4 @@
-import { buildEmailBase, buildEmailCard, COLORS, FONTS } from '../../../src/services/emailBuilder.js';
+import { buildEmailBase, buildEmailCard, COLORS, FONTS } from '../../services/emailBuilder.js';
 
 interface BookingRescheduledData {
   clientName: string;
