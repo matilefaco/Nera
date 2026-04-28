@@ -126,8 +126,13 @@ export interface UserProfile {
   waitlistMode?: 'auto' | 'manual';
   callmebotApiKey?: string;
   callmebotPhone?: string;
-  whatsappNotificationsEnabled?: boolean;
-  
+  // Sharing & Open Graph
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImageUrl?: string;
+  ogCtaText?: string;
+  ogUpdatedAt?: string;
+
   createdAt: string;
   plan?: 'free' | 'essencial' | 'pro';
   planExpiresAt?: string; // ISO date

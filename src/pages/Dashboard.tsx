@@ -25,6 +25,7 @@ import { Appointment, WaitlistEntry, BlockedSchedule, AnalyticsEvent, Service } 
 import { AnimatePresence } from 'motion/react';
 import AppLayout from '../components/AppLayout';
 import { ActivationChecklist } from '../components/ActivationChecklist';
+import { SharingPreviewSection } from '../components/SharingPreviewSection';
 import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 import QuickBlockModal from '../components/QuickBlockModal';
 import UpgradeModal from '../components/UpgradeModal';
@@ -41,7 +42,7 @@ import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 const isDev = import.meta.env.DEV;
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
-type DashboardTab = "hoje" | "geral" | "insights";
+type DashboardTab = "hoje" | "geral" | "insights" | "divulgacao";
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -49,7 +50,7 @@ export default function Dashboard() {
   
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
     const saved = localStorage.getItem("nera_dashboard_tab");
-    return saved === "hoje" || saved === "geral" || saved === "insights" ? saved : "hoje";
+    return saved === "hoje" || saved === "geral" || saved === "insights" || saved === "divulgacao" ? saved : "hoje";
   });
 
   useEffect(() => {
@@ -790,6 +791,15 @@ export default function Dashboard() {
             )}
           </button>
           <button 
+            onClick={() => setActiveTab("divulgacao")}
+            className={cn(
+              "px-5 py-2 rounded-full transition-all flex items-center gap-2",
+              activeTab === "divulgacao" ? "bg-white shadow-sm text-brand-ink" : "text-brand-stone"
+            )}
+          >
+            Divulgação
+          </button>
+          <button 
             onClick={() => setActiveTab("insights")}
             className={cn(
               "px-5 py-2 rounded-full transition-all flex items-center gap-2",
@@ -978,6 +988,15 @@ export default function Dashboard() {
                 </section>
               )}
           </div>
+        )}
+
+        {activeTab === "divulgacao" && profile && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <SharingPreviewSection profile={profile} />
+          </motion.div>
         )}
 
         {/* HOJE SIMPLE VIEW */}
