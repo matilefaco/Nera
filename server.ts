@@ -61,9 +61,9 @@ export async function createServerApp() {
 
       const prof = snapshot.empty ? null : (snapshot.docs[0].data() as any);
       
-      // OG Fallbacks
-      const title = prof?.ogTitle || (prof ? `${prof.name} | ${prof.specialty || "Profissional Nera"}` : "User Not Found");
-      const imageUrl = prof?.ogImageUrl || prof?.avatar || "https://usenera.com/og-default.png";
+      // OG Fallbacks with priority requested by user
+      const title = prof?.ogTitle || (prof ? `${prof.name} | ${prof.category || prof.specialty || "Profissional Nera"}` : "User Not Found");
+      const imageUrl = prof?.ogImageUrl || prof?.photoUrl || prof?.avatar || "https://usenera.com/og-default.png";
       const description = prof?.ogDescription || (prof?.bio?.slice(0, 160) || "Profissional Nera");
       
       const profileUrl = `https://usenera.com/p/${slug}`;
@@ -71,12 +71,13 @@ export async function createServerApp() {
       const debugInfo = {
         slug,
         found: !!prof,
-        imageUrl,
-        profileUrl,
-        title,
-        ogDescription: prof?.ogDescription,
-        ogTitle: prof?.ogTitle,
-        ogImageUrl: prof?.ogImageUrl,
+        rawUser: prof, // Full dump for debugging
+        finalTags: {
+          title,
+          imageUrl,
+          description,
+          profileUrl
+        },
         env: {
           NODE_ENV: process.env.NODE_ENV,
           K_SERVICE: process.env.K_SERVICE,
@@ -148,16 +149,16 @@ export async function createServerApp() {
           .replace(/'/g, "&#039;");
       };
 
-      // OG Logic with fallbacks
+      // OG Logic with fallbacks requested by user
       const safeName = escapeHtml(prof.name || "Profissional");
-      const safeSpecialty = escapeHtml(prof.specialty || "Profissional Nera");
+      const safeCategory = escapeHtml(prof.category || prof.specialty || "Profissional Nera");
       
-      const title = prof.ogTitle ? escapeHtml(prof.ogTitle) : `${safeName} | ${safeSpecialty}`;
+      const title = prof.ogTitle ? escapeHtml(prof.ogTitle) : `${safeName} | ${safeCategory}`;
       const description = prof.ogDescription 
         ? escapeHtml(prof.ogDescription) 
         : escapeHtml(prof.bio?.slice(0, 160) || `Agende um horário com ${prof.name} pelo Nera.`);
       
-      const imageUrl = prof.ogImageUrl || prof.avatar || "https://usenera.com/og-default.png";
+      const imageUrl = prof.ogImageUrl || prof.photoUrl || prof.avatar || "https://usenera.com/og-default.png";
       const profileUrl = `https://usenera.com/p/${prof.slug}`;
 
       // In production, read from dist/index.html. In dev, from the root index.html.
