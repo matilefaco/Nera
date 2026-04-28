@@ -1,8 +1,8 @@
 import admin from "firebase-admin";
-import { db } from "./firebaseAdmin";
-import { sendBookingConfirmedEmail } from "./emails/sendEmail";
-import { markEmailSent } from "./utils";
-import { createGoogleCalendarEvent } from "./routes/calendarRoutes";
+import { db } from "./firebaseAdmin.js";
+import { sendBookingConfirmedEmail } from "./emails/sendEmail.js";
+import { markEmailSent } from "./utils.js";
+import { createGoogleCalendarEvent } from "./routes/calendarRoutes.js";
 
 const emailQueue: string[] = [];
 let isProcessingQueue = false;

@@ -1,8 +1,8 @@
 import express from "express";
 import admin from "firebase-admin";
-import { db } from "../firebaseAdmin";
-import { sendBookingConfirmedEmail } from "../emails/sendEmail";
-import { createGoogleCalendarEvent } from "./calendarRoutes";
+import { db } from "../firebaseAdmin.js";
+import { sendBookingConfirmedEmail } from "../emails/sendEmail.js";
+import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 
 const router = express.Router();
 

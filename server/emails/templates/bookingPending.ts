@@ -1,5 +1,5 @@
 
-import { COLORS, FONTS, buildEmailBase, buildEmailCard } from '../../../src/services/emailBuilder';
+import { COLORS, FONTS, buildEmailBase, buildEmailCard } from '../../../src/services/emailBuilder.js';
 
 interface BookingPendingData {
   professionalName: string;

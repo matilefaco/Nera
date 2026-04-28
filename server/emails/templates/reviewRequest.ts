@@ -1,4 +1,4 @@
-import { buildEmailBase, buildEmailCard } from '../../../src/services/emailBuilder';
+import { buildEmailBase, buildEmailCard } from '../../../src/services/emailBuilder.js';
 
 interface ReviewRequestData {
   clientName: string;

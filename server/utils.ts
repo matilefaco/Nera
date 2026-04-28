@@ -1,4 +1,4 @@
-import { db } from "./firebaseAdmin";
+import { db } from "./firebaseAdmin.js";
 import admin from "firebase-admin";
 
 // Helper to format Brazilian phone numbers for WhatsApp Cloud API

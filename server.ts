@@ -3,17 +3,17 @@ import path from "path";
 import fs from "fs";
 import cors from "cors";
 import dotenv from "dotenv";
-import { initFirebase, db } from "./server/firebaseAdmin";
-import { setupBackgroundTriggers } from "./server/background";
+import { initFirebase, db } from "./server/firebaseAdmin.js";
+import { setupBackgroundTriggers } from "./server/background.js";
 
 // Routes
-import bookingRoutes from "./server/routes/bookingRoutes";
-import notificationRoutes from "./server/routes/notificationRoutes";
-import profileRoutes from "./server/routes/profileRoutes";
-import planRoutes from "./server/routes/planRoutes";
-import analyticsRoutes from "./server/routes/analyticsRoutes";
-import calendarRoutes from "./server/routes/calendarRoutes";
-import slugRoutes from "./server/routes/slugRoutes";
+import bookingRoutes from "./server/routes/bookingRoutes.js";
+import notificationRoutes from "./server/routes/notificationRoutes.js";
+import profileRoutes from "./server/routes/profileRoutes.js";
+import planRoutes from "./server/routes/planRoutes.js";
+import analyticsRoutes from "./server/routes/analyticsRoutes.js";
+import calendarRoutes from "./server/routes/calendarRoutes.js";
+import slugRoutes from "./server/routes/slugRoutes.js";
 
 dotenv.config();
 

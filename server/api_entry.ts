@@ -1,5 +1,5 @@
 import { onRequest } from "firebase-functions/v2/https";
-import { createServerApp } from "../server";
+import { createServerApp } from "../server.js";
 
 /**
  * Universal backend entry point for Firebase Functions (2nd Gen).

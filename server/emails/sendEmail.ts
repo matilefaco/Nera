@@ -1,17 +1,17 @@
 
 import { Resend } from 'resend';
-import { buildBookingPendingEmail } from './templates/bookingPending';
-import { buildProfessionalNewBookingEmail } from './templates/professionalNewBooking';
-import { buildConfirmationRequest24hEmail } from './templates/confirmationRequest24h';
-import { buildRetentionEmail } from './templates/retention';
-import { buildBookingConfirmedEmail } from './templates/bookingConfirmed';
-import { buildBookingCancelledEmail } from './templates/bookingCancelled';
-import { buildReviewRequestEmail } from './templates/reviewRequest';
-import { buildWelcomeEmail } from './templates/welcome';
-import { buildPasswordResetEmail } from './templates/passwordReset';
-import { buildWaitlistInviteEmail } from './templates/waitlistInvite';
-import { buildBookingReminder24hEmail } from './templates/bookingReminder24h';
-import { buildBookingRescheduledEmail } from './templates/bookingRescheduled';
+import { buildBookingPendingEmail } from './templates/bookingPending.js';
+import { buildProfessionalNewBookingEmail } from './templates/professionalNewBooking.js';
+import { buildConfirmationRequest24hEmail } from './templates/confirmationRequest24h.js';
+import { buildRetentionEmail } from './templates/retention.js';
+import { buildBookingConfirmedEmail } from './templates/bookingConfirmed.js';
+import { buildBookingCancelledEmail } from './templates/bookingCancelled.js';
+import { buildReviewRequestEmail } from './templates/reviewRequest.js';
+import { buildWelcomeEmail } from './templates/welcome.js';
+import { buildPasswordResetEmail } from './templates/passwordReset.js';
+import { buildWaitlistInviteEmail } from './templates/waitlistInvite.js';
+import { buildBookingReminder24hEmail } from './templates/bookingReminder24h.js';
+import { buildBookingRescheduledEmail } from './templates/bookingRescheduled.js';
 
 // Lazy initialization of Resend client
 let _resendClient: Resend | null = null;

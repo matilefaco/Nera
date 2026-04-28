@@ -1,4 +1,4 @@
-import { buildEmailBase, buildEmailCard, COLORS, FONTS } from '../../../src/services/emailBuilder';
+import { buildEmailBase, buildEmailCard, COLORS, FONTS } from '../../../src/services/emailBuilder.js';
 
 interface BookingConfirmedData {
   clientName: string;

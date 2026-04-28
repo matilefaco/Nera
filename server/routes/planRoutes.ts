@@ -1,7 +1,7 @@
 import express from "express";
 import admin from "firebase-admin";
-import { db } from "../firebaseAdmin";
-import { sendReferralRewardEmail } from "../emails/sendEmail";
+import { db } from "../firebaseAdmin.js";
+import { sendReferralRewardEmail } from "../emails/sendEmail.js";
 import Stripe from "stripe";
 
 const router = express.Router();

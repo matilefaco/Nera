@@ -1,5 +1,5 @@
-import { db } from "../firebaseAdmin";
-import { PlanFeatures } from "../../src/types";
+import { db } from "../firebaseAdmin.js";
+import { PlanFeatures } from "../../src/types.js";
 
 export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
   return async (req: any, res: any, next: any) => {
