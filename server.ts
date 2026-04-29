@@ -2,22 +2,14 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
-import dotenv from "dotenv";
-import { initFirebase, db } from "./server/firebaseAdmin.js";
-import { setupBackgroundTriggers } from "./server/background.js";
-
-// Routes
-import bookingRoutes from "./server/routes/bookingRoutes.js";
-import notificationRoutes from "./server/routes/notificationRoutes.js";
-import profileRoutes from "./server/routes/profileRoutes.js";
-import planRoutes from "./server/routes/planRoutes.js";
-import analyticsRoutes from "./server/routes/analyticsRoutes.js";
-import calendarRoutes from "./server/routes/calendarRoutes.js";
-import slugRoutes from "./server/routes/slugRoutes.js";
-
-dotenv.config();
 
 export async function createServerApp() {
+  // 1. Initial configuration (Move heavy logic here)
+  const { config } = await import("dotenv");
+  config();
+
+  const firebaseAdmin = await import("./server/firebaseAdmin.js");
+  
   const app = express();
 
   app.use(cors({
@@ -28,26 +20,22 @@ export async function createServerApp() {
     optionsSuccessStatus: 200
   }));
 
-  // Global Health Check (Early to pass Cloud Run health probes)
+  // 2. Immediate Diagnostic Endpoints
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", time: new Date().toISOString() });
   });
 
-  // Diagnostic Endpoint for Public Booking
   app.get("/api/public/booking-health", (req, res) => {
     res.json({ 
       ok: true, 
       route: "booking-global", 
       time: new Date().toISOString(),
-      headers: req.headers,
-      query: req.query,
       env: process.env.NODE_ENV,
-      port: process.env.PORT,
       url: req.url
     });
   });
 
-  // Skip express.json for Stripe Webhook to preserve raw body
+  // 3. Skip express.json for Stripe Webhook
   app.use((req, res, next) => {
     if (req.originalUrl === "/api/plans/webhook") {
       next();
@@ -56,218 +44,56 @@ export async function createServerApp() {
     }
   });
 
-  // Initialize Firebase (Asyncly but awaited to ensure DB is ready for routes)
+  // 4. Initialize Firebase Admin (Awaited to ensure DB is ready for route handlers)
   try {
-    console.log("[SERVER] Initializing Firebase Admin...");
-    await initFirebase();
-    console.log("[SERVER] Firebase initialized.");
+    await firebaseAdmin.initFirebase();
+    console.log("[SERVER] Firebase Admin initialized.");
   } catch (err) {
     console.error("[SERVER] Failed to initialize Firebase:", err);
   }
 
-  // API Routes registration
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      console.log(`[API_REQUEST] ${req.method} ${req.path}`);
-    }
-    next();
-  });
+  // 5. Registration of API Routes (Lazy Imported to avoid initialization bloat)
+  app.use("/api", (await import("./server/routes/bookingRoutes.js")).default);
+  app.use("/api", (await import("./server/routes/notificationRoutes.js")).default);
+  app.use("/api/profile", (await import("./server/routes/profileRoutes.js")).default);
+  app.use("/api/plans", (await import("./server/routes/planRoutes.js")).default);
+  app.use("/api", (await import("./server/routes/analyticsRoutes.js")).default);
+  app.use("/api/calendar", (await import("./server/routes/calendarRoutes.js")).default);
+  app.use("/api/slug", (await import("./server/routes/slugRoutes.js")).default);
 
-  app.use("/api", bookingRoutes);
-  app.use("/api", notificationRoutes);
-  app.use("/api/profile", profileRoutes);
-  app.use("/api/plans", planRoutes);
-  app.use("/api", analyticsRoutes);
-  app.use("/api/calendar", calendarRoutes);
-  app.use("/api/slug", slugRoutes);
-
-  // Lazy-loaded index.html template for SSR performance
-  let cachedIndexHtml: string | null = null;
-
-  function getTemplate() {
-    if (cachedIndexHtml) return cachedIndexHtml;
-
-    const indexPath = process.env.NODE_ENV === "production" 
-      ? path.join(process.cwd(), "dist", "index.html")
-      : path.join(process.cwd(), "index.html");
-
-    try {
-      if (fs.existsSync(indexPath)) {
-        cachedIndexHtml = fs.readFileSync(indexPath, "utf-8");
-        console.log(`[SSR] index.html template loaded from ${indexPath}`);
-        return cachedIndexHtml;
-      }
-    } catch (err) {
-      console.error(`[SSR] Failed to read index.html:`, err);
-    }
-    return "";
-  }
-
-  // Helper to fetch profile and prepare OG data
-  async function getProfileOgData(slug: string) {
-    const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
-    if (snapshot.empty) return null;
-    
-    const prof = snapshot.docs[0].data() as any;
-    
-    const escapeHtml = (unsafe: string) => {
-      return (unsafe || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    };
-
-    const safeName = escapeHtml(prof.name || "Profissional");
-    const safeCategory = escapeHtml(prof.category || prof.specialty || "Profissional Nera");
-    
-    const title = prof.ogTitle ? escapeHtml(prof.ogTitle) : `${safeName} | ${safeCategory}`;
-    const description = prof.ogDescription 
-      ? escapeHtml(prof.ogDescription) 
-      : escapeHtml(prof.bio?.slice(0, 160) || `Agende um horário com ${prof.name} pelo Nera.`);
-    
-    const imageUrl = prof.ogImageUrl || prof.photoUrl || prof.avatar || "https://usenera.com/og-default.png";
-    const profileUrl = `https://usenera.com/p/${prof.slug}`;
-
-    return { 
-      prof, 
-      title, 
-      description, 
-      imageUrl, 
-      profileUrl,
-      safeName,
-      safeCategory
-    };
-  }
-
-  // SSR for Professional Profiles (SEO/Social Previews)
-  app.get("/debug-og/:slug", async (req, res) => {
-    try {
-      const { slug } = req.params;
-      const data = await getProfileOgData(slug);
-      
-      // Sanitize profile for debugging (remove PII)
-      const sanitizedProf = data ? {
-        name: data.prof.name,
-        slug: data.prof.slug,
-        category: data.prof.category,
-        specialty: data.prof.specialty,
-        bio: data.prof.bio,
-        headline: data.prof.headline,
-        avatar: data.prof.avatar,
-        photoUrl: data.prof.photoUrl,
-        ogTitle: data.prof.ogTitle,
-        ogDescription: data.prof.ogDescription,
-        ogImageUrl: data.prof.ogImageUrl,
-        ogCtaText: data.prof.ogCtaText,
-        ogUpdatedAt: data.prof.ogUpdatedAt,
-        instagram: data.prof.instagram,
-        city: data.prof.city,
-        neighborhood: data.prof.neighborhood
-      } : null;
-
-      const debugInfo = {
-        slug,
-        found: !!data,
-        rawUser: sanitizedProf,
-        finalTags: data ? {
-          title: data.title,
-          imageUrl: data.imageUrl,
-          description: data.description,
-          profileUrl: data.profileUrl,
-          ctaText: data.prof?.ogCtaText
-        } : null,
-        env: {
-          NODE_ENV: process.env.NODE_ENV,
-          PROJECT_ID: process.env.GOOGLE_CLOUD_PROJECT
-        },
-        userAgent: req.headers["user-agent"],
-        serverTime: new Date().toISOString()
-      };
-
-      res.setHeader("Content-Type", "text/html");
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Nera Debug OG - ${slug}</title>
-          <style>body { font-family: monospace; background: #1a1a1a; color: #00ff00; padding: 20px; }</style>
-        </head>
-        <body>
-          <h1>Nera Debug OG</h1>
-          <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
-          <hr />
-          <h3>Social Tags</h3>
-          <p>Title: ${data?.title}</p>
-          <p>URL: ${data?.profileUrl}</p>
-          <img src="${data?.imageUrl}" style="max-width: 400px; border: 1px solid #333;" />
-        </body>
-        </html>
-      `);
-    } catch (err: any) {
-      res.status(500).send(`<h1>Server Error</h1><pre>${err.message}\n${err.stack}</pre>`);
-    }
-  });
-
+  // 6. SSR for Professional Profiles
   app.get("/p/:slug", async (req, res, next) => {
     try {
-      const ua = req.headers["user-agent"] || "";
-      const isCrawler = /facebookexternalhit|Twitterbot|WhatsApp|TelegramBot|LinkedInBot|Slackbot|pinterest|Googlebot/i.test(ua);
-
-      console.log("SSR PROFILE ROUTE HIT", {
-        slug: req.params.slug,
-        isCrawler,
-        userAgent: ua,
-        env: process.env.NODE_ENV,
-        url: req.url
-      });
-
       const { slug } = req.params;
-      const data = await getProfileOgData(slug);
-
-      if (!data) {
-        console.log("SSR PROFILE: User not found in Firestore", slug);
-        return next();
-      }
-
-      let html = getTemplate();
+      const snapshot = await firebaseAdmin.db.collection("users").where("slug", "==", slug).limit(1).get();
       
-      if (!html) {
-        console.error("SSR PROFILE: index.html template still not available");
-        return next();
-      }
+      if (snapshot.empty) return next();
+      
+      const prof = snapshot.docs[0].data() as any;
+      const indexPath = process.env.NODE_ENV === "production" 
+        ? path.join(process.cwd(), "dist", "index.html")
+        : path.join(process.cwd(), "index.html");
+
+      if (!fs.existsSync(indexPath)) return next();
+      let html = fs.readFileSync(indexPath, "utf-8");
+
+      const title = prof.name || "Profissional Nera";
+      const description = prof.bio?.slice(0, 160) || "Agende online";
+      const imageUrl = prof.photoUrl || prof.avatar || "https://usenera.com/og-default.png";
 
       const metaTags = `
-  <!-- SSR META TAGS START -->
-  <title>${data.title}</title>
-  <meta name="description" content="${data.description}" />
-  <meta property="og:title" content="${data.title}" />
-  <meta property="og:description" content="${data.description}" />
-  <meta property="og:image" content="${data.imageUrl}" />
-  <meta property="og:image:secure_url" content="${data.imageUrl}" />
-  <meta property="og:image:type" content="image/png" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
-  <meta property="og:url" content="${data.profileUrl}" />
-  <meta property="og:type" content="profile" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="${data.imageUrl}" />
-  <!-- SSR META TAGS END -->`;
+        <title>${title}</title>
+        <meta name="description" content="${description}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${description}" />
+        <meta property="og:image" content="${imageUrl}" />
+        <meta name="twitter:card" content="summary_large_image" />
+      `;
 
-      // Inject before </head> to ensure it's within the head section
       if (html.includes("</head>")) {
         html = html.replace("</head>", `${metaTags}\n</head>`);
-      } else {
-        html = metaTags + html;
       }
-
-      console.log("SSR PROFILE SUCCESS", {
-        slug,
-        env: process.env.NODE_ENV,
-        title: data.title
-      });
-
+      
       res.setHeader("Content-Type", "text/html");
       return res.send(html);
     } catch (err) {
@@ -276,10 +102,7 @@ export async function createServerApp() {
     }
   });
 
-  // Global Health Check
-  // Already registered above
-
-  // Vite middleware for development or Static server for production
+  // 7. Vite/Static serving
   if (process.env.NODE_ENV !== "production") {
     const { createServer } = await import("vite");
     const vite = await createServer({
@@ -295,7 +118,7 @@ export async function createServerApp() {
     });
   }
 
-  // Final Error Handler
+  // 8. Error Handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error(`[CRITICAL ERROR]`, err);
     res.status(500).json({ error: "Internal Server Error", message: err.message });

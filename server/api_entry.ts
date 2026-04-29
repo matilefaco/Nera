@@ -2,13 +2,12 @@ import { onRequest } from "firebase-functions/v2/https";
 
 /**
  * Universal backend entry point.
- * This acts as both a Firebase Function and a standalone express server for Cloud Run.
+ * Optimized for < 1s startup by using lazy initialization.
  */
 let cachedApp: any = null;
 
 async function getApp() {
   if (!cachedApp) {
-    console.log("[BOOT] Initializing server app (lazy)...");
     const { createServerApp } = await import("../server.js");
     cachedApp = await createServerApp();
   }
@@ -22,23 +21,26 @@ export const api = onRequest({
   timeoutSeconds: 60,
   minInstances: 0,
 }, async (req: any, res: any) => {
-  const app = await getApp();
-  return app(req, res);
+  try {
+    const app = await getApp();
+    return app(req, res);
+  } catch (err: any) {
+    console.error("[FUNCTION ERROR]", err);
+    res.status(500).send("Internal Server Error during initialization");
+  }
 });
 
 // 2. Standalone listener for Cloud Run
-const isMainModule = import.meta.url.startsWith('file:') && 
-  (process.argv[1] && (process.argv[1].endsWith('api_entry.js') || process.argv[1].endsWith('api_entry.ts')));
+const isStandalone = process.env.RUN_STANDALONE === 'true' || 
+  (import.meta.url.startsWith('file:') && process.argv[1]?.includes('api_entry'));
 
-if (isMainModule || process.env.RUN_STANDALONE === 'true') {
+if (isStandalone) {
   const PORT = Number(process.env.PORT) || 8080;
-  console.log(`[BOOT] Environment: PORT=${process.env.PORT}, NODE_ENV=${process.env.NODE_ENV}`);
-  console.log(`[BOOT] Standalone mode detected. Starting listener on port ${PORT}...`);
+  console.log(`[BOOT] Standalone mode. Starting listener on port ${PORT}...`);
   
   getApp().then(app => {
     app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[SERVER] Listening at http://0.0.0.0:${PORT}`);
-      console.log(`[SERVER] Ready for traffic. Base path: /`);
+      console.log(`[SERVER] Ready at http://0.0.0.0:${PORT}`);
     });
   }).catch(err => {
     console.error("CRITICAL BOOT ERROR:", err);
