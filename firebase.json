@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "webapp-bb725",
     "public": "dist",
     "ignore": [
       "firebase.json",
