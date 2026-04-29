@@ -1,49 +1,46 @@
 import { onRequest } from "firebase-functions/v2/https";
 
 /**
- * Universal backend entry point.
- * Optimized for < 1s startup by using lazy initialization.
+ * Universal backend entry point for Firebase Functions v2 / Cloud Run.
+ * Optimized for < 1s startup via lazy initialization.
  */
 let cachedApp: any = null;
 
-async function getApp() {
+/**
+ * Lazy initialization of the Express app.
+ * This prevents heavy imports from blocking the overall process startup.
+ */
+async function createExpressApp() {
   if (!cachedApp) {
+    // We import dynamically to keep the initial script evaluation instantaneous
     const { createServerApp } = await import("../server.js");
     cachedApp = await createServerApp();
   }
   return cachedApp;
 }
 
-// 1. Export for Firebase Functions
-export const api = onRequest({
-  region: "us-east1",
-  memory: "512MiB",
-  timeoutSeconds: 60,
-  minInstances: 0,
-}, async (req: any, res: any) => {
-  try {
-    const app = await getApp();
-    return app(req, res);
-  } catch (err: any) {
-    console.error("[FUNCTION ERROR]", err);
-    res.status(500).send("Internal Server Error during initialization");
+/**
+ * Primary API Handler.
+ * Firebase Functions v2 and Cloud Run (via Functions Framework) handle the HTTP port binding.
+ */
+export const api = onRequest(
+  {
+    region: "us-east1",
+    memory: "512MiB",
+    timeoutSeconds: 60,
+    minInstances: 0,
+    cors: true,
+  },
+  async (req: any, res: any) => {
+    try {
+      const app = await createExpressApp();
+      return app(req, res);
+    } catch (err: any) {
+      console.error("[CRITICAL STARTUP ERROR]", err);
+      res.status(500).send("Internal Server Error during initialization");
+    }
   }
-});
+);
 
-// 2. Standalone listener for Cloud Run
-const isStandalone = process.env.RUN_STANDALONE === 'true' || 
-  (import.meta.url.startsWith('file:') && process.argv[1]?.includes('api_entry'));
-
-if (isStandalone) {
-  const PORT = Number(process.env.PORT) || 8080;
-  console.log(`[BOOT] Standalone mode. Starting listener on port ${PORT}...`);
-  
-  getApp().then(app => {
-    app.listen(PORT, "0.0.0.0", () => {
-      console.log(`[SERVER] Ready at http://0.0.0.0:${PORT}`);
-    });
-  }).catch(err => {
-    console.error("CRITICAL BOOT ERROR:", err);
-    process.exit(1);
-  });
-}
+// NO app.listen() or server.listen() here.
+// Process startup is instantaneous (< 100ms) because heavy logic is inside createExpressApp().
