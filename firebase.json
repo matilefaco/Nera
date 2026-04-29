@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "webapp-bb725",
+    "site": "ai-studio-applet-webapp-bb725",
     "public": "dist",
     "ignore": [
       "firebase.json",
