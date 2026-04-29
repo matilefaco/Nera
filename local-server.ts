@@ -1,12 +1,19 @@
 import { createServerApp } from "./server.js";
 
-const PORT = Number(process.env.PORT) || 3000;
+console.log("Starting server...");
 
-createServerApp().then(app => {
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Standalone server running on http://localhost:${PORT}`);
-  });
-}).catch(err => {
-  console.error("CRITICAL SERVER STARTUP ERROR:", err);
-  process.exit(1);
-});
+const start = async () => {
+  try {
+    const PORT = process.env.PORT || 8080;
+    const app = await createServerApp();
+    
+    app.listen(PORT, () => {
+      console.log("Server running on port", PORT);
+    });
+  } catch (err) {
+    console.error("CRITICAL SERVER STARTUP ERROR:", err);
+    process.exit(1);
+  }
+};
+
+start();

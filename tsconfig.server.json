@@ -9,5 +9,5 @@
     "noEmit": false,
     "allowImportingTsExtensions": false
   },
-  "include": ["server.ts", "local-server.ts", "server/**/*", "src/types.ts"]
+  "include": ["server.ts", "local-server.ts", "server/**/*", "src/types.ts", "src/constants/plans.ts"]
 }

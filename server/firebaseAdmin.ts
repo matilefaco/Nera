@@ -42,41 +42,15 @@ export const initFirebase = async () => {
       throw new Error("Missing firebase-applet-config.json");
     }
 
-    const identity = await getRuntimeIdentity();
-    console.log(`[FIREBASE ADMIN] Runtime Identity:`, identity);
-    console.log(`[FIREBASE ADMIN] Target Project: ${firebaseConfig.projectId}`);
-    
     if (!admin.apps.length) {
       admin.initializeApp({
         projectId: firebaseConfig.projectId,
       });
-      console.log('[FIREBASE ADMIN] initialized = true');
+      console.log('[FIREBASE ADMIN] initialized.');
     }
 
-    // Two instances: one for configured DB, one for (default)
     db = getFirestore(firebaseConfig.firestoreDatabaseId);
-    defaultDb = getFirestore(); // (default)
-
-    // Test database access asynchronously
-    (async () => {
-      console.log(`[FIREBASE ADMIN] Testing database: ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
-      try {
-        await db.collection('appointments').limit(1).get();
-        console.log(`[FIRESTORE TEST] Success reading from ${firebaseConfig.firestoreDatabaseId || '(default)'}`);
-      } catch (err: any) {
-        console.error(`[FIRESTORE TEST] Failed reading from database '${firebaseConfig.firestoreDatabaseId}':`, err.message);
-        
-        console.log(`[FIREBASE ADMIN] Attempting fallback to (default) database...`);
-        try {
-          await defaultDb.collection('appointments').limit(1).get();
-          console.log(`[FIRESTORE TEST] Success reading from (default) database!`);
-          console.warn(`[FIREBASE ADMIN] CRITICAL: Swapping 'db' instance to (default) because the configured one failed.`);
-          db = defaultDb; // SWAP for the entire application
-        } catch (defaultErr: any) {
-          console.error(`[FIRESTORE TEST] Failed reading from (default) database as well:`, defaultErr.message);
-        }
-      }
-    })();
+    defaultDb = getFirestore();
   } catch (err: any) {
     console.error('[FIREBASE ADMIN] Critical Initialization Error:', err.message);
   }

@@ -9,11 +9,16 @@ import { createServerApp } from "../server.js";
  * export is immediately visible to the Firebase Functions scanner, avoiding 
  * issues with top-level await during function discovery.
  */
-const app = await createServerApp();
+let cachedApp: any = null;
 
 export const api = onRequest({
-  region: "us-east1",
   memory: "512MiB",
   timeoutSeconds: 60,
   minInstances: 0,
-}, app);
+}, async (req: any, res: any) => {
+  if (!cachedApp) {
+    console.log("[FUNCTIONS] Initializing server app (lazy)...");
+    cachedApp = await createServerApp();
+  }
+  return cachedApp(req, res);
+});

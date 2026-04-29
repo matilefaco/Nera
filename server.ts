@@ -19,7 +19,6 @@ dotenv.config();
 
 export async function createServerApp() {
   const app = express();
-  const PORT = 3000;
 
   app.use(cors());
 
@@ -37,12 +36,18 @@ export async function createServerApp() {
     }
   });
 
-  // Initialize Firebase and Background Triggers (Asyncly to not block startup)
-  initFirebase().then(() => {
+  // Initialize Firebase and Background Triggers
+  try {
+    console.log("[SERVER] Initializing Firebase Admin...");
+    await initFirebase();
+    
+    // Background triggers can run in the background
     setupBackgroundTriggers();
-  }).catch(err => {
+    console.log("[SERVER] Firebase initialized.");
+  } catch (err) {
     console.error("[SERVER] Failed to initialize Firebase/Background:", err);
-  });
+    // Continue anyway - might be able to serve health checks or static files
+  }
 
   // API Routes registration
   app.use("/api", bookingRoutes);
@@ -53,22 +58,26 @@ export async function createServerApp() {
   app.use("/api/calendar", calendarRoutes);
   app.use("/api/slug", slugRoutes);
 
-  // Pre-load the index.html template for SSR performance
-  // In production, read from dist/index.html. In dev, from the root index.html.
-  const indexPath = process.env.NODE_ENV === "production" 
-    ? path.join(process.cwd(), "dist", "index.html")
-    : path.join(process.cwd(), "index.html");
+  // Lazy-loaded index.html template for SSR performance
+  let cachedIndexHtml: string | null = null;
 
-  let cachedIndexHtml = "";
-  try {
-    if (fs.existsSync(indexPath)) {
-      cachedIndexHtml = fs.readFileSync(indexPath, "utf-8");
-      console.log(`[SSR] index.html template loaded in memory from ${indexPath}`);
-    } else {
-      console.warn(`[SSR] index.html not found at ${indexPath} during startup. Will retry on first request.`);
+  function getTemplate() {
+    if (cachedIndexHtml) return cachedIndexHtml;
+
+    const indexPath = process.env.NODE_ENV === "production" 
+      ? path.join(process.cwd(), "dist", "index.html")
+      : path.join(process.cwd(), "index.html");
+
+    try {
+      if (fs.existsSync(indexPath)) {
+        cachedIndexHtml = fs.readFileSync(indexPath, "utf-8");
+        console.log(`[SSR] index.html template loaded from ${indexPath}`);
+        return cachedIndexHtml;
+      }
+    } catch (err) {
+      console.error(`[SSR] Failed to read index.html:`, err);
     }
-  } catch (err) {
-    console.error(`[SSR] Failed to read index.html during startup:`, err);
+    return "";
   }
 
   // Helper to fetch profile and prepare OG data
@@ -199,16 +208,8 @@ export async function createServerApp() {
         return next();
       }
 
-      let html = cachedIndexHtml;
-
-      // Lazy load if cache is empty (e.g. build finished after server started)
-      if (!html) {
-        if (fs.existsSync(indexPath)) {
-          html = fs.readFileSync(indexPath, "utf-8");
-          cachedIndexHtml = html; // Cache it for subsequent requests
-        }
-      }
-
+      let html = getTemplate();
+      
       if (!html) {
         console.error("SSR PROFILE: index.html template still not available");
         return next();
