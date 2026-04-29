@@ -137,7 +137,7 @@ router.get("/debug-email", async (req, res) => {
     resendKeyPresent: !!apiKey,
     resendKeyPrefix: apiKey ? `${apiKey.substring(0, 5)}...` : 'N/A',
     from,
-    appUrl: appUrl || 'http://localhost:3000 (fallback)',
+    appUrl: appUrl || `${req.protocol}://${req.get('host')}`,
     nodeEnv: process.env.NODE_ENV
   });
 });
@@ -409,7 +409,7 @@ router.post("/push/subscribe", async (req, res) => {
 
 router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, res) => {
   const { type, payload } = req.body;
-  const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+  const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   
   console.log(`[BOOKING FLOW] Processing notification ${type}...`);
   console.log(`[BOOKING FLOW] Debug Payload for ${type}:`, JSON.stringify(payload, null, 2));
@@ -950,7 +950,7 @@ router.get('/cron/review-requests', async (req, res) => {
       .get();
 
     let sentCount = 0;
-    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
 
     for (const docSnap of snap.docs) {
       const appt = docSnap.data();

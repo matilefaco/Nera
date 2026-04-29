@@ -52,9 +52,10 @@ service cloud.firestore {
 
     function isValidAppointment(data) {
       return data.professionalId is string &&
-             data.clientName is string && data.clientName.size() > 0 &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
              data.date is string && data.time is string &&
-             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired'];
+             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired'] &&
+             data.price is number && data.price >= 0;
     }
 
     function isValidBlockedSchedule(data) {
@@ -115,27 +116,18 @@ service cloud.firestore {
 
     // Appointment Rules - SECURED
     match /appointments/{appointmentId} {
-      // 1. Secured Read: Only professional owner or client (verified by email) can read.
-      // Note: In a production app, client access would ideally be via a secure token or auth.
-      // Here we restrict blanket public access to protect PII.
+      // 1. Secured Read: Only professional owner or admin.
       allow get: if isDocOwner(existing()) || isAdmin();
-      allow list: if isDocOwner(existing()) || isAdmin();
+      allow list: if (isSignedIn() && isDocOwner(resource.data)) || isAdmin();
       
-      // 2. Secured Create: Only allow creating 'pending' appointments.
-      allow create: if isValidAppointment(incoming()) && 
-                    incoming().status == 'pending';
-
-      // 3. Secured Update:
-      // - Professional owner (or admin) can manage all fields.
-      // - Users cannot cancel appointments they don't own unless authorized.
-      // - Here we restrict cancellation to the owner only to prevent public vandalism.
+      // 2. Secured Create/Update: Only owner/admin. (Backend via Admin SDK bypasses this for public bookings)
+      allow create: if (isSignedIn() && isDocOwner(incoming())) || isAdmin();
       allow update: if (isDocOwner(existing()) || isAdmin()) && isValidAppointment(incoming());
     }
 
     match /blocked_slots/{slotId} {
       allow read: if true;
-      allow create: if (isSignedIn() && incoming().professionalId == request.auth.uid) || 
-                    (!isSignedIn() && incoming().isPending == true);
+      allow create: if (isSignedIn() && incoming().professionalId == request.auth.uid);
       allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
       allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
     }
@@ -197,17 +189,15 @@ service cloud.firestore {
     }
 
     match /coupons/{couponId} {
-      allow read: if true; // Público — qualquer cliente pode verificar
+      allow read: if true; 
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
-      allow update: if isSignedIn() && existing().professionalId == request.auth.uid || isAdmin();
+      allow update: if (isSignedIn() && (existing().professionalId == request.auth.uid || isAdmin()));
       allow delete: if isSignedIn() && existing().professionalId == request.auth.uid || isAdmin();
     }
 
     match /client_summaries/{summaryId} {
-      allow read: if isSignedIn() && resource.data.professionalId == request.auth.uid;
-      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid && isValidClientSummary(incoming());
-      allow update: if isSignedIn() && existing().professionalId == request.auth.uid && isValidClientSummary(incoming());
-      allow delete: if isAdmin();
+      allow get, list: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow create, update, delete: if isAdmin();
     }
 
     match /analytics_events/{eventId} {
@@ -217,8 +207,8 @@ service cloud.firestore {
     }
 
     match /reservation_links/{linkId} {
-      allow read: if true; // Público para lookup instantâneo
-      allow write: if isSignedIn(); // Apenas app via transação
+      allow read: if true; // Lookup instantâneo via token (backend bypasses for creation)
+      allow write: if isAdmin();
     }
 
     match /whatsapp_logs/{logId} {

@@ -8,12 +8,12 @@
     "node": "22"
   },
   "scripts": {
-    "dev": "tsx local-server.ts",
+    "dev": "PORT=3000 RUN_STANDALONE=true tsx server/api_entry.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "clean": "rm -rf dist dist-server",
     "lint": "tsc --noEmit",
-    "start": "node dist-server/local-server.js"
+    "start": "RUN_STANDALONE=true node dist-server/server/api_entry.js"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",

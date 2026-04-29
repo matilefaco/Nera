@@ -8,16 +8,11 @@
     ],
     "rewrites": [
       {
-        "source": "/p/**",
-        "function": "api"
-      },
-      {
-        "source": "/debug-og/**",
-        "function": "api"
-      },
-      {
         "source": "/api/**",
-        "function": "api"
+        "function": {
+          "functionId": "api",
+          "region": "us-east1"
+        }
       },
       {
         "source": "**",

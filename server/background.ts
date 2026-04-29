@@ -94,57 +94,7 @@ const processEmailQueue = async () => {
 };
 
 export const setupBackgroundTriggers = () => {
-  if (!db) {
-    console.error('[AUTO CONFIRM EMAIL] DB not initialized. Skipping listener setup.');
-    return;
-  }
-  console.log('[AUTO CONFIRM EMAIL] Initializing background listener for appointments...');
-  
-  // Guard to avoid sending emails for existing historical confirmed bookings on cold start
-  const serverStartTime = Date.now();
-  
-  db.collection('appointments').onSnapshot(snapshot => {
-    snapshot.docChanges().forEach(async (change) => {
-      // We only care about added or modified (status transitions)
-      if (change.type === 'removed') return;
-
-      const data = change.doc.data();
-      const id = change.doc.id;
-      const status = data.status;
-
-      // TRIGGER: Confirmation Email
-      const isConfirmed = status === 'confirmed' || status === 'accepted';
-      const alreadySent = data.emailConfirmationSent === true || data.emailEvents?.bookingConfirmedClient === true;
-
-      if (isConfirmed && !alreadySent) {
-        // Additional safety: don't process very old appointments if they somehow trigger an 'added' event
-        const createdAtStr = data.createdAt; // ISO string
-        if (createdAtStr) {
-          const createdAt = new Date(createdAtStr).getTime();
-          if (Date.now() - serverStartTime < 30000 && Date.now() - createdAt > 86400000) {
-            console.log(`[AUTO CONFIRM EMAIL] skipping historical confirmed appointment: ${id}`);
-            await db.collection('appointments').doc(id).update({ emailConfirmationSent: true }).catch(() => {});
-            return;
-          }
-        }
-
-        // TRIGGER: Google Calendar Sync
-        const calendarAlreadyCreated = data.googleCalendarEventCreated === true || !!data.googleCalendarEventId;
-        if (isConfirmed && !calendarAlreadyCreated) {
-           createGoogleCalendarEvent({ id, ...data }, data.professionalId).then(() => {
-             db.collection('appointments').doc(id).update({ googleCalendarEventCreated: true }).catch(() => {});
-           });
-        }
-
-        // Add to queue if not already there
-        if (!emailQueue.includes(id)) {
-          console.log(`[AUTO CONFIRM EMAIL] Adding ${id} to background queue (Status: ${status})`);
-          emailQueue.push(id);
-          processEmailQueue();
-        }
-      }
-    });
-  }, (error) => {
-    console.error('[AUTO CONFIRM EMAIL] Snapshot listener error:', error);
-  });
+  console.log('[BACKGROUND] Background listeners are disabled in this environment to ensure fast startup.');
+  // Permanent listeners like onSnapshot are not suitable for Cloud Functions or auto-scaling Cloud Run.
+  // Consider using Firebase Functions Cloud Triggers instead.
 };

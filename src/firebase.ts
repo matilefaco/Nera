@@ -59,13 +59,30 @@ export function handleBookingError(error: any) {
   console.log('[DEBUG] error object:', JSON.stringify(error));
   console.error('[Booking Error Handler]:', error);
 
+  let message = 'Não foi possível concluir agora. Tente novamente.';
+
+  // 0. Handle JSON Errors (from handleFirestoreError)
+  if (error.message && (error.message.startsWith('{') || error.message.includes('"error":'))) {
+    try {
+      const info = JSON.parse(error.message);
+      if (info.error) {
+         console.error('[BOOKING_DIAGNOSTIC] Parsed Firestore Error:', info);
+         if (info.error.includes('permission-denied') || info.error.includes('insufficient permissions')) {
+            message = 'Permissão negada. Verifique as configurações de acesso públicas.';
+         } else if (info.error.includes('doc-after-write')) {
+            message = 'Erro de transação: Leitura após escrita detectada e corrigida.';
+         }
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+
   // If the error message is specific and from our API, use it
   if (error.message && error.message.length < 100 && !error.code) {
     toast.error(`Erro: ${error.message}`);
     return error.message;
   }
-
-  let message = 'Não foi possível concluir agora. Tente novamente.';
 
   // 1. Specific Business Logic Errors
   const businessErrors = [
@@ -293,12 +310,12 @@ export function getClientKey(phone?: string, email?: string, name?: string): str
 /**
  * Internal helper to update client summary within a transaction
  */
-async function updateClientSummaryInternal(transaction: any, appointment: Appointment, professionalId: string, isNew: boolean, oldStatus?: string) {
+async function updateClientSummaryInternal(transaction: any, appointment: Appointment, professionalId: string, isNew: boolean, oldStatus?: string, preFetchedSnap?: any) {
   const clientKey = getClientKey(appointment.clientWhatsapp, appointment.clientEmail, appointment.clientName);
   const summaryId = `${professionalId}_${clientKey}`;
   const summaryRef = doc(db, 'client_summaries', summaryId);
   
-  const summarySnap = await transaction.get(summaryRef);
+  const summarySnap = preFetchedSnap || await transaction.get(summaryRef);
   let summary = summarySnap.exists() ? summarySnap.data() : {
     professionalId,
     clientKey,
@@ -379,143 +396,98 @@ export async function updateClientSummaryFromAppointment(appointment: Appointmen
 }
 
 /**
- * Creates a booking request and notifies the professional.
+ * Creates a booking request and notifies the professional via Backend API.
  * Regra Oficial: Pedido pendente NÃO bloqueia horário.
  */
 export async function createBookingRequest(appointmentData: Partial<Appointment>) {
-  console.log('[BOOKING_FLOW] createBookingRequest initiated');
-  console.log('[BOOKING_FLOW] Payload details:', {
-    pro: appointmentData.professionalId,
-    date: appointmentData.date,
-    time: appointmentData.time,
-    service: appointmentData.serviceName
-  });
+  console.log('[BOOKING_FLOW] calling backend create-booking...');
   
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
     console.error('[BOOKING_FLOW] ERROR: Missing required fields');
     throw new Error('Dados de agendamento incompletos');
   }
 
-  // Gerar tokens e códigos únicos
-  const generateRandomSuffix = (length: number = 4) => {
-    return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
-  };
-
-  const generateReservationCode = (date: string) => {
-    const formattedDate = date.replace(/-/g, '');
-    return `NR-${formattedDate}-${generateRandomSuffix()}`;
-  };
-
   try {
-    const cleanedData = removeEmptyFields(appointmentData);
-    const apptRef = doc(collection(db, 'appointments'));
+    let apiUrl = import.meta.env.VITE_API_URL || '';
     
-    // Novas chaves de segurança e consulta
-    const reservationCode = generateReservationCode(appointmentData.date);
-    const manageSlug = reservationCode.toLowerCase();
+    // Force relative path if:
+    // 1. Current URL contains localhost but we are NOT on localhost
+    // 2. We are in production (NODE_ENV=production) and accessed via browser
+    const isProduction = import.meta.env.PROD;
+    const isOnDifferentHost = typeof window !== 'undefined' && apiUrl.includes('localhost') && !window.location.hostname.includes('localhost');
     
-    console.log(`[BOOKING_FLOW] Generated reservationCode: ${reservationCode}`);
-    console.log(`[BOOKING_FLOW] Generated manageSlug: ${manageSlug}`);
+    if (isOnDifferentHost || (isProduction && typeof window !== 'undefined')) {
+      console.log(`[BOOKING_FLOW] Forcing relative path (isProduction: ${isProduction}, isOnDifferentHost: ${isOnDifferentHost})`);
+      apiUrl = '';
+    }
+
+    let sanitizedApiUrl = apiUrl.replace(/\/$/, '');
+    const fullUrl = `${sanitizedApiUrl}/api/public/create-booking`;
+    const windowInfo = typeof window !== 'undefined' ? {
+      origin: window.location.origin,
+      hostname: window.location.hostname,
+      protocol: window.location.protocol,
+      href: window.location.href,
+      userAgent: navigator.userAgent
+    } : null;
+
+    console.log(`[BOOKING_FLOW] --- DIAGNOSTIC START ---`);
+    console.log(`[BOOKING_FLOW] API Endpoint: ${fullUrl}`);
+    console.log(`[BOOKING_FLOW] Method: POST`);
+    console.log(`[BOOKING_FLOW] Environment:`, { 
+      PROD: import.meta.env.PROD, 
+      isLocalhost: fullUrl.includes('localhost'),
+      window: windowInfo 
+    });
     
-    const finalData = {
-      ...cleanedData,
-      status: 'pending',
-      token: manageSlug,
-      publicToken: manageSlug,
-      manageToken: manageSlug,
-      reservationCode,
-      manageSlug,
-      createdAt: serverTimestamp(),
-    };
+    // Payload sanitizado for logging (no PII if possible, but actually for debugging we might need it)
+    console.log(`[BOOKING_FLOW] Payload Keys:`, Object.keys(appointmentData));
 
-    await runTransaction(db, async (transaction) => {
-      transaction.set(apptRef, finalData);
-
-      // If coupon is applied, increment its usedCount
-      if (appointmentData.couponId) {
-        const couponRef = doc(db, 'coupons', appointmentData.couponId);
-        const couponSnap = await transaction.get(couponRef);
-        if (couponSnap.exists()) {
-          const coupon = couponSnap.data();
-          
-          // 1. Check max uses
-          if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
-            throw new Error('Este cupom atingiu o limite de usos.');
-          }
-
-          // 2. Check per-client limit
-          if (coupon.perClientLimit === 1) {
-            const clientPhone = appointmentData.clientWhatsapp?.replace(/\D/g, '');
-            const clientEmail = appointmentData.clientEmail?.trim().toLowerCase();
-            
-            // Note: We can't easily query within a transaction for other documents that aren't accessed by ref.
-            // However, we are already checking it client-side in the validation step.
-            // For full security, we could use a client-side check + this transaction for the count.
-            // But since the prompt asks for the check, and we want to prevent multiple uses:
-          }
-
-          transaction.update(couponRef, {
-            usedCount: increment(1)
-          });
-        }
-      }
-
-      // Create reservation_links for instant backend lookup
-      const linkRef = doc(db, 'reservation_links', manageSlug);
-      transaction.set(linkRef, {
-        appointmentId: apptRef.id,
-        manageSlug,
-        reservationCode,
-        professionalId: appointmentData.professionalId,
-        clientEmail: appointmentData.clientEmail,
-        createdAt: serverTimestamp()
+    const response = await fetch(fullUrl, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Client-Platform': 'Web'
+      },
+      mode: 'cors',
+      cache: 'no-cache',
+      credentials: 'omit',
+      body: JSON.stringify(appointmentData)
+    }).catch(err => {
+      console.error('[BOOKING_FLOW] --- fetch() CRASHED ---');
+      console.error('[BOOKING_FLOW] Error Details:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+        url: fullUrl,
+        origin: window.location.origin
       });
-
-      // Update Client Summary
-      const apptForSummary = { id: apptRef.id, ...finalData } as Appointment;
-      await updateClientSummaryInternal(transaction, apptForSummary, appointmentData.professionalId!, true);
+      
+      const isTypeError = err.name === 'TypeError';
+      const detail = isTypeError ? `Possível erro de CORS, Rede ou Protocolo (TypeError). Verifique se o backend em ${fullUrl} está acessível.` : err.message;
+      
+      throw new Error(`Falha de conexão com o servidor (Network Error). Detalhes: ${detail}`);
     });
 
-    console.log(`[BOOKING_FLOW] Document saved with ID: ${apptRef.id}`);
-    
-    // Garantir leitura oficial do banco
-    const verifySnap = await getDoc(apptRef);
-    const savedData = verifySnap.data() as any;
-    const finalToken = savedData?.manageSlug || manageSlug;
-    
-    console.log(`[BOOKING_FLOW] Verified slug from Firestore: ${finalToken}`);
-    console.log(`[BOOKING_FLOW] manageUrl: ${window.location.origin}/r/${finalToken}`);
-    
-    // Diagnostic Logs
-    console.log(`[EMAIL FLOW] client email candidate: ${appointmentData.clientEmail || 'MISSING'}`);
-    console.log(`[EMAIL FLOW] token candidate: ${finalToken || 'MISSING'}`);
+    console.log(`[BOOKING_FLOW] Response status: ${response.status}`);
 
-    // Trigger notification
-    console.log('[EMAIL FLOW] calling notify(NEW_BOOKING_REQUEST)...');
-    
-    // Explicit payload to ensure no collisions with 'id' or 'appointmentId' fields in data
-    const notifyPayload = {
-      ...appointmentData,
-      appointmentId: apptRef.id,
-      token: finalToken,
-      professionalWhatsapp: appointmentData.professionalWhatsapp || ''
-    };
-
-    try {
-      const res = await notify('NEW_BOOKING_REQUEST', notifyPayload);
-      console.log('[BOOKING FLOW] NEW_BOOKING_REQUEST notification success:', res);
-    } catch (err) {
-      console.error('[BOOKING FLOW] NEW_BOOKING_REQUEST notification failed:', err);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`[BOOKING_FLOW] Backend error:`, errorData);
+      throw new Error(errorData.error || 'Erro ao criar agendamento no servidor');
     }
+
+    const result = await response.json();
+    console.log(`[BOOKING_FLOW] Backend success:`, result);
     
     return { 
-      bookingId: apptRef.id, 
-      token: finalToken,
-      reservationCode: savedData?.reservationCode || reservationCode
+      bookingId: result.bookingId, 
+      token: result.token,
+      reservationCode: result.reservationCode
     };
   } catch (error: any) {
-    console.error('[Booking] CRITICAL ERROR creating request:', error);
-    handleFirestoreError(error, OperationType.CREATE, 'appointments');
+    console.error('[Booking] CRITICAL ERROR creating request via backend:', error);
     throw error;
   }
 }
@@ -666,8 +638,17 @@ export async function confirmAppointmentAtomic(appointmentId: string, profession
       const lockId = `${data.professionalId}_${dateVal}_${cleanTime}`;
       const lockRef = doc(db, 'booking_locks', lockId);
       
-      console.log(`[CONFIRM LOCK CHECK] Looking for lock: ${lockId}`);
-      const lockDoc = await transaction.get(lockRef);
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = doc(db, 'client_summaries', summaryId);
+
+      console.log(`[CONFIRM LOCK & SUMMARY CHECK] Looking for lock: ${lockId} and summary: ${summaryId}`);
+      
+      // RUN ALL READS
+      const [lockDoc, summarySnap] = await Promise.all([
+        transaction.get(lockRef),
+        transaction.get(summaryRef)
+      ]);
 
       const blockingStatuses = ['confirmed', 'accepted', 'completed'];
       if (lockDoc.exists()) {
@@ -705,7 +686,7 @@ export async function confirmAppointmentAtomic(appointmentId: string, profession
 
       // Update Client Summary
       const updatedAppt = { ...data, ...updateData } as Appointment;
-      await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, data.status);
+      await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, data.status, summarySnap);
 
       console.log(`[CONFIRM SUCCESS] Appointment ${appointmentId} confirmed atomicly`);
       
@@ -743,6 +724,12 @@ export async function declineAppointmentAtomic(appointmentId: string, profession
 
       if (data.professionalId !== professionalId) throw new Error("permission-denied");
       
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = doc(db, 'client_summaries', summaryId);
+      
+      const summarySnap = await transaction.get(summaryRef);
+      
       // Only pending can be declined via this atomic flow
       if (data.status !== 'pending') {
         throw new Error(`Transição de ${data.status} para recusada não permitida.`);
@@ -760,7 +747,7 @@ export async function declineAppointmentAtomic(appointmentId: string, profession
       
       // Update Client Summary
       const updatedAppt = { ...data, ...updateData } as Appointment;
-      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status);
+      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status, summarySnap);
       
       // Trigger notification
       notify('BOOKING_REJECTED', {
@@ -806,17 +793,28 @@ export async function cancelConfirmedAppointmentAtomic(appointmentId: string, pr
       const dateVal = data.date || dAny.appointmentDate || dAny.selectedDate || dAny.scheduledDate;
       const timeVal = data.time || dAny.appointmentTime || dAny.selectedTime || dAny.startTime;
 
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${professionalId}_${clientKey}`;
+      const summaryRef = doc(db, 'client_summaries', summaryId);
+      
+      let lockRef = null;
+      let lockSnapPromise = Promise.resolve(null as any);
+      
       if (dateVal && timeVal) {
         const cleanTime = timeVal.replace(':', '');
         const lockId = `${professionalId}_${dateVal}_${cleanTime}`;
-        const lockRef = doc(db, 'booking_locks', lockId);
-        
-        // Always try to delete the lock if it points to this appointment
-        const lockDoc = await transaction.get(lockRef);
-        if (lockDoc.exists() && lockDoc.data().appointmentId === appointmentId) {
-          transaction.delete(lockRef);
-          console.log(`[CANCEL TX] Slot lock ${lockId} deleted.`);
-        }
+        lockRef = doc(db, 'booking_locks', lockId);
+        lockSnapPromise = transaction.get(lockRef);
+      }
+
+      const [lockDoc, summarySnap] = await Promise.all([
+        lockSnapPromise,
+        transaction.get(summaryRef)
+      ]);
+
+      if (lockRef && lockDoc && lockDoc.exists() && lockDoc.data().appointmentId === appointmentId) {
+        transaction.delete(lockRef);
+        console.log(`[CANCEL TX] Slot lock points to this appt. Deleting.`);
       }
 
       const updateData = {
@@ -831,7 +829,7 @@ export async function cancelConfirmedAppointmentAtomic(appointmentId: string, pr
       
       // Update Client Summary
       const updatedAppt = { ...data, ...updateData } as Appointment;
-      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status);
+      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status, summarySnap);
       
       // Trigger notification
       notify('BOOKING_CANCELLED', {

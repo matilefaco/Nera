@@ -89,7 +89,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
         setClientName(waitlistEntry.clientName);
         setClientPhone(waitlistEntry.clientWhatsapp);
         setShowRestoreDraft(false);
-        setStep(4); // Pre-filled, let's go straight to confirmation
+        setStep(3); // Changed from 4 to 3 to allow review before confirming
       } else if (!selectedService) {
         // Only reset if we don't have a selection already (to avoid flickering if re-rendering)
         setSelectedService(null);
@@ -461,8 +461,12 @@ export default function BookingModal({ profile, services, onClose, open, initial
   };
 
   const handleBooking = async () => {
+    console.log('[BOOKING] handleBooking started');
     setBookingAttempted(true);
-    if (!profile || !selectedService) return;
+    if (!profile || !selectedService) {
+      console.warn('[BOOKING] Missing profile or service', { profile: !!profile, service: !!selectedService });
+      return;
+    }
     
     // Core validations
     const isBaseValid = clientName.trim().length >= 2 && clientPhone.trim() && clientEmail.trim();
@@ -657,7 +661,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       </AnimatePresence>
 
       <AnimatePresence>
-        {open && step >= 2 && step <= 4 && (
+        {open && step >= 1 && step <= 4 && (
           <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center p-0 md:p-6 overflow-hidden">
             <motion.div 
               initial={{ y: "100%" }} 

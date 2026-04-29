@@ -6,6 +6,223 @@ import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 
 const router = express.Router();
 
+// --- HELPER FUNCTIONS FOR BACKEND BOOKING ---
+const getClientKey = (phone?: string, email?: string, name?: string): string => {
+  const cleanPhone = phone?.replace(/\D/g, '') || '';
+  if (cleanPhone && cleanPhone.length >= 8) return cleanPhone;
+  if (email) return email.toLowerCase().trim();
+  return `name-${(name || 'anon').toLowerCase().replace(/\s+/g, '-')}`;
+};
+
+const generateRandomSuffix = (length: number = 4) => {
+  return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
+};
+
+const generateReservationCode = (date: string) => {
+  const formattedDate = (date || '').replace(/-/g, '');
+  return `NR-${formattedDate}-${generateRandomSuffix()}`;
+};
+
+const removeEmptyFields = (obj: any): any => {
+  const newObj: any = {};
+  Object.keys(obj).forEach(key => {
+    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') {
+      newObj[key] = obj[key];
+    }
+  });
+  return newObj;
+};
+
+async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, appointment: any, professionalId: string, isNew: boolean, oldStatus?: string, preFetchedSnap?: admin.firestore.DocumentSnapshot) {
+  const clientKey = getClientKey(appointment.clientWhatsapp, appointment.clientEmail, appointment.clientName);
+  const summaryId = `${professionalId}_${clientKey}`;
+  const summaryRef = db.collection('client_summaries').doc(summaryId);
+  
+  const summarySnap = preFetchedSnap || await transaction.get(summaryRef);
+  let summary = summarySnap.exists ? summarySnap.data() as any : {
+    professionalId,
+    clientKey,
+    clientName: appointment.clientName,
+    clientPhone: appointment.clientWhatsapp || '',
+    clientEmail: appointment.clientEmail || '',
+    totalAppointments: 0,
+    confirmedAppointments: 0,
+    cancelledAppointments: 0,
+    noShowCount: 0,
+    totalSpent: 0,
+    lastAppointmentDate: appointment.date,
+    lastServiceName: appointment.serviceName,
+    firstAppointmentDate: appointment.date,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const status = appointment.status;
+  const price = (Number(appointment.price) || 0) + (Number(appointment.travelFee) || 0);
+
+  if (isNew) {
+    summary.totalAppointments += 1;
+    if (!summary.firstAppointmentDate || new Date(appointment.date) < new Date(summary.firstAppointmentDate)) {
+      summary.firstAppointmentDate = appointment.date;
+    }
+  }
+
+  const wasConfirmed = oldStatus === 'confirmed' || oldStatus === 'accepted' || oldStatus === 'completed';
+  const isNowConfirmed = status === 'confirmed' || status === 'accepted' || status === 'completed';
+
+  if (isNowConfirmed && !wasConfirmed) {
+    summary.confirmedAppointments += 1;
+    summary.totalSpent += price;
+  } else if (!isNowConfirmed && wasConfirmed) {
+    summary.confirmedAppointments = Math.max(0, summary.confirmedAppointments - 1);
+    summary.totalSpent = Math.max(0, summary.totalSpent - price);
+  }
+
+  if (status === 'cancelled' || status === 'cancelled_by_client' || status === 'cancelled_by_professional') {
+    if (oldStatus !== 'cancelled' && oldStatus !== 'cancelled_by_client' && oldStatus !== 'cancelled_by_professional') {
+      summary.cancelledAppointments += 1;
+    }
+  }
+
+  if (appointment.noShow) {
+    summary.noShowCount += 1;
+  }
+
+  if (!summary.lastAppointmentDate || new Date(appointment.date) >= new Date(summary.lastAppointmentDate)) {
+    summary.lastAppointmentDate = appointment.date;
+    summary.lastServiceName = appointment.serviceName;
+    summary.clientName = appointment.clientName || summary.clientName;
+    summary.clientPhone = appointment.clientWhatsapp || summary.clientPhone;
+    summary.clientEmail = appointment.clientEmail || summary.clientEmail;
+  }
+
+  summary.updatedAt = new Date().toISOString();
+  transaction.set(summaryRef, summary, { merge: true });
+}
+
+// --- SECURE PUBLIC BOOKING ENDPOINT ---
+router.get("/public/booking-health", (req, res) => {
+  res.json({ 
+    ok: true, 
+    route: "booking", 
+    time: new Date().toISOString(),
+    headers: req.headers,
+    processId: process.pid
+  });
+});
+
+router.post("/public/create-booking", async (req, res) => {
+  const appointmentData = req.body;
+  console.log(`[API_BOOKING] Request received! Body:`, JSON.stringify(appointmentData));
+  
+  if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
+    console.warn(`[API_BOOKING] REJECTED: Missing fields`, appointmentData);
+    return res.status(400).json({ error: "Dados de agendamento incompletos" });
+  }
+
+  try {
+    const cleanedData = removeEmptyFields(appointmentData);
+    const apptRef = db.collection('appointments').doc();
+    const reservationCode = generateReservationCode(appointmentData.date);
+    const manageSlug = reservationCode.toLowerCase();
+
+    const finalData = {
+      ...cleanedData,
+      status: 'pending',
+      token: manageSlug,
+      publicToken: manageSlug,
+      manageToken: manageSlug,
+      reservationCode,
+      manageSlug,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    await db.runTransaction(async (transaction) => {
+      // 1. ALL READS
+      
+      // Professional Check
+      const proRef = db.collection('users').doc(appointmentData.professionalId);
+      const proSnap = await transaction.get(proRef);
+      if (!proSnap.exists) {
+        throw new Error('Profissional não encontrado.');
+      }
+
+      // Service Check & Official Price
+      if (!appointmentData.serviceId) {
+        throw new Error('ID do serviço não fornecido.');
+      }
+      const serviceRef = db.collection('services').doc(appointmentData.serviceId);
+      const serviceSnap = await transaction.get(serviceRef);
+      if (!serviceSnap.exists) {
+        throw new Error('Serviço não encontrado.');
+      }
+      const service = serviceSnap.data() as any;
+      
+      // Force official price and duration from service
+      finalData.price = Number(service.price) || 0;
+      finalData.duration = Number(service.duration) || 60;
+      finalData.serviceName = service.name;
+
+      // Coupon (if any)
+      let couponSnap = null;
+      let couponRef = null;
+      if (appointmentData.couponId) {
+        couponRef = db.collection('coupons').doc(appointmentData.couponId);
+        couponSnap = await transaction.get(couponRef);
+      }
+
+      // Summary
+      const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
+      const summaryId = `${appointmentData.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
+
+      // 2. LOGIC & WRITES
+      
+      if (couponSnap && couponSnap.exists) {
+        const coupon = couponSnap.data() as any;
+        if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
+          throw new Error('Este cupom atingiu o limite de usos.');
+        }
+        transaction.update(couponRef!, {
+          usedCount: admin.firestore.FieldValue.increment(1)
+        });
+      }
+
+      // Create Appointment
+      transaction.set(apptRef, finalData);
+
+      // Create reservation_links
+      const linkRef = db.collection('reservation_links').doc(manageSlug);
+      transaction.set(linkRef, {
+        appointmentId: apptRef.id,
+        manageSlug,
+        reservationCode,
+        professionalId: appointmentData.professionalId,
+        clientEmail: appointmentData.clientEmail,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // Update Client Summary
+      await updateClientSummaryInternal(transaction, finalData, appointmentData.professionalId, true, undefined, summarySnap);
+    });
+
+    console.log(`[API_BOOKING] SUCCESS: Appt ${apptRef.id}, Slug ${manageSlug}`);
+
+    res.json({
+      success: true,
+      bookingId: apptRef.id,
+      token: manageSlug,
+      reservationCode
+    });
+
+  } catch (err: any) {
+    console.error('[API_BOOKING] FAILED:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- DIAGNOSTIC ENDPOINT FOR EMAILS ---
 router.get("/debug-booking-email", async (req, res) => {
   try {

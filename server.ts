@@ -20,11 +20,31 @@ dotenv.config();
 export async function createServerApp() {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+  }));
 
   // Global Health Check (Early to pass Cloud Run health probes)
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
+  });
+
+  // Diagnostic Endpoint for Public Booking
+  app.get("/api/public/booking-health", (req, res) => {
+    res.json({ 
+      ok: true, 
+      route: "booking-global", 
+      time: new Date().toISOString(),
+      headers: req.headers,
+      query: req.query,
+      env: process.env.NODE_ENV,
+      port: process.env.PORT,
+      url: req.url
+    });
   });
 
   // Skip express.json for Stripe Webhook to preserve raw body
@@ -36,20 +56,23 @@ export async function createServerApp() {
     }
   });
 
-  // Initialize Firebase and Background Triggers
+  // Initialize Firebase (Asyncly but awaited to ensure DB is ready for routes)
   try {
     console.log("[SERVER] Initializing Firebase Admin...");
     await initFirebase();
-    
-    // Background triggers can run in the background
-    setupBackgroundTriggers();
     console.log("[SERVER] Firebase initialized.");
   } catch (err) {
-    console.error("[SERVER] Failed to initialize Firebase/Background:", err);
-    // Continue anyway - might be able to serve health checks or static files
+    console.error("[SERVER] Failed to initialize Firebase:", err);
   }
 
   // API Routes registration
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      console.log(`[API_REQUEST] ${req.method} ${req.path}`);
+    }
+    next();
+  });
+
   app.use("/api", bookingRoutes);
   app.use("/api", notificationRoutes);
   app.use("/api/profile", profileRoutes);
@@ -271,6 +294,12 @@ export async function createServerApp() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
+
+  // Final Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(`[CRITICAL ERROR]`, err);
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  });
 
   return app;
 }
