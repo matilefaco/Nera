@@ -13,8 +13,19 @@ export async function createServerApp() {
   const app = express();
 
   // 1. Surgical Fix for "stream is not readable"
-  // As requested: Use simple express.json() without global verify
-  app.use(express.json());
+  // As requested: Middleware that only runs express.json() if body is not already parsed
+  app.use((req: any, res, next) => {
+    if (req.body !== undefined) {
+      return next();
+    }
+
+    if (req.readable === false) {
+      req.body = {};
+      return next();
+    }
+
+    return express.json()(req, res, next);
+  });
 
   app.use(cors({
     origin: true,
