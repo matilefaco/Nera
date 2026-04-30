@@ -9,14 +9,22 @@ const router = express.Router();
  */
 router.get("/check", async (req, res) => {
   try {
-    const { slug, uid, city } = req.query;
-    if (!slug || typeof slug !== "string") {
+    const query = (req.query || {}) as any;
+    const { slug, uid, city } = query;
+
+    // Fallback parsing from URLSearchParams if params are missing in req.query
+    const requestUrl = new URL(req.originalUrl || req.url, "https://usenera.com");
+    const slugParam = typeof slug === "string" ? slug : requestUrl.searchParams.get("slug");
+    const uidParam = typeof uid === "string" ? uid : requestUrl.searchParams.get("uid");
+    const cityParam = typeof city === "string" ? city : requestUrl.searchParams.get("city");
+
+    if (!slugParam || typeof slugParam !== "string") {
       return res.status(400).json({ error: "Parâmetro 'slug' é obrigatório." });
     }
 
-    const cleanSlug = slug.toLowerCase().trim();
-    const currentUid = typeof uid === "string" ? uid : null;
-    const cityStr = typeof city === "string" ? city.toLowerCase().trim().replace(/[^a-z0-9]/g, '-') : '';
+    const cleanSlug = slugParam.toLowerCase().trim();
+    const currentUid = typeof uidParam === "string" ? uidParam : null;
+    const cityStr = typeof cityParam === "string" ? cityParam.toLowerCase().trim().replace(/[^a-z0-9]/g, '-') : '';
 
     // 1. Validation
     const slugRegex = /^[a-z0-9-]+$/;
