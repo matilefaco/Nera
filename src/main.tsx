@@ -1,23 +1,8 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
-import './index.css';
+import React from 'react';
+import ReactDOM from 'react-dom/client';
 
-// Manual SW registration for improved reliability (especially for push)
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw-push.js', { scope: '/' })
-      .then(registration => {
-        console.log('[SW] Registered successfully:', registration.scope);
-      })
-      .catch(error => {
-        console.error('[SW] Registration failed:', error);
-      });
-  });
-}
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <h1>Nera Professional Dashboard</h1>
+  </React.StrictMode>
 );
