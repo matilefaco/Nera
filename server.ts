@@ -66,7 +66,7 @@ export async function createServerApp() {
   app.use("/api/plans", planRoutes);
   app.use("/api", analyticsRoutes);
   app.use("/api/calendar", calendarRoutes);
-  app.use("/api/slug", slugRoutes);
+  app.use("/api", slugRoutes);
 
   // 6. SSR for Professional Profiles
   app.get("/p/:slug", async (req, res, next) => {

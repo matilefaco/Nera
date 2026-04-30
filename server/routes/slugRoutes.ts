@@ -7,7 +7,7 @@ const router = express.Router();
  * GET /api/slug/check?slug={slug}&uid={uid}
  * Logic: Checks if a slug is available. Available if not exists OR if owned by uid.
  */
-router.get("/check", async (req, res) => {
+router.get("/slug/check", async (req, res) => {
   try {
     const { slug, uid, city } = req.query;
     if (!slug || typeof slug !== "string") {
