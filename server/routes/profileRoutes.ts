@@ -1,5 +1,5 @@
 import express from "express";
-import { db } from "../firebaseAdmin.js";
+import { db, getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 import { isValidWhatsapp } from "../utils.js";
 import { PLAN_CONFIGS } from "../../src/constants/plans.js";
@@ -20,6 +20,9 @@ router.post("/save", async (req, res) => {
 
   try {
     console.log("[PROFILE SAVE] Starting transaction for UID:", uid, "Slug:", slug);
+    const db = getDb();
+    if (!db) throw new Error("Database not connected");
+
     const result = await db.runTransaction(async (transaction) => {
       const slugRef = db.collection("slugs").doc(slug);
       const userRef = db.collection("users").doc(uid);
@@ -117,6 +120,9 @@ router.get("/reservation/:slug", async (req, res) => {
     const { slug } = req.params;
     if (!slug) return res.status(400).json({ error: "Missing slug" });
 
+    const db = getDb();
+    if (!db) throw new Error("Database not connected");
+
     const slugStr = slug.toLowerCase();
     let appointmentData: any = null;
     let appointmentId: string | null = null;
@@ -195,6 +201,9 @@ router.get("/debug-reservation", async (req, res) => {
   try {
     const { slug } = req.query;
     if (!slug) return res.status(400).json({ error: "Missing slug or token" });
+
+    const db = getDb();
+    if (!db) throw new Error("Database not connected");
 
     const slugStr = slug as string;
     const results: any = { 

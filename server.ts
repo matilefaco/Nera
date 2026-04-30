@@ -72,7 +72,10 @@ export async function createServerApp() {
   app.get("/p/:slug", async (req, res, next) => {
     try {
       const { slug } = req.params;
-      const snapshot = await firebaseAdmin.db.collection("users").where("slug", "==", slug).limit(1).get();
+      const db = firebaseAdmin.getDb();
+      if (!db) return next();
+      
+      const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
       
       if (snapshot.empty) return next();
       

@@ -1,5 +1,5 @@
 import express from "express";
-import { db } from "../firebaseAdmin.js";
+import { getDb } from "../firebaseAdmin.js";
 
 const router = express.Router();
 
@@ -34,7 +34,16 @@ router.get("/check", async (req, res) => {
     }
 
     // 2. Check existence in Firestore
+    console.log("[SLUG CHECK] checking slug:", cleanSlug, "for uid:", currentUid);
+    const db = getDb();
+    
+    if (!db) {
+      console.error("[SLUG CHECK ERROR] Firestore db is NOT initialized.");
+      return res.status(500).json({ error: "Serviço de banco de dados não disponível." });
+    }
+
     const slugDoc = await db.collection("slugs").doc(cleanSlug).get();
+    console.log("[SLUG CHECK] query completed. Exists:", slugDoc.exists);
 
     if (slugDoc.exists) {
       const ownerId = slugDoc.data()?.uid;
@@ -71,7 +80,7 @@ router.get("/check", async (req, res) => {
     });
 
   } catch (err: any) {
-    console.error("[SLUG CHECK ERROR]", err.message);
+    console.error("[SLUG CHECK ERROR FULL]", err);
     res.status(500).json({ error: "Erro ao verificar disponibilidade do link." });
   }
 });
