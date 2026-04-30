@@ -34,54 +34,73 @@ router.get("/check", async (req, res) => {
     }
 
     // 2. Check existence in Firestore
-    console.log("[SLUG CHECK] checking slug:", cleanSlug, "for uid:", currentUid);
     const db = getDb();
+    console.log("[SLUG CHECK DEBUG] Step 1: db instance", !!db);
     
     if (!db) {
       console.error("[SLUG CHECK ERROR] Firestore db is NOT initialized.");
-      return res.status(500).json({ error: "Serviço de banco de dados não disponível." });
-    }
-
-    const slugDoc = await db.collection("slugs").doc(cleanSlug).get();
-    console.log("[SLUG CHECK] query completed. Exists:", slugDoc.exists);
-
-    if (slugDoc.exists) {
-      const ownerId = slugDoc.data()?.uid;
-      
-      // If the owner is the one asking, it's available
-      if (currentUid && ownerId === currentUid) {
-        return res.json({ 
-          available: true,
-          message: "Este já é o seu link!" 
-        });
-      }
-
-      // Return suggestions
-      const suggestions = [
-        `${cleanSlug}-2`
-      ];
-
-      if (cityStr) {
-        suggestions.push(`${cleanSlug}-${cityStr}`);
-      } else {
-        suggestions.push(`${cleanSlug}-pro`);
-      }
-
-      return res.json({ 
-        available: false, 
-        suggestions,
-        message: "Este link já está em uso."
+      return res.status(500).json({ 
+        error: "Serviço de banco de dados não disponível.",
+        debug: "db_not_initialized"
       });
     }
 
-    return res.json({ 
-      available: true,
-      message: "Link disponível!" 
-    });
+    try {
+      console.log("[SLUG CHECK DEBUG] Step 2: Accessing collection 'slugs' for doc:", cleanSlug);
+      const slugDoc = await db.collection("slugs").doc(cleanSlug).get();
+      console.log("[SLUG CHECK DEBUG] Step 3: Query completed. Exists:", slugDoc.exists);
+
+      if (slugDoc.exists) {
+        const ownerId = slugDoc.data()?.uid;
+        console.log("[SLUG CHECK DEBUG] Step 4a: Slug exists. Owner:", ownerId);
+        
+        // If the owner is the one asking, it's available
+        if (currentUid && ownerId === currentUid) {
+          return res.json({ 
+            available: true,
+            message: "Este já é o seu link!" 
+          });
+        }
+
+        // Return suggestions
+        const suggestions = [
+          `${cleanSlug}-2`
+        ];
+
+        if (cityStr) {
+          suggestions.push(`${cleanSlug}-${cityStr}`);
+        } else {
+          suggestions.push(`${cleanSlug}-pro`);
+        }
+
+        return res.json({ 
+          available: false, 
+          suggestions,
+          message: "Este link já está em uso."
+        });
+      }
+
+      console.log("[SLUG CHECK DEBUG] Step 4b: Slug available.");
+      return res.json({ 
+        available: true,
+        message: "Link disponível!" 
+      });
+    } catch (innerErr: any) {
+      console.error("[SLUG CHECK INNER ERROR]", innerErr);
+      return res.status(500).json({
+        error: "Erro ao acessar o banco de dados.",
+        debug: innerErr.message || "fire_error",
+        stack: innerErr.stack
+      });
+    }
 
   } catch (err: any) {
-    console.error("[SLUG CHECK ERROR FULL]", err);
-    res.status(500).json({ error: "Erro ao verificar disponibilidade do link." });
+    console.error("[SLUG CHECK OUTER ERROR FULL]", err);
+    return res.status(500).json({ 
+      error: "Erro ao verificar disponibilidade do link.",
+      debug: err?.message || String(err),
+      code: err?.code || null
+    });
   }
 });
 
