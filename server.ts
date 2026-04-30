@@ -51,7 +51,7 @@ export async function createServerApp() {
   }
 
   // 4. Routes
-  app.use('/api/public', bookingRouter);
+  app.use('/api', bookingRouter);
   app.use('/api/plans', planRouter);
   app.use('/api/slug', slugRouter);
   app.use('/api/analytics', analyticsRouter);
