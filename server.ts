@@ -34,6 +34,13 @@ export async function createServerApp() {
     res.json({ status: "ok", time: new Date().toISOString() });
   });
 
+  app.get("/api/debug/version", (req, res) => {
+    res.json({
+      version: "booking-debug-v1",
+      time: new Date().toISOString()
+    });
+  });
+
   app.get("/api/diagnostic/firebase", async (req, res) => {
     try {
       const db = firebaseAdmin.getDb();
