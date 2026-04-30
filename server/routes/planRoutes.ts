@@ -105,7 +105,7 @@ router.post("/create-checkout", async (req, res) => {
 /**
  * STRIPE WEBHOOK
  */
-router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+router.post("/webhook", async (req: any, res) => {
   const db = getDb();
   const stripe = getStripe();
   const sig = req.headers["stripe-signature"];
@@ -114,11 +114,11 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   let event;
 
   try {
-    if (webhookSecret && sig) {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    if (webhookSecret && sig && req.rawBody) {
+      event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
     } else {
-      // Fallback for dev without signature validation if desired, but better to be strict
-      event = JSON.parse(req.body.toString());
+      // If we don't have signature verification, we use the already parsed body
+      event = req.body;
     }
   } catch (err: any) {
     console.error(`[STRIPE WEBHOOK ERROR] Verification failed: ${err.message}`);

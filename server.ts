@@ -20,6 +20,16 @@ export async function createServerApp() {
     optionsSuccessStatus: 200
   }));
 
+  // Standard JSON body parsing for all routes - placed BEFORE all routes
+  app.use(express.json({
+    verify: (req: any, res, buf) => {
+      // Capture raw body for signature verification (Stripe)
+      if (req.originalUrl && req.originalUrl.includes("/webhook")) {
+        req.rawBody = buf;
+      }
+    }
+  }));
+
   // 2. Immediate Diagnostic Endpoints
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
@@ -33,15 +43,6 @@ export async function createServerApp() {
       env: process.env.NODE_ENV,
       url: req.url
     });
-  });
-
-  // 3. Skip express.json for Stripe Webhook
-  app.use((req, res, next) => {
-    if (req.originalUrl === "/api/plans/webhook") {
-      next();
-    } else {
-      express.json()(req, res, next);
-    }
   });
 
   // 4. Initialize Firebase Admin (Awaited to ensure DB is ready for route handlers)
