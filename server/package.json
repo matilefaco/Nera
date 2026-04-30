@@ -1,0 +1,6 @@
+{
+  "main": "dist-server/index.js",
+  "engines": {
+    "node": "18"
+  }
+}
