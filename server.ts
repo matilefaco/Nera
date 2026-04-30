@@ -13,12 +13,8 @@ export async function createServerApp() {
   const app = express();
 
   // 1. Surgical Fix for "stream is not readable"
-  // As requested: Use simple express.json() but we capture rawBody for Stripe
-  app.use(express.json({
-    verify: (req: any, res, buf) => {
-      req.rawBody = buf;
-    }
-  }));
+  // As requested: Use simple express.json() without global verify
+  app.use(express.json());
 
   app.use(cors({
     origin: true,

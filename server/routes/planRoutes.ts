@@ -8,8 +8,8 @@ planRouter.post("/webhook", async (req, res) => {
   const sig = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   
-  // Use rawBody captured in verify callback of express.json
-  const rawBody = (req as any).rawBody;
+  // In Firebase Functions v2, req.rawBody is automatically provided as a Buffer.
+  const rawBody = (req as any).rawBody || req.body; // Fallback if needed
 
   if (!sig || !webhookSecret) {
     console.warn("[WEBHOOK] Missing signature or secret. Skipping validation.");
