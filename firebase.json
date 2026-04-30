@@ -10,8 +10,7 @@
     "rewrites": [
       {
         "source": "/api/**",
-        "function": "api",
-        "region": "us-east1"
+        "function": "api"
       },
       {
         "source": "**",
