@@ -12,22 +12,19 @@ export async function createServerApp() {
   
   const app = express();
 
+  // 1. Body Parser FIRST - Capture rawBody for Stripe but parse JSON for all
+  app.use(express.json({
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf;
+    }
+  }));
+
   app.use(cors({
     origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     optionsSuccessStatus: 200
-  }));
-
-  // Standard JSON body parsing for all routes - placed BEFORE all routes
-  app.use(express.json({
-    verify: (req: any, res, buf) => {
-      // Capture raw body for signature verification (Stripe)
-      if (req.originalUrl && req.originalUrl.includes("/webhook")) {
-        req.rawBody = buf;
-      }
-    }
   }));
 
   // 2. Immediate Diagnostic Endpoints
