@@ -20,7 +20,7 @@
     ]
   },
   "functions": {
-    "source": "server",
+    "source": ".",
     "codebase": "default",
     "predeploy": [
       "npm run build"
