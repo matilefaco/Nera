@@ -38,19 +38,8 @@ export default defineConfig(({mode}) => {
         workbox: {
           importScripts: ['/sw-push.js'],
           globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-          runtimeCaching: [
-            {
-              urlPattern: ({ url }) => ['/dashboard', '/agenda', '/perfil'].includes(url.pathname),
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'pages-cache',
-                expiration: {
-                  maxEntries: 10,
-                  maxAgeSeconds: 60 * 60 * 24 * 7 // 1 week
-                }
-              }
-            }
-          ]
+          skipWaiting: true,
+          clientsClaim: true,
         }
       })
     ],
