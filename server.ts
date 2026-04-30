@@ -2,34 +2,74 @@ import express from 'express';
 import cors from 'cors';
 import { bookingRouter } from './server/routes/bookingRoutes.js';
 import { planRouter } from './server/routes/planRoutes.js';
+import { slugRouter } from './server/routes/slugRoutes.js';
+import { analyticsRouter } from './server/routes/analyticsRoutes.js';
+import { profileRouter } from './server/routes/profileRoutes.js';
+import { calendarRouter } from './server/routes/calendarRoutes.js';
+import { notificationRouter } from './server/routes/notificationRoutes.js';
 import * as firebaseAdmin from './server/firebaseAdmin.js';
 
-const app = express();
-const port = 3000;
+export async function createServerApp() {
+  const app = express();
 
-// 1. SIMPLEST BODY PARSER - As requested by user
-app.use(express.json());
+  // 1. Surgical Fix for "stream is not readable"
+  // As requested: Use simple express.json() but we capture rawBody for Stripe
+  app.use(express.json({
+    verify: (req: any, res, buf) => {
+      req.rawBody = buf;
+    }
+  }));
 
-// 2. CORS
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+  app.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    optionsSuccessStatus: 200
+  }));
 
-// Initialize Firebase
-firebaseAdmin.initFirebase();
+  // 2. Immediate Diagnostic Endpoints
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", time: new Date().toISOString() });
+  });
 
-// Routes
-app.use('/api/public', bookingRouter);
-app.use('/api/plans', planRouter);
+  app.get("/api/diagnostic/firebase", async (req, res) => {
+    try {
+      const db = firebaseAdmin.getDb();
+      const test = await db.collection("system").doc("health").get();
+      res.json({ status: "firebase_ok", exists: test.exists });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
+  // 3. Initialize Firebase Admin
+  try {
+    await firebaseAdmin.initFirebase();
+  } catch (err) {
+    console.error("[CRITICAL] Firebase Admin Init Failed:", err);
+  }
 
-app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
-});
+  // 4. Routes
+  app.use('/api/public', bookingRouter);
+  app.use('/api/plans', planRouter);
+  app.use('/api/slug', slugRouter);
+  app.use('/api/analytics', analyticsRouter);
+  app.use('/api/profile', profileRouter);
+  app.use('/api/calendar', calendarRouter);
+  app.use('/api/notifications', notificationRouter);
 
-export default app;
+  return app;
+}
+
+// Development local runner
+if (process.env.NODE_ENV !== 'production' && import.meta.url === `file://${process.argv[1]}`) {
+  const port = 3000;
+  createServerApp().then(app => {
+    app.listen(port, () => {
+      console.log(`[LOCAL DEV] Server listening on port ${port}`);
+    });
+  });
+}
+
+export default createServerApp;
