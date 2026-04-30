@@ -19,6 +19,8 @@ export const api = onRequest({
 }, async (req, res) => {
   try {
     const app = await createExpressApp();
+    console.log("[API_ENTRY] method:", req.method, "url:", req.url, "bodyExists:", !!(req as any).body);
+    (req as any).body = (req as any).body || {};
     return app(req, res);
   } catch (err) {
     console.error("[CRITICAL STARTUP ERROR]", err);
