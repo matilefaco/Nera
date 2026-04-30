@@ -3,12 +3,12 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "main": "dist-server/server/api_entry.js",
+  "main": "index.js",
   "engines": {
     "node": "22"
   },
   "scripts": {
-    "dev": "tsx server_dev.ts",
+    "dev": "NODE_OPTIONS='--import tsx' functions-framework --target=api --port=3000 --source=server/api_entry.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
     "preview": "vite preview",
     "clean": "rm -rf dist dist-server",

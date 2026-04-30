@@ -293,7 +293,7 @@ export default function ProfilePage() {
         }));
 
       // 2. Prepare Payload
-      const finalPayload: Record<string, any> = {
+      const finalPayload = {
         name: sanitizedName,
         specialty: sanitizedSpecialty,
         city: sanitizedCity,
@@ -318,6 +318,7 @@ export default function ProfilePage() {
         pricingStrategy,
         avatar,
         profileTheme,
+        paymentMethods: paymentMethods.length > 0 ? paymentMethods : undefined,
         antiNoShowEnabled,
         advancePaymentRequired,
         delayTolerance,
@@ -336,16 +337,12 @@ export default function ProfilePage() {
         updatedAt: new Date().toISOString()
       };
 
-      if (paymentMethods.length > 0) {
-        finalPayload.paymentMethods = paymentMethods;
-      }
-
       try {
         await setDoc(doc(db, 'users', user.uid), finalPayload, { merge: true });
         console.log('[ProfileSave] Success');
         toast.success('Seu perfil foi atualizado com sucesso.');
       } catch (err: any) {
-        console.error('[ProfileSave] Failed while writing users document:', err, { userId: user.uid, payloadKeys: Object.keys(finalPayload) });
+        console.error('[ProfileSave] Failed:', err);
         if (err?.code === 'resource-exhausted' || err?.message?.includes('too large')) {
           toast.error('Seu perfil está com muitas fotos. Tente remover algumas para salvar.');
         } else {

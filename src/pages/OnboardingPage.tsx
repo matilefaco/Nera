@@ -120,10 +120,10 @@ export default function OnboardingPage() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const prevNameRef = useRef(name);
 
-  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable' | 'invalid'>('idle');
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable' | 'invalid' | 'unknown'>('idle');
   const [slugMessage, setSlugMessage] = useState('');
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
-  const [isSlugDebouncing, setIsSlugDebouncing] = useState(false);
+  const slugCheckRef = useRef<string>('');
 
   // Auto-generate slug when name changes, but only if slug was empty or matched the previous name
   useEffect(() => {
@@ -139,73 +139,74 @@ export default function OnboardingPage() {
     if (!slug) {
       setSlugStatus('idle');
       setSlugMessage('');
-      setSlugSuggestions([]);
+      slugCheckRef.current = '';
       return;
     }
 
     const cleanSlug = slug.toLowerCase().trim();
     const slugRegex = /^[a-z0-9-]+$/;
-    let isActive = true;
 
     if (cleanSlug.length < 3 || cleanSlug.length > 50) {
       setSlugStatus('invalid');
       setSlugMessage('O link deve ter entre 3 e 50 caracteres.');
-      setSlugSuggestions([]);
+      slugCheckRef.current = cleanSlug;
       return;
     }
 
     if (!slugRegex.test(cleanSlug)) {
       setSlugStatus('invalid');
       setSlugMessage('Use apenas letras, números e hífens.');
-      setSlugSuggestions([]);
+      slugCheckRef.current = cleanSlug;
       return;
     }
 
+    slugCheckRef.current = cleanSlug;
+    setSlugStatus('checking');
+    setSlugMessage('Verificando disponibilidade...');
+
     const timer = setTimeout(async () => {
-      setSlugStatus('checking');
+      // If the slug changed during the debounce, don't proceed with the old one
+      if (slugCheckRef.current !== cleanSlug) return;
+
       try {
-        const queryParams = new URLSearchParams({
+        const queryParams = new URLSearchParams({ 
           slug: cleanSlug,
           uid: user?.uid || '',
           city: city || ''
         });
+        const res = await fetch(`/api/slug/check?${queryParams}`);
+        
+        // If the slug changed while the fetch was in progress, ignore result
+        if (slugCheckRef.current !== cleanSlug) return;
 
-        const res = await fetch(`/api/slug/check?${queryParams.toString()}`);
+        if (!res.ok) throw new Error('API failed');
+
         const data = await res.json();
-
-        if (!isActive) return;
-
-        if (!res.ok) {
-          setSlugStatus('invalid');
-          setSlugMessage(data?.error || 'Não foi possível validar este link agora.');
-          setSlugSuggestions([]);
-          return;
-        }
-
-        if (data?.available === true) {
+        
+        if (data.available === true) {
           setSlugStatus('available');
           setSlugMessage(`Link disponível: usenera.com/p/${cleanSlug}`);
           setSlugSuggestions([]);
-          return;
+        } else if (data.available === false) {
+          setSlugStatus('unavailable');
+          setSlugMessage('Este link já está em uso.');
+          setSlugSuggestions(data.suggestions || []);
+        } else {
+          setSlugStatus('unknown');
+          setSlugMessage('');
         }
-
-        setSlugStatus('unavailable');
-        setSlugMessage(data?.message || 'Este link já está em uso.');
-        setSlugSuggestions(Array.isArray(data?.suggestions) ? data.suggestions : []);
       } catch (err) {
-        if (!isActive) return;
         console.error('Error checking slug:', err);
-        setSlugStatus('invalid');
-        setSlugMessage('Não foi possível validar este link agora.');
-        setSlugSuggestions([]);
+        // Only update if it's still the same slug
+        if (slugCheckRef.current === cleanSlug) {
+          setSlugStatus('unknown');
+          setSlugMessage('');
+        }
       }
-    }, 500);
+    }, 600);
 
-    return () => {
-      isActive = false;
-      clearTimeout(timer);
-    };
-  }, [slug, user?.uid, city]);
+    return () => clearTimeout(timer);
+  }, [slug]);
 
   // Step 2: Service Mode Details
   const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>('city_wide');

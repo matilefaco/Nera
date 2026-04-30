@@ -9,13 +9,6 @@ export async function createServerApp() {
   config();
 
   const firebaseAdmin = await import("./server/firebaseAdmin.js");
-  const bookingRoutes = (await import("./server/routes/bookingRoutes.js")).default as unknown as express.Router;
-  const notificationRoutes = (await import("./server/routes/notificationRoutes.js")).default as unknown as express.Router;
-  const profileRoutes = (await import("./server/routes/profileRoutes.js")).default as unknown as express.Router;
-  const planRoutes = (await import("./server/routes/planRoutes.js")).default as unknown as express.Router;
-  const analyticsRoutes = (await import("./server/routes/analyticsRoutes.js")).default as unknown as express.Router;
-  const calendarRoutes = (await import("./server/routes/calendarRoutes.js")).default as unknown as express.Router;
-  const slugRoutes = (await import("./server/routes/slugRoutes.js")).default as unknown as express.Router;
   
   const app = express();
 
@@ -59,14 +52,14 @@ export async function createServerApp() {
     console.error("[SERVER] Failed to initialize Firebase:", err);
   }
 
-  // 5. Registration of API Routes
-  app.use("/api", bookingRoutes);
-  app.use("/api", notificationRoutes);
-  app.use("/api/profile", profileRoutes);
-  app.use("/api/plans", planRoutes);
-  app.use("/api", analyticsRoutes);
-  app.use("/api/calendar", calendarRoutes);
-  app.use("/api", slugRoutes);
+  // 5. Registration of API Routes (Lazy Imported to avoid initialization bloat)
+  app.use("/api", (await import("./server/routes/bookingRoutes.js")).default);
+  app.use("/api", (await import("./server/routes/notificationRoutes.js")).default);
+  app.use("/api/profile", (await import("./server/routes/profileRoutes.js")).default);
+  app.use("/api/plans", (await import("./server/routes/planRoutes.js")).default);
+  app.use("/api", (await import("./server/routes/analyticsRoutes.js")).default);
+  app.use("/api/calendar", (await import("./server/routes/calendarRoutes.js")).default);
+  app.use("/api/slug", (await import("./server/routes/slugRoutes.js")).default);
 
   // 6. SSR for Professional Profiles
   app.get("/p/:slug", async (req, res, next) => {

@@ -631,20 +631,6 @@ export default function BookingModal({ profile, services, onClose, open, initial
   if (!open && step !== 4) return null;
 
   const totalSteps = 3;
-  const canContinueFromStep1 = Boolean(selectedService && selectedDate && selectedTime);
-  const canContinueFromStep2 = Boolean(
-    clientName &&
-    clientPhone &&
-    clientEmail &&
-    (!isHomeService || (addressStreet && addressNumber))
-  );
-  const shouldShowMobileCta =
-    open &&
-    step >= 1 &&
-    step <= 3 &&
-    ((step === 1 && canContinueFromStep1) ||
-      (step === 2 && canContinueFromStep2) ||
-      step === 3);
 
   return (
     <>
@@ -682,7 +668,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
               animate={{ y: 0 }} 
               exit={{ y: "100%" }} 
               transition={{ type: "spring", damping: 25, stiffness: 200 }} 
-              className={cn("bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[90vh] overflow-y-auto no-scrollbar md:pb-12", shouldShowMobileCta ? "pb-40" : "pb-10")}
+              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[90vh] overflow-y-auto no-scrollbar pb-32 md:pb-12"
             >
               <button onClick={onClose} className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors">
                 <X size={24} />
@@ -1019,7 +1005,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       </AnimatePresence>
 
       <AnimatePresence>
-        {shouldShowMobileCta && (
+        {open && step >= 1 && step <= 3 && (
           <motion.div 
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
@@ -1030,7 +1016,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
               <PremiumButton 
                 variant="terracotta" 
                 className="w-full py-7" 
-                disabled={(step === 1 && !canContinueFromStep1) || (step === 2 && !canContinueFromStep2)} 
+                disabled={
+                  (step === 1 && (!selectedService || !selectedDate || !selectedTime)) || 
+                  (step === 2 && (!clientName || !clientPhone || !clientEmail || (isHomeService && (!addressStreet || !addressNumber))))
+                } 
                 loading={step === 3 && bookingLoading} 
                 onClick={() => { 
                   if (step === 1) setStep(2); 

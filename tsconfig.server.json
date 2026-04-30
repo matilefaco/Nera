@@ -7,9 +7,7 @@
     "moduleResolution": "NodeNext",
     "target": "ES2022",
     "noEmit": false,
-    "allowImportingTsExtensions": false,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowImportingTsExtensions": false
   },
   "include": ["server.ts", "server/**/*", "src/types.ts", "src/constants/plans.ts"]
 }

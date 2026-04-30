@@ -30,7 +30,7 @@ export interface FormIdentityProps {
   setInstagramConfirmed?: (val: boolean) => void;
   slug?: string;
   setSlug?: (val: string) => void;
-  slugStatus?: 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid';
+  slugStatus?: 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid' | 'unknown';
   slugMessage?: string;
   slugSuggestions?: string[];
   onSelectSuggestion?: (val: string) => void;

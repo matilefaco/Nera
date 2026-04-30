@@ -1,7 +1,7 @@
 import { db } from "../firebaseAdmin.js";
-import { PLAN_CONFIGS } from "../constants/plans.js";
+import { PlanFeatures } from "../../src/types.js";
 
-export const checkPlanFeature = (featureName: keyof typeof PLAN_CONFIGS.free.features) => {
+export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
   return async (req: any, res: any, next: any) => {
     // Identifying professionalId from different possible places
     const professionalId = req.headers['x-professional-id'] || req.body.professionalId || req.query.professionalId;
@@ -22,7 +22,16 @@ export const checkPlanFeature = (featureName: keyof typeof PLAN_CONFIGS.free.fea
       const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
       const activePlan = isExpired ? 'free' : plan;
 
-      const features = PLAN_CONFIGS[(activePlan as keyof typeof PLAN_CONFIGS)]?.features ?? PLAN_CONFIGS.free.features;
+      const features: PlanFeatures = {
+        unlimitedBookings: activePlan === 'essencial' || activePlan === 'pro',
+        whatsappNotifications: activePlan === 'essencial' || activePlan === 'pro',
+        advancedDashboard: activePlan === 'pro',
+        waitlist: activePlan === 'pro',
+        antiNoShow: activePlan === 'pro',
+        coupons: activePlan === 'essencial' || activePlan === 'pro',
+        analytics: activePlan === 'pro',
+        reports: activePlan === 'pro',
+      };
 
       if (!features[featureName]) {
         return res.status(403).json({ 
