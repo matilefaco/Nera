@@ -29,8 +29,6 @@
       "ignore": [
         "node_modules",
         ".git",
-        "public",
-        "src",
         ".firebase",
         "firebase-debug.log"
       ]
