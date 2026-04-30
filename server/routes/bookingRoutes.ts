@@ -114,18 +114,44 @@ router.get("/public/booking-health", (req, res) => {
 
 router.post("/public/create-booking", async (req, res) => {
   const db = getDb();
-  const appointmentData = req.body;
-  console.log(`[API_BOOKING] Request received! Body:`, JSON.stringify(appointmentData));
   
-  if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
-    console.warn(`[API_BOOKING] REJECTED: Missing fields`, appointmentData);
+  const {
+    professionalId,
+    date,
+    time,
+    serviceId,
+    clientName,
+    clientEmail,
+    clientWhatsapp,
+    locationType,
+    neighborhood,
+    prepInstructions,
+    couponId
+  } = req.body;
+
+  console.log(`[API_BOOKING] Request received for professional: ${professionalId} on ${date} at ${time}`);
+  
+  if (!professionalId || !date || !time) {
+    console.warn(`[API_BOOKING] REJECTED: Missing fields (proId, date or time)`);
     return res.status(400).json({ error: "Dados de agendamento incompletos" });
   }
 
   try {
-    const cleanedData = removeEmptyFields(appointmentData);
+    const cleanedData = removeEmptyFields({
+      professionalId,
+      date,
+      time,
+      serviceId,
+      clientName,
+      clientEmail,
+      clientWhatsapp,
+      locationType,
+      neighborhood,
+      prepInstructions,
+      couponId
+    });
     const apptRef = db.collection('appointments').doc();
-    const reservationCode = generateReservationCode(appointmentData.date);
+    const reservationCode = generateReservationCode(date);
     const manageSlug = reservationCode.toLowerCase();
 
     const finalData = {
@@ -144,17 +170,17 @@ router.post("/public/create-booking", async (req, res) => {
       // 1. ALL READS
       
       // Professional Check
-      const proRef = db.collection('users').doc(appointmentData.professionalId);
+      const proRef = db.collection('users').doc(professionalId);
       const proSnap = await transaction.get(proRef);
       if (!proSnap.exists) {
         throw new Error('Profissional não encontrado.');
       }
 
       // Service Check & Official Price
-      if (!appointmentData.serviceId) {
+      if (!serviceId) {
         throw new Error('ID do serviço não fornecido.');
       }
-      const serviceRef = db.collection('services').doc(appointmentData.serviceId);
+      const serviceRef = db.collection('services').doc(serviceId);
       const serviceSnap = await transaction.get(serviceRef);
       if (!serviceSnap.exists) {
         throw new Error('Serviço não encontrado.');
@@ -169,14 +195,14 @@ router.post("/public/create-booking", async (req, res) => {
       // Coupon (if any)
       let couponSnap = null;
       let couponRef = null;
-      if (appointmentData.couponId) {
-        couponRef = db.collection('coupons').doc(appointmentData.couponId);
+      if (couponId) {
+        couponRef = db.collection('coupons').doc(couponId);
         couponSnap = await transaction.get(couponRef);
       }
 
       // Summary
-      const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
-      const summaryId = `${appointmentData.professionalId}_${clientKey}`;
+      const clientKey = getClientKey(clientWhatsapp, clientEmail, clientName);
+      const summaryId = `${professionalId}_${clientKey}`;
       const summaryRef = db.collection('client_summaries').doc(summaryId);
       const summarySnap = await transaction.get(summaryRef);
 
@@ -201,13 +227,13 @@ router.post("/public/create-booking", async (req, res) => {
         appointmentId: apptRef.id,
         manageSlug,
         reservationCode,
-        professionalId: appointmentData.professionalId,
-        clientEmail: appointmentData.clientEmail,
+        professionalId: professionalId,
+        clientEmail: clientEmail,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       // Update Client Summary
-      await updateClientSummaryInternal(transaction, finalData, appointmentData.professionalId, true, undefined, summarySnap);
+      await updateClientSummaryInternal(transaction, finalData, professionalId, true, undefined, summarySnap);
     });
 
     console.log(`[API_BOOKING] SUCCESS: Appt ${apptRef.id}, Slug ${manageSlug}`);
