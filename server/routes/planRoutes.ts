@@ -1,6 +1,6 @@
 import express from "express";
 import admin from "firebase-admin";
-import { db } from "../firebaseAdmin.js";
+import { getDb } from "../firebaseAdmin.js";
 import { sendReferralRewardEmail, sendTrialWillEndEmail } from "../emails/sendEmail.js";
 import Stripe from "stripe";
 
@@ -27,6 +27,7 @@ function getStripe() {
  * CREATE CHECKOUT SESSION
  */
 router.post("/create-checkout", async (req, res) => {
+  const db = getDb();
   const { plan, professionalId, email } = req.body;
 
   if (!plan || !professionalId || !email) {
@@ -105,6 +106,7 @@ router.post("/create-checkout", async (req, res) => {
  * STRIPE WEBHOOK
  */
 router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const db = getDb();
   const stripe = getStripe();
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;

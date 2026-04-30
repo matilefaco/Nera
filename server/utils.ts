@@ -1,4 +1,4 @@
-import { db } from "./firebaseAdmin.js";
+import { getDb } from "./firebaseAdmin.js";
 import admin from "firebase-admin";
 import { logWhatsAppMessage, normalizePhone } from "./services/whatsappService.js";
 
@@ -36,6 +36,7 @@ export function isValidWhatsapp(phone: string): boolean {
 export async function shouldSendEmail(appointmentId: string, eventKey: string): Promise<boolean> {
   if (!appointmentId) return true; // Can't track if no ID
   
+  const db = getDb();
   try {
     const doc = await db.collection('appointments').doc(appointmentId).get();
     if (!doc.exists) return true;
@@ -54,6 +55,7 @@ export async function shouldSendEmail(appointmentId: string, eventKey: string): 
 
 export async function markEmailSent(appointmentId: string, eventKey: string) {
   if (!appointmentId) return;
+  const db = getDb();
   try {
     await db.collection('appointments').doc(appointmentId).update({
       [`emailEvents.${eventKey}`]: admin.firestore.FieldValue.serverTimestamp()
@@ -65,6 +67,7 @@ export async function markEmailSent(appointmentId: string, eventKey: string) {
 
 // WhatsApp Notification Handler (Official Meta Cloud API)
 export async function sendWhatsAppMeta(to: string, message: string, metadata: { userId?: string, appointmentId?: string, type?: string, clientName?: string, clientWhatsapp?: string } = {}) {
+  const db = getDb();
   const accessToken = process.env.META_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 

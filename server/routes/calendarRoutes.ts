@@ -1,6 +1,6 @@
 import express from "express";
 import { google } from "googleapis";
-import { db } from "../firebaseAdmin.js";
+import { getDb } from "../firebaseAdmin.js";
 
 const router = express.Router();
 
@@ -38,6 +38,7 @@ router.get("/auth-url", (req, res) => {
 
 // 2. OAuth Callback
 router.get("/callback", async (req, res) => {
+  const db = getDb();
   const { code, state } = req.query;
   const professionalId = state as string;
   const origin = `${req.protocol}://${req.get("host")}`.replace(/\/+$/, "");
@@ -97,6 +98,7 @@ router.get("/callback", async (req, res) => {
 
 // 3. Status and Toggle
 router.get("/status", async (req, res) => {
+  const db = getDb();
   const professionalId = req.query.professionalId as string;
 
   if (!professionalId) {
@@ -117,6 +119,7 @@ router.get("/status", async (req, res) => {
 });
 
 router.post("/toggle", async (req, res) => {
+  const db = getDb();
   const { professionalId, enabled } = req.body;
 
   if (!professionalId) {
@@ -134,6 +137,7 @@ router.post("/toggle", async (req, res) => {
 });
 
 router.post("/disconnect", async (req, res) => {
+  const db = getDb();
   const { professionalId } = req.body;
 
   if (!professionalId) {
@@ -154,6 +158,7 @@ router.post("/disconnect", async (req, res) => {
  * CREATE EVENT FUNCTION (Exported)
  */
 export async function createGoogleCalendarEvent(appointment: any, professionalId: string) {
+  const db = getDb();
   try {
     const userDoc = await db.collection("users").doc(professionalId).get();
     const integration = userDoc.data()?.integrations?.google_calendar;

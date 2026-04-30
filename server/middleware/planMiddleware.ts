@@ -1,8 +1,9 @@
-import { db } from "../firebaseAdmin.js";
+import { getDb } from "../firebaseAdmin.js";
 import { PlanFeatures } from "../../src/types.js";
 
 export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
   return async (req: any, res: any, next: any) => {
+    const db = getDb();
     // Identifying professionalId from different possible places
     const professionalId = req.headers['x-professional-id'] || req.body.professionalId || req.query.professionalId;
     

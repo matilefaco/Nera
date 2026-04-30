@@ -1,3 +1,4 @@
+import { getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 
 interface WhatsAppMetadata {
@@ -103,7 +104,7 @@ export function validateBrazilPhone(phone: string): boolean {
  * Unified logger for WhatsApp messages
  */
 export async function logWhatsAppMessage(
-  db: admin.firestore.Firestore,
+  _db: admin.firestore.Firestore,
   data: {
     userId: string;
     phone: string;
@@ -121,6 +122,7 @@ export async function logWhatsAppMessage(
   }
 ) {
   const normalizedPhone = normalizePhone(data.phone);
+  const db = getDb();
   const idempotencyKey = data.idempotencyKey || `${normalizedPhone}_${Buffer.from(data.message).toString('base64').substring(0, 32)}`;
   
   const logId = data.idempotencyKey ? 
@@ -168,11 +170,12 @@ export async function logWhatsAppMessage(
  * Sends a WhatsApp message via Z-API
  */
 export async function sendWhatsApp(
-  db: admin.firestore.Firestore,
+  _db: admin.firestore.Firestore,
   phone: string,
   message: string,
   metadata: WhatsAppMetadata
 ) {
+  const db = getDb();
   const instanceId = process.env.ZAPI_INSTANCE_ID;
   const token = process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN;
   const clientToken = process.env.ZAPI_CLIENT_TOKEN;
@@ -300,7 +303,8 @@ export function detectWhatsAppIntent(message: string): 'confirm' | 'reschedule' 
 /**
  * Handle Inbound Message logic
  */
-export async function handleInboundMessage(db: admin.firestore.Firestore, phone: string, message: string, rawPayload: any) {
+export async function handleInboundMessage(_db: admin.firestore.Firestore, phone: string, message: string, rawPayload: any) {
+  const db = getDb();
   const normalizedPhone = normalizePhone(phone);
   const phoneVariations = getPhoneVariations(phone);
   const intent = detectWhatsAppIntent(message);

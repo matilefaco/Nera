@@ -1,6 +1,6 @@
 import express from "express";
 import admin from "firebase-admin";
-import { db } from "../firebaseAdmin.js";
+import { getDb } from "../firebaseAdmin.js";
 import { sendBookingConfirmedEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 
@@ -34,6 +34,7 @@ const removeEmptyFields = (obj: any): any => {
 };
 
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, appointment: any, professionalId: string, isNew: boolean, oldStatus?: string, preFetchedSnap?: admin.firestore.DocumentSnapshot) {
+  const db = getDb();
   const clientKey = getClientKey(appointment.clientWhatsapp, appointment.clientEmail, appointment.clientName);
   const summaryId = `${professionalId}_${clientKey}`;
   const summaryRef = db.collection('client_summaries').doc(summaryId);
@@ -112,6 +113,7 @@ router.get("/public/booking-health", (req, res) => {
 });
 
 router.post("/public/create-booking", async (req, res) => {
+  const db = getDb();
   const appointmentData = req.body;
   console.log(`[API_BOOKING] Request received! Body:`, JSON.stringify(appointmentData));
   
@@ -219,13 +221,17 @@ router.post("/public/create-booking", async (req, res) => {
 
   } catch (err: any) {
     console.error('[API_BOOKING] FAILED:', err.message);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      error: err.message,
+      code: err.code || null
+    });
   }
 });
 
 // --- DIAGNOSTIC ENDPOINT FOR EMAILS ---
 router.get("/debug-booking-email", async (req, res) => {
   try {
+    const db = getDb();
     const { appointmentId } = req.query;
     const debugInfo: any = {
       timestamp: new Date().toISOString(),
@@ -273,6 +279,7 @@ router.get("/debug-booking-email", async (req, res) => {
 // --- NEW: DIAGNOSTIC ENDPOINT FOR CONFIRMATION FLOW ---
 router.get("/debug-confirmation-email", async (req, res) => {
   try {
+    const db = getDb();
     const { appointmentId } = req.query;
     if (!appointmentId) return res.status(400).json({ error: "Missing appointmentId" });
 
@@ -322,6 +329,7 @@ router.get("/debug-confirmation-email", async (req, res) => {
 
 // --- NEW: EXECUTION ENDPOINT FOR CONFIRMATION EMAIL ---
 router.get("/run-confirmation-email", async (req, res) => {
+  const db = getDb();
   const { appointmentId, token: queryToken } = req.query;
   const response: any = {
     receivedAppointmentId: appointmentId || null,
@@ -435,6 +443,7 @@ router.get("/run-confirmation-email", async (req, res) => {
 
 // --- NEW: FULL AUDIT ENDPOINT ---
 router.get("/debug-confirmation-email-full", async (req, res) => {
+  const db = getDb();
   const { appointmentId } = req.query;
   const audit: any = {
     routeHit: true,
@@ -513,6 +522,7 @@ router.get("/debug-confirmation-email-full", async (req, res) => {
 
 router.get("/fix-duplicate-slots", async (req, res) => {
   try {
+    const db = getDb();
     const { professionalId } = req.query;
     if (!professionalId) return res.status(400).json({ error: "Missing professionalId" });
 
@@ -595,6 +605,7 @@ router.get("/fix-duplicate-slots", async (req, res) => {
 
 router.get("/debug-slot-lock", async (req, res) => {
   try {
+    const db = getDb();
     const { professionalId, date, time } = req.query;
     if (!professionalId || !date || !time) return res.status(400).json({ error: "Missing parameters" });
 
@@ -627,6 +638,7 @@ router.get("/debug-slot-lock", async (req, res) => {
 
 // --- NEW: ATOMIC APPOINTMENT CONFIRMATION ENDPOINT ---
 router.post("/appointments/:appointmentId/confirm", async (req, res) => {
+  const db = getDb();
   const { appointmentId } = req.params;
   const { professionalId } = req.body;
 
@@ -755,6 +767,7 @@ router.post("/appointments/:appointmentId/confirm", async (req, res) => {
 // --- NEW: DIAGNOSTIC ENDPOINT FOR CAN BOOK SLOT ---
 router.get("/debug-can-book-slot", async (req, res) => {
   try {
+    const db = getDb();
     const { professionalId, serviceId, date, time } = req.query;
     if (!professionalId || !date || !time) return res.status(400).json({ error: "Missing professionalId, date or time" });
 
@@ -846,6 +859,7 @@ router.get("/debug-can-book-slot", async (req, res) => {
 
 router.get("/debug-reservation-token", async (req, res) => {
   try {
+    const db = getDb();
     const { token } = req.query;
     if (!token) return res.status(400).json({ error: "Missing token" });
 
@@ -882,6 +896,7 @@ router.get("/debug-reservation-token", async (req, res) => {
 
 router.get("/debug-next-slot-full", async (req, res) => {
   try {
+    const db = getDb();
     const { professionalId, serviceId } = req.query;
     if (!professionalId) return res.status(400).json({ error: "Missing professionalId" });
 
@@ -985,6 +1000,7 @@ router.get("/debug-next-slot-full", async (req, res) => {
 
 router.get("/debug-bookable-slots", async (req, res) => {
   try {
+    const db = getDb();
     const { professionalId, serviceId, date } = req.query;
     if (!professionalId || !date) return res.status(400).json({ error: "Missing professionalId or date" });
 
@@ -1041,6 +1057,7 @@ router.get("/debug-bookable-slots", async (req, res) => {
 
 router.post("/booking/:id/confirm-presence", async (req, res) => {
   try {
+    const db = getDb();
     const { id } = req.params;
     const appRef = db.collection('appointments').doc(id);
     const appDoc = await appRef.get();

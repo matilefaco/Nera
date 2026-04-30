@@ -1,6 +1,6 @@
 import express from "express";
 import admin from "firebase-admin";
-import { db } from "../firebaseAdmin.js";
+import { getDb } from "../firebaseAdmin.js";
 import { 
   sendProfessionalNewBookingEmail,
   sendBookingPendingEmail,
@@ -27,6 +27,7 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 }
 
 export async function sendPushToUser(professionalId: string, payload: any) {
+  const db = getDb();
   try {
     const subscriptionsSnap = await db.collection('users').doc(professionalId).collection('push_subscriptions').get();
     
@@ -58,6 +59,7 @@ export async function sendPushToUser(professionalId: string, payload: any) {
  * Creates an internal alert for last-minute cancellations (less than 2 hours).
  */
 async function createLastMinuteAlert(payload: any) {
+  const db = getDb();
   const { professionalId, clientName, serviceName, date, time, appointmentId } = payload;
   const apptId = appointmentId || payload.id;
 
@@ -219,6 +221,7 @@ router.get("/test-email-hotmail-plain", async (req, res) => {
 });
 
 router.get("/test-whatsapp", async (req, res) => {
+  const db = getDb();
   const { phone, message, type, simulateInbound } = req.query;
   if (!phone) return res.status(400).json({ error: "Missing phone" });
   
@@ -280,6 +283,7 @@ router.get("/test-whatsapp", async (req, res) => {
 });
 
 router.post("/zapi/webhook", async (req, res) => {
+  const db = getDb();
   const payload = req.body;
   console.log("[Z-API Webhook] Received payload:", JSON.stringify(payload));
 
@@ -310,6 +314,7 @@ router.get("/debug-whatsapp", async (req, res) => {
 });
 
 router.post("/push/subscribe", async (req, res) => {
+  const db = getDb();
   const { subscription, userId, userAgent } = req.body;
   const authHeader = req.headers.authorization;
 
@@ -408,6 +413,7 @@ router.post("/push/subscribe", async (req, res) => {
 });
 
 router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, res) => {
+  const db = getDb();
   const { type, payload } = req.body;
   const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   
@@ -744,6 +750,7 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
 });
 
 router.get('/cron/reminders24h', async (req, res) => {
+  const db = getDb();
   const secret = req.headers['x-cron-secret'];
   if (secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -879,6 +886,7 @@ router.get('/cron/reminders24h', async (req, res) => {
 });
 
 router.get('/cron/reminders2h', async (req, res) => {
+  const db = getDb();
   const secret = req.headers['x-cron-secret'];
   if (secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -933,6 +941,7 @@ router.get('/cron/reminders2h', async (req, res) => {
 });
 
 router.get('/cron/review-requests', async (req, res) => {
+  const db = getDb();
   const secret = req.headers['x-cron-secret'];
   if (secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1023,6 +1032,7 @@ router.get('/cron/review-requests', async (req, res) => {
 });
 
 router.get('/cron/anti-no-show', async (req, res) => {
+  const db = getDb();
   const secret = req.headers['x-cron-secret'];
   if (secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1087,6 +1097,7 @@ router.get('/cron/anti-no-show', async (req, res) => {
 });
 
 router.get('/cron/retention', async (req, res) => {
+  const db = getDb();
   const secret = req.headers['x-cron-secret'];
   if (secret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });

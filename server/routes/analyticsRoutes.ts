@@ -1,5 +1,5 @@
 import express from "express";
-import { db } from "../firebaseAdmin.js";
+import { getDb } from "../firebaseAdmin.js";
 import { 
   callNvidiaAI, 
   aiRateLimit, 
@@ -198,6 +198,7 @@ router.post("/ai/categorize-portfolio-item", async (req, res) => {
 });
 
 router.get("/reports/monthly", checkPlanFeature('reports'), async (req, res) => {
+  const db = getDb();
   const { month, professionalId } = req.query;
 
   if (!month || !professionalId) {
