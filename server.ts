@@ -2,6 +2,21 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
+import * as bookingRoutesModule from "./server/routes/bookingRoutes.js";
+import * as notificationRoutesModule from "./server/routes/notificationRoutes.js";
+import * as profileRoutesModule from "./server/routes/profileRoutes.js";
+import * as planRoutesModule from "./server/routes/planRoutes.js";
+import * as analyticsRoutesModule from "./server/routes/analyticsRoutes.js";
+import * as calendarRoutesModule from "./server/routes/calendarRoutes.js";
+import * as slugRoutesModule from "./server/routes/slugRoutes.js";
+
+const bookingRoutes = bookingRoutesModule.default as unknown as express.Router;
+const notificationRoutes = notificationRoutesModule.default as unknown as express.Router;
+const profileRoutes = profileRoutesModule.default as unknown as express.Router;
+const planRoutes = planRoutesModule.default as unknown as express.Router;
+const analyticsRoutes = analyticsRoutesModule.default as unknown as express.Router;
+const calendarRoutes = calendarRoutesModule.default as unknown as express.Router;
+const slugRoutes = slugRoutesModule.default as unknown as express.Router;
 
 export async function createServerApp() {
   // 1. Initial configuration (Move heavy logic here)
@@ -52,14 +67,14 @@ export async function createServerApp() {
     console.error("[SERVER] Failed to initialize Firebase:", err);
   }
 
-  // 5. Registration of API Routes (Lazy Imported to avoid initialization bloat)
-  app.use("/api", (await import("./server/routes/bookingRoutes.js")).default);
-  app.use("/api", (await import("./server/routes/notificationRoutes.js")).default);
-  app.use("/api/profile", (await import("./server/routes/profileRoutes.js")).default);
-  app.use("/api/plans", (await import("./server/routes/planRoutes.js")).default);
-  app.use("/api", (await import("./server/routes/analyticsRoutes.js")).default);
-  app.use("/api/calendar", (await import("./server/routes/calendarRoutes.js")).default);
-  app.use("/api/slug", (await import("./server/routes/slugRoutes.js")).default);
+  // 5. Registration of API Routes
+  app.use("/api", bookingRoutes);
+  app.use("/api", notificationRoutes);
+  app.use("/api/profile", profileRoutes);
+  app.use("/api/plans", planRoutes);
+  app.use("/api", analyticsRoutes);
+  app.use("/api/calendar", calendarRoutes);
+  app.use("/api/slug", slugRoutes);
 
   // 6. SSR for Professional Profiles
   app.get("/p/:slug", async (req, res, next) => {

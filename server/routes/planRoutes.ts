@@ -2,13 +2,15 @@ import express from "express";
 import admin from "firebase-admin";
 import { db } from "../firebaseAdmin.js";
 import { sendReferralRewardEmail, sendTrialWillEndEmail } from "../emails/sendEmail.js";
-import Stripe from "stripe";
+import Stripe, { type Checkout } from "stripe";
+type Event = any;
+type Subscription = any;
 
 const router = express.Router();
 
 const isDev = process.env.NODE_ENV !== "production";
 
-let stripeModule: Stripe | null = null;
+let stripeModule: import("stripe").Stripe | null = null;
 
 function getStripe() {
   if (!stripeModule) {
@@ -50,7 +52,7 @@ router.post("/create-checkout", async (req, res) => {
     const userDoc = await db.collection("users").doc(professionalId).get();
     const credits = userDoc.data()?.credits || 0;
 
-    const sessionParams: Stripe.Checkout.SessionCreateParams = {
+    const sessionParams: Checkout.SessionCreateParams = {
       payment_method_types: ["card"],
       line_items: [
         {
@@ -109,14 +111,14 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   const sig = req.headers["stripe-signature"];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  let event;
+  let event: Event;
 
   try {
     if (webhookSecret && sig) {
       event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } else {
       // Fallback for dev without signature validation if desired, but better to be strict
-      event = JSON.parse(req.body.toString());
+      event = JSON.parse(req.body.toString()) as Event;
     }
   } catch (err: any) {
     console.error(`[STRIPE WEBHOOK ERROR] Verification failed: ${err.message}`);
@@ -126,7 +128,7 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   console.log(`[STRIPE WEBHOOK] Received event: ${event.type}`);
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.Checkout.Session;
+    const session = event.data.object as Checkout.Session;
     const userId = session.client_reference_id;
     const plan = session.metadata?.plan || 'pro'; 
 
@@ -215,7 +217,7 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   }
 
   if (event.type === 'customer.subscription.trial_will_end') {
-    const subscription = event.data.object as Stripe.Subscription;
+    const subscription = event.data.object as Subscription;
     const customerId = subscription.customer as string;
 
     if (isDev) {
@@ -287,7 +289,7 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
   }
 
   if (event.type === 'customer.subscription.deleted') {
-    const subscription = event.data.object as Stripe.Subscription;
+    const subscription = event.data.object as Subscription;
     const customerId = subscription.customer;
 
     try {
