@@ -1,6 +1,0 @@
-{
-  "main": "../dist-server/server/api_entry.js",
-  "engines": {
-    "node": "20"
-  }
-}
