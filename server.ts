@@ -52,16 +52,21 @@ export async function createServerApp() {
     console.error("[SERVER] Failed to initialize Firebase:", err);
   }
 
-  // 5. Registration of API Routes (Ordered specifically to prevent route hijacking)
-  app.use("/api/slug", (await import("./server/routes/slugRoutes.js")).default);
-  app.use("/api/profile", (await import("./server/routes/profileRoutes.js")).default);
-  app.use("/api/plans", (await import("./server/routes/planRoutes.js")).default);
-  app.use("/api/calendar", (await import("./server/routes/calendarRoutes.js")).default);
+  // 5. Registration of API Routes (Consolidated for consistent path resolution in production)
+  const apiRouter = express.Router();
 
-  // Generic catch-all routers for remaining /api endpoints
-  app.use("/api", (await import("./server/routes/bookingRoutes.js")).default);
-  app.use("/api", (await import("./server/routes/notificationRoutes.js")).default);
-  app.use("/api", (await import("./server/routes/analyticsRoutes.js")).default);
+  // Specific routers
+  apiRouter.use("/slug", (await import("./server/routes/slugRoutes.js")).default);
+  apiRouter.use("/profile", (await import("./server/routes/profileRoutes.js")).default);
+  apiRouter.use("/plans", (await import("./server/routes/planRoutes.js")).default);
+  apiRouter.use("/calendar", (await import("./server/routes/calendarRoutes.js")).default);
+
+  // Generic catch-all routers for remaining endpoints (mounting directly at root of apiRouter)
+  apiRouter.use((await import("./server/routes/bookingRoutes.js")).default);
+  apiRouter.use((await import("./server/routes/notificationRoutes.js")).default);
+  apiRouter.use((await import("./server/routes/analyticsRoutes.js")).default);
+
+  app.use("/api", apiRouter);
 
   // 6. SSR for Professional Profiles
   app.get("/p/:slug", async (req, res, next) => {
