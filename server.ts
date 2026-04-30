@@ -2,21 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
-import * as bookingRoutesModule from "./server/routes/bookingRoutes.js";
-import * as notificationRoutesModule from "./server/routes/notificationRoutes.js";
-import * as profileRoutesModule from "./server/routes/profileRoutes.js";
-import * as planRoutesModule from "./server/routes/planRoutes.js";
-import * as analyticsRoutesModule from "./server/routes/analyticsRoutes.js";
-import * as calendarRoutesModule from "./server/routes/calendarRoutes.js";
-import * as slugRoutesModule from "./server/routes/slugRoutes.js";
-
-const bookingRoutes = bookingRoutesModule.default as unknown as express.Router;
-const notificationRoutes = notificationRoutesModule.default as unknown as express.Router;
-const profileRoutes = profileRoutesModule.default as unknown as express.Router;
-const planRoutes = planRoutesModule.default as unknown as express.Router;
-const analyticsRoutes = analyticsRoutesModule.default as unknown as express.Router;
-const calendarRoutes = calendarRoutesModule.default as unknown as express.Router;
-const slugRoutes = slugRoutesModule.default as unknown as express.Router;
 
 export async function createServerApp() {
   // 1. Initial configuration (Move heavy logic here)
@@ -24,6 +9,13 @@ export async function createServerApp() {
   config();
 
   const firebaseAdmin = await import("./server/firebaseAdmin.js");
+  const bookingRoutes = (await import("./server/routes/bookingRoutes.js")).default as unknown as express.Router;
+  const notificationRoutes = (await import("./server/routes/notificationRoutes.js")).default as unknown as express.Router;
+  const profileRoutes = (await import("./server/routes/profileRoutes.js")).default as unknown as express.Router;
+  const planRoutes = (await import("./server/routes/planRoutes.js")).default as unknown as express.Router;
+  const analyticsRoutes = (await import("./server/routes/analyticsRoutes.js")).default as unknown as express.Router;
+  const calendarRoutes = (await import("./server/routes/calendarRoutes.js")).default as unknown as express.Router;
+  const slugRoutes = (await import("./server/routes/slugRoutes.js")).default as unknown as express.Router;
   
   const app = express();
 
