@@ -19,21 +19,19 @@
       }
     ]
   },
-  "functions": [
-    {
-      "source": ".",
-      "codebase": "default",
-      "predeploy": [
-        "npm run build"
-      ],
-      "ignore": [
-        "node_modules",
-        ".git",
-        ".firebase",
-        "firebase-debug.log"
-      ]
-    }
-  ],
+  "functions": {
+    "source": "server",
+    "codebase": "default",
+    "predeploy": [
+      "npm run build"
+    ],
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".firebase",
+      "firebase-debug.log"
+    ]
+  },
   "firestore": {
     "rules": "firestore.rules"
   },
