@@ -13,18 +13,12 @@ export async function createServerApp() {
   const app = express();
 
   // 1. Surgical Fix for "stream is not readable"
-  // As requested: Middleware that only runs express.json() if body is not already parsed
+  // As requested: Middleware that doesn't read the stream, since body might be pre-parsed
   app.use((req: any, res, next) => {
-    if (req.body !== undefined) {
-      return next();
-    }
-
-    if (req.readable === false) {
+    if (req.body === undefined || req.body === null) {
       req.body = {};
-      return next();
     }
-
-    return express.json()(req, res, next);
+    return next();
   });
 
   app.use(cors({
