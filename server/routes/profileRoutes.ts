@@ -2,7 +2,7 @@ import express from "express";
 import { db } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 import { isValidWhatsapp } from "../utils.js";
-import { PLAN_CONFIGS } from "../../src/constants/plans.js";
+import { PLAN_CONFIGS } from "../constants/plans.js";
 
 const router = express.Router();
 
