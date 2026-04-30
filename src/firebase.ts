@@ -206,8 +206,14 @@ export async function uploadImageToStorage(file: File | Blob, folder: string): P
 export async function saveProfilePartial(userId: string, payload: Partial<UserProfile>) {
   console.log(`[Firestore] Saving profile partial for ${userId}...`);
   
+  // DEFENSIVE: Never allow updating slug via partial save. Must use transactional API.
+  const { slug, ...rest } = payload as any;
+  if (slug) {
+    console.warn(`[Firestore] Blocking insecure slug update for ${userId}. Use /api/profile/save instead.`);
+  }
+
   // Clean data before saving
-  const cleanedPayload = removeEmptyFields(payload);
+  const cleanedPayload = removeEmptyFields(rest);
   
   const userRef = doc(db, 'users', userId);
   try {

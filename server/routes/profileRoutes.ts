@@ -27,37 +27,43 @@ router.post("/save", async (req, res) => {
       const slugRef = db.collection("slugs").doc(slug);
       const userRef = db.collection("users").doc(uid);
 
-      console.log("[PROFILE SAVE TX] Fetching slug and user documents...");
-      const slugDoc = await transaction.get(slugRef);
-      const userSnap = await transaction.get(userRef);
+      console.log("[PROFILE SAVE TX] Fetching docs for UID:", uid, "Slug:", slug);
+      const [slugDoc, userSnap] = await Promise.all([
+        transaction.get(slugRef),
+        transaction.get(userRef)
+      ]);
 
-      // 1. If slug exists, check if it belongs to THIS user
+      // 1. If slug exists, verify ownership
       if (slugDoc.exists) {
         const ownerId = slugDoc.data()?.uid;
-        if (ownerId !== uid) {
-          console.warn("[PROFILE SAVE TX] Slug collision:", slug, "belongs to", ownerId);
+        if (ownerId && ownerId !== uid) {
+          console.warn("[PROFILE SAVE TX] Slug conflict:", slug, "owned by", ownerId);
           throw new Error("Este link já está sendo usado por outra profissional.");
         }
       }
 
-      // 2. If user already had a different slug, release old one
+      // 2. Handle old slug release if changed
       const userData = userSnap.exists ? userSnap.data() : null;
       const currentSlug = userData?.slug;
-      if (currentSlug && currentSlug !== slug) {
+      
+      if (currentSlug && currentSlug.toLowerCase() !== slug) {
         console.log("[PROFILE SAVE TX] Releasing old slug:", currentSlug);
-        const oldSlugRef = db.collection("slugs").doc(currentSlug);
+        const oldSlugRef = db.collection("slugs").doc(currentSlug.toLowerCase());
         transaction.delete(oldSlugRef);
       }
 
-      // 3. Claim the slug
-      console.log("[PROFILE SAVE TX] Claiming slug:", slug);
+      // 3. Securely Lock/Claim the new slug
+      console.log("[PROFILE SAVE TX] Locking slug:", slug);
       transaction.set(slugRef, { 
         uid, 
-        claimedAt: admin.firestore.FieldValue.serverTimestamp() 
-      });
+        slug,
+        createdAt: slugDoc.exists ? (slugDoc.data()?.createdAt || admin.firestore.FieldValue.serverTimestamp()) : admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        source: "profile_save"
+      }, { merge: true });
 
-      // 4. Update the profile
-      console.log("[PROFILE SAVE TX] Updating user info for:", uid);
+      // 4. Update the user profile
+      console.log("[PROFILE SAVE TX] Updating user profile doc");
 
       // --- THEME VALIDATION (Security) ---
       const userPlan = (userData?.plan || 'free').toLowerCase() as keyof typeof PLAN_CONFIGS;

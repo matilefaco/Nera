@@ -338,16 +338,27 @@ export default function ProfilePage() {
       };
 
       try {
-        await setDoc(doc(db, 'users', user.uid), finalPayload, { merge: true });
+        console.log('[ProfileSave] Calling transactional save API...');
+        const response = await fetch('/api/profile/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: user.uid,
+            profileData: finalPayload,
+            services: [] // We don't update services in this simple save flow yet, or we could pass them if available
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Erro ao salvar perfil');
+        }
+
         console.log('[ProfileSave] Success');
         toast.success('Seu perfil foi atualizado com sucesso.');
       } catch (err: any) {
         console.error('[ProfileSave] Failed:', err);
-        if (err?.code === 'resource-exhausted' || err?.message?.includes('too large')) {
-          toast.error('Seu perfil está com muitas fotos. Tente remover algumas para salvar.');
-        } else {
-          handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`);
-        }
+        toast.error(err.message || 'Não foi possível salvar seu perfil agora.');
       }
     } catch (error: any) {
       console.error('[ProfileSave] CRITICAL ERROR:', error);

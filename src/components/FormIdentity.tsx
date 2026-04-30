@@ -30,7 +30,7 @@ export interface FormIdentityProps {
   setInstagramConfirmed?: (val: boolean) => void;
   slug?: string;
   setSlug?: (val: string) => void;
-  slugStatus?: 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid' | 'unknown';
+  slugStatus?: 'idle' | 'checking' | 'available' | 'unavailable' | 'invalid';
   slugMessage?: string;
   slugSuggestions?: string[];
   onSelectSuggestion?: (val: string) => void;
@@ -465,10 +465,10 @@ export const FormIdentity = ({
                 </label>
               )}
               <div className={cn(
-                "flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border transition-all",
-                slugStatus === 'available' ? "border-green-200 ring-1 ring-green-100" :
-                slugStatus === 'unavailable' || slugStatus === 'invalid' || errors.slug ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
-                "border-brand-mist"
+                "flex items-center gap-2 p-3.5 rounded-[18px] border transition-all",
+                slugStatus === 'available' ? "bg-green-50 border-green-200 ring-1 ring-green-100" :
+                slugStatus === 'unavailable' || slugStatus === 'invalid' || errors.slug ? "bg-brand-parchment border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
+                "bg-brand-parchment border-brand-mist"
               )}>
                 <span className="text-brand-stone text-xs ml-1">usenera.com/p/</span>
                 <input 

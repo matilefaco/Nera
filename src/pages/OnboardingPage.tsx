@@ -120,7 +120,7 @@ export default function OnboardingPage() {
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const prevNameRef = useRef(name);
 
-  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable' | 'invalid' | 'unknown'>('idle');
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'unavailable' | 'invalid'>('idle');
   const [slugMessage, setSlugMessage] = useState('');
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
   const slugCheckRef = useRef<string>('');
@@ -185,21 +185,21 @@ export default function OnboardingPage() {
         
         if (data.available === true) {
           setSlugStatus('available');
-          setSlugMessage(`Link disponível: usenera.com/p/${cleanSlug}`);
+          setSlugMessage('Link disponível!');
           setSlugSuggestions([]);
         } else if (data.available === false) {
           setSlugStatus('unavailable');
           setSlugMessage('Este link já está em uso.');
           setSlugSuggestions(data.suggestions || []);
         } else {
-          setSlugStatus('unknown');
+          setSlugStatus('idle');
           setSlugMessage('');
         }
       } catch (err) {
         console.error('Error checking slug:', err);
         // Only update if it's still the same slug
         if (slugCheckRef.current === cleanSlug) {
-          setSlugStatus('unknown');
+          setSlugStatus('idle');
           setSlugMessage('');
         }
       }
@@ -1410,7 +1410,7 @@ export default function OnboardingPage() {
                 </button>
                 <button 
                   onClick={handleFinish}
-                  disabled={loading || isFinalizing}
+                  disabled={loading || isFinalizing || slugStatus !== 'available'}
                   className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
                   {isFinalizing ? (
