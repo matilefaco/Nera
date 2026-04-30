@@ -12,12 +12,18 @@ export async function createServerApp() {
   
   const app = express();
 
-  // 1. Body Parser FIRST - Capture rawBody for Stripe but parse JSON for all
-  app.use(express.json({
-    verify: (req: any, res, buf) => {
-      req.rawBody = buf;
+  // 1. Body Parsers with Isolation
+  app.use((req: any, res, next) => {
+    if (req.originalUrl && req.originalUrl.includes("/webhook")) {
+      express.raw({ type: 'application/json' })(req, res, next);
+    } else {
+      express.json({
+        verify: (req: any, res, buf) => {
+          req.rawBody = buf;
+        }
+      })(req, res, next);
     }
-  }));
+  });
 
   app.use(cors({
     origin: true,

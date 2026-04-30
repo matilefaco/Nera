@@ -112,13 +112,14 @@ router.post("/webhook", async (req: any, res) => {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   let event;
+  const rawBody = req.body; // express.raw puts Buffer in req.body
 
   try {
-    if (webhookSecret && sig && req.rawBody) {
-      event = stripe.webhooks.constructEvent(req.rawBody, sig, webhookSecret);
+    if (webhookSecret && sig && rawBody) {
+      event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
     } else {
-      // If we don't have signature verification, we use the already parsed body
-      event = req.body;
+      // Fallback: If not verified by signature, try to parse it if it's a buffer
+      event = Buffer.isBuffer(rawBody) ? JSON.parse(rawBody.toString()) : rawBody;
     }
   } catch (err: any) {
     console.error(`[STRIPE WEBHOOK ERROR] Verification failed: ${err.message}`);
