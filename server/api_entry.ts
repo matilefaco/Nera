@@ -44,8 +44,10 @@ export const api = onRequest({
         body.serviceId &&
         body.date &&
         body.time &&
-        body.clientName &&
-        body.clientPhone
+        (
+          (body.client && body.client.name && body.client.phone) ||
+          (body.clientName && body.clientPhone)
+        )
       );
 
       if (!hasRequiredPayload) {
