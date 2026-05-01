@@ -5,8 +5,90 @@ import { removeEmptyFields, generateReservationCode, getClientKey } from '../uti
 
 export const bookingRouter = express.Router();
 
+type ResolvedProfessional = {
+  id: string;
+  collection: 'users' | 'professionals';
+  data: admin.firestore.DocumentData;
+};
+
+function cleanText(value: unknown): string {
+  return String(value || '').trim();
+}
+
+function cleanSlug(value: unknown): string {
+  return cleanText(value).toLowerCase();
+}
+
+function firstNonEmpty(...values: unknown[]) {
+  return values.find((value) => cleanText(value) !== '');
+}
+
+async function findProfessionalByIdOrSlug(identifier: unknown): Promise<ResolvedProfessional | null> {
+  const db = getDb();
+  const raw = cleanText(identifier);
+  const slug = cleanSlug(identifier);
+  if (!raw) return null;
+
+  const collections: Array<'users' | 'professionals'> = ['users', 'professionals'];
+
+  // 1) Try direct Firestore document id first.
+  for (const collection of collections) {
+    const doc = await db.collection(collection).doc(raw).get();
+    if (doc.exists) {
+      return { id: doc.id, collection, data: doc.data() || {} };
+    }
+  }
+
+  // 2) Try common slug fields for legacy and current profiles.
+  const slugFields = ['slug', 'publicSlug', 'profileSlug', 'username', 'handle'];
+  for (const collection of collections) {
+    for (const field of slugFields) {
+      const snap = await db.collection(collection).where(field, '==', slug).limit(1).get();
+      if (!snap.empty) {
+        const doc = snap.docs[0];
+        return { id: doc.id, collection, data: doc.data() || {} };
+      }
+    }
+  }
+
+  // 3) Try slug lock collections created by newer onboarding/profile logic.
+  const slugDocCollections = ['slugs', 'profile_slugs', 'public_slugs'];
+  for (const collection of slugDocCollections) {
+    const slugDoc = await db.collection(collection).doc(slug).get();
+    if (!slugDoc.exists) continue;
+
+    const data = slugDoc.data() || {};
+    const referencedId = cleanText(data.uid || data.userId || data.professionalId || data.profileId || data.ownerId);
+    if (!referencedId) continue;
+
+    for (const targetCollection of collections) {
+      const proDoc = await db.collection(targetCollection).doc(referencedId).get();
+      if (proDoc.exists) {
+        return { id: proDoc.id, collection: targetCollection, data: proDoc.data() || {} };
+      }
+    }
+  }
+
+  return null;
+}
+
+function getServiceFromProfessional(proData: admin.firestore.DocumentData, serviceId: unknown) {
+  const id = cleanText(serviceId);
+  if (!id) return null;
+
+  const serviceArrays = [proData.services, proData.catalogServices, proData.serviceList].filter(Array.isArray) as any[][];
+  for (const services of serviceArrays) {
+    const found = services.find((service) => {
+      if (!service) return false;
+      return cleanText(service.id) === id || cleanText(service.serviceId) === id || cleanText(service.name) === id || cleanText(service.title) === id;
+    });
+    if (found) return found;
+  }
+
+  return null;
+}
+
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, data: any, professionalId: string, isNew: boolean, oldData?: any, existingSummarySnap?: admin.firestore.DocumentSnapshot) {
-  // Mock logic for restoration - the user wants the structure back
   const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
   const summaryId = `${professionalId}_${clientKey}`;
   const summaryRef = getDb().collection('client_summaries').doc(summaryId);
@@ -26,43 +108,62 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
 
 bookingRouter.post("/public/create-booking", async (req, res) => {
   const db = getDb();
-  
-  const {
-    professionalId,
+  const body = req.body || {};
+  const client = body.client || body.customer || {};
+  const service = body.service || body.selectedService || {};
+
+  const rawProfessionalId = firstNonEmpty(body.professionalId, body.professionalUid, body.providerId, body.userId, body.profileId, body.slug, body.professionalSlug);
+  const date = firstNonEmpty(body.date, body.selectedDate, body.appointmentDate, body.bookingDate);
+  const time = firstNonEmpty(body.time, body.selectedTime, body.appointmentTime, body.slot, body.hour);
+  const serviceId = firstNonEmpty(body.serviceId, body.selectedServiceId, service.id, service.serviceId, service.name, service.title);
+  const clientName = firstNonEmpty(body.clientName, body.name, client.name, client.clientName);
+  const clientEmail = firstNonEmpty(body.clientEmail, body.email, client.email, client.clientEmail);
+  const clientWhatsapp = firstNonEmpty(body.clientWhatsapp, body.clientPhone, body.whatsapp, body.phone, client.whatsapp, client.phone, client.clientWhatsapp, client.clientPhone);
+  const locationType = firstNonEmpty(body.locationType, body.attendanceLocation, body.location?.type, body.location);
+  const neighborhood = firstNonEmpty(body.neighborhood, body.location?.neighborhood, client.neighborhood);
+  const prepInstructions = firstNonEmpty(body.prepInstructions, body.notes, body.observations);
+  const couponId = firstNonEmpty(body.couponId, body.coupon?.id);
+
+  console.log(`[API_BOOKING] Request received`, {
+    rawProfessionalId,
+    serviceId,
     date,
     time,
-    serviceId,
-    clientName,
-    clientEmail,
-    clientWhatsapp,
-    client, // Support nested client
-    locationType,
-    neighborhood,
-    prepInstructions,
-    couponId
-  } = req.body;
-
-  // Extract from nested if present
-  const cName = clientName || client?.name;
-  const cEmail = clientEmail || client?.email;
-  const cWhatsapp = clientWhatsapp || client?.phone;
-
-  console.log(`[API_BOOKING] Request received for professional: ${professionalId} on ${date} at ${time}`);
+    hasClientName: Boolean(clientName),
+    hasClientWhatsapp: Boolean(clientWhatsapp),
+    bodyKeys: Object.keys(body)
+  });
   
-  if (!professionalId || !date || !time) {
-    console.warn(`[API_BOOKING] REJECTED: Missing fields (proId, date or time)`);
-    return res.status(400).json({ error: "Dados de agendamento incompletos" });
+  const missingFields = [
+    ['professionalId', rawProfessionalId],
+    ['serviceId', serviceId],
+    ['date', date],
+    ['time', time],
+    ['clientName', clientName],
+    ['clientWhatsapp', clientWhatsapp]
+  ].filter(([, value]) => !value).map(([key]) => key);
+
+  if (missingFields.length > 0) {
+    console.warn(`[API_BOOKING] REJECTED: Missing fields`, missingFields);
+    return res.status(400).json({ error: "Dados de agendamento incompletos", missingFields });
   }
 
   try {
+    const resolvedProfessional = await findProfessionalByIdOrSlug(rawProfessionalId);
+    if (!resolvedProfessional) {
+      throw new Error('Profissional não encontrado.');
+    }
+
+    const professionalId = resolvedProfessional.id;
     const cleanedData = removeEmptyFields({
       professionalId,
+      professionalSlug: cleanSlug(rawProfessionalId),
       date,
       time,
       serviceId,
-      clientName: cName,
-      clientEmail: cEmail,
-      clientWhatsapp: cWhatsapp,
+      clientName,
+      clientEmail,
+      clientWhatsapp,
       locationType,
       neighborhood,
       prepInstructions,
@@ -70,7 +171,7 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
     });
     
     const apptRef = db.collection('appointments').doc();
-    const reservationCode = generateReservationCode(date);
+    const reservationCode = generateReservationCode(cleanText(date));
     const manageSlug = reservationCode.toLowerCase();
 
     const finalData = {
@@ -83,26 +184,24 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
     };
 
     await db.runTransaction(async (transaction) => {
-      // Professional Check
-      const proRef = db.collection('users').doc(professionalId);
+      const proRef = db.collection(resolvedProfessional.collection).doc(professionalId);
       const proSnap = await transaction.get(proRef);
       if (!proSnap.exists) {
         throw new Error('Profissional não encontrado.');
       }
 
-      // Service Check
       if (!serviceId) {
         throw new Error('ID do serviço não fornecido.');
       }
-      const serviceRef = db.collection('services').doc(serviceId);
+
+      const serviceRef = db.collection('services').doc(cleanText(serviceId));
       const serviceSnap = await transaction.get(serviceRef);
-      if (!serviceSnap.exists) {
+      if (!serviceSnap.exists && !getServiceFromProfessional(proSnap.data() || {}, serviceId)) {
         throw new Error('Serviço não encontrado.');
       }
 
-      // Coupon (if any)
       if (couponId) {
-        const couponRef = db.collection('coupons').doc(couponId);
+        const couponRef = db.collection('coupons').doc(cleanText(couponId));
         const couponSnap = await transaction.get(couponRef);
         if (!couponSnap.exists) {
            console.warn("Coupon not found:", couponId);
@@ -116,13 +215,12 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
 
       transaction.set(apptRef, finalData);
 
-      // Slug tracking
       const slugRef = db.collection('appointment_slugs').doc(manageSlug);
       transaction.set(slugRef, {
         appointmentId: apptRef.id,
         manageSlug,
         reservationCode,
-        professionalId: professionalId,
+        professionalId,
         clientEmail: clientEmail || '',
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
@@ -149,42 +247,21 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
     const { slug } = req.params;
     console.log("[PROFILE ROUTE HIT]", slug);
 
-    if (!slug) {
-      return res.status(400).json({ error: "Slug obrigatório" });
-    }
+    const resolvedProfessional = await findProfessionalByIdOrSlug(slug);
 
-    const db = getDb();
-    
-    // Attempting 'professionals' first as requested, but we should be careful if 'users' was the standard
-    // However, the user provided this specific code.
-    let snapshot = await db
-      .collection("professionals")
-      .where("slug", "==", slug.toLowerCase())
-      .limit(1)
-      .get();
-
-    // Fallback to 'users' if 'professionals' is empty (safety measure)
-    if (snapshot.empty) {
-      snapshot = await db
-        .collection("users")
-        .where("slug", "==", slug.toLowerCase())
-        .limit(1)
-        .get();
-    }
-
-    if (snapshot.empty) {
+    if (!resolvedProfessional) {
       return res.status(404).json({ error: "Profissional não encontrado" });
     }
 
-    const doc = snapshot.docs[0];
-    const data = doc.data();
+    const data = resolvedProfessional.data;
 
     return res.json({
-      id: doc.id,
-      slug: data.slug,
-      name: data.name || data.displayName || 'Profissional',
-      services: data.services || [],
-      ...data
+      ...data,
+      id: resolvedProfessional.id,
+      collection: resolvedProfessional.collection,
+      slug: data.slug || data.publicSlug || data.profileSlug || cleanSlug(slug),
+      name: data.name || data.displayName || data.businessName || 'Profissional',
+      services: data.services || data.catalogServices || data.serviceList || []
     });
 
   } catch (err) {
