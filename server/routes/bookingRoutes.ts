@@ -145,28 +145,50 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
 });
 
 bookingRouter.get("/public/profile/:slug", async (req, res) => {
-  const { slug } = req.params;
-  const db = getDb();
-  
   try {
-    const usersRef = db.collection('users');
-    const q = usersRef.where('slug', '==', slug.toLowerCase()).limit(1);
-    const snap = await q.get();
+    const { slug } = req.params;
+    console.log("[PROFILE ROUTE HIT]", slug);
+
+    if (!slug) {
+      return res.status(400).json({ error: "Slug obrigatório" });
+    }
+
+    const db = getDb();
     
-    if (snap.empty) {
+    // Attempting 'professionals' first as requested, but we should be careful if 'users' was the standard
+    // However, the user provided this specific code.
+    let snapshot = await db
+      .collection("professionals")
+      .where("slug", "==", slug.toLowerCase())
+      .limit(1)
+      .get();
+
+    // Fallback to 'users' if 'professionals' is empty (safety measure)
+    if (snapshot.empty) {
+      snapshot = await db
+        .collection("users")
+        .where("slug", "==", slug.toLowerCase())
+        .limit(1)
+        .get();
+    }
+
+    if (snapshot.empty) {
       return res.status(404).json({ error: "Profissional não encontrado" });
     }
-    
-    const doc = snap.docs[0];
+
+    const doc = snapshot.docs[0];
     const data = doc.data();
-    
-    return res.status(200).json({
+
+    return res.json({
       id: doc.id,
       slug: data.slug,
       name: data.name || data.displayName || 'Profissional',
-      services: data.services || []
+      services: data.services || [],
+      ...data
     });
-  } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+
+  } catch (err) {
+    console.error("[PROFILE_BY_SLUG_ERROR]", err);
+    return res.status(500).json({ error: "Erro interno" });
   }
 });
