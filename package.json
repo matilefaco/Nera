@@ -2,10 +2,11 @@
   "name": "nera-professional",
   "version": "1.0.0",
   "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "start": "node dist-server/server.js",
+    "start": "node dist/server.js",
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build && tsc",
     "lint": "tsc --noEmit",
     "preview": "vite preview"
   },

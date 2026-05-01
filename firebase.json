@@ -1,12 +1,4 @@
 {
-  "functions": {
-    "source": ".",
-    "runtime": "nodejs20",
-    "codebase": "default",
-    "predeploy": [
-      "npm run build"
-    ]
-  },
   "hosting": {
     "public": "dist",
     "ignore": [
@@ -23,6 +15,14 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ]
+  },
+  "functions": {
+    "source": ".",
+    "runtime": "nodejs20",
+    "codebase": "default",
+    "predeploy": [
+      "npm run build"
     ]
   },
   "firestore": {
