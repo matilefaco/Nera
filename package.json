@@ -2,7 +2,6 @@
   "name": "nera-professional",
   "version": "1.0.0",
   "type": "module",
-  "main": "dist-server/server/api_entry.js",
   "scripts": {
     "start": "node dist-server/server.js",
     "dev": "vite",

@@ -16,6 +16,7 @@ export const api = onRequest({
   timeoutSeconds: 60,
   minInstances: 0,
   cors: true,
+  // v2: forced refresh
 }, async (req, res) => {
   try {
     const app = await createExpressApp();

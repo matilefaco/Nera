@@ -1,5 +1,8 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { bookingRouter } from './server/routes/bookingRoutes.js';
 import { planRouter } from './server/routes/planRoutes.js';
 import { slugRouter } from './server/routes/slugRoutes.js';
@@ -60,15 +63,35 @@ export async function createServerApp() {
   app.use('/api/calendar', calendarRouter);
   app.use('/api/notifications', notificationRouter);
 
+  // 5. Serve Static Files (Frontend)
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  
+  // In Cloud Run, dist is usually at the root, same as dist-server's parent
+  const distPath = path.resolve(__dirname, '../dist');
+  
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    // SPA fallback
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api')) {
+        return next();
+      }
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
   return app;
 }
 
-// Development local runner
-if (process.env.NODE_ENV !== 'production' && import.meta.url === `file://${process.argv[1]}`) {
+// Start server if run directly
+const isMain = import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('server.js');
+
+if (isMain) {
   const port = 3000;
   createServerApp().then(app => {
     app.listen(port, () => {
-      console.log(`[LOCAL DEV] Server listening on port ${port}`);
+      console.log(`[SERVER] Listening on port ${port}`);
     });
   });
 }
