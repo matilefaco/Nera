@@ -7,10 +7,7 @@ export async function initFirebase() {
     admin.initializeApp();
   }
   db = admin.firestore();
-  db.settings({
-    databaseId: "5d44-4968-bb61-5bb5b2cc"
-  });
-  console.log("[FIREBASE] Admin initialized with databaseId.", "5d44-4968-bb61-5bb5b2cc");
+  console.log("[FIREBASE] Admin initialized.");
 }
 
 export function getDb() {
@@ -19,9 +16,6 @@ export function getDb() {
        admin.initializeApp();
     }
     db = admin.firestore();
-    db.settings({
-      databaseId: "5d44-4968-bb61-5bb5b2cc"
-    });
   }
   return db;
 }
