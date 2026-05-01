@@ -67,6 +67,14 @@ export async function createServerApp() {
   app.use('/api/calendar', calendarRouter);
   app.use('/api/notifications', notificationRouter);
 
+  // API-only fallback (never serve HTML from Functions)
+  app.use((req, res) => {
+    res.status(404).json({
+      error: 'Not Found',
+      path: req.originalUrl || req.url
+    });
+  });
+
   return app;
 }
 
