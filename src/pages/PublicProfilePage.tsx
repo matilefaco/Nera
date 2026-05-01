@@ -309,9 +309,20 @@ export const PublicProfilePage: React.FC = () => {
                     <h2 className="text-2xl font-serif mb-6">Selecione o Serviço</h2>
                     <div className="grid gap-4">
                       {professional.services.length === 0 ? (
-                        <div className="text-center py-12 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                          <Scissors className="mx-auto mb-4 text-gray-300" size={32} />
-                          <p className="text-gray-500">Nenhum serviço disponível no momento.</p>
+                        <div className="text-center py-16 bg-gray-50 rounded-[2rem] border-2 border-dashed border-gray-100 flex flex-col items-center">
+                          <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mb-6 text-gray-300">
+                             <Scissors size={28} />
+                          </div>
+                          <h3 className="text-xl font-serif text-gray-900 mb-2">Nenhum serviço disponível</h3>
+                          <p className="text-gray-500 max-w-[240px] leading-relaxed">
+                            Este profissional ainda não cadastrou serviços para agendamento online.
+                          </p>
+                          <a 
+                            href="/"
+                            className="mt-8 px-6 py-3 bg-[#1A1A1A] text-white rounded-full text-sm font-bold shadow-lg shadow-black/10 transition-transform active:scale-95"
+                          >
+                            Add service (Professional)
+                          </a>
                         </div>
                       ) : (
                         professional.services.map((service) => (

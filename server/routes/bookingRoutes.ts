@@ -1,7 +1,7 @@
 import express from 'express';
 import { getDb } from '../firebaseAdmin.js';
 import admin from 'firebase-admin';
-import { removeEmptyFields, generateReservationCode, getClientKey } from '../utils.js';
+import { removeEmptyFields, generateReservationCode, getClientKey, normalizeId } from '../utils.js';
 
 export const bookingRouter = express.Router();
 
@@ -144,10 +144,6 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
   }
 });
 
-function normalizeId(value: unknown): string {
-  return String(value || "").replace(/^"+|"+$/g, "").trim();
-}
-
 // v4: robust profile lookup exclusively in USERS collection
 bookingRouter.get("/public/profile/:slug", async (req, res) => {
   try {
@@ -209,9 +205,9 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
 
     // 3. Fetch services from root collection if needed
     // Normalize correct ID just in case
-    const professional = { id: normalizeId(foundDoc.id) };
+    const safeProfessionalId = normalizeId(foundDoc.id);
 
-    const servicesSnapshot = await db.collection("services").where("professionalId", "==", professional.id).get();
+    const servicesSnapshot = await db.collection("services").where("professionalId", "==", safeProfessionalId).get();
     
     // Mapping and extra normalization on the returned objects (Task 3 compliance)
     const services = servicesSnapshot.docs.map(s => {
@@ -223,10 +219,15 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
       };
     });
 
+    if (services.length === 0) {
+      console.error(`[CRITICAL] No services found for professionalId: ${safeProfessionalId} (slug: ${slug})`);
+    }
+
     console.log("[PROFILE LOOKUP]", { slug, found: true, id: foundDoc.id, servicesCount: services.length });
 
     return res.json({
       ...docToReturn,
+      id: safeProfessionalId,
       name: docToReturn.name || docToReturn.displayName || 'Profissional',
       services: services.length > 0 ? services : (docToReturn.services || [])
     });

@@ -1,3 +1,7 @@
+export function normalizeId(value: unknown): string {
+  return String(value || "").replace(/^"+|"+$/g, "").trim();
+}
+
 export function removeEmptyFields(obj: any) {
   const newObj: any = {};
   Object.keys(obj).forEach(key => {

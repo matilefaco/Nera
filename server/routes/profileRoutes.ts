@@ -1,6 +1,7 @@
 import express from 'express';
 import { getDb } from '../firebaseAdmin.js';
 import admin from 'firebase-admin';
+import { normalizeId } from '../utils.js';
 
 export const profileRouter = express.Router();
 
@@ -42,10 +43,22 @@ profileRouter.post("/complete-onboarding", async (req, res) => {
 
     // 3. Create new services
     services.forEach((service: any) => {
+      const cleanName = String(service.name || "").trim();
+      const cleanPrice = Number(service.price);
+      const cleanDuration = Number(service.duration);
+      const cleanProfessionalId = normalizeId(userId);
+
+      if (!cleanName || cleanPrice <= 0 || cleanDuration <= 0 || !cleanProfessionalId) {
+        throw new Error(`Invalida service data: ${service.name}. Name, price > 0, duration > 0 and professionalId are required.`);
+      }
+
       const serviceRef = db.collection('services').doc();
       batch.set(serviceRef, {
         ...service,
-        professionalId: userId, // Ensure real UID is used
+        name: cleanName,
+        price: cleanPrice,
+        duration: cleanDuration,
+        professionalId: cleanProfessionalId, // Ensure real UID is used and clean
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });

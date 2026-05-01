@@ -72,8 +72,11 @@ export const OnboardingPage: React.FC = () => {
   };
 
   const handleAddService = () => {
-    if (!newService.name || !newService.price || !newService.duration) {
-      setError("Preencha os campos obrigatórios do serviço.");
+    const priceNum = parseFloat(newService.price);
+    const durationNum = parseInt(newService.duration);
+
+    if (!newService.name.trim() || isNaN(priceNum) || priceNum <= 0 || isNaN(durationNum) || durationNum <= 0) {
+      setError("Preencha o nome, preço > 0 e duração > 0.");
       return;
     }
     setServices([...services, { ...newService, id: Math.random().toString(36).substr(2, 9) }]);
@@ -526,13 +529,18 @@ export const OnboardingPage: React.FC = () => {
                 <div className="flex flex-col gap-4">
                   <button 
                     onClick={handleComplete}
-                    disabled={loading}
+                    disabled={loading || services.length === 0}
                     className="w-full py-5 bg-[#1A1A1A] text-white rounded-2xl font-bold text-lg shadow-xl shadow-black/20 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                   >
                     {loading ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                         Publicando seu Perfil...
+                      </>
+                    ) : services.length === 0 ? (
+                      <>
+                        Adicione um serviço antes
+                        <AlertCircle size={20} className="text-red-400" />
                       </>
                     ) : (
                       <>
