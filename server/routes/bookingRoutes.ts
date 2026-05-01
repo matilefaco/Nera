@@ -31,7 +31,6 @@ async function findProfessionalByIdOrSlug(identifier: unknown): Promise<Resolved
 
   const collections: Array<'users' | 'professionals'> = ['users', 'professionals'];
 
-  // 1) Try direct Firestore document id first.
   for (const collection of collections) {
     const doc = await db.collection(collection).doc(raw).get();
     if (doc.exists) {
@@ -39,7 +38,6 @@ async function findProfessionalByIdOrSlug(identifier: unknown): Promise<Resolved
     }
   }
 
-  // 2) Try common slug fields for legacy and current profiles.
   const slugFields = ['slug', 'publicSlug', 'profileSlug', 'username', 'handle'];
   for (const collection of collections) {
     for (const field of slugFields) {
@@ -51,7 +49,6 @@ async function findProfessionalByIdOrSlug(identifier: unknown): Promise<Resolved
     }
   }
 
-  // 3) Try slug lock collections created by newer onboarding/profile logic.
   const slugDocCollections = ['slugs', 'profile_slugs', 'public_slugs'];
   for (const collection of slugDocCollections) {
     const slugDoc = await db.collection(collection).doc(slug).get();
@@ -89,7 +86,11 @@ function getServiceFromProfessional(proData: admin.firestore.DocumentData, servi
 }
 
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, data: any, professionalId: string, isNew: boolean, oldData?: any, existingSummarySnap?: admin.firestore.DocumentSnapshot) {
-  const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+  const clientKey = getClientKey(
+    cleanText(data.clientWhatsapp),
+    cleanText(data.clientEmail),
+    cleanText(data.clientName)
+  );
   const summaryId = `${professionalId}_${clientKey}`;
   const summaryRef = getDb().collection('client_summaries').doc(summaryId);
   
@@ -155,23 +156,30 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
     }
 
     const professionalId = resolvedProfessional.id;
+    const cleanClientName = cleanText(clientName);
+    const cleanClientEmail = cleanText(clientEmail);
+    const cleanClientWhatsapp = cleanText(clientWhatsapp);
+    const cleanServiceId = cleanText(serviceId);
+    const cleanDate = cleanText(date);
+    const cleanTime = cleanText(time);
+
     const cleanedData = removeEmptyFields({
       professionalId,
       professionalSlug: cleanSlug(rawProfessionalId),
-      date,
-      time,
-      serviceId,
-      clientName,
-      clientEmail,
-      clientWhatsapp,
-      locationType,
-      neighborhood,
-      prepInstructions,
-      couponId
+      date: cleanDate,
+      time: cleanTime,
+      serviceId: cleanServiceId,
+      clientName: cleanClientName,
+      clientEmail: cleanClientEmail,
+      clientWhatsapp: cleanClientWhatsapp,
+      locationType: cleanText(locationType),
+      neighborhood: cleanText(neighborhood),
+      prepInstructions: cleanText(prepInstructions),
+      couponId: cleanText(couponId)
     });
     
     const apptRef = db.collection('appointments').doc();
-    const reservationCode = generateReservationCode(cleanText(date));
+    const reservationCode = generateReservationCode(cleanDate);
     const manageSlug = reservationCode.toLowerCase();
 
     const finalData = {
@@ -190,13 +198,13 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
         throw new Error('Profissional não encontrado.');
       }
 
-      if (!serviceId) {
+      if (!cleanServiceId) {
         throw new Error('ID do serviço não fornecido.');
       }
 
-      const serviceRef = db.collection('services').doc(cleanText(serviceId));
+      const serviceRef = db.collection('services').doc(cleanServiceId);
       const serviceSnap = await transaction.get(serviceRef);
-      if (!serviceSnap.exists && !getServiceFromProfessional(proSnap.data() || {}, serviceId)) {
+      if (!serviceSnap.exists && !getServiceFromProfessional(proSnap.data() || {}, cleanServiceId)) {
         throw new Error('Serviço não encontrado.');
       }
 
@@ -208,7 +216,7 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
         }
       }
 
-      const clientKey = getClientKey(clientWhatsapp, clientEmail, clientName);
+      const clientKey = getClientKey(cleanClientWhatsapp, cleanClientEmail, cleanClientName);
       const summaryId = `${professionalId}_${clientKey}`;
       const summaryRef = db.collection('client_summaries').doc(summaryId);
       const summarySnap = await transaction.get(summaryRef);
@@ -221,7 +229,7 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
         manageSlug,
         reservationCode,
         professionalId,
-        clientEmail: clientEmail || '',
+        clientEmail: cleanClientEmail,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
