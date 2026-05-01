@@ -41,15 +41,58 @@ function candidateMatches(candidate: unknown, keys: string[]): boolean {
   });
 }
 
-function getDashboardProfessionalId(profileDocId: string, professionalData: Record<string, any>): string {
-  return normalizeId(
-    professionalData.uid ||
-    professionalData.userId ||
+async function resolveDashboardProfessionalId(
+  db: admin.firestore.Firestore,
+  profileDocId: string,
+  professionalData: Record<string, any>
+): Promise<string> {
+  const explicit = normalizeId(
+    professionalData.dashboardProfessionalId ||
     professionalData.authUid ||
     professionalData.ownerId ||
-    professionalData.professionalId ||
-    profileDocId
+    professionalData.userId ||
+    professionalData.uid
   );
+
+  if (explicit && explicit !== profileDocId) return explicit;
+
+  const email = String(professionalData.email || '').trim().toLowerCase();
+  if (email) {
+    try {
+      const authUser = await admin.auth().getUserByEmail(email);
+      const authUid = normalizeId(authUser.uid);
+      if (authUid) {
+        console.log('[API_BOOKING] owner resolved by Firebase Auth email', { profileDocId, authUid, email });
+        try {
+          await db.collection('users').doc(profileDocId).set({ dashboardProfessionalId: authUid }, { merge: true });
+        } catch (cacheErr: any) {
+          console.warn('[API_BOOKING] could not cache dashboardProfessionalId', cacheErr.message);
+        }
+        return authUid;
+      }
+    } catch (authErr: any) {
+      console.warn('[API_BOOKING] auth email lookup failed', { email, message: authErr.message });
+    }
+
+    try {
+      const sameEmail = await db.collection('users').where('email', '==', email).limit(10).get();
+      const otherDoc = sameEmail.docs.find((doc) => normalizeId(doc.id) !== profileDocId);
+      if (otherDoc) {
+        const ownerId = normalizeId(otherDoc.id);
+        console.log('[API_BOOKING] owner resolved by users.email', { profileDocId, ownerId, email });
+        try {
+          await db.collection('users').doc(profileDocId).set({ dashboardProfessionalId: ownerId }, { merge: true });
+        } catch (cacheErr: any) {
+          console.warn('[API_BOOKING] could not cache dashboardProfessionalId', cacheErr.message);
+        }
+        return ownerId;
+      }
+    } catch (queryErr: any) {
+      console.warn('[API_BOOKING] users.email lookup failed', { email, message: queryErr.message });
+    }
+  }
+
+  return profileDocId;
 }
 
 async function findServiceForBooking(params: {
@@ -207,7 +250,7 @@ bookingRouter.post('/public/create-booking', async (req, res) => {
     if (!proSnap.exists) throw new Error('Profissional não encontrado.');
 
     const professionalData = proSnap.data() || {};
-    const dashboardProfessionalId = getDashboardProfessionalId(publicProfessionalId, professionalData);
+    const dashboardProfessionalId = await resolveDashboardProfessionalId(db, publicProfessionalId, professionalData);
     console.log('[API_BOOKING] professional ids:', { publicProfessionalId, dashboardProfessionalId, profileUid: professionalData.uid || null });
 
     const serviceMatch = await findServiceForBooking({
