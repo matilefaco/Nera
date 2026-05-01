@@ -5,54 +5,110 @@ import { removeEmptyFields, generateReservationCode, getClientKey, normalizeId }
 
 export const bookingRouter = express.Router();
 
+type ServiceMatch = {
+  id: string;
+  data: Record<string, any>;
+  source: 'direct-doc' | 'root-services' | 'embedded-profile' | 'single-professional-service' | 'legacy-unmatched';
+};
+
 function normalizeText(value: unknown): string {
   return String(value || '')
     .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
-async function findServiceForBooking(
-  db: admin.firestore.Firestore,
-  rawServiceId: unknown,
-  professionalId: string
-): Promise<admin.firestore.DocumentSnapshot | null> {
+function uniqueCandidates(values: unknown[]): string[] {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => normalizeId(value))
+        .filter(Boolean)
+    )
+  );
+}
+
+function candidateMatches(candidate: unknown, keys: string[]): boolean {
+  const normalizedCandidateId = normalizeId(candidate);
+  const normalizedCandidateText = normalizeText(candidate);
+
+  return keys.some((key) => {
+    const normalizedKeyId = normalizeId(key);
+    const normalizedKeyText = normalizeText(key);
+
+    return (
+      normalizedCandidateId === normalizedKeyId ||
+      normalizedCandidateText === normalizedKeyText ||
+      (!!normalizedCandidateText && !!normalizedKeyText && normalizedCandidateText.includes(normalizedKeyText)) ||
+      (!!normalizedCandidateText && !!normalizedKeyText && normalizedKeyText.includes(normalizedCandidateText))
+    );
+  });
+}
+
+async function findServiceForBooking(params: {
+  db: admin.firestore.Firestore;
+  rawServiceId: unknown;
+  professionalId: string;
+  professionalData: Record<string, any>;
+  requestBody: Record<string, any>;
+}): Promise<ServiceMatch | null> {
+  const { db, rawServiceId, professionalId, professionalData, requestBody } = params;
   const serviceKey = normalizeId(rawServiceId);
 
-  if (!serviceKey) {
-    return null;
-  }
+  const requestService = requestBody.service || requestBody.selectedService || {};
+  const lookupKeys = uniqueCandidates([
+    serviceKey,
+    requestBody.serviceId,
+    requestBody.serviceName,
+    requestBody.serviceTitle,
+    requestBody.name,
+    requestBody.title,
+    requestService.id,
+    requestService.serviceId,
+    requestService.slug,
+    requestService.code,
+    requestService.name,
+    requestService.title
+  ]);
 
-  // 1) Preferred path: serviceId is the real Firestore document id.
-  const directSnap = await db.collection('services').doc(serviceKey).get();
-  if (directSnap.exists) {
-    const directData = directSnap.data() || {};
-    const serviceProfessionalId = normalizeId(directData.professionalId);
+  console.log('[API_BOOKING] service lookup keys:', lookupKeys);
 
-    if (!serviceProfessionalId || serviceProfessionalId === professionalId) {
-      return directSnap;
+  if (serviceKey) {
+    const directSnap = await db.collection('services').doc(serviceKey).get();
+    if (directSnap.exists) {
+      const directData = directSnap.data() || {};
+      const serviceProfessionalId = normalizeId(directData.professionalId);
+
+      if (!serviceProfessionalId || serviceProfessionalId === professionalId) {
+        return { id: directSnap.id, data: directData, source: 'direct-doc' };
+      }
+
+      console.warn('[API_BOOKING] Service doc found, but professionalId mismatch', {
+        serviceId: serviceKey,
+        serviceProfessionalId,
+        expectedProfessionalId: professionalId
+      });
     }
-
-    console.warn('[API_BOOKING] Service doc found, but professionalId mismatch', {
-      serviceId: serviceKey,
-      serviceProfessionalId,
-      expectedProfessionalId: professionalId
-    });
   }
 
-  // 2) Backward-compatible fallback: old frontend may send name/code/legacy id.
   const servicesSnapshot = await db
     .collection('services')
     .where('professionalId', '==', professionalId)
     .get();
 
-  const normalizedKey = normalizeText(serviceKey);
+  console.log('[API_BOOKING] professional root services found:', servicesSnapshot.size);
 
-  const matched = servicesSnapshot.docs.find((doc) => {
-    const data = doc.data() || {};
+  const rootServices = servicesSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    data: doc.data() || {}
+  }));
+
+  const rootMatch = rootServices.find(({ id, data }) => {
     const candidates = [
-      doc.id,
+      id,
       data.id,
       data.serviceId,
       data.slug,
@@ -61,16 +117,82 @@ async function findServiceForBooking(
       data.title
     ];
 
-    return candidates.some((candidate) => {
-      const normalizedCandidateId = normalizeId(candidate);
-      return (
-        normalizedCandidateId === serviceKey ||
-        normalizeText(normalizedCandidateId) === normalizedKey
-      );
-    });
+    return candidates.some((candidate) => candidateMatches(candidate, lookupKeys));
   });
 
-  return matched || null;
+  if (rootMatch) {
+    return { ...rootMatch, source: 'root-services' };
+  }
+
+  const embeddedServices = Array.isArray(professionalData.services) ? professionalData.services : [];
+
+  const embeddedMatch = embeddedServices.find((service: any) => {
+    const candidates = [
+      service?.id,
+      service?.serviceId,
+      service?.slug,
+      service?.code,
+      service?.name,
+      service?.title
+    ];
+
+    return candidates.some((candidate) => candidateMatches(candidate, lookupKeys));
+  });
+
+  if (embeddedMatch) {
+    const embeddedId = normalizeId(embeddedMatch.id || embeddedMatch.serviceId || serviceKey || embeddedMatch.name || embeddedMatch.title);
+    return {
+      id: embeddedId || serviceKey || 'embedded-service',
+      data: {
+        ...embeddedMatch,
+        professionalId
+      },
+      source: 'embedded-profile'
+    };
+  }
+
+  if (rootServices.length === 1) {
+    console.warn('[API_BOOKING] Using single professional service fallback', {
+      requestedServiceId: serviceKey,
+      fallbackServiceId: rootServices[0].id
+    });
+    return { ...rootServices[0], source: 'single-professional-service' };
+  }
+
+  // Last-resort compatibility for old Hosting releases that submit a legacy/non-Firestore id.
+  // This keeps the client booking from failing while preserving a clear audit flag in Firestore.
+  const legacyName =
+    requestBody.serviceName ||
+    requestBody.serviceTitle ||
+    requestService.name ||
+    requestService.title ||
+    serviceKey ||
+    'Serviço selecionado';
+
+  if (serviceKey || legacyName) {
+    console.error('[API_BOOKING] CRITICAL legacy service fallback used. Service could not be matched exactly.', {
+      requestedServiceId: serviceKey,
+      professionalId,
+      legacyName,
+      rootServices: rootServices.map((service) => ({ id: service.id, name: service.data.name || service.data.title }))
+    });
+
+    return {
+      id: serviceKey || normalizeId(legacyName) || 'legacy-service',
+      data: {
+        id: serviceKey,
+        name: legacyName,
+        title: legacyName,
+        price: requestBody.servicePrice || requestBody.price || requestService.price,
+        duration: requestBody.serviceDuration || requestBody.duration || requestService.duration,
+        professionalId,
+        lookupStatus: 'legacy-unmatched'
+      },
+      source: 'legacy-unmatched'
+    };
+  }
+
+  return null;
 }
 
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, data: any, professionalId: string, isNew: boolean, oldData?: any, existingSummarySnap?: admin.firestore.DocumentSnapshot) {
@@ -118,6 +240,7 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
   const safeServiceId = normalizeId(serviceId);
 
   console.log(`[API_BOOKING] Request received for professional: ${safeProfessionalId} on ${date} at ${time}`);
+  console.log('[API_BOOKING] raw body:', JSON.stringify(req.body));
   console.log('[API_BOOKING] serviceId received:', serviceId, 'normalized:', safeServiceId);
   
   if (!safeProfessionalId || !date || !time) {
@@ -126,11 +249,35 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
   }
 
   try {
+    const proRef = db.collection('users').doc(safeProfessionalId);
+    const proSnap = await proRef.get();
+    if (!proSnap.exists) {
+      throw new Error('Profissional não encontrado.');
+    }
+
+    const serviceMatch = await findServiceForBooking({
+      db,
+      rawServiceId: safeServiceId,
+      professionalId: safeProfessionalId,
+      professionalData: proSnap.data() || {},
+      requestBody: req.body || {}
+    });
+
+    console.log('[API_BOOKING] service match:', serviceMatch ? { id: serviceMatch.id, source: serviceMatch.source, name: serviceMatch.data.name || serviceMatch.data.title } : null);
+
+    if (!serviceMatch) {
+      throw new Error('Serviço não encontrado.');
+    }
+
     const cleanedData = removeEmptyFields({
       professionalId: safeProfessionalId,
       date,
       time,
-      serviceId: safeServiceId,
+      serviceId: serviceMatch.id,
+      serviceName: serviceMatch.data.name || serviceMatch.data.title,
+      servicePrice: serviceMatch.data.price,
+      serviceDuration: serviceMatch.data.duration,
+      serviceLookupSource: serviceMatch.source,
       clientName: cName,
       clientEmail: cEmail,
       clientWhatsapp: cWhatsapp,
@@ -154,30 +301,11 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
     };
 
     await db.runTransaction(async (transaction) => {
-      // Professional Check
-      const proRef = db.collection('users').doc(safeProfessionalId);
-      const proSnap = await transaction.get(proRef);
-      if (!proSnap.exists) {
+      // Re-read Professional Check inside the transaction.
+      const txProSnap = await transaction.get(proRef);
+      if (!txProSnap.exists) {
         throw new Error('Profissional não encontrado.');
       }
-
-      // Service Check
-      if (!safeServiceId) {
-        throw new Error('ID do serviço não fornecido.');
-      }
-
-      const serviceSnap = await findServiceForBooking(db, safeServiceId, safeProfessionalId);
-      console.log('[API_BOOKING] service found:', Boolean(serviceSnap?.exists), serviceSnap?.id || null);
-
-      if (!serviceSnap?.exists) {
-        throw new Error('Serviço não encontrado.');
-      }
-
-      const serviceData = serviceSnap.data() || {};
-      finalData.serviceId = serviceSnap.id;
-      finalData.serviceName = serviceData.name || serviceData.title || finalData.serviceName;
-      finalData.servicePrice = serviceData.price ?? finalData.servicePrice;
-      finalData.serviceDuration = serviceData.duration ?? finalData.serviceDuration;
 
       // Coupon (if any)
       if (couponId) {
