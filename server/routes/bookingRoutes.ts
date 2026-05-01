@@ -5,6 +5,74 @@ import { removeEmptyFields, generateReservationCode, getClientKey, normalizeId }
 
 export const bookingRouter = express.Router();
 
+function normalizeText(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+async function findServiceForBooking(
+  db: admin.firestore.Firestore,
+  rawServiceId: unknown,
+  professionalId: string
+): Promise<admin.firestore.DocumentSnapshot | null> {
+  const serviceKey = normalizeId(rawServiceId);
+
+  if (!serviceKey) {
+    return null;
+  }
+
+  // 1) Preferred path: serviceId is the real Firestore document id.
+  const directSnap = await db.collection('services').doc(serviceKey).get();
+  if (directSnap.exists) {
+    const directData = directSnap.data() || {};
+    const serviceProfessionalId = normalizeId(directData.professionalId);
+
+    if (!serviceProfessionalId || serviceProfessionalId === professionalId) {
+      return directSnap;
+    }
+
+    console.warn('[API_BOOKING] Service doc found, but professionalId mismatch', {
+      serviceId: serviceKey,
+      serviceProfessionalId,
+      expectedProfessionalId: professionalId
+    });
+  }
+
+  // 2) Backward-compatible fallback: old frontend may send name/code/legacy id.
+  const servicesSnapshot = await db
+    .collection('services')
+    .where('professionalId', '==', professionalId)
+    .get();
+
+  const normalizedKey = normalizeText(serviceKey);
+
+  const matched = servicesSnapshot.docs.find((doc) => {
+    const data = doc.data() || {};
+    const candidates = [
+      doc.id,
+      data.id,
+      data.serviceId,
+      data.slug,
+      data.code,
+      data.name,
+      data.title
+    ];
+
+    return candidates.some((candidate) => {
+      const normalizedCandidateId = normalizeId(candidate);
+      return (
+        normalizedCandidateId === serviceKey ||
+        normalizeText(normalizedCandidateId) === normalizedKey
+      );
+    });
+  });
+
+  return matched || null;
+}
+
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, data: any, professionalId: string, isNew: boolean, oldData?: any, existingSummarySnap?: admin.firestore.DocumentSnapshot) {
   // Mock logic for restoration - the user wants the structure back
   const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
@@ -46,20 +114,23 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
   const cName = clientName || client?.name;
   const cEmail = clientEmail || client?.email;
   const cWhatsapp = clientWhatsapp || client?.phone;
+  const safeProfessionalId = normalizeId(professionalId);
+  const safeServiceId = normalizeId(serviceId);
 
-  console.log(`[API_BOOKING] Request received for professional: ${professionalId} on ${date} at ${time}`);
+  console.log(`[API_BOOKING] Request received for professional: ${safeProfessionalId} on ${date} at ${time}`);
+  console.log('[API_BOOKING] serviceId received:', serviceId, 'normalized:', safeServiceId);
   
-  if (!professionalId || !date || !time) {
+  if (!safeProfessionalId || !date || !time) {
     console.warn(`[API_BOOKING] REJECTED: Missing fields (proId, date or time)`);
     return res.status(400).json({ error: "Dados de agendamento incompletos" });
   }
 
   try {
     const cleanedData = removeEmptyFields({
-      professionalId,
+      professionalId: safeProfessionalId,
       date,
       time,
-      serviceId,
+      serviceId: safeServiceId,
       clientName: cName,
       clientEmail: cEmail,
       clientWhatsapp: cWhatsapp,
@@ -84,21 +155,29 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
 
     await db.runTransaction(async (transaction) => {
       // Professional Check
-      const proRef = db.collection('users').doc(professionalId);
+      const proRef = db.collection('users').doc(safeProfessionalId);
       const proSnap = await transaction.get(proRef);
       if (!proSnap.exists) {
         throw new Error('Profissional não encontrado.');
       }
 
       // Service Check
-      if (!serviceId) {
+      if (!safeServiceId) {
         throw new Error('ID do serviço não fornecido.');
       }
-      const serviceRef = db.collection('services').doc(serviceId);
-      const serviceSnap = await transaction.get(serviceRef);
-      if (!serviceSnap.exists) {
+
+      const serviceSnap = await findServiceForBooking(db, safeServiceId, safeProfessionalId);
+      console.log('[API_BOOKING] service found:', Boolean(serviceSnap?.exists), serviceSnap?.id || null);
+
+      if (!serviceSnap?.exists) {
         throw new Error('Serviço não encontrado.');
       }
+
+      const serviceData = serviceSnap.data() || {};
+      finalData.serviceId = serviceSnap.id;
+      finalData.serviceName = serviceData.name || serviceData.title || finalData.serviceName;
+      finalData.servicePrice = serviceData.price ?? finalData.servicePrice;
+      finalData.serviceDuration = serviceData.duration ?? finalData.serviceDuration;
 
       // Coupon (if any)
       if (couponId) {
@@ -109,8 +188,8 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
         }
       }
 
-      const clientKey = getClientKey(clientWhatsapp, clientEmail, clientName);
-      const summaryId = `${professionalId}_${clientKey}`;
+      const clientKey = getClientKey(cWhatsapp, cEmail, cName);
+      const summaryId = `${safeProfessionalId}_${clientKey}`;
       const summaryRef = db.collection('client_summaries').doc(summaryId);
       const summarySnap = await transaction.get(summaryRef);
 
@@ -122,12 +201,12 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
         appointmentId: apptRef.id,
         manageSlug,
         reservationCode,
-        professionalId: professionalId,
-        clientEmail: clientEmail || '',
+        professionalId: safeProfessionalId,
+        clientEmail: cEmail || '',
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      await updateClientSummaryInternal(transaction, finalData, professionalId, true, undefined, summarySnap);
+      await updateClientSummaryInternal(transaction, finalData, safeProfessionalId, true, undefined, summarySnap);
     });
 
     console.log(`[API_BOOKING] SUCCESS: Appt ${apptRef.id}, Slug ${manageSlug}`);
