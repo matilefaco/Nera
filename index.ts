@@ -1,1 +1,1 @@
-export { api } from "./server/api_entry";
+export { api } from "./server/api_entry.js";
