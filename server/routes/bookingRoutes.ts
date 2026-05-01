@@ -144,11 +144,11 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
   }
 });
 
-// v3: robust profile lookup + slug auto-migration
+// v4: robust profile lookup exclusively in USERS collection
 bookingRouter.get("/public/profile/:slug", async (req, res) => {
   try {
     const { slug } = req.params;
-    console.log("[PROFILE ROUTE HIT]", slug);
+    console.log("[PROFILE LOOKUP USERS]", slug);
 
     if (!slug) {
       return res.status(400).json({ error: "Slug obrigatório" });
@@ -160,11 +160,11 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
     let docToReturn: any = null;
     let foundDoc: admin.firestore.DocumentSnapshot | null = null;
 
-    // 1. Try lookups in sequence
-    // A. By slug field in users
+    // 1. Try lookups in sequence (ONLY in 'users' collection)
+    // A. By slug field
     let snapshot = await db.collection("users").where("slug", "==", slugLower).limit(1).get();
     
-    // B. By username or handle in users
+    // B. By username or handle
     if (snapshot.empty) {
       snapshot = await db.collection("users").where("username", "==", slugLower).limit(1).get();
     }
@@ -172,7 +172,7 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
       snapshot = await db.collection("users").where("handle", "==", slugLower).limit(1).get();
     }
 
-    // C. Fallback: Direct Document ID (Extreme Fallback)
+    // C. Fallback: Direct Document ID
     if (snapshot.empty) {
       const directDoc = await db.collection("users").doc(slug).get();
       if (directDoc.exists) {
@@ -180,14 +180,6 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
       }
     } else {
       foundDoc = snapshot.docs[0];
-    }
-
-    // D. Try professionals collection (legacy/requested fallback)
-    if (!foundDoc) {
-      snapshot = await db.collection("professionals").where("slug", "==", slugLower).limit(1).get();
-      if (!snapshot.empty) {
-        foundDoc = snapshot.docs[0];
-      }
     }
 
     if (!foundDoc) {
