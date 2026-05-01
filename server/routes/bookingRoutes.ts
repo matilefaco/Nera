@@ -192,10 +192,8 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
 
     // 2. Migration Logic: If found but missing slug, auto-generate and save
     if (!data.slug) {
-      const nameForSlug = data.name || data.displayName || data.username || 'prof';
-      const generatedSlug = nameForSlug.toLowerCase().replace(/\s+/g, '');
-      
-      console.log(`[PROFILE MIGRATION] Generating slug for ${foundDoc.id}: ${generatedSlug}`);
+      const generatedSlug = slugLower; // use slug from URL (lowercase)
+      console.log("[SLUG AUTO-CREATED]", generatedSlug);
       
       try {
         await foundDoc.ref.update({ slug: generatedSlug });
