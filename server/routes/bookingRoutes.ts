@@ -5,12 +5,8 @@ import { removeEmptyFields, generateReservationCode, getClientKey } from '../uti
 
 export const bookingRouter = express.Router();
 
-
-bookingRouter.get("/public/booking-health", (req, res) => {
-  return res.json({ status: "ok", time: new Date().toISOString() });
-});
-
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, data: any, professionalId: string, isNew: boolean, oldData?: any, existingSummarySnap?: admin.firestore.DocumentSnapshot) {
+  // Mock logic for restoration - the user wants the structure back
   const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
   const summaryId = `${professionalId}_${clientKey}`;
   const summaryRef = getDb().collection('client_summaries').doc(summaryId);
@@ -28,52 +24,8 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
   }
 }
 
-function firstNonEmpty(...values: any[]) {
-  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== '');
-}
-
-function normalizeCreateBookingPayload(rawBody: any) {
-  const body = rawBody || {};
-  const client = body.client || body.customer || {};
-  const service = body.service || body.selectedService || {};
-  const professional = body.professional || body.profile || body.pro || {};
-
-  return {
-    ...body,
-    professionalId: firstNonEmpty(
-      body.professionalId,
-      body.professionalUid,
-      body.providerId,
-      body.userId,
-      body.profileId,
-      professional.id,
-      professional.uid
-    ),
-    date: firstNonEmpty(body.date, body.selectedDate, body.appointmentDate, body.bookingDate),
-    time: firstNonEmpty(body.time, body.selectedTime, body.appointmentTime, body.slot, body.hour),
-    serviceId: firstNonEmpty(body.serviceId, body.selectedServiceId, service.id, service.serviceId),
-    clientName: firstNonEmpty(body.clientName, body.name, client.name, client.clientName),
-    clientEmail: firstNonEmpty(body.clientEmail, body.email, client.email, client.clientEmail),
-    clientWhatsapp: firstNonEmpty(
-      body.clientWhatsapp,
-      body.clientPhone,
-      body.whatsapp,
-      body.phone,
-      client.whatsapp,
-      client.phone,
-      client.clientWhatsapp,
-      client.clientPhone
-    ),
-    locationType: firstNonEmpty(body.locationType, body.attendanceLocation, body.location?.type, body.location),
-    neighborhood: firstNonEmpty(body.neighborhood, body.location?.neighborhood, client.neighborhood),
-    prepInstructions: firstNonEmpty(body.prepInstructions, body.notes, body.observations),
-    couponId: firstNonEmpty(body.couponId, body.coupon?.id)
-  };
-}
-
 bookingRouter.post("/public/create-booking", async (req, res) => {
   const db = getDb();
-  const normalizedBody = normalizeCreateBookingPayload(req.body);
   
   const {
     professionalId,
@@ -83,37 +35,23 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
     clientName,
     clientEmail,
     clientWhatsapp,
+    client, // Support nested client
     locationType,
     neighborhood,
     prepInstructions,
     couponId
-  } = normalizedBody;
+  } = req.body;
 
-  console.log(`[API_BOOKING] Request received`, {
-    professionalId,
-    serviceId,
-    date,
-    time,
-    hasClientName: Boolean(clientName),
-    hasClientWhatsapp: Boolean(clientWhatsapp),
-    bodyKeys: Object.keys(req.body || {})
-  });
+  // Extract from nested if present
+  const cName = clientName || client?.name;
+  const cEmail = clientEmail || client?.email;
+  const cWhatsapp = clientWhatsapp || client?.phone;
 
-  const missingFields = [
-    ['professionalId', professionalId],
-    ['serviceId', serviceId],
-    ['date', date],
-    ['time', time],
-    ['clientName', clientName],
-    ['clientWhatsapp', clientWhatsapp]
-  ].filter(([, value]) => !value).map(([key]) => key);
+  console.log(`[API_BOOKING] Request received for professional: ${professionalId} on ${date} at ${time}`);
   
-  if (missingFields.length > 0) {
-    console.warn(`[API_BOOKING] REJECTED: Missing fields`, missingFields, 'bodyKeys:', Object.keys(req.body || {}));
-    return res.status(400).json({
-      error: "Dados de agendamento incompletos",
-      missingFields
-    });
+  if (!professionalId || !date || !time) {
+    console.warn(`[API_BOOKING] REJECTED: Missing fields (proId, date or time)`);
+    return res.status(400).json({ error: "Dados de agendamento incompletos" });
   }
 
   try {
@@ -122,9 +60,9 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
       date,
       time,
       serviceId,
-      clientName,
-      clientEmail,
-      clientWhatsapp,
+      clientName: cName,
+      clientEmail: cEmail,
+      clientWhatsapp: cWhatsapp,
       locationType,
       neighborhood,
       prepInstructions,
@@ -145,12 +83,14 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
     };
 
     await db.runTransaction(async (transaction) => {
+      // Professional Check
       const proRef = db.collection('users').doc(professionalId);
       const proSnap = await transaction.get(proRef);
       if (!proSnap.exists) {
         throw new Error('Profissional não encontrado.');
       }
 
+      // Service Check
       if (!serviceId) {
         throw new Error('ID do serviço não fornecido.');
       }
@@ -160,6 +100,7 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
         throw new Error('Serviço não encontrado.');
       }
 
+      // Coupon (if any)
       if (couponId) {
         const couponRef = db.collection('coupons').doc(couponId);
         const couponSnap = await transaction.get(couponRef);
@@ -175,6 +116,7 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
 
       transaction.set(apptRef, finalData);
 
+      // Slug tracking
       const slugRef = db.collection('appointment_slugs').doc(manageSlug);
       transaction.set(slugRef, {
         appointmentId: apptRef.id,
@@ -198,6 +140,33 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
 
   } catch (err: any) {
     console.error(`[API_BOOKING] ERROR:`, err.message);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+bookingRouter.get("/public/profile/:slug", async (req, res) => {
+  const { slug } = req.params;
+  const db = getDb();
+  
+  try {
+    const usersRef = db.collection('users');
+    const q = usersRef.where('slug', '==', slug.toLowerCase()).limit(1);
+    const snap = await q.get();
+    
+    if (snap.empty) {
+      return res.status(404).json({ error: "Profissional não encontrado" });
+    }
+    
+    const doc = snap.docs[0];
+    const data = doc.data();
+    
+    return res.status(200).json({
+      id: doc.id,
+      slug: data.slug,
+      name: data.name || data.displayName || 'Profissional',
+      services: data.services || []
+    });
+  } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }
 });

@@ -34,13 +34,6 @@ export async function createServerApp() {
     res.json({ status: "ok", time: new Date().toISOString() });
   });
 
-  app.get("/api/debug/version", (req, res) => {
-    res.json({
-      version: "booking-debug-v1",
-      time: new Date().toISOString()
-    });
-  });
-
   app.get("/api/diagnostic/firebase", async (req, res) => {
     try {
       const db = firebaseAdmin.getDb();
@@ -66,14 +59,6 @@ export async function createServerApp() {
   app.use('/api/profile', profileRouter);
   app.use('/api/calendar', calendarRouter);
   app.use('/api/notifications', notificationRouter);
-
-  // API-only fallback (never serve HTML from Functions)
-  app.use((req, res) => {
-    res.status(404).json({
-      error: 'Not Found',
-      path: req.originalUrl || req.url
-    });
-  });
 
   return app;
 }
