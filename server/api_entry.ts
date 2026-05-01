@@ -24,6 +24,6 @@ export const api = onRequest({
     return app(req, res);
   } catch (err) {
     console.error("[CRITICAL STARTUP ERROR]", err);
-    res.status(500).send("Internal Server Error during initialization");
+    res.status(500).json({ error: "Internal Server Error during initialization" });
   }
 });

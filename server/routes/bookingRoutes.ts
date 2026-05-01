@@ -5,6 +5,11 @@ import { removeEmptyFields, generateReservationCode, getClientKey } from '../uti
 
 export const bookingRouter = express.Router();
 
+
+bookingRouter.get("/public/booking-health", (req, res) => {
+  return res.json({ status: "ok", time: new Date().toISOString() });
+});
+
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, data: any, professionalId: string, isNew: boolean, oldData?: any, existingSummarySnap?: admin.firestore.DocumentSnapshot) {
   // Mock logic for restoration - the user wants the structure back
   const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
