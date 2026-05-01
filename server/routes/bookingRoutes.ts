@@ -144,6 +144,10 @@ bookingRouter.post("/public/create-booking", async (req, res) => {
   }
 });
 
+function normalizeId(value: unknown): string {
+  return String(value || "").replace(/^"+|"+$/g, "").trim();
+}
+
 // v4: robust profile lookup exclusively in USERS collection
 bookingRouter.get("/public/profile/:slug", async (req, res) => {
   try {
@@ -203,12 +207,28 @@ bookingRouter.get("/public/profile/:slug", async (req, res) => {
       }
     }
 
-    console.log("[PROFILE LOOKUP]", { slug, found: true, id: foundDoc.id });
+    // 3. Fetch services from root collection if needed
+    // Normalize correct ID just in case
+    const professional = { id: normalizeId(foundDoc.id) };
+
+    const servicesSnapshot = await db.collection("services").where("professionalId", "==", professional.id).get();
+    
+    // Mapping and extra normalization on the returned objects (Task 3 compliance)
+    const services = servicesSnapshot.docs.map(s => {
+      const sData = s.data();
+      return { 
+        id: s.id, 
+        ...sData,
+        professionalId: normalizeId(sData.professionalId)
+      };
+    });
+
+    console.log("[PROFILE LOOKUP]", { slug, found: true, id: foundDoc.id, servicesCount: services.length });
 
     return res.json({
       ...docToReturn,
       name: docToReturn.name || docToReturn.displayName || 'Profissional',
-      services: docToReturn.services || []
+      services: services.length > 0 ? services : (docToReturn.services || [])
     });
 
   } catch (err) {
