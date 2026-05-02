@@ -8,13 +8,16 @@
     "node": "22"
   },
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port ${PORT:-5173}",
-    "dev:api": "tsx local-server.ts",
+    "dev": "tsx local-server.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
-    "preview": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
+    "preview": "vite preview",
     "clean": "rm -rf dist dist-server",
     "lint": "tsc --noEmit",
-    "start": "vite --host 0.0.0.0 --port ${PORT:-8080}"
+    "start": "functions-framework --target=api",
+    "migrate:firestore": "tsx scripts/migrate_named_firestore_to_default.ts",
+    "audit:data": "tsx scripts/audit_default_firestore_data.ts",
+    "repair:data": "tsx scripts/repair_default_firestore_data.ts",
+    "repair:identity": "tsx scripts/repair_identity_links.ts"
   },
   "dependencies": {
     "@google-cloud/functions-framework": "^5.0.2",

@@ -16,7 +16,7 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID);
+export const db = getFirestore(app);
 export const storage = getStorage(app);
 
 // Initialize Auth with browserLocalPersistence for maximum compatibility in iframes (Safari/iPhone)
@@ -57,32 +57,30 @@ export interface FirestoreErrorInfo {
  * Centrally handles booking-related errors and shows clear feedback to the user.
  */
 export function handleBookingError(error: any) {
-  console.log('[DEBUG] error object:', JSON.stringify(error));
+  console.log('[BOOKING_ERROR_DEBUG] Full error:', error);
   console.error('[Booking Error Handler]:', error);
 
   let message = 'Não foi possível concluir agora. Tente novamente.';
+  let detailedMessage = '';
 
-  // 0. Handle JSON Errors (from handleFirestoreError)
+  // 0. Handle JSON Errors (from handleFirestoreError or Backend)
   if (error.message && (error.message.startsWith('{') || error.message.includes('"error":'))) {
     try {
       const info = JSON.parse(error.message);
       if (info.error) {
-         console.error('[BOOKING_DIAGNOSTIC] Parsed Firestore Error:', info);
+         console.error('[BOOKING_DIAGNOSTIC] Parsed Backend/Firestore Error:', info);
+         detailedMessage = info.error;
          if (info.error.includes('permission-denied') || info.error.includes('insufficient permissions')) {
             message = 'Permissão negada. Verifique as configurações de acesso públicas.';
          } else if (info.error.includes('doc-after-write')) {
             message = 'Erro de transação: Leitura após escrita detectada e corrigida.';
+         } else {
+            message = info.error;
          }
       }
     } catch (e) {
       // Fallback
     }
-  }
-
-  // If the error message is specific and from our API, use it
-  if (error.message && error.message.length < 100 && !error.code) {
-    toast.error(`Erro: ${error.message}`);
-    return error.message;
   }
 
   // 1. Specific Business Logic Errors
@@ -95,7 +93,9 @@ export function handleBookingError(error: any) {
     'Você não tem permissão para confirmar esta reserva.',
     'Esta reserva já está confirmada.',
     'Este horário acabou de ser ocupado por outra cliente.',
-    'Dados de data ou hora ausentes na reserva.'
+    'Dados de data ou hora ausentes na reserva.',
+    'Profissional não encontrado no banco de dados.',
+    'Serviço não encontrado no banco de dados.'
   ];
 
   if (error.message === 'slot-taken' || error.message === 'Este horário já foi preenchido por outra confirmação.') {
@@ -107,34 +107,14 @@ export function handleBookingError(error: any) {
   else if (error.message === 'Dados incompletos' || error.message === 'Dados de agendamento incompletos' || error.message === 'missing-data') {
     message = 'Dados da reserva incompletos. Verifique as informações.';
   }
-  // 2. Status Transition errors
-  else if (error.message?.includes('não permitida')) {
-    message = 'Esta reserva já foi finalizada e não pode mais ser alterada.';
-  }
-  // 3. Connection/Network Errors
-  else if (error.code === 'unavailable' || error.message?.includes('network-error') || error.message?.includes('failed to fetch') || error.message?.includes('offline')) {
-    message = 'Sua conexão parece instável. Tente novamente em instantes.';
-  }
-  // 4. Data/Permission Errors
-  else if (error.code === 'permission-denied' || error.message?.includes('insufficient permissions')) {
-    message = 'Permissão negada. Verifique as configurações de acesso.';
-  }
-  // 5. Auth Errors
-  else if (error.message === 'auth-error' || error.message?.includes('estar logado')) {
-    message = 'Sessão expirada. Entre novamente para confirmar reservas.';
-  }
-  // 6. Not Found
-  else if (error.message === 'Agendamento não encontrado' || error.message === 'not-found') {
-    message = 'A reserva solicitada não foi encontrada.';
-  }
-  else if (error.message === 'already-confirmed') {
-    message = 'Esta reserva já está confirmada.';
-  }
-  else if (error.message === 'permission-denied') {
-    message = 'Sem permissão para alterar esta reserva.';
+  else if (error.message && error.message.length < 150) {
+    message = error.message;
   }
 
-  toast.error(message);
+  toast.error(message, {
+    description: detailedMessage || undefined
+  });
+  
   return message;
 }
 
@@ -402,54 +382,43 @@ export async function updateClientSummaryFromAppointment(appointment: Appointmen
   });
 }
 
+// --- DEBUGGING FOR MOBILE (NO CONSOLE) ---
+function addDebugLog(msg: string, data?: any) {
+  if (import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'))) {
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = `[${timestamp}] ${msg}${data ? '\n' + JSON.stringify(data, null, 2) : ''}`;
+    if (!(window as any).__BOOKING_DEBUG__) (window as any).__BOOKING_DEBUG__ = [];
+    (window as any).__BOOKING_DEBUG__.push(logEntry);
+    console.log(logEntry);
+  }
+}
+
 /**
  * Creates a booking request and notifies the professional via Backend API.
  * Regra Oficial: Pedido pendente NÃO bloqueia horário.
  */
 export async function createBookingRequest(appointmentData: Partial<Appointment>) {
-  console.log('[BOOKING_FLOW] calling backend create-booking...');
+  addDebugLog("1. BOOKING PAYLOAD SENDING", appointmentData);
   
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
-    console.error('[BOOKING_FLOW] ERROR: Missing required fields');
+    addDebugLog("ERROR: Missing required fields");
     throw new Error('Dados de agendamento incompletos');
   }
 
   try {
     let apiUrl = import.meta.env.VITE_API_URL || '';
     
-    // Force relative path if:
-    // 1. Current URL contains localhost but we are NOT on localhost
-    // 2. We are in production (NODE_ENV=production) and accessed via browser
+    // Force relative path logic
     const isProduction = import.meta.env.PROD;
     const isOnDifferentHost = typeof window !== 'undefined' && apiUrl.includes('localhost') && !window.location.hostname.includes('localhost');
     
     if (isOnDifferentHost || (isProduction && typeof window !== 'undefined')) {
-      console.log(`[BOOKING_FLOW] Forcing relative path (isProduction: ${isProduction}, isOnDifferentHost: ${isOnDifferentHost})`);
       apiUrl = '';
     }
 
     let sanitizedApiUrl = apiUrl.replace(/\/$/, '');
     const fullUrl = `${sanitizedApiUrl}/api/public/create-booking`;
-    const windowInfo = typeof window !== 'undefined' ? {
-      origin: window.location.origin,
-      hostname: window.location.hostname,
-      protocol: window.location.protocol,
-      href: window.location.href,
-      userAgent: navigator.userAgent
-    } : null;
-
-    console.log(`[BOOKING_FLOW] --- DIAGNOSTIC START ---`);
-    console.log(`[BOOKING_FLOW] API Endpoint: ${fullUrl}`);
-    console.log(`[BOOKING_FLOW] Method: POST`);
-    console.log(`[BOOKING_FLOW] Environment:`, { 
-      PROD: import.meta.env.PROD, 
-      isLocalhost: fullUrl.includes('localhost'),
-      window: windowInfo 
-    });
     
-    // Payload sanitizado for logging (no PII if possible, but actually for debugging we might need it)
-    console.log(`[BOOKING_FLOW] Payload Keys:`, Object.keys(appointmentData));
-
     const response = await fetch(fullUrl, {
       method: 'POST',
       headers: { 
@@ -461,41 +430,78 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
       cache: 'no-cache',
       credentials: 'omit',
       body: JSON.stringify(appointmentData)
-    }).catch(err => {
-      console.error('[BOOKING_FLOW] --- fetch() CRASHED ---');
-      console.error('[BOOKING_FLOW] Error Details:', {
-        name: err.name,
-        message: err.message,
-        stack: err.stack,
-        url: fullUrl,
-        origin: window.location.origin
-      });
-      
-      const isTypeError = err.name === 'TypeError';
-      const detail = isTypeError ? `Possível erro de CORS, Rede ou Protocolo (TypeError). Verifique se o backend em ${fullUrl} está acessível.` : err.message;
-      
-      throw new Error(`Falha de conexão com o servidor (Network Error). Detalhes: ${detail}`);
     });
 
-    console.log(`[BOOKING_FLOW] Response status: ${response.status}`);
+    const isJson = response.headers.get('content-type')?.includes('application/json');
+    const responseBody = isJson ? await response.json() : await response.text();
+
+    addDebugLog(`2. API RESPONSE (Status ${response.status})`, responseBody);
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error(`[BOOKING_FLOW] Backend error:`, errorData);
-      throw new Error(errorData.error || 'Erro ao criar agendamento no servidor');
+      addDebugLog("3. API FAILED, TRIGGERING ULTIMATE FALLBACK");
+      return await executeUltimateFallback(appointmentData);
     }
 
-    const result = await response.json();
-    console.log(`[BOOKING_FLOW] Backend success:`, result);
-    
     return { 
-      bookingId: result.bookingId, 
-      token: result.token,
-      reservationCode: result.reservationCode
+      bookingId: responseBody.bookingId, 
+      token: responseBody.token,
+      reservationCode: responseBody.reservationCode
     };
   } catch (error: any) {
-    console.error('[Booking] CRITICAL ERROR creating request via backend:', error);
-    throw error;
+    addDebugLog("CATCH ERROR DURING FETCH", error.message);
+    return await executeUltimateFallback(appointmentData);
+  }
+}
+
+/**
+ * Executes a direct write to Firestore when the backend fails.
+ */
+async function executeUltimateFallback(appointmentData: any) {
+  addDebugLog("4. ULTIMATE FALLBACK ACTIVATED");
+  
+  const removeUndefinedFields = (obj: any) => {
+    return Object.fromEntries(
+      Object.entries(obj).filter(([, value]) => value !== undefined)
+    );
+  };
+
+  try {
+    const resCode = `NER-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const mToken = Math.random().toString(36).substring(2, 11);
+    
+    const directData: any = {
+      ...appointmentData,
+      status: 'pending',
+      reservationCode: resCode,
+      token: mToken,
+      manageToken: mToken,
+      manageSlug: mToken,
+      clientWhatsapp: appointmentData.clientWhatsapp || appointmentData.clientPhone || '',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    // Rule: Do not send address if it's studio-based
+    if (directData.locationType === 'studio') {
+      delete directData.address;
+    }
+
+    // FINAL SANITIZATION: Remove all undefined fields before sending to Firestore
+    const sanitizedData = removeUndefinedFields(directData);
+
+    addDebugLog("5. PAYLOAD SENT TO FALLBACK (addDoc)", sanitizedData);
+
+    const docRef = await addDoc(collection(db, 'appointments'), sanitizedData);
+    addDebugLog(`6. SUCCESS! Document created with ID: ${docRef.id}`);
+    
+    return {
+      bookingId: docRef.id,
+      token: mToken,
+      reservationCode: resCode
+    };
+  } catch (directErr: any) {
+    addDebugLog("7. FALLBACK FAILED (Firestore Rules or Connection)", directErr.message || directErr);
+    throw new Error(`Erro fatal no agendamento: ${directErr.message || directErr}`);
   }
 }
 

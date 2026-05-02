@@ -108,17 +108,15 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
                     "font-serif text-brand-ink leading-tight mb-2",
                     isCompact ? "text-lg" : "text-2xl"
                   )}>
-                    {service.name}
+                    {service.name || "Serviço"}
                   </h3>
 
-                  {service.description && (
-                    <p className={cn(
-                      "font-light leading-relaxed text-brand-stone line-clamp-2",
-                      isCompact ? "text-[11px] max-w-[200px] md:max-w-md" : "text-[13px] mb-6"
-                    )}>
-                      {service.description}
-                    </p>
-                  )}
+                  <p className={cn(
+                    "font-light leading-relaxed text-brand-stone line-clamp-2",
+                    isCompact ? "text-[11px] max-w-[200px] md:max-w-md" : "text-[13px] mb-6"
+                  )}>
+                    {service.description || "Nenhuma descrição disponível."}
+                  </p>
 
                   {isCompact && (
                     <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--theme-accent,var(--color-brand-terracotta))] mt-1">
@@ -131,10 +129,10 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
                   <div className="mt-6 flex items-end justify-between border-t border-brand-mist/50 pt-6">
                     <div>
                       <div className="font-serif text-2xl text-brand-ink">
-                        {formatCurrency(service.price)}
+                        {formatCurrency(service.price || 0)}
                       </div>
                       <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-brand-stone">
-                        {service.duration} minutos
+                        {service.duration || 0} minutos
                       </div>
                     </div>
                     
@@ -149,7 +147,7 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
               {isCompact && (
                 <div className="relative z-10 flex flex-col items-end gap-3 ml-4">
                   <div className="font-serif text-xl border-b border-brand-mist/30 pb-0.5">
-                    {formatCurrency(service.price)}
+                    {formatCurrency(service.price || 0)}
                   </div>
                   <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:translate-x-1 transition-transform">
                     Reservar

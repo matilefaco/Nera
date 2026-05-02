@@ -19,13 +19,17 @@ export const getDb = () => {
 export const initFirebase = async () => {
   try {
     if (!admin.apps.length) {
-      admin.initializeApp();
-      console.log("[FIREBASE ADMIN] Initialized with default credentials");
+      const projectId = process.env.VITE_FIREBASE_PROJECT_ID || "ai-studio-applet-webapp-bb725";
+      admin.initializeApp({
+        projectId
+      });
+      console.log(`[FIREBASE ADMIN] Initialized with projectId: ${projectId}`);
     }
 
+    // Using the (default) database instance
     db = getFirestore();
     defaultDb = db;
-    console.log("[FIREBASE ADMIN] Firestore references initialized");
+    console.log(`[NERA FIRESTORE] Initialized with database: (default)`);
   } catch (err: any) {
     console.error("[FIREBASE ADMIN] Critical Initialization Error:", err.message);
   }

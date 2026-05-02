@@ -51,6 +51,17 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [successDraft, setSuccessDraft] = useState<any>(null);
   const [bookingMode, setBookingMode] = useState<'studio' | 'home' | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [, forceUpdate] = useState({});
+
+  useEffect(() => {
+    // Poll for debug logs periodically when modal is open and in dev/ais mode
+    if (!(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-')))) return;
+    
+    const interval = setInterval(() => {
+      forceUpdate({});
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [appointmentToken, setAppointmentToken] = useState<string | null>(null);
   const [reservationCode, setReservationCode] = useState<string | null>(null);
@@ -461,10 +472,28 @@ export default function BookingModal({ profile, services, onClose, open, initial
   };
 
   const handleBooking = async () => {
-    console.log('[BOOKING] handleBooking started');
+    const totalPrice = calculateTotalPrice();
+    
+    // LOGS OBRIGATÓRIOS DO USUÁRIO
+    console.log("BOOKING PAYLOAD SENDING:", {
+      professionalId: profile?.uid,
+      serviceId: selectedService?.id,
+      serviceName: selectedService?.name,
+      totalPrice: totalPrice,
+      date: selectedDate,
+      time: selectedTime,
+      clientName,
+      clientPhone
+    });
+    
     setBookingAttempted(true);
-    if (!profile || !selectedService) {
-      console.warn('[BOOKING] Missing profile or service', { profile: !!profile, service: !!selectedService });
+    
+    if (!profile?.uid || !selectedService?.id || (selectedService?.price ?? 0) < 0) {
+      console.error('[BOOKING_ERROR] Invalid service or profile data', { 
+        service: selectedService, 
+        profileId: profile?.uid 
+      });
+      toast.error('Dados de agendamento incompletos ou inválidos.');
       return;
     }
     
@@ -622,6 +651,8 @@ export default function BookingModal({ profile, services, onClose, open, initial
         setStep(4);
       }, 800);
     } catch (error: any) {
+      if (!(window as any).__BOOKING_DEBUG__) (window as any).__BOOKING_DEBUG__ = [];
+      (window as any).__BOOKING_DEBUG__.push(`[FATAL ERROR] ${error.message || error}`);
       handleBookingError(error);
     } finally {
       setBookingLoading(false);
@@ -684,10 +715,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
                         {services.map((service) => (
                           <button key={service.id} onClick={() => { setSelectedService(service); }} className={cn("w-full p-6 text-left rounded-[24px] border transition-all flex justify-between items-center group relative overflow-hidden", selectedService?.id === service.id ? "bg-brand-ink border-brand-ink text-brand-white" : "bg-brand-parchment border-brand-mist hover:border-brand-ink")}>
                             <div className="flex-1 relative z-10">
-                              <h4 className={cn("font-serif text-lg", selectedService?.id === service.id ? "text-brand-white" : "text-brand-ink")}>{service.name}</h4>
-                              <span className="text-[10px] uppercase tracking-widest opacity-60">{service.duration} min</span>
+                              <h4 className={cn("font-serif text-lg", selectedService?.id === service.id ? "text-brand-white" : "text-brand-ink")}>{service.name || "Serviço"}</h4>
+                              <span className="text-[10px] uppercase tracking-widest opacity-60">{service.duration || 0} min</span>
                             </div>
-                            <div className="text-xl font-serif text-brand-terracotta relative z-10">{formatCurrency(service.price)}</div>
+                            <div className="text-xl font-serif text-brand-terracotta relative z-10">{formatCurrency(service.price || 0)}</div>
                           </button>
                         ))}
                       </div>
@@ -991,6 +1022,32 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       Você receberá as atualizações por e-mail e WhatsApp.
                     </p>
                   </div>
+
+                  {/* DEBUG PANEL FOR MOBILE DEV/PREVIEW ONLY */}
+                  {(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'))) && step === 3 && (
+                    <div className="mb-10 p-4 bg-brand-linen rounded-2xl border border-brand-mist text-left">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-[9px] font-bold text-brand-stone uppercase tracking-widest">Debug Info (DEV ONLY)</h4>
+                        <button 
+                          onClick={() => { (window as any).__BOOKING_DEBUG__ = []; forceUpdate({}); }}
+                          className="text-[9px] text-brand-terracotta underline"
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto text-[9px] font-mono text-brand-ink space-y-1">
+                        {(window as any).__BOOKING_DEBUG__?.length > 0 ? (
+                          (window as any).__BOOKING_DEBUG__.map((log: string, i: number) => (
+                            <div key={i} className="border-b border-brand-mist/30 pb-2">
+                              <pre className="whitespace-pre-wrap">{log}</pre>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-brand-stone italic">Nenhum log capturado ainda. Toque em "Confirmar Agora".</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="hidden md:block">
                     <PremiumButton variant="terracotta" className="w-full py-7" onClick={handleBooking} loading={bookingLoading} loadingText="Confirmando...">

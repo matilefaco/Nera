@@ -263,7 +263,47 @@ export default function PublicProfile() {
               where('active', '==', true)
             );
             const servicesSnapshot = await getDocs(servicesQ);
-            setServices(servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service)));
+            const rawServices = servicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Service));
+            
+            // Filter: active, name, price > 0, duration > 0, professionalId valid
+            const validServices = rawServices.filter(s => 
+              s.active !== false && 
+              s.name?.trim() && 
+              (s.price ?? 0) > 0 && 
+              (s.duration ?? 0) > 0 && 
+              s.professionalId
+            );
+
+            // Deduplicate: Group by professionalId + normalized name
+            const normalizedGroups = new Map<string, Service[]>();
+            validServices.forEach(s => {
+              const normName = s.name.toLowerCase().trim();
+              if (!normalizedGroups.has(normName)) normalizedGroups.set(normName, []);
+              normalizedGroups.get(normName)!.push(s);
+            });
+
+            const dedupedServices = Array.from(normalizedGroups.values()).map(group => {
+              if (group.length === 1) return group[0];
+              // Sort criteria:
+              // 1. Has description
+              // 2. Most recent (updatedAt or createdAt)
+              return group.sort((a, b) => {
+                const aHasDesc = !!a.description?.trim();
+                const bHasDesc = !!b.description?.trim();
+                if (aHasDesc !== bHasDesc) return aHasDesc ? -1 : 1;
+                
+                const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+                const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+                return bTime - aTime;
+              })[0];
+            });
+
+            if (isDev) {
+              console.log(`[PublicProfile] Services Filtered: ${rawServices.length} -> ${dedupedServices.length}`);
+              console.log(`[PublicProfile] Services List:`, dedupedServices.map(s => `${s.name} (${s.id})`));
+            }
+
+            setServices(dedupedServices);
           } catch (e) {
             devLog("[PublicProfile] Failed to fetch services silently:", e);
           }

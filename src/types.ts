@@ -16,6 +16,10 @@ export interface Service {
   price: number;
   duration: number;
   description?: string;
+  active?: boolean;
+  professionalId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PortfolioItem {

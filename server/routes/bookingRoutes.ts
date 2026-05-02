@@ -7,6 +7,10 @@ import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 const router = express.Router();
 
 // --- HELPER FUNCTIONS FOR BACKEND BOOKING ---
+const normalizeId = (id: any): string => {
+  return String(id || "").trim().replace(/^"+|"+$/g, "");
+};
+
 const getClientKey = (phone?: string, email?: string, name?: string): string => {
   const cleanPhone = phone?.replace(/\D/g, '') || '';
   if (cleanPhone && cleanPhone.length >= 8) return cleanPhone;
@@ -115,11 +119,11 @@ router.get("/public/booking-health", (req, res) => {
 router.post("/public/create-booking", async (req, res) => {
   const db = getDb();
   const appointmentData = req.body;
-  console.log(`[API_BOOKING] Request received! Body:`, JSON.stringify(appointmentData));
+  console.log("BOOKING PAYLOAD RECEBIDO:", JSON.stringify(appointmentData, null, 2));
   
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
-    console.warn(`[API_BOOKING] REJECTED: Missing fields`, appointmentData);
-    return res.status(400).json({ error: "Dados de agendamento incompletos" });
+    console.error(`[API_BOOKING] REJECTED: Missing fields`, appointmentData);
+    return res.status(400).json({ error: "Dados de agendamento incompletos (professionalId, date ou time ausentes)" });
   }
 
   try {
@@ -128,7 +132,7 @@ router.post("/public/create-booking", async (req, res) => {
     const reservationCode = generateReservationCode(appointmentData.date);
     const manageSlug = reservationCode.toLowerCase();
 
-    const finalData = {
+    const finalData: any = {
       ...cleanedData,
       status: 'pending',
       token: manageSlug,
@@ -136,35 +140,48 @@ router.post("/public/create-booking", async (req, res) => {
       manageToken: manageSlug,
       reservationCode,
       manageSlug,
+      clientWhatsapp: appointmentData.clientWhatsapp || appointmentData.clientPhone || '',
+      clientPhone: appointmentData.clientWhatsapp || appointmentData.clientPhone || '',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
+    console.log(`[API_BOOKING] Transaction starting. ApptID: ${apptRef.id}`);
+
     await db.runTransaction(async (transaction) => {
-      // 1. ALL READS
-      
       // Professional Check
       const proRef = db.collection('users').doc(appointmentData.professionalId);
       const proSnap = await transaction.get(proRef);
       if (!proSnap.exists) {
-        throw new Error('Profissional não encontrado.');
+        console.error(`BOOKING ERROR: Professional not found: ${appointmentData.professionalId}`);
+        throw new Error(`Profissional não encontrado (${appointmentData.professionalId}). Verifique se o perfil existe.`);
       }
 
       // Service Check & Official Price
       if (!appointmentData.serviceId) {
+        console.error(`BOOKING ERROR: Missing serviceId`);
         throw new Error('ID do serviço não fornecido.');
       }
       const serviceRef = db.collection('services').doc(appointmentData.serviceId);
       const serviceSnap = await transaction.get(serviceRef);
       if (!serviceSnap.exists) {
-        throw new Error('Serviço não encontrado.');
+        console.error(`BOOKING ERROR: Service not found: ${appointmentData.serviceId}`);
+        throw new Error(`Serviço não encontrado (${appointmentData.serviceId}). Verifique se o serviço ainda existe.`);
       }
       const service = serviceSnap.data() as any;
-      
+
+      // Ownership check (Critical for data integrity after migration)
+      if (normalizeId(service.professionalId) !== normalizeId(appointmentData.professionalId)) {
+        console.warn(`[API_BOOKING] ID MISMATCH: Service ${appointmentData.serviceId} belongs to ${service.professionalId}, but booking requested for ${appointmentData.professionalId}.`);
+        // If they are different, we should probably follow the service's owner to avoid orphan appointments
+        // but for now we just log and use the service's proId as the source of truth if needed
+      }
+
       // Force official price and duration from service
       finalData.price = Number(service.price) || 0;
       finalData.duration = Number(service.duration) || 60;
       finalData.serviceName = service.name;
+      finalData.professionalId = service.professionalId; // Force owner from service
 
       // Coupon (if any)
       let couponSnap = null;
@@ -174,14 +191,7 @@ router.post("/public/create-booking", async (req, res) => {
         couponSnap = await transaction.get(couponRef);
       }
 
-      // Summary
-      const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
-      const summaryId = `${appointmentData.professionalId}_${clientKey}`;
-      const summaryRef = db.collection('client_summaries').doc(summaryId);
-      const summarySnap = await transaction.get(summaryRef);
-
       // 2. LOGIC & WRITES
-      
       if (couponSnap && couponSnap.exists) {
         const coupon = couponSnap.data() as any;
         if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
@@ -207,10 +217,14 @@ router.post("/public/create-booking", async (req, res) => {
       });
 
       // Update Client Summary
+      const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
+      const summaryId = `${appointmentData.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
       await updateClientSummaryInternal(transaction, finalData, appointmentData.professionalId, true, undefined, summarySnap);
     });
 
-    console.log(`[API_BOOKING] SUCCESS: Appt ${apptRef.id}, Slug ${manageSlug}`);
+    console.log(`[API_BOOKING] SUCCESS: Committed Appt ${apptRef.id}`);
 
     res.json({
       success: true,
@@ -220,7 +234,7 @@ router.post("/public/create-booking", async (req, res) => {
     });
 
   } catch (err: any) {
-    console.error('[API_BOOKING] FAILED:', err.message);
+    console.error("BOOKING ERROR:", err.message);
     res.status(500).json({ 
       error: err.message,
       code: err.code || null
