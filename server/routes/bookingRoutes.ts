@@ -4,6 +4,7 @@ import { getDb } from "../firebaseAdmin.js";
 import { sendBookingConfirmedEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 import { redactSensitiveData } from "../utils.js";
+import { validateBookingPayload, hasUndefinedDeep } from "../../src/lib/payloadValidators.js";
 
 const router = express.Router();
 const isProduction = process.env.NODE_ENV === "production";
@@ -121,13 +122,17 @@ router.get("/public/booking-health", (req, res) => {
 
 router.post("/public/create-booking", async (req, res) => {
   const db = getDb();
-  const appointmentData = req.body;
-  console.log("BOOKING PAYLOAD RECEBIDO:", JSON.stringify(redactSensitiveData(appointmentData), null, 2));
-  
-  if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
-    console.error(`[API_BOOKING] REJECTED: Missing fields`, redactSensitiveData(appointmentData));
-    return res.status(400).json({ error: "Dados de agendamento incompletos (professionalId, date ou time ausentes)" });
+  let appointmentData: any;
+
+  try {
+    appointmentData = validateBookingPayload(req.body);
+    if (hasUndefinedDeep(appointmentData)) throw new Error("Payload de booking contém valores undefined");
+  } catch (error: any) {
+    console.warn("[CRITICAL_ROUTE]", JSON.stringify({ route: "create_booking", status: "failed", reason: error.message }));
+    return res.status(400).json({ error: error.message || "Payload de booking inválido" });
   }
+
+  console.log("[CRITICAL_ROUTE]", JSON.stringify({ route: "create_booking", status: "started", professionalId: String(appointmentData.professionalId).slice(0, 6) + "***", serviceId: String(appointmentData.serviceId).slice(0, 6) + "***" }));
 
   try {
     const cleanedData = removeEmptyFields(appointmentData);
@@ -227,7 +232,7 @@ router.post("/public/create-booking", async (req, res) => {
       await updateClientSummaryInternal(transaction, finalData, finalData.professionalId, true, undefined, summarySnap);
     });
 
-    console.log(`[API_BOOKING] SUCCESS: Committed Appt ${apptRef.id}`);
+    console.log("[CRITICAL_ROUTE]", JSON.stringify({ route: "create_booking", status: "success", bookingId: apptRef.id }));
 
     res.json({
       success: true,
@@ -237,7 +242,7 @@ router.post("/public/create-booking", async (req, res) => {
     });
 
   } catch (err: any) {
-    console.error("BOOKING ERROR:", err.message);
+    console.error("[CRITICAL_ROUTE]", JSON.stringify({ route: "create_booking", status: "failed", reason: err.message }));
     res.status(500).json({ 
       error: err.message,
       code: err.code || null

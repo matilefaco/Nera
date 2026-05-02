@@ -1,4 +1,4 @@
-import { Appointment } from '../types';
+import { Appointment } from '../types.js';
 
 export function getClientScore(appointments: Appointment[], whatsapp: string) {
   const cleanWhatsapp = whatsapp.replace(/\D/g, '');
