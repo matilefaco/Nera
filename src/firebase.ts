@@ -2,27 +2,26 @@ import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
+// TEMP: hardcoded config (mobile fix)
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDO2OcFecgXEfATajxcY0piPP8VfCoQGWU",
+  authDomain: "ai-studio-applet-webapp-bb725.firebaseapp.com",
+  projectId: "ai-studio-applet-webapp-bb725",
+  storageBucket: "ai-studio-applet-webapp-bb725.firebasestorage.app",
+  messagingSenderId: "768951224787",
+  appId: "1:768951224787:web:9165a57c367a649f1e8726"
 };
-
-export const firebaseConfigReady = Boolean(
-  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId
-);
 
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
 let dbInstance: Firestore | null = null;
 
-if (firebaseConfigReady) {
+try {
   app = initializeApp(firebaseConfig);
   authInstance = getAuth(app);
   dbInstance = getFirestore(app);
+} catch (e) {
+  console.error("Firebase init error:", e);
 }
 
 export { app };
