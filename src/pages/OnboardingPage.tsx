@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { generateSlug, formatCurrency, cn, removeEmptyFields, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
+import { generateSlug, formatCurrency, cn, removeUndefinedDeep, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { FormIdentity } from '../components/FormIdentity';
@@ -468,7 +468,6 @@ export default function OnboardingPage() {
   const prevStep = () => setStep(s => s - 1);
 
   const handleFinish = async () => {
-    console.log('[OnboardingSave] handleFinish triggered');
     setFormErrors({});
 
     // 0. CHECK AVATAR
@@ -536,94 +535,89 @@ export default function OnboardingPage() {
     
     setLoading(true);
     setIsFinalizing(true);
-    console.log('[ONBOARDING] Starting finalization via API. Data:', { 
+    
+    const activeServices = services.filter(s => s.name.trim() !== '' && s.price);
+    
+    const rawProfileData: Partial<UserProfile> = {
+      name: name.trim(),
+      specialty: specialty.trim(),
+      city: (studioAddress.city || city).trim(),
+      neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
+      slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+      whatsapp: cleanWhatsapp(whatsapp),
+      paymentMethods,
+      bio: bio.trim(),
+      headline: headline.trim(),
+      instagram: instagram.trim().replace('@', ''),
+      avatar,
+      serviceMode,
+      serviceAreaType,
+      studioAddress: {
+        street: (studioAddress.street || '').trim(),
+        number: (studioAddress.number || '').trim(),
+        complement: (studioAddress.complement || '').trim(),
+        neighborhood: (studioAddress.neighborhood || '').trim(),
+        city: (studioAddress.city || city || '').trim(),
+        reference: (studioAddress.reference || '').trim()
+      },
+      serviceAreas: serviceAreas.map(area => ({
+        name: area.name.trim(),
+        fee: Number(area.fee) || 0
+      })),
+      workingHours: {
+        startTime,
+        endTime,
+        workingDays
+      },
+      professionalIdentity: {
+        mainSpecialty: specialty.trim(),
+        yearsExperience,
+        serviceStyle: selectedStyles,
+        differentials: selectedDifferentials,
+        attendsAt: serviceMode as any
+      } as ProfessionalIdentity,
+      published: true, // Explicitly marked as published
+      onboardingCompleted: true,
+      onboardingStep: 6,
+      indexable: true,
+      planRank: profile?.planRank || 0,
+      avatarSkipped: avatar ? false : avatarSkipped,
+      updatedAt: new Date().toISOString()
+    };
+
+    const rawServicesData = activeServices.map(service => ({
+      name: service.name.trim(),
+      duration: Number(service.duration) || 60,
+      price: Number(service.price) || 0,
+      description: (service.description || '').trim()
+    }));
+
+    // SANITIZATION: Remove all undefined/empty fields to prevent Firestore errors
+    const profileData = removeUndefinedDeep(rawProfileData);
+    const servicesData = removeUndefinedDeep(rawServicesData);
+
+    const payload = { 
       uid: user.uid, 
-      slug, 
-      name, 
-      onboardingCompleted: true 
-    });
+      profileData, 
+      services: servicesData 
+    };
 
     try {
-      const activeServices = services.filter(s => s.name.trim() !== '' && s.price);
-      
-      const profileData: Partial<UserProfile> = {
-        name: name.trim(),
-        specialty: specialty.trim(),
-        city: (studioAddress.city || city).trim(),
-        neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
-        slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
-        whatsapp: cleanWhatsapp(whatsapp),
-        paymentMethods,
-        bio: bio.trim(),
-        headline: headline.trim(),
-        instagram: instagram.trim().replace('@', ''),
-        avatar,
-        serviceMode,
-        serviceAreaType,
-        studioAddress: removeEmptyFields({
-          street: (studioAddress.street || '').trim(),
-          number: (studioAddress.number || '').trim(),
-          complement: (studioAddress.complement || '').trim(),
-          neighborhood: (studioAddress.neighborhood || '').trim(),
-          city: (studioAddress.city || city || '').trim(),
-          reference: (studioAddress.reference || '').trim()
-        }),
-        serviceAreas: serviceAreas.map(area => ({
-          name: area.name.trim(),
-          fee: Number(area.fee) || 0
-        })),
-        workingHours: {
-          startTime,
-          endTime,
-          workingDays
-        },
-        professionalIdentity: {
-          mainSpecialty: specialty.trim(),
-          yearsExperience,
-          serviceStyle: selectedStyles,
-          differentials: selectedDifferentials,
-          attendsAt: serviceMode as any
-        } as ProfessionalIdentity,
-        onboardingCompleted: true,
-        onboardingStep: 6,
-        indexable: true,
-        planRank: profile?.planRank || 0,
-        avatarSkipped: avatar ? false : avatarSkipped
-      };
-
-      const servicesData = activeServices.map(service => ({
-        name: service.name.trim(),
-        duration: Number(service.duration) || 60,
-        price: Number(service.price) || 0,
-        description: (service.description || '').trim()
-      }));
-
       const response = await fetch('/api/profile/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: user.uid,
-          profileData,
-          services: servicesData
-        })
+        body: JSON.stringify(payload)
       });
 
+      const isJson = response.headers.get('content-type')?.includes('application/json');
+      const responseBody = isJson ? await response.json() : await response.text();
+      
       if (!response.ok) {
-        let errorMsg = 'Erro ao publicar seu perfil.';
-        try {
-          const errorData = await response.json();
-          errorMsg = errorData.error || errorMsg;
-        } catch (e) {
-          console.error('[ONBOARDING] Server returned non-JSON error:', response.status);
-          errorMsg = `Erro do servidor (${response.status})`;
-        }
-        throw new Error(errorMsg);
+        throw new Error(typeof responseBody === 'object' ? responseBody.error : responseBody);
       }
 
-      console.log('[ONBOARDING] Transactional save completed successfully');
       setStep(6);
     } catch (error: any) {
-      console.error('[ONBOARDING ERROR] Finalization failed:', error);
       toast.error(getHumanError(error));
     } finally {
       setIsFinalizing(false);

@@ -25,33 +25,27 @@ export function generateSlug(text: string) {
 }
 
 /**
+ * Recursively removes undefined fields from an object or array.
+ */
+export function removeUndefinedDeep(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(removeUndefinedDeep).filter((v) => v !== undefined);
+  }
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, removeUndefinedDeep(v)])
+    );
+  }
+  return value;
+}
+
+/**
  * Recursively removes empty strings, undefined, null, and empty arrays from an object.
  */
 export function removeEmptyFields<T>(obj: T): T {
-  if (Array.isArray(obj)) {
-    return obj
-      .map(v => (v && typeof v === 'object' ? removeEmptyFields(v) : v))
-      .filter(v => v !== null && v !== undefined && v !== '') as any;
-  }
-  
-  if (obj && typeof obj === 'object') {
-    return Object.entries(obj).reduce((acc, [key, value]) => {
-      const cleaned = value && typeof value === 'object' ? removeEmptyFields(value) : value;
-      
-      if (
-        cleaned !== null && 
-        cleaned !== undefined && 
-        cleaned !== '' && 
-        !(Array.isArray(cleaned) && cleaned.length === 0)
-      ) {
-        acc[key] = cleaned;
-      }
-      
-      return acc;
-    }, {} as any);
-  }
-  
-  return obj;
+  return removeUndefinedDeep(obj);
 }
 
 /**

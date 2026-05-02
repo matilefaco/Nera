@@ -123,6 +123,7 @@ export interface UserProfile {
   avatarSkipped?: boolean;
   monthlyRevenueGoal?: number;
   indexable?: boolean;
+  published?: boolean;
   planRank?: number;
   averageRating?: number;
   totalReviews?: number;

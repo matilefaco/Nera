@@ -67,7 +67,44 @@ export default function ServicesPage() {
 
     const q = query(collection(db, 'services'), where('professionalId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setServices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+      
+      // 1. Filtragem básica (active, name, price, duration)
+      const filtered = rawServices.filter((s: any) => 
+        s.active !== false &&
+        s.name?.trim() &&
+        Number(s.price) > 0 &&
+        Number(s.duration) > 0
+      );
+
+      // 2. Deduplicação por professionalId + normalized(name)
+      // Como já estamos filtrando por user.uid, comparamos apenas o nome normalizado
+      const grouped = new Map<string, any[]>();
+      filtered.forEach((s: any) => {
+        const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(s);
+      });
+
+      const uniqueServices = Array.from(grouped.values()).map(list => {
+        if (list.length === 1) return list[0];
+        
+        // Critérios de desempate se houver duplicados:
+        // 1. Tem descrição
+        // 2. Mais recente (updatedAt ou createdAt)
+        // 3. Primeiro da lista
+        return [...list].sort((a, b) => {
+          const aDesc = !!a.description?.trim();
+          const bDesc = !!b.description?.trim();
+          if (aDesc !== bDesc) return aDesc ? -1 : 1;
+          
+          const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+          const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+          return bTime - aTime;
+        })[0];
+      });
+
+      setServices(uniqueServices);
     });
     return () => unsubscribe();
   }, [user]);

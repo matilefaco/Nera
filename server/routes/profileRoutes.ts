@@ -7,12 +7,33 @@ import { PLAN_CONFIGS } from "../../src/constants/plans.js";
 const router = express.Router();
 
 /**
+ * Recursively removes undefined fields from an object or array.
+ */
+const removeUndefinedDeep = (value: any): any => {
+  if (Array.isArray(value)) {
+    return value.map(removeUndefinedDeep).filter((v) => v !== undefined);
+  }
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, removeUndefinedDeep(v)])
+    );
+  }
+  return value;
+};
+
+/**
  * POST /api/profile/save
  * Transactional save that claims a slug and updates the user profile.
  */
 router.post("/save", async (req, res) => {
   const { uid, profileData, services } = req.body;
-  const slug = profileData?.slug?.toLowerCase()?.trim();
+  
+  console.log("[PROFILE_PUBLISH_PAYLOAD] Received for UID:", uid);
+  
+  const sanitizedProfile = removeUndefinedDeep(profileData || {});
+  const slug = sanitizedProfile?.slug?.toLowerCase()?.trim();
 
   if (!uid || !slug) {
     return res.status(400).json({ error: "UID e Slug são obrigatórios." });
@@ -67,10 +88,10 @@ router.post("/save", async (req, res) => {
 
       // --- THEME VALIDATION (Security) ---
       const userPlan = (userData?.plan || 'free').toLowerCase() as keyof typeof PLAN_CONFIGS;
-      const themeVariant = profileData?.profileTheme?.variant;
+      const themeVariant = sanitizedProfile?.profileTheme?.variant;
       
       // WhatsApp validation on backend
-      const whatsapp = profileData?.whatsapp;
+      const whatsapp = sanitizedProfile?.whatsapp;
       if (whatsapp && !isValidWhatsapp(whatsapp)) {
         console.warn(`[SECURITY] User ${uid} tried to save invalid WhatsApp: ${whatsapp}`);
         throw new Error("O número de WhatsApp informado é inválido. Use um formato brasileiro (DDD + número).");
@@ -79,27 +100,28 @@ router.post("/save", async (req, res) => {
       const config = PLAN_CONFIGS[userPlan] || PLAN_CONFIGS.free;
       const allowed = config.themes;
 
-      let validatedTheme = profileData?.profileTheme;
+      let validatedTheme = sanitizedProfile?.profileTheme;
       if (themeVariant && !allowed.includes(themeVariant)) {
         console.warn(`[THEME SECURITY] User ${uid} (${userPlan}) tried to use ${themeVariant}. Resetting to terracotta.`);
         validatedTheme = { variant: 'terracotta' };
       }
 
-      const finalProfileData = {
-        ...profileData,
+      const finalProfileData = removeUndefinedDeep({
+        ...sanitizedProfile,
         profileTheme: validatedTheme,
         slug,
         updatedAt: new Date().toISOString()
-      };
+      });
       transaction.set(userRef, finalProfileData, { merge: true });
 
       // 5. Handle Services if provided
       if (Array.isArray(services) && services.length > 0) {
         console.log("[PROFILE SAVE TX] Adding", services.length, "services");
         for (const service of services) {
+          const sanitizedService = removeUndefinedDeep(service);
           const serviceRef = db.collection("services").doc();
           transaction.set(serviceRef, {
-            ...service,
+            ...sanitizedService,
             professionalId: uid,
             createdAt: new Date().toISOString(),
             active: true
@@ -114,7 +136,7 @@ router.post("/save", async (req, res) => {
     console.log("[PROFILE SAVE] Transaction committed successfully for UID:", uid);
     res.json(result);
   } catch (err: any) {
-    console.error("[PROFILE SAVE ERROR]", err.message);
+    console.error("[PROFILE_PUBLISH_ERROR]", err.message);
     const status = err.message.includes("já está sendo usado") ? 409 : 500;
     res.status(status).json({ error: err.message });
   }

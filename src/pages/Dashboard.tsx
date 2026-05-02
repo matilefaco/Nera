@@ -517,8 +517,42 @@ export default function Dashboard() {
     );
 
     const unsubServices = onSnapshot(qServices, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
-      setServices(docs);
+      const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
+      
+      // 1. Filtragem básica (active, name, price, duration)
+      const filtered = rawServices.filter((s: any) => 
+        s.active !== false &&
+        s.name?.trim() &&
+        Number(s.price) > 0 &&
+        Number(s.duration) > 0
+      );
+
+      // 2. Deduplicação por normalized(name)
+      const grouped = new Map<string, any[]>();
+      filtered.forEach(s => {
+        const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key)!.push(s);
+      });
+
+      const uniqueServices = Array.from(grouped.values()).map(list => {
+        if (list.length === 1) return list[0];
+        
+        // Critérios de desempate se houver duplicados:
+        // 1. Tem descrição
+        // 2. Mais recente (updatedAt ou createdAt)
+        return [...list].sort((a, b) => {
+          const aDesc = !!(a as any).description?.trim();
+          const bDesc = !!(b as any).description?.trim();
+          if (aDesc !== bDesc) return aDesc ? -1 : 1;
+          
+          const aTime = new Date((a as any).updatedAt || (a as any).createdAt || 0).getTime();
+          const bTime = new Date((b as any).updatedAt || (b as any).createdAt || 0).getTime();
+          return bTime - aTime;
+        })[0];
+      });
+
+      setServices(uniqueServices);
     });
 
     // Query: WhatsApp Logs

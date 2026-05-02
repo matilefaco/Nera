@@ -3,7 +3,7 @@ import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, 
 import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit, increment } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
-import { removeEmptyFields, parseFirestoreDate } from './lib/utils';
+import { removeUndefinedDeep, parseFirestoreDate } from './lib/utils';
 import { toast } from 'sonner';
 
 const firebaseConfig = {
@@ -194,7 +194,7 @@ export async function saveProfilePartial(userId: string, payload: Partial<UserPr
   }
 
   // Clean data before saving
-  const cleanedPayload = removeEmptyFields(rest);
+  const cleanedPayload = removeUndefinedDeep(rest);
   
   const userRef = doc(db, 'users', userId);
   try {
@@ -382,26 +382,14 @@ export async function updateClientSummaryFromAppointment(appointment: Appointmen
   });
 }
 
-// --- DEBUGGING FOR MOBILE (NO CONSOLE) ---
-function addDebugLog(msg: string, data?: any) {
-  if (import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'))) {
-    const timestamp = new Date().toLocaleTimeString();
-    const logEntry = `[${timestamp}] ${msg}${data ? '\n' + JSON.stringify(data, null, 2) : ''}`;
-    if (!(window as any).__BOOKING_DEBUG__) (window as any).__BOOKING_DEBUG__ = [];
-    (window as any).__BOOKING_DEBUG__.push(logEntry);
-    console.log(logEntry);
-  }
-}
+// --- BOOKING ENGINE ---
 
 /**
  * Creates a booking request and notifies the professional via Backend API.
  * Regra Oficial: Pedido pendente NÃO bloqueia horário.
  */
 export async function createBookingRequest(appointmentData: Partial<Appointment>) {
-  addDebugLog("1. BOOKING PAYLOAD SENDING", appointmentData);
-  
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
-    addDebugLog("ERROR: Missing required fields");
     throw new Error('Dados de agendamento incompletos');
   }
 
@@ -435,10 +423,7 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
     const isJson = response.headers.get('content-type')?.includes('application/json');
     const responseBody = isJson ? await response.json() : await response.text();
 
-    addDebugLog(`2. API RESPONSE (Status ${response.status})`, responseBody);
-
     if (!response.ok) {
-      addDebugLog("3. API FAILED, TRIGGERING ULTIMATE FALLBACK");
       return await executeUltimateFallback(appointmentData);
     }
 
@@ -448,7 +433,6 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
       reservationCode: responseBody.reservationCode
     };
   } catch (error: any) {
-    addDebugLog("CATCH ERROR DURING FETCH", error.message);
     return await executeUltimateFallback(appointmentData);
   }
 }
@@ -457,14 +441,6 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
  * Executes a direct write to Firestore when the backend fails.
  */
 async function executeUltimateFallback(appointmentData: any) {
-  addDebugLog("4. ULTIMATE FALLBACK ACTIVATED");
-  
-  const removeUndefinedFields = (obj: any) => {
-    return Object.fromEntries(
-      Object.entries(obj).filter(([, value]) => value !== undefined)
-    );
-  };
-
   try {
     const resCode = `NER-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     const mToken = Math.random().toString(36).substring(2, 11);
@@ -487,12 +463,9 @@ async function executeUltimateFallback(appointmentData: any) {
     }
 
     // FINAL SANITIZATION: Remove all undefined fields before sending to Firestore
-    const sanitizedData = removeUndefinedFields(directData);
-
-    addDebugLog("5. PAYLOAD SENT TO FALLBACK (addDoc)", sanitizedData);
+    const sanitizedData = removeUndefinedDeep(directData);
 
     const docRef = await addDoc(collection(db, 'appointments'), sanitizedData);
-    addDebugLog(`6. SUCCESS! Document created with ID: ${docRef.id}`);
     
     return {
       bookingId: docRef.id,
@@ -500,7 +473,6 @@ async function executeUltimateFallback(appointmentData: any) {
       reservationCode: resCode
     };
   } catch (directErr: any) {
-    addDebugLog("7. FALLBACK FAILED (Firestore Rules or Connection)", directErr.message || directErr);
     throw new Error(`Erro fatal no agendamento: ${directErr.message || directErr}`);
   }
 }
@@ -1279,7 +1251,7 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
 
 export async function addToWaitlist(entry: Partial<WaitlistEntry>) {
   console.log('[Waitlist] Adding entry...');
-  const cleaned = removeEmptyFields(entry);
+  const cleaned = removeUndefinedDeep(entry);
   const waitlistRef = collection(db, 'waitlist');
   try {
     await addDoc(waitlistRef, {
