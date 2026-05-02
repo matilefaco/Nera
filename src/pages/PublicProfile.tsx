@@ -225,6 +225,7 @@ export default function PublicProfile() {
 
   useEffect(() => {
     const fetchData = async () => {
+      const profileStart = performance.now();
       if (!slug) {
         setLoading(false);
         return;
@@ -236,6 +237,11 @@ export default function PublicProfile() {
           setServices(MOCK_SERVICES);
           setReviews(MOCK_REVIEWS);
           setStats(MOCK_STATS);
+          if (isDev) {
+            console.log(`[PublicProfile][Perf] mock profile+services loaded in ${Math.round(performance.now() - profileStart)}ms`);
+            console.log(`[PublicProfile][Perf] optional queries deferred: reviews, analytics, availability, blocked slots, tracking`);
+            console.log(`[PublicProfile][Perf] first render ready in ${Math.round(performance.now() - profileStart)}ms`);
+          }
           setLoading(false);
         }, 500);
         return;
@@ -249,14 +255,17 @@ export default function PublicProfile() {
           const userData = snapshot.docs[0].data();
           const professionalId = snapshot.docs[0].id;
           setProfile({ ...userData, uid: professionalId } as UserProfile);
+          if (isDev) {
+            console.log(`[PublicProfile][Perf] slug/profile loaded in ${Math.round(performance.now() - profileStart)}ms`);
+          }
           
           // Growth Analytics: Log Visit
           if (slug !== 'helena-prado' && slug !== 'exemplo') {
             logAnalyticsEvent(professionalId, 'visit');
           }
 
-          // Secondary fetches should be silent and independent
-          // 1. Services
+          // Essential fetch: services (required for first render)
+          const servicesStart = performance.now();
           try {
             const servicesQ = query(collection(db, 'services'), 
               where('professionalId', '==', professionalId), 
@@ -304,60 +313,86 @@ export default function PublicProfile() {
             }
 
             setServices(dedupedServices);
-          } catch (e) {
-            devLog("[PublicProfile] Failed to fetch services silently:", e);
-          }
-
-          // 2. Stats
-          try {
-            const statsDoc = await getDocs(query(collection(db, 'review_stats'), where('professionalId', '==', professionalId)));
-            if (!statsDoc.empty) {
-              setStats(statsDoc.docs[0].data());
+            if (isDev) {
+              console.log(`[PublicProfile][Perf] services loaded in ${Math.round(performance.now() - servicesStart)}ms`);
             }
           } catch (e) {
-            devLog("[PublicProfile] Failed to fetch stats silently:", e);
+            console.error("[PublicProfile] Failed to fetch essential services:", e);
+          } finally {
+            if (isDev) {
+              console.log(`[PublicProfile][Perf] first render ready in ${Math.round(performance.now() - profileStart)}ms`);
+              console.log(`[PublicProfile][Perf] optional queries deferred: reviews, analytics, availability, blocked slots, tracking`);
+            }
+            setLoading(false);
           }
 
-          // 3. Reviews
-          try {
-            const reviewsQ = query(
-              collection(db, 'reviews'), 
-              where('professionalId', '==', professionalId),
-              where('publicApproved', '==', true),
-              where('publicDisplayMode', 'in', ['named', 'anonymous'])
-            );
-            const reviewsSnapshot = await getDocs(reviewsQ);
-            setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review)));
-          } catch (e) {
-            devLog("[PublicProfile] Failed to fetch reviews silently:", e);
-          }
+          const withTimeout = async <T,>(label: string, operation: Promise<T>, timeoutMs = 6000): Promise<T | null> => {
+            const timeoutPromise = new Promise<null>((resolve) => {
+              setTimeout(() => resolve(null), timeoutMs);
+            });
+            const result = await Promise.race([operation, timeoutPromise]);
+            if (result === null) devLog(`[PublicProfile] Optional query timed out: ${label} (${timeoutMs}ms)`);
+            return result as T | null;
+          };
 
-          // 4. Portfolio (Legacy subcollection fallback)
-          if (!userData.portfolio || userData.portfolio.length === 0) {
+          // Optional fetches should never block first render
+          (async () => {
+            // 1. Stats
             try {
-              const portfolioQ = query(collection(db, 'users', professionalId, 'portfolio'), orderBy('createdAt', 'desc'));
-              const portfolioSnapshot = await getDocs(portfolioQ);
-              if (!portfolioSnapshot.empty) {
-                const portfolioItems = portfolioSnapshot.docs.map(doc => ({
-                  id: doc.id,
-                  url: doc.data().url || doc.data().imageUrl,
-                  category: doc.data().category,
-                  createdAt: doc.data().createdAt || new Date().toISOString()
-                }));
-                setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
+              const statsDoc = await withTimeout(
+                'stats',
+                getDocs(query(collection(db, 'review_stats'), where('professionalId', '==', professionalId)))
+              );
+              if (statsDoc && !statsDoc.empty) {
+                setStats(statsDoc.docs[0].data());
               }
             } catch (e) {
-              devLog("[PublicProfile] Failed to fetch legacy portfolio silently:", e);
+              devLog("[PublicProfile] Failed to fetch stats silently:", e);
             }
-          }
+
+            // 2. Reviews
+            try {
+              const reviewsQ = query(
+                collection(db, 'reviews'), 
+                where('professionalId', '==', professionalId),
+                where('publicApproved', '==', true),
+                where('publicDisplayMode', 'in', ['named', 'anonymous'])
+              );
+              const reviewsSnapshot = await withTimeout('reviews', getDocs(reviewsQ));
+              if (reviewsSnapshot) {
+                setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review)));
+              }
+            } catch (e) {
+              devLog("[PublicProfile] Failed to fetch reviews silently:", e);
+            }
+
+            // 3. Portfolio (Legacy subcollection fallback)
+            if (!userData.portfolio || userData.portfolio.length === 0) {
+              try {
+                const portfolioQ = query(collection(db, 'users', professionalId, 'portfolio'), orderBy('createdAt', 'desc'));
+                const portfolioSnapshot = await withTimeout('legacy-portfolio', getDocs(portfolioQ));
+                if (portfolioSnapshot && !portfolioSnapshot.empty) {
+                  const portfolioItems = portfolioSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    url: doc.data().url || doc.data().imageUrl,
+                    category: doc.data().category,
+                    createdAt: doc.data().createdAt || new Date().toISOString()
+                  }));
+                  setProfile(prev => prev ? { ...prev, portfolio: portfolioItems } : null);
+                }
+              } catch (e) {
+                devLog("[PublicProfile] Failed to fetch legacy portfolio silently:", e);
+              }
+            }
+          })();
         } else {
           setProfile(null);
+          setLoading(false);
         }
       } catch (error) {
         console.error("Critical error fetching public profile:", error);
         // Only show error for critical failure (user not found or total DB failure)
         toast.error('Não foi possível carregar as informações do perfil.');
-      } finally {
         setLoading(false);
       }
     };
