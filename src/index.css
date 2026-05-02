@@ -1,3 +1,128 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Outfit:wght@200;300;400;500&family=Great+Vibes&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", serif;
+  --font-signature: "Great Vibes", cursive;
+  
+  --color-brand-ink: #18120E;
+  --color-brand-espresso: #2E1F14;
+  --color-brand-terracotta: #A85C3A;
+  --color-brand-sienna: #C47250;
+  --color-brand-blush: #EDD9CC;
+  --color-brand-parchment: #F9F5F0;
+  --color-brand-linen: #F2EBE3;
+  --color-brand-stone: #8A7060;
+  --color-brand-mist: #E5DDD6;
+  --color-brand-white: #FDFAF7;
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  --animate-shimmer: shimmer 2s infinite ease-in-out;
+
+  @keyframes bounce-subtle {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-3px); }
+  }
+
+  --animate-bounce-subtle: bounce-subtle 2s infinite ease-in-out;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-parchment text-brand-ink font-sans antialiased selection:bg-brand-terracotta/20;
+  }
+
+  body::after {
+    content: '';
+    @apply fixed inset-0 pointer-events-none z-[9999] opacity-[0.035] mix-blend-multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+
+  .display-hero {
+    @apply text-[56px] md:text-[96px] font-normal leading-[0.92] tracking-tighter;
+  }
+
+  .heading-section {
+    @apply text-[34px] md:text-[52px] font-normal leading-[1.08] tracking-tight;
+  }
+
+  .body-text {
+    @apply text-[15px] leading-[1.8] font-light;
+  }
+
+  .label-text {
+    @apply text-[9px] uppercase tracking-[0.35em] font-semibold text-brand-stone;
+  }
+}
+
+@keyframes drawLine {
+  from { stroke-dashoffset: 600; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-6px) rotate(-1.5deg); }
+}
+
+.animate-draw {
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: drawLine 2s 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-drift {
+  animation: drift 7s ease-in-out infinite;
+}
+
+.premium-shadow {
+  box-shadow: 0 40px 80px -20px rgba(24, 18, 14, 0.08);
+}
+
+.card-refined {
+  @apply bg-brand-white border border-brand-mist rounded-[24px] p-8 transition-all duration-300;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.editorial-underline {
+  @apply relative inline-block;
+}
+
+.editorial-underline::after {
+  content: '';
+  @apply absolute bottom-0.5 left-0 w-full h-px bg-current opacity-20;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-brand-ink/5 rounded-full hover:bg-brand-ink/10 transition-colors;
+}

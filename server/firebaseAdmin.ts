@@ -1,26 +1,32 @@
-import admin from 'firebase-admin';
+import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 
-let db: admin.firestore.Firestore;
+export let db: admin.firestore.Firestore;
+export let defaultDb: admin.firestore.Firestore;
 
-export async function initFirebase() {
-  if (admin.apps.length === 0) {
-    const app = admin.initializeApp({
-      projectId: 'ai-studio-applet-webapp-bb725'
-    });
-    console.log("[FIREBASE] Admin initialized for project:", app.options.projectId);
-  }
-  db = admin.firestore();
-  console.log("[FIREBASE] Admin initialized.");
-}
-
-export function getDb() {
+/**
+ * Returns the initialized Firestore instance.
+ * In Cloud Functions, this typically defaults to the project's default database.
+ */
+export const getDb = () => {
   if (!db) {
-    if (admin.apps.length === 0) {
-       admin.initializeApp({
-         projectId: 'ai-studio-applet-webapp-bb725'
-       });
-    }
-    db = admin.firestore();
+    console.warn("[FIREBASE ADMIN] db requested but not initialized. Returning default if available.");
+    return defaultDb || getFirestore();
   }
   return db;
-}
+};
+
+export const initFirebase = async () => {
+  try {
+    if (!admin.apps.length) {
+      admin.initializeApp();
+      console.log("[FIREBASE ADMIN] Initialized with default credentials");
+    }
+
+    db = getFirestore();
+    defaultDb = db;
+    console.log("[FIREBASE ADMIN] Firestore references initialized");
+  } catch (err: any) {
+    console.error("[FIREBASE ADMIN] Critical Initialization Error:", err.message);
+  }
+};

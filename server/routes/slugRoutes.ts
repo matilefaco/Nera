@@ -1,26 +1,115 @@
-import express from 'express';
-import { getDb } from '../firebaseAdmin.js';
+import express from "express";
+import { getDb } from "../firebaseAdmin.js";
 
-export const slugRouter = express.Router();
+const router = express.Router();
 
-slugRouter.get("/check", async (req, res) => {
-  const { slug } = req.query;
-  
-  if (!slug || typeof slug !== 'string') {
-    return res.status(400).json({ error: "Slug inválido" });
-  }
-
-  const db = getDb();
+    /**
+ * GET /api/slug/check?slug={slug}&uid={uid}
+ * Logic: Checks if a slug is available. Available if not exists OR if owned by uid.
+ */
+router.get("/check", async (req, res) => {
   try {
-    const slugRef = db.collection('appointment_slugs').doc(slug.toLowerCase());
-    const snap = await slugRef.get();
-    
-    if (!snap.exists) {
-      return res.status(404).json({ error: "Reserva não encontrada" });
+    const query = (req.query || {}) as any;
+    const { slug, uid, city } = query;
+
+    // Fallback parsing from URLSearchParams if params are missing in req.query
+    const requestUrl = new URL(req.originalUrl || req.url, "https://usenera.com");
+    const slugParam = typeof slug === "string" ? slug : requestUrl.searchParams.get("slug");
+    const uidParam = typeof uid === "string" ? uid : requestUrl.searchParams.get("uid");
+    const cityParam = typeof city === "string" ? city : requestUrl.searchParams.get("city");
+
+    if (!slugParam || typeof slugParam !== "string") {
+      return res.status(400).json({ error: "Parâmetro 'slug' é obrigatório." });
     }
 
-    return res.status(200).json(snap.data());
+    const cleanSlug = slugParam.toLowerCase().trim();
+    const currentUid = typeof uidParam === "string" ? uidParam : null;
+    const cityStr = typeof cityParam === "string" ? cityParam.toLowerCase().trim().replace(/[^a-z0-9]/g, '-') : '';
+
+    // 1. Validation
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (cleanSlug.length < 3 || cleanSlug.length > 50) {
+      return res.status(400).json({ 
+        available: false, 
+        error: "O link deve ter entre 3 e 50 caracteres." 
+      });
+    }
+    if (!slugRegex.test(cleanSlug)) {
+      return res.status(400).json({ 
+        available: false, 
+        error: "O link deve conter apenas letras minúsculas, números e hífens." 
+      });
+    }
+
+    // 2. Check existence in Firestore
+    const db = getDb();
+    console.log("[SLUG CHECK DEBUG] Step 1: db instance", !!db);
+    
+    if (!db) {
+      console.error("[SLUG CHECK ERROR] Firestore db is NOT initialized.");
+      return res.status(500).json({ 
+        error: "Serviço de banco de dados não disponível.",
+        debug: "db_not_initialized"
+      });
+    }
+
+    try {
+      console.log("[SLUG CHECK DEBUG] Step 2: Accessing collection 'slugs' for doc:", cleanSlug);
+      const slugDoc = await db.collection("slugs").doc(cleanSlug).get();
+      console.log("[SLUG CHECK DEBUG] Step 3: Query completed. Exists:", slugDoc.exists);
+
+      if (slugDoc.exists) {
+        const ownerId = slugDoc.data()?.uid;
+        console.log("[SLUG CHECK DEBUG] Step 4a: Slug exists. Owner:", ownerId);
+        
+        // If the owner is the one asking, it's available
+        if (currentUid && ownerId === currentUid) {
+          return res.json({ 
+            available: true,
+            message: "Este já é o seu link!" 
+          });
+        }
+
+        // Return suggestions
+        const suggestions = [
+          `${cleanSlug}-2`
+        ];
+
+        if (cityStr) {
+          suggestions.push(`${cleanSlug}-${cityStr}`);
+        } else {
+          suggestions.push(`${cleanSlug}-pro`);
+        }
+
+        return res.json({ 
+          available: false, 
+          suggestions,
+          message: "Este link já está em uso."
+        });
+      }
+
+      console.log("[SLUG CHECK DEBUG] Step 4b: Slug available.");
+      return res.json({ 
+        available: true,
+        message: "Link disponível!" 
+      });
+    } catch (innerErr: any) {
+      console.error("[SLUG CHECK INNER ERROR]", innerErr);
+      return res.status(500).json({
+        error: "Erro ao acessar o banco de dados.",
+        debug: innerErr.message || "fire_error",
+        stack: innerErr.stack
+      });
+    }
+
   } catch (err: any) {
-    return res.status(500).json({ error: err.message });
+    console.error("[SLUG CHECK OUTER ERROR FULL]", err);
+    return res.status(500).json({ 
+      error: "Erro ao verificar disponibilidade do link.",
+      debug: err?.message || String(err),
+      code: err?.code || null
+    });
   }
 });
+
+export default router;

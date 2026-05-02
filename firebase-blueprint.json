@@ -1,0 +1,359 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Dados da profissional autônoma",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "specialty": { "type": "string" },
+        "bio": { "type": "string" },
+        "location": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "slug": { "type": "string" },
+        "avatar": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "professionalIdentity": {
+          "type": "object",
+          "properties": {
+            "mainSpecialty": { "type": "string" },
+            "subSpecialties": { "type": "array", "items": { "type": "string" } },
+            "yearsExperience": { "type": "string" },
+            "serviceStyle": { "type": "array", "items": { "type": "string" } },
+            "differentials": { "type": "array", "items": { "type": "string" } },
+            "attendsAt": { "type": "string", "enum": ["studio", "home", "hybrid"] }
+          }
+        },
+        "studioAddress": {
+          "type": "object",
+          "properties": {
+            "street": { "type": "string" },
+            "number": { "type": "string" },
+            "complement": { "type": "string" },
+            "neighborhood": { "type": "string" },
+            "city": { "type": "string" },
+            "reference": { "type": "string" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "slug"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Serviços oferecidos pela profissional",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "duration": { "type": "number" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["professionalId", "name", "duration", "price"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Agendamentos realizados pelas clientes",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientWhatsapp": { "type": "string" },
+        "clientEmail": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string" },
+        "locationType": { "type": "string", "enum": ["studio", "home"] },
+        "neighborhood": { "type": "string" },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending_confirmation", "confirmed", "declined", "cancelled", "completed", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "confirmedAt": { "type": "string", "format": "date-time" },
+        "declinedAt": { "type": "string", "format": "date-time" },
+        "expiresAt": { "type": "string", "format": "date-time" },
+        "reviewRequestedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "serviceId", "clientName", "clientWhatsapp", "clientEmail", "date", "time", "status"]
+    },
+    "Availability": {
+      "title": "Availability",
+      "description": "Configuração de horários da profissional",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "dayOfWeek": { "type": "number" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["professionalId", "dayOfWeek", "startTime", "endTime"]
+    },
+    "ReviewRequest": {
+      "title": "Review Request",
+      "description": "Solicitação de avaliação vinculada a um agendamento",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string" },
+        "professionalId": { "type": "string" },
+        "clientDisplayName": { "type": "string" },
+        "clientNeighborhood": { "type": "string" },
+        "token": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "submitted", "expired"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bookingId", "professionalId", "token", "status"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Avaliação real de uma cliente",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string" },
+        "professionalId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "rating": { "type": "number" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "comment": { "type": "string" },
+        "publicDisplayMode": { "type": "string", "enum": ["named", "anonymous", "private"] },
+        "firstName": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["bookingId", "professionalId", "rating", "publicDisplayMode"]
+    },
+    "ReviewStats": {
+      "title": "Review Stats",
+      "description": "Estatísticas agregadas de avaliações",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "averageRating": { "type": "number" },
+        "totalReviews": { "type": "number" },
+        "totalCompletedBookings": { "type": "number" },
+        "topTags": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["professionalId"]
+    },
+    "PortfolioItem": {
+      "title": "Portfolio Item",
+      "description": "Item individual do portfólio da profissional",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["imageUrl", "createdAt"]
+    },
+    "BlockedSlot": {
+      "title": "Blocked Slot",
+      "description": "Horário bloqueado na agenda",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "appointmentId": { "type": "string" }
+      },
+      "required": ["professionalId", "date", "time"]
+    },
+    "BlockedSchedule": {
+      "title": "Blocked Schedule",
+      "description": "Intervalo ou dia bloqueado na agenda",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "reason": { "type": "string" },
+        "customReason": { "type": "string" },
+        "type": { "type": "string", "enum": ["manual", "automatic", "full_day"] },
+        "isRecurring": { "type": "boolean" },
+        "recurringDays": { "type": "array", "items": { "type": "number" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "date", "type"]
+    },
+    "WaitlistEntry": {
+      "title": "Waitlist Entry",
+      "description": "Entrada na lista de espera prioritária",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientWhatsapp": { "type": "string" },
+        "requestedDate": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "period": { "type": "string", "enum": ["morning", "afternoon", "night", "any"] },
+        "preferredTime": { "type": "string" },
+        "assignedTime": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "invited", "expired", "booked", "cancelled"] },
+        "invitationSentAt": { "type": "string", "format": "date-time" },
+        "invitationExpiresAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "clientName", "clientWhatsapp", "requestedDate", "serviceId", "status"]
+    },
+    "WaitlistStats": {
+      "title": "Waitlist Stats",
+      "description": "Estatísticas da lista de espera",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "recoveredSlots": { "type": "number" },
+        "savedRevenue": { "type": "number" },
+        "totalEntries": { "type": "number" }
+      },
+      "required": ["professionalId"]
+    },
+    "WhatsAppLog": {
+      "title": "WhatsApp Log",
+      "description": "Registros de envios de mensagens via WhatsApp",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "phone": { "type": "string" },
+        "clientName": { "type": "string" },
+        "clientWhatsapp": { "type": "string" },
+        "message": { "type": "string" },
+        "messagePreview": { "type": "string" },
+        "messageType": { "type": "string" },
+        "status": { "type": "string", "enum": ["sent", "failed", "pending"] },
+        "error": { "type": "string" },
+        "appointmentId": { "type": "string" },
+        "userId": { "type": "string" },
+        "idempotencyKey": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "sentAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["phone", "message", "status", "createdAt", "userId"]
+    },
+    "WhatsAppInboundLog": {
+      "title": "WhatsApp Inbound Log",
+      "description": "Logs de mensagens recebidas via WhatsApp e processadas pelo sistema",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "phone": { "type": "string" },
+        "rawMessage": { "type": "string" },
+        "normalizedMessage": { "type": "string" },
+        "intent": { "type": "string", "enum": ["confirm", "reschedule", "cancel", "help", "unknown"] },
+        "appointmentId": { "type": "string" },
+        "status": { "type": "string", "enum": ["received", "processed", "ignored", "failed"] },
+        "rawPayload": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "processedAt": { "type": "string", "format": "date-time" },
+        "error": { "type": "string" }
+      },
+      "required": ["phone", "rawMessage", "status", "createdAt"]
+    },
+    "BillingLog": {
+      "title": "Billing Log",
+      "description": "Registros de eventos financeiros do Stripe",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "stripeCustomerId": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "subscriptionId": { "type": "string" },
+        "metadata": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "createdAt"]
+    },
+    "Alert": {
+      "title": "Alert",
+      "description": "Alertas e notificações internas para a profissional",
+      "type": "object",
+      "properties": {
+        "professionalId": { "type": "string" },
+        "type": { "type": "string", "enum": ["last_minute_cancellation"] },
+        "appointmentId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "scheduledDate": { "type": "string" },
+        "scheduledTime": { "type": "string" },
+        "hoursUntil": { "type": "number" },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["professionalId", "type", "read", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Perfil da profissional"
+    },
+    "/users/{userId}/portfolio/{itemId}": {
+      "schema": "PortfolioItem",
+      "description": "Itens do portfólio"
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Lista de serviços"
+    },
+    "/appointments/{appointmentId}": {
+      "schema": "Appointment",
+      "description": "Lista de agendamentos"
+    },
+    "/availability/{availabilityId}": {
+      "schema": "Availability",
+      "description": "Configuração de horários"
+    },
+    "/blocked_slots/{slotId}": {
+      "schema": "BlockedSlot",
+      "description": "Horários bloqueados"
+    },
+    "/blocked_schedules/{scheduleId}": {
+      "schema": "BlockedSchedule",
+      "description": "Bloqueios de agenda inteligentes"
+    },
+    "/waitlist/{entryId}": {
+      "schema": "WaitlistEntry",
+      "description": "Entradas da lista de espera"
+    },
+    "/waitlist_stats/{statsId}": {
+      "schema": "WaitlistStats",
+      "description": "Estatísticas de recuperação da lista"
+    },
+    "/review_requests/{requestId}": {
+      "schema": "ReviewRequest",
+      "description": "Controle de solicitações de avaliação"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Avaliação oficial das clientes"
+    },
+    "/review_stats/{professionalId}": {
+      "schema": "ReviewStats",
+      "description": "Consolidado de reputação da profissional"
+    },
+    "/whatsapp_logs/{logId}": {
+      "schema": "WhatsAppLog",
+      "description": "Logs de envios do WhatsApp"
+    },
+    "/whatsapp_inbound_logs/{logId}": {
+      "schema": "WhatsAppInboundLog",
+      "description": "Logs de mensagens recebidas do WhatsApp"
+    },
+    "/billing_logs/{logId}": {
+      "schema": "BillingLog",
+      "description": "Histórico de faturamento e pagamentos"
+    },
+    "/alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "Alertas internos para profissionais"
+    }
+  }
+}

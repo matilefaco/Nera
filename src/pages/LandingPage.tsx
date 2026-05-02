@@ -1,0 +1,411 @@
+import { motion } from 'motion/react';
+import { Link } from 'react-router-dom';
+import { 
+  ArrowRight, Clock, MapPin, TrendingUp, 
+  Smartphone, Star, ChevronRight, Check
+} from 'lucide-react';
+import Logo from '../components/Logo';
+import { PLANS } from '../config/plans';
+
+// Substituir por depoimentos reais antes de campanhas pagas.
+const TESTIMONIALS_PLACEHOLDER = true;
+
+export default function LandingPage() {
+  const freePlan = PLANS.find(p => p.id === 'free')!;
+  const essencialPlan = PLANS.find(p => p.id === 'essencial')!;
+  const proPlan = PLANS.find(p => p.id === 'pro')!;
+
+  return (
+    <div className="flex flex-col min-h-screen bg-brand-parchment">
+      {/* Navigation */}
+      <nav className="flex items-center justify-between px-6 py-8 max-w-7xl mx-auto w-full relative z-20">
+        <Logo />
+        <div className="flex items-center gap-8">
+          <Link to="/profissionais" className="hidden md:block text-[11px] font-medium text-brand-stone uppercase tracking-[0.15em] hover:text-brand-ink transition-colors">
+            Encontrar Profissionais
+          </Link>
+          <Link to="/login" className="text-[11px] font-medium text-brand-stone uppercase tracking-[0.15em] hover:text-brand-ink transition-colors">
+            Entrar
+          </Link>
+          <Link to="/register" className="bg-brand-ink text-brand-white px-6 py-3 rounded-full text-[10px] font-medium uppercase tracking-[0.15em] hover:bg-brand-espresso transition-all">
+            Fazer parte
+          </Link>
+        </div>
+      </nav>
+
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="px-6 pt-20 pb-32 max-w-7xl mx-auto w-full relative">
+          <div className="max-w-4xl">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8 }}
+            >
+              <div className="inline-flex items-center gap-2 bg-brand-linen border border-brand-mist px-4 py-2 rounded-full mb-10">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta" />
+                <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-brand-terracotta">Para profissionais autônomas</span>
+              </div>
+
+              <h1 className="text-[56px] md:text-[88px] font-serif font-normal leading-[1.05] tracking-tight text-brand-ink mb-10 text-balance">
+                Você responde o dia inteiro. <br />
+                <span className="italic text-brand-terracotta">E ainda perde cliente.</span>
+              </h1>
+              
+              <p className="text-brand-stone text-lg md:text-xl max-w-2xl mb-12 leading-relaxed font-light">
+                Sua agenda inteligente que elimina o caos do WhatsApp e profissionaliza 
+                seu faturamento com reservas automáticas e zero faltas.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
+                <Link to="/register" className="w-full sm:w-auto bg-brand-ink text-brand-white px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-espresso transition-all flex items-center justify-between gap-8 group">
+                  <span>Começar grátis</span>
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link to="/p/helena-prado" className="w-full sm:w-auto bg-transparent text-brand-ink border border-brand-mist px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-linen transition-all text-center">
+                  Ver exemplo real →
+                </Link>
+              </div>
+
+              <div className="flex items-center gap-4 pt-8 border-t border-brand-mist">
+                <div className="flex -space-x-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="w-10 h-10 rounded-full border-2 border-brand-parchment bg-brand-blush flex items-center justify-center text-[10px] font-medium text-brand-terracotta">
+                      {String.fromCharCode(64 + i)}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[12px] text-brand-stone font-light">
+                  <span className="font-medium text-brand-ink">+500 profissionais</span> já organizaram sua agenda com a nera
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Pain Points Section */}
+        <section className="bg-brand-espresso py-32 px-6">
+          <div className="max-w-7xl mx-auto w-full">
+            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-sienna mb-6 block">O problema real</span>
+            <h2 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-white leading-tight mb-20 max-w-2xl">
+              Chega de caos <br />
+              <span className="italic text-brand-sienna">na sua agenda.</span>
+            </h2>
+
+            <div className="grid md:grid-cols-3 gap-12">
+              {[
+                { icon: <Smartphone size={20} />, text: "Suas clientes esperam resposta no WhatsApp antes de confirmar" },
+                { icon: <Star size={20} />, text: "Clientes somem depois do primeiro atendimento — sem histórico, sem retorno" },
+                { icon: <TrendingUp size={20} />, text: "Você não sabe quanto perdeu em faltas este mês" }
+              ].map((item, i) => (
+                <div key={i} className="flex gap-5 items-start">
+                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-brand-sienna shrink-0">
+                    {item.icon}
+                  </div>
+                  <p className="text-brand-white/60 text-sm leading-relaxed pt-2 font-light">
+                    {item.text}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section className="bg-brand-parchment py-32 px-6">
+          <div className="max-w-7xl mx-auto w-full">
+            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-terracotta mb-6 block">A solução</span>
+            <h2 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-ink leading-tight mb-20 max-w-3xl">
+              Tudo para <span className="italic text-brand-terracotta">profissionalizar</span> seu negócio
+            </h2>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { 
+                  title: "Reservas 24/7", 
+                  desc: "Sua cliente reserva sozinha enquanto você atende ou dorme. Sem idas e vindas no WhatsApp.",
+                  icon: <Clock size={24} />
+                },
+                { 
+                  title: "Feita para domicílio", 
+                  desc: "Bairros, taxas e deslocamento gerenciados automaticamente. A primeira agenda construída para quem vai até a cliente.",
+                  icon: <MapPin size={24} />
+                },
+                { 
+                  title: "Visão financeira clara", 
+                  desc: "Saiba exatamente quanto vai receber hoje, esta semana e este mês. Sem planilha.",
+                  icon: <TrendingUp size={24} />
+                }
+              ].map((feat, i) => (
+                <div key={i} className="card-refined hover:border-brand-terracotta/30 group">
+                  <div className="w-12 h-12 rounded-2xl bg-brand-linen border border-brand-mist flex items-center justify-center text-brand-terracotta mb-8 group-hover:bg-brand-terracotta group-hover:text-brand-white transition-all">
+                    {feat.icon}
+                  </div>
+                  <h3 className="text-2xl font-serif font-normal text-brand-ink mb-4">{feat.title}</h3>
+                  <p className="text-brand-stone text-sm leading-relaxed font-light">{feat.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Interactive Demo Section */}
+        <section className="bg-brand-white py-32 px-6 overflow-hidden">
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="grid lg:grid-cols-2 gap-20 items-center">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6 block">Vitrine Profissional</span>
+                <h2 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-ink leading-tight mb-8">
+                  Veja como sua <br />
+                  <span className="italic text-brand-terracotta">página pode ficar.</span>
+                </h2>
+                <p className="text-brand-stone text-lg mb-12 font-light leading-relaxed">
+                  Uma página bonita, profissional e pronta para receber reservas. 
+                  Dê à sua cliente a experiência de um salão de luxo, direto no link da sua bio.
+                </p>
+
+                <div className="space-y-6 mb-12">
+                  {[
+                    "Seus serviços organizados por categoria",
+                    "Agenda automática integrada",
+                    "Cálculo de taxa de serviço por bairro",
+                    "Visual premium que valoriza seu trabalho",
+                    "Funciona perfeitamente em qualquer celular"
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded-full bg-brand-linen flex items-center justify-center text-brand-terracotta">
+                        <Check size={12} />
+                      </div>
+                      <span className="text-sm font-medium text-brand-stone uppercase tracking-tight">{item}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <Link to="/register" className="w-full sm:w-auto bg-brand-ink text-white px-10 py-5 rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg text-center">
+                    Criar a minha agora
+                  </Link>
+                  <Link to="/p/helena-prado" className="w-full sm:w-auto text-brand-ink font-bold text-[11px] uppercase tracking-widest hover:underline text-center">
+                    Ver exemplo completo
+                  </Link>
+                </div>
+              </div>
+
+              <div className="relative">
+                {/* Phone Mockup */}
+                <motion.div 
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.9 }}
+                  className="relative mx-auto w-[320px] h-[640px] bg-brand-ink rounded-[52px] p-2 shadow-2xl ring-1 ring-black/10 overflow-hidden"
+                >
+                  <div className="w-full h-full bg-white rounded-[40px] overflow-hidden relative">
+                    {/* Notch Overlay */}
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-brand-ink rounded-b-2xl z-50 pointer-events-none" />
+                    
+                    {/* Real Preview Iframe */}
+                    <iframe 
+                      src="/p/helena-prado" 
+                      title="Preview do Nera"
+                      loading="lazy"
+                      className="w-[375px] h-[667px] origin-top-left pointer-events-none border-none select-none"
+                      style={{ 
+                        transform: 'scale(0.81)', // Escale 375 para ~304 (dentro do 320p)
+                        width: '375px',
+                        height: '790px' // Expand height so we can see more content
+                      }}
+                    />
+                  </div>
+                </motion.div>
+
+                {/* Floating Elements */}
+                <motion.div 
+                  animate={{ y: [0, -10, 0] }}
+                  transition={{ duration: 4, repeat: Infinity }}
+                  className="absolute -right-10 top-1/4 bg-white p-4 rounded-2xl shadow-xl border border-brand-mist z-40 hidden md:block"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                      <Check size={16} />
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
+                      Reserva Confirmada
+                    </div>
+                  </div>
+                </motion.div>
+
+                <motion.div 
+                  animate={{ y: [0, 10, 0] }}
+                  transition={{ duration: 5, repeat: Infinity }}
+                  className="absolute -left-10 bottom-1/4 bg-brand-terracotta text-white p-4 rounded-2xl shadow-xl z-40 hidden md:block"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                      <Clock size={16} />
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-widest">
+                      Agenda Lotada ✨
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Planos */}
+        <section className="bg-brand-parchment py-32 px-6">
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="text-center mb-16">
+              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-4 block">Planos simples</span>
+              <h2 className="text-[42px] md:text-[52px] font-serif font-normal text-brand-ink leading-tight">
+                Comece grátis, <em className="italic text-brand-terracotta">cresça no seu ritmo.</em>
+              </h2>
+            </div>
+
+              <div className="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+                {/* GRATUITO */}
+                <div className="card-refined p-10 flex flex-col h-full">
+                  <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">{freePlan.name}</div>
+                  <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ {freePlan.price}</div>
+                  <div className="text-brand-stone text-sm font-light mb-1">{freePlan.subtitle}</div>
+                  <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest mb-8 italic">{freePlan.tagline}</div>
+                  <ul className="space-y-3 mb-10 flex-1">
+                  {freePlan.features.map(f => (
+                    <li key={f.text} className="text-sm text-brand-stone font-light flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f.text}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/register" className="block text-center border border-brand-mist py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:bg-brand-linen transition-all">
+                  {freePlan.cta}
+                </Link>
+              </div>
+
+              {/* ESSENCIAL */}
+              <div className="bg-brand-ink rounded-[32px] p-10 relative flex flex-col h-full">
+                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">{essencialPlan.name}</div>
+                <div className="text-[52px] font-serif font-normal text-brand-white leading-none mb-2">R$ {essencialPlan.price}</div>
+                <div className="text-brand-stone text-sm font-light mb-8">{essencialPlan.subtitle}</div>
+                <ul className="space-y-3 mb-10 flex-1">
+                  {essencialPlan.features.map(f => (
+                    <li key={f.text} className="text-sm text-brand-white/70 font-light flex items-center gap-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f.text}
+                    </li>
+                  ))}
+                </ul>
+                <Link to="/register?plan=essencial" className="block text-center bg-brand-terracotta text-white py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-sienna transition-all">
+                  {essencialPlan.cta}
+                </Link>
+              </div>
+
+                {/* PRO */}
+              <div 
+                className="rounded-[32px] p-12 lg:p-14 border border-[#C49A7A] shadow-[0_64px_100px_rgba(91,52,35,0.25)] bg-[#F2E8DF] relative transition-all hover:translate-y-[-8px] hover:shadow-[0_80px_120px_rgba(91,52,35,0.3)] group scale-[1.02] z-10 flex flex-col h-full"
+              >
+                <div className="absolute top-0 right-10 -translate-y-1/2 bg-brand-terracotta text-white px-4 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-widest shadow-lg">
+                  Recomendado para quem quer crescer
+                </div>
+                <div className="text-[9px] font-bold uppercase tracking-[0.35em] text-brand-terracotta mb-6 block">Plano {proPlan.name}</div>
+                <div className="flex items-baseline gap-1 mb-2">
+                  <span className="text-[52px] font-serif font-normal text-brand-ink leading-none">R$ {proPlan.price}</span>
+                  <span className="text-xs text-brand-stone font-bold uppercase tracking-widest">{proPlan.priceDescriptor}</span>
+                </div>
+                <div className="text-brand-stone/60 text-[10px] font-bold uppercase tracking-widest mb-8">{proPlan.subtitle}</div>
+                <ul className="space-y-4 mb-10 flex-1">
+                  {proPlan.features.map((f, i) => (
+                    <li key={f.text} className={`text-[13px] text-brand-ink font-medium flex items-center gap-4 ${f.isHighlight ? 'text-brand-terracotta font-bold' : ''}`}>
+                      <div className={`w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0 ${f.isHighlight ? 'animate-pulse' : ''}`} />
+                      <span className="tracking-tight">{f.text}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link 
+                  to="/register?plan=pro" 
+                  className="block text-center bg-brand-terracotta text-white py-5 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] shadow-[0_12px_24px_rgba(168,92,58,0.3)] hover:bg-brand-sienna hover:shadow-xl transition-all"
+                >
+                  {proPlan.cta}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Testimonials */}
+        <section className="bg-brand-white py-32 px-6">
+          <div className="max-w-7xl mx-auto w-full">
+            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-12 block text-center">O que dizem as profissionais</span>
+            
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="bg-brand-ink p-10 rounded-[32px] text-brand-white">
+                <div className="flex gap-1 text-brand-sienna mb-6">
+                  {[...Array(5)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
+                </div>
+                <p className="text-xl font-serif italic font-normal leading-relaxed mb-8">
+                  "Minha página ficou com cara de marca grande. Minhas clientes amaram a facilidade de agendar sozinhas e eu parei de perder tempo no WhatsApp."
+                </p>
+                <div className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/30">
+                  Karina M. · Nail Designer · São Paulo
+                </div>
+              </div>
+              
+              <div className="bg-brand-linen p-10 rounded-[32px] border border-brand-mist">
+                <div className="flex gap-1 text-brand-terracotta mb-6">
+                  {[...Array(5)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
+                </div>
+                <p className="text-xl font-serif italic font-normal leading-relaxed mb-8 text-brand-ink">
+                  "O sistema de taxa por bairro mudou tudo. Agora cobro o valor justo pelo meu deslocamento de forma automática e profissional."
+                </p>
+                <div className="text-[10px] font-medium uppercase tracking-[0.15em] text-brand-stone">
+                  Ana P. · Esteticista · Curitiba
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Final CTA */}
+        <section className="bg-brand-terracotta py-32 px-6 text-center">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-[48px] md:text-[72px] font-serif font-normal text-brand-white leading-[1.1] mb-8">
+              Pronta para o próximo nível?
+            </h2>
+            <p className="text-brand-white/70 text-lg mb-12 font-light">
+              Crie sua conta em 2 minutos e comece a receber agendamentos hoje mesmo.
+            </p>
+            <Link to="/register" className="inline-flex w-full sm:w-auto bg-brand-white text-brand-terracotta px-12 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-parchment transition-all items-center justify-center gap-8 group">
+              <span>Fazer parte da revolução</span>
+              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <p className="text-brand-white/40 text-[10px] uppercase tracking-[0.1em] mt-8">
+              Sem cartão de crédito · Setup em 2 min · Cancele quando quiser
+            </p>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-brand-ink py-20 px-6">
+        <div className="max-w-7xl mx-auto w-full flex flex-col items-center">
+          <Logo variant="dark" className="mb-12" />
+          
+          <div className="flex gap-10 mb-12">
+            <Link to="/profissionais" className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/50 hover:text-brand-white transition-colors">
+              Diretório
+            </Link>
+            {['Termos', 'Privacidade', 'Suporte', 'Instagram'].map((item) => (
+              <Link key={item} to="#" className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20 hover:text-brand-white transition-colors">
+                {item}
+              </Link>
+            ))}
+          </div>
+          
+          <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/10">
+            © 2025 nera · Feito para profissionais que valorizam excelência
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
+}

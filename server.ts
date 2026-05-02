@@ -1,28 +1,16 @@
-import express from 'express';
-import cors from 'cors';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { bookingRouter } from './server/routes/bookingRoutes.js';
-import { planRouter } from './server/routes/planRoutes.js';
-import { slugRouter } from './server/routes/slugRoutes.js';
-import { analyticsRouter } from './server/routes/analyticsRoutes.js';
-import { profileRouter } from './server/routes/profileRoutes.js';
-import { calendarRouter } from './server/routes/calendarRoutes.js';
-import { notificationRouter } from './server/routes/notificationRoutes.js';
-import * as firebaseAdmin from './server/firebaseAdmin.js';
+import express from "express";
+import path from "path";
+import fs from "fs";
+import cors from "cors";
 
 export async function createServerApp() {
-  const app = express();
+  // 1. Initial configuration (Move heavy logic here)
+  const { config } = await import("dotenv");
+  config();
 
-  // 1. Surgical Fix for "stream is not readable"
-  // As requested: Middleware that doesn't read the stream, since body might be pre-parsed
-  app.use((req: any, res, next) => {
-    if (req.body === undefined || req.body === null) {
-      req.body = {};
-    }
-    return next();
-  });
+  const firebaseAdmin = await import("./server/firebaseAdmin.js");
+  
+  const app = express();
 
   app.use(cors({
     origin: true,
@@ -37,63 +25,116 @@ export async function createServerApp() {
     res.json({ status: "ok", time: new Date().toISOString() });
   });
 
-  app.get("/api/diagnostic/firebase", async (req, res) => {
-    try {
-      const db = firebaseAdmin.getDb();
-      const test = await db.collection("system").doc("health").get();
-      res.json({ status: "firebase_ok", exists: test.exists });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+  app.get("/api/public/booking-health", (req, res) => {
+    res.json({ 
+      ok: true, 
+      route: "booking-global", 
+      time: new Date().toISOString(),
+      env: process.env.NODE_ENV,
+      url: req.url
+    });
+  });
+
+  // 3. Skip express.json for Stripe Webhook
+  app.use((req, res, next) => {
+    if (req.originalUrl === "/api/plans/webhook") {
+      next();
+    } else {
+      express.json()(req, res, next);
     }
   });
 
-  // 3. Initialize Firebase Admin
+  // 4. Initialize Firebase Admin (Awaited to ensure DB is ready for route handlers)
   try {
     await firebaseAdmin.initFirebase();
+    console.log("[SERVER] Firebase Admin initialized.");
   } catch (err) {
-    console.error("[CRITICAL] Firebase Admin Init Failed:", err);
+    console.error("[SERVER] Failed to initialize Firebase:", err);
   }
 
-  // 4. Routes
-  app.use('/api', bookingRouter);
-  app.use('/api/plans', planRouter);
-  app.use('/api/slug', slugRouter);
-  app.use('/api/analytics', analyticsRouter);
-  app.use('/api/profile', profileRouter);
-  app.use('/api/calendar', calendarRouter);
-  app.use('/api/notifications', notificationRouter);
+  // 5. Registration of API Routes (Consolidated for consistent path resolution in production)
+  const apiRouter = express.Router();
 
-  // 5. Serve Static Files (Frontend)
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  
-  // In Cloud Run, dist is usually at the root, same as dist-server's parent
-  const distPath = path.resolve(__dirname, '../dist');
-  
-  if (fs.existsSync(distPath)) {
-    app.use(express.static(distPath));
-    // SPA fallback
-    app.get('*', (req, res, next) => {
-      if (req.path.startsWith('/api')) {
-        return next();
+  // Specific routers
+  apiRouter.use("/slug", (await import("./server/routes/slugRoutes.js")).default);
+  apiRouter.use("/profile", (await import("./server/routes/profileRoutes.js")).default);
+  apiRouter.use("/plans", (await import("./server/routes/planRoutes.js")).default);
+  apiRouter.use("/calendar", (await import("./server/routes/calendarRoutes.js")).default);
+
+  // Generic catch-all routers for remaining endpoints (mounting directly at root of apiRouter)
+  apiRouter.use((await import("./server/routes/bookingRoutes.js")).default);
+  apiRouter.use((await import("./server/routes/notificationRoutes.js")).default);
+  apiRouter.use((await import("./server/routes/analyticsRoutes.js")).default);
+
+  app.use("/api", apiRouter);
+
+  // 6. SSR for Professional Profiles
+  app.get("/p/:slug", async (req, res, next) => {
+    try {
+      const { slug } = req.params;
+      const db = firebaseAdmin.getDb();
+      if (!db) return next();
+      
+      const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
+      
+      if (snapshot.empty) return next();
+      
+      const prof = snapshot.docs[0].data() as any;
+      const indexPath = process.env.NODE_ENV === "production" 
+        ? path.join(process.cwd(), "dist", "index.html")
+        : path.join(process.cwd(), "index.html");
+
+      if (!fs.existsSync(indexPath)) return next();
+      let html = fs.readFileSync(indexPath, "utf-8");
+
+      const title = prof.name || "Profissional Nera";
+      const description = prof.bio?.slice(0, 160) || "Agende online";
+      const imageUrl = prof.photoUrl || prof.avatar || "https://usenera.com/og-default.png";
+
+      const metaTags = `
+        <title>${title}</title>
+        <meta name="description" content="${description}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${description}" />
+        <meta property="og:image" content="${imageUrl}" />
+        <meta name="twitter:card" content="summary_large_image" />
+      `;
+
+      if (html.includes("</head>")) {
+        html = html.replace("</head>", `${metaTags}\n</head>`);
       }
+      
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      console.error("[SSR ERROR]", err);
+      return next();
+    }
+  });
+
+  // 7. Vite/Static serving
+  if (process.env.NODE_ENV !== "production") {
+    const { createServer } = await import("vite");
+    const vite = await createServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
+  // 8. Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(`[CRITICAL ERROR]`, err);
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  });
+
   return app;
 }
 
-// Start server if run directly
-const isMain = import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('server.js');
-
-if (isMain) {
-  const port = process.env.PORT || 3000;
-  createServerApp().then(app => {
-    app.listen(port, () => {
-      console.log(`[SERVER] Listening on port ${port}`);
-    });
-  });
-}
-
-export default createServerApp;
+// No standalone listen here - moved to local-server.ts
