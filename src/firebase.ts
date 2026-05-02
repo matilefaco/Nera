@@ -3,7 +3,8 @@ import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, 
 import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit, increment } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
-import { removeUndefinedDeep, parseFirestoreDate } from './lib/utils';
+import { parseFirestoreDate } from './lib/utils';
+import { sanitizeForFirestore, redactAuthForLogs } from './lib/firestoreSafe';
 import { toast } from 'sonner';
 
 const firebaseConfig = {
@@ -57,7 +58,6 @@ export interface FirestoreErrorInfo {
  * Centrally handles booking-related errors and shows clear feedback to the user.
  */
 export function handleBookingError(error: any) {
-  console.log('[BOOKING_ERROR_DEBUG] Full error:', error);
   console.error('[Booking Error Handler]:', error);
 
   let message = 'Não foi possível concluir agora. Tente novamente.';
@@ -137,7 +137,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  console.error('Firestore Error: ', JSON.stringify({ ...errInfo, authInfo: redactAuthForLogs(errInfo.authInfo) }));
   throw new Error(JSON.stringify(errInfo));
 }
 
@@ -194,7 +194,7 @@ export async function saveProfilePartial(userId: string, payload: Partial<UserPr
   }
 
   // Clean data before saving
-  const cleanedPayload = removeUndefinedDeep(rest);
+  const cleanedPayload = sanitizeForFirestore(rest);
   
   const userRef = doc(db, 'users', userId);
   try {
@@ -463,7 +463,7 @@ async function executeUltimateFallback(appointmentData: any) {
     }
 
     // FINAL SANITIZATION: Remove all undefined fields before sending to Firestore
-    const sanitizedData = removeUndefinedDeep(directData);
+    const sanitizedData = sanitizeForFirestore(directData);
 
     const docRef = await addDoc(collection(db, 'appointments'), sanitizedData);
     
@@ -1251,7 +1251,7 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
 
 export async function addToWaitlist(entry: Partial<WaitlistEntry>) {
   console.log('[Waitlist] Adding entry...');
-  const cleaned = removeUndefinedDeep(entry);
+  const cleaned = sanitizeForFirestore(entry);
   const waitlistRef = collection(db, 'waitlist');
   try {
     await addDoc(waitlistRef, {
