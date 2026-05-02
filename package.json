@@ -8,12 +8,13 @@
     "node": "22"
   },
   "scripts": {
-    "dev": "tsx local-server.ts",
+    "dev": "vite --host 0.0.0.0 --port ${PORT:-5173}",
+    "dev:api": "tsx local-server.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
     "clean": "rm -rf dist dist-server",
     "lint": "tsc --noEmit",
-    "start": "functions-framework --target=api"
+    "start": "vite --host 0.0.0.0 --port ${PORT:-8080}"
   },
   "dependencies": {
     "@google-cloud/functions-framework": "^5.0.2",
