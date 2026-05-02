@@ -5,6 +5,7 @@ import { isValidWhatsapp } from "../utils.js";
 import { PLAN_CONFIGS } from "../../src/constants/plans.js";
 
 const router = express.Router();
+const isProduction = process.env.NODE_ENV === "production";
 
 /**
  * Recursively removes undefined fields from an object or array.
@@ -226,6 +227,7 @@ router.get("/reservation/:slug", async (req, res) => {
 
 // --- NEW: DIAGNOSTIC ENDPOINT FOR RESERVATION ---
 router.get("/debug-reservation", async (req, res) => {
+  if (isProduction) return res.status(404).json({ error: "Not found" });
   try {
     const { slug } = req.query;
     if (!slug) return res.status(400).json({ error: "Missing slug or token" });

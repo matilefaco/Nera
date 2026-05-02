@@ -52,10 +52,24 @@ service cloud.firestore {
 
     function isValidAppointment(data) {
       return data.professionalId is string &&
+             data.serviceId is string &&
              data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.clientWhatsapp is string &&
              data.date is string && data.time is string &&
              data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired'] &&
              data.price is number && data.price >= 0;
+    }
+
+    function isValidPublicAppointmentCreate(data) {
+      return data.keys().hasAll(['professionalId', 'serviceId', 'clientName', 'clientWhatsapp', 'date', 'time', 'status', 'createdAt']) &&
+             data.professionalId is string && data.professionalId.size() > 0 &&
+             data.serviceId is string && data.serviceId.size() > 0 &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.clientWhatsapp is string && data.clientWhatsapp.size() >= 8 &&
+             data.date is string && data.date.size() > 0 &&
+             data.time is string && data.time.size() > 0 &&
+             data.status == 'pending' &&
+             data.createdAt != null;
     }
 
     function isValidBlockedSchedule(data) {
@@ -122,7 +136,7 @@ service cloud.firestore {
       
       // 2. Secured Create/Update: Only owner/admin. (Backend via Admin SDK bypasses this for public bookings)
       // Fallback: ALLOW public create to support preview/dev mode where backend might be unstable.
-      allow create: if isValidAppointment(incoming()); 
+      allow create: if ((isSignedIn() && isValidAppointment(incoming())) || isValidPublicAppointmentCreate(incoming()));
       allow update: if (isDocOwner(existing()) || isAdmin()) && isValidAppointment(incoming());
     }
 
@@ -157,7 +171,15 @@ service cloud.firestore {
     match /review_requests/{requestId} {
       allow read: if true;
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
-      allow update: if true;
+      allow update: if isSignedIn() &&
+                    existing().professionalId == request.auth.uid &&
+                    incoming().professionalId == existing().professionalId &&
+                    incoming().clientName == existing().clientName &&
+                    incoming().clientWhatsapp == existing().clientWhatsapp &&
+                    incoming().appointmentId == existing().appointmentId &&
+                    incoming().createdAt == existing().createdAt &&
+                    incoming().sentAt == existing().sentAt &&
+                    incoming().status in ['pending', 'sent', 'failed', 'completed'];
     }
 
     match /blocked_schedules/{scheduleId} {

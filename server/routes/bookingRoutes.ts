@@ -3,8 +3,11 @@ import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { sendBookingConfirmedEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
+import { redactSensitiveData } from "../utils.js";
 
 const router = express.Router();
+const isProduction = process.env.NODE_ENV === "production";
+const blockInProduction = (res: express.Response) => res.status(404).json({ error: "Not found" });
 
 // --- HELPER FUNCTIONS FOR BACKEND BOOKING ---
 const normalizeId = (id: any): string => {
@@ -119,10 +122,10 @@ router.get("/public/booking-health", (req, res) => {
 router.post("/public/create-booking", async (req, res) => {
   const db = getDb();
   const appointmentData = req.body;
-  console.log("BOOKING PAYLOAD RECEBIDO:", JSON.stringify(appointmentData, null, 2));
+  console.log("BOOKING PAYLOAD RECEBIDO:", JSON.stringify(redactSensitiveData(appointmentData), null, 2));
   
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
-    console.error(`[API_BOOKING] REJECTED: Missing fields`, appointmentData);
+    console.error(`[API_BOOKING] REJECTED: Missing fields`, redactSensitiveData(appointmentData));
     return res.status(400).json({ error: "Dados de agendamento incompletos (professionalId, date ou time ausentes)" });
   }
 
@@ -211,17 +214,17 @@ router.post("/public/create-booking", async (req, res) => {
         appointmentId: apptRef.id,
         manageSlug,
         reservationCode,
-        professionalId: appointmentData.professionalId,
+        professionalId: finalData.professionalId,
         clientEmail: appointmentData.clientEmail,
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       // Update Client Summary
       const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
-      const summaryId = `${appointmentData.professionalId}_${clientKey}`;
+      const summaryId = `${finalData.professionalId}_${clientKey}`;
       const summaryRef = db.collection('client_summaries').doc(summaryId);
       const summarySnap = await transaction.get(summaryRef);
-      await updateClientSummaryInternal(transaction, finalData, appointmentData.professionalId, true, undefined, summarySnap);
+      await updateClientSummaryInternal(transaction, finalData, finalData.professionalId, true, undefined, summarySnap);
     });
 
     console.log(`[API_BOOKING] SUCCESS: Committed Appt ${apptRef.id}`);
@@ -244,6 +247,7 @@ router.post("/public/create-booking", async (req, res) => {
 
 // --- DIAGNOSTIC ENDPOINT FOR EMAILS ---
 router.get("/debug-booking-email", async (req, res) => {
+  if (isProduction) return blockInProduction(res);
   try {
     const db = getDb();
     const { appointmentId } = req.query;
@@ -292,6 +296,7 @@ router.get("/debug-booking-email", async (req, res) => {
 
 // --- NEW: DIAGNOSTIC ENDPOINT FOR CONFIRMATION FLOW ---
 router.get("/debug-confirmation-email", async (req, res) => {
+  if (isProduction) return blockInProduction(res);
   try {
     const db = getDb();
     const { appointmentId } = req.query;
@@ -457,6 +462,7 @@ router.get("/run-confirmation-email", async (req, res) => {
 
 // --- NEW: FULL AUDIT ENDPOINT ---
 router.get("/debug-confirmation-email-full", async (req, res) => {
+  if (isProduction) return blockInProduction(res);
   const db = getDb();
   const { appointmentId } = req.query;
   const audit: any = {
