@@ -8,16 +8,14 @@
     "node": "22"
   },
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "dev:api": "NODE_OPTIONS='--import tsx' functions-framework --target=api --port=3000 --source=server/api_entry.ts",
+    "dev": "NODE_OPTIONS='--import tsx' functions-framework --target=api --port=3000 --source=server/api_entry.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
-    "preview": "vite preview --host 0.0.0.0",
+    "preview": "vite preview",
     "clean": "rm -rf dist dist-server",
     "lint": "tsc --noEmit",
     "start": "functions-framework --target=api"
   },
   "dependencies": {
-    "@emotion/is-prop-valid": "^1.4.0",
     "@google-cloud/functions-framework": "^5.0.2",
     "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",

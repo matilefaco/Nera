@@ -2,20 +2,21 @@ import { initializeApp } from 'firebase/app';
 import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, indexedDBLocalPersistence } from 'firebase/auth';
 import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit, increment } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
-import firebaseConfig from '../firebase-applet-config.json';
 import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
 import { removeEmptyFields, parseFirestoreDate } from './lib/utils';
 import { toast } from 'sonner';
 
-const requiredKeys = ['apiKey', 'authDomain', 'projectId'];
-requiredKeys.forEach(key => {
-  if (!firebaseConfig[key as keyof typeof firebaseConfig]) {
-    throw new Error(`[FIREBASE CONFIG] CRITICAL: Missing ${key}. Check firebase-applet-config.json`);
-  }
-});
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
 
 export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, import.meta.env.VITE_FIREBASE_DATABASE_ID);
 export const storage = getStorage(app);
 
 // Initialize Auth with browserLocalPersistence for maximum compatibility in iframes (Safari/iPhone)
