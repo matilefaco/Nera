@@ -1,0 +1,234 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner(data) {
+      return isSignedIn() && request.auth.uid == data.professionalId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "matilefaco1@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Validation Blueprints
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'slug']) &&
+             data.uid == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.slug is string && data.slug.size() > 2 && data.slug.size() < 50;
+    }
+
+    function isValidService(data) {
+      return data.keys().hasAll(['professionalId', 'name', 'duration', 'price']) &&
+             data.professionalId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.duration is number && data.duration > 0 &&
+             data.price is number && data.price >= 0;
+    }
+
+    function isValidAppointment(data) {
+      return data.professionalId is string &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.date is string && data.time is string &&
+             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired'] &&
+             data.price is number && data.price >= 0;
+    }
+
+    function isValidBlockedSchedule(data) {
+      return data.keys().hasAll(['professionalId', 'date', 'type']) &&
+             data.professionalId is string && data.professionalId.size() > 0 &&
+             data.date is string && data.type in ['manual', 'automatic', 'full_day'] &&
+             (!('startTime' in data) || data.startTime is string) &&
+             (!('endTime' in data) || data.endTime is string);
+    }
+
+    function isValidWaitlistEntry(data) {
+      return data.keys().hasAll(['professionalId', 'clientName', 'clientWhatsapp', 'requestedDate', 'serviceId', 'status']) &&
+             data.professionalId is string && data.professionalId.size() > 0 &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
+             data.clientWhatsapp is string && data.clientWhatsapp.size() >= 10 &&
+             data.requestedDate is string &&
+             data.status in ['waiting', 'invited', 'expired', 'booked', 'cancelled'];
+    }
+
+    function isValidWaitlistStats(data) {
+      return data.keys().hasAll(['professionalId', 'recoveredSlots', 'savedRevenue', 'totalEntries']) &&
+             data.professionalId is string && 
+             data.recoveredSlots is number &&
+             data.savedRevenue is number &&
+             data.totalEntries is number;
+    }
+
+    function isValidClientSummary(data) {
+      return data.keys().hasAll(['professionalId', 'clientKey', 'clientName', 'totalSpent', 'totalAppointments']) &&
+             data.professionalId is string &&
+             data.clientKey is string && data.clientKey.size() <= 128 &&
+             data.clientName is string && data.clientName.size() <= 100 &&
+             data.totalSpent is number && data.totalSpent >= 0 &&
+             data.totalAppointments is number && data.totalAppointments >= 0;
+    }
+
+    function isValidWhatsAppLog(data) {
+      return data.keys().hasAll(['phone', 'message', 'status', 'createdAt', 'userId']) &&
+             data.userId == request.auth.uid &&
+             data.phone is string && data.phone.size() > 7 &&
+             data.message is string &&
+             data.status in ['pending', 'sent', 'failed'];
+    }
+
+    // Profile Rules
+    match /users/{userId} {
+      allow read: if true; 
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if (isOwner(userId) && isValidUser(incoming())) || isAdmin();
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create: if isSignedIn() && isValidService(incoming());
+      allow update: if (isDocOwner(existing()) || isAdmin()) && isValidService(incoming());
+      allow delete: if isDocOwner(existing()) || isAdmin();
+    }
+
+    // Appointment Rules - SECURED
+    match /appointments/{appointmentId} {
+      // 1. Secured Read: Only professional owner or admin.
+      allow get: if isDocOwner(existing()) || isAdmin();
+      allow list: if (isSignedIn() && isDocOwner(resource.data)) || isAdmin();
+      
+      // 2. Secured Create/Update: Only owner/admin. (Backend via Admin SDK bypasses this for public bookings)
+      allow create: if (isSignedIn() && isDocOwner(incoming())) || isAdmin();
+      allow update: if (isDocOwner(existing()) || isAdmin()) && isValidAppointment(incoming());
+    }
+
+    match /blocked_slots/{slotId} {
+      allow read: if true;
+      allow create: if (isSignedIn() && incoming().professionalId == request.auth.uid);
+      allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+      allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+    }
+
+    match /availability/{availabilityId} {
+      allow read: if true;
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
+      allow update: if (isDocOwner(existing()) || isAdmin()) && incoming().professionalId == request.auth.uid;
+      allow delete: if isDocOwner(existing()) || isAdmin();
+    }
+
+    match /review_stats/{statsId} {
+      allow read: if true;
+      // Writes apenas via Cloud Functions com service account
+      // Enquanto não há Cloud Function, restringir ao admin
+      allow write: if isAdmin();
+    }
+
+    // Supporting collections
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if true; // Public can create review via token
+      allow update, delete: if isAdmin();
+    }
+
+    match /review_requests/{requestId} {
+      allow read: if true;
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
+      allow update: if true;
+    }
+
+    match /blocked_schedules/{scheduleId} {
+      // Profissional autenticada pode criar seus próprios bloqueios
+      allow read: if true; // Necessário para BookingModal verificar slots
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid && isValidBlockedSchedule(incoming());
+      allow update: if isSignedIn() && existing().professionalId == request.auth.uid && isValidBlockedSchedule(incoming());
+      allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+    }
+
+    match /waitlist/{entryId} {
+      // Clientes podem criar entradas (sem auth), profissional pode gerenciar as suas
+      allow read: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+      allow create: if isValidWaitlistEntry(incoming()); // Público — cliente entra na lista sem login
+      allow update: if (isSignedIn() && (existing().professionalId == request.auth.uid || isAdmin())) && isValidWaitlistEntry(incoming());
+      allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+    }
+
+    match /waitlist_stats/{statsId} {
+      allow read: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+      // Atualizado via Dashboard ou trigger
+      allow write: if (isSignedIn() && (incoming().professionalId == request.auth.uid || existing().professionalId == request.auth.uid)) || isAdmin();
+    }
+
+    match /booking_locks/{lockId} {
+      allow read: if true;
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
+      allow update: if isSignedIn() && existing().professionalId == request.auth.uid;
+      allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+    }
+
+    match /coupons/{couponId} {
+      allow read: if true; 
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
+      allow update: if (isSignedIn() && (existing().professionalId == request.auth.uid || isAdmin()));
+      allow delete: if isSignedIn() && existing().professionalId == request.auth.uid || isAdmin();
+    }
+
+    match /client_summaries/{summaryId} {
+      allow get, list: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /analytics_events/{eventId} {
+      allow read: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow create: if true; // Público — log de visitas/cliques
+      allow delete: if isAdmin();
+    }
+
+    match /reservation_links/{linkId} {
+      allow read: if true; // Lookup instantâneo via token (backend bypasses for creation)
+      allow write: if isAdmin();
+    }
+
+    match /whatsapp_logs/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Backend (service accounts) usually handles writes, but for client-side logging:
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidWhatsAppLog(incoming());
+      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidWhatsAppLog(incoming());
+    }
+
+    match /billing_logs/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      // Writes are usually server-side, but allow creation if needed
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+    }
+
+    match /alerts/{alertId} {
+      allow read: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.professionalId == request.auth.uid && 
+                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create: if false; // System only
+    }
+  }
+}
