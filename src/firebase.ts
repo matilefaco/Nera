@@ -2,7 +2,7 @@ import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
-// TEMP: hardcoded config (mobile fix)
+// TEMP: hardcoded config to unblock mobile setup. Later, move this back to VITE_FIREBASE_* env vars.
 const firebaseConfig = {
   apiKey: "AIzaSyDO2OcFecgXEfATajxcY0piPP8VfCoQGWU",
   authDomain: "ai-studio-applet-webapp-bb725.firebaseapp.com",
@@ -11,6 +11,10 @@ const firebaseConfig = {
   messagingSenderId: "768951224787",
   appId: "1:768951224787:web:9165a57c367a649f1e8726"
 };
+
+export const firebaseConfigReady = Boolean(
+  firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId && firebaseConfig.appId
+);
 
 let app: FirebaseApp | null = null;
 let authInstance: Auth | null = null;
