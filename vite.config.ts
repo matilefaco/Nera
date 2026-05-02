@@ -11,6 +11,7 @@ export default defineConfig(({mode}) => {
       react(), 
       tailwindcss(),
       VitePWA({
+        disable: mode === 'development',
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
