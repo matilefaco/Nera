@@ -1,4 +1,4 @@
-import { removeUndefinedDeep } from './utils';
+import { removeUndefinedDeep } from './utils.js';
 
 /**
  * Shared Firestore sanitization helper.

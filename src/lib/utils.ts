@@ -1,7 +1,7 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Timestamp, FieldValue } from 'firebase/firestore';
-import { AddressData } from '../types';
+import { AddressData } from '../types.js';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

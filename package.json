@@ -17,7 +17,8 @@
     "migrate:firestore": "tsx scripts/migrate_named_firestore_to_default.ts",
     "audit:data": "tsx scripts/audit_default_firestore_data.ts",
     "repair:data": "tsx scripts/repair_default_firestore_data.ts",
-    "repair:identity": "tsx scripts/repair_identity_links.ts"
+    "repair:identity": "tsx scripts/repair_identity_links.ts",
+    "validate:phase3": "tsx scripts/validate_phase3.ts"
   },
   "dependencies": {
     "@google-cloud/functions-framework": "^5.0.2",
