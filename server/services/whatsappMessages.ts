@@ -100,6 +100,15 @@ ${data.motivoCancelamento ? `\nMotivo: ${data.motivoCancelamento}` : ''}
 Sentimos muito pelo inconveniente.`.trim();
 }
 
+export function buildLastMinuteCancellationMessage(data: { 
+  clienteNome: string, 
+  servicoNome: string, 
+  horario: string,
+  hoursUntil: number
+}): string {
+  return `🚨 *Aviso de última hora*\n\nInfelizmente, ${data.clienteNome} cancelou o serviço (${data.servicoNome}) agendado para às ${data.horario}.\n\nComo o cancelamento foi feito com apenas ${data.hoursUntil}h de antecedência, o horário já foi liberado novamente para você.`.trim();
+}
+
 export function buildReviewRequestMessage(data: { 
   clienteNome: string, 
   profissionalNome: string, 

@@ -58,14 +58,14 @@ export async function sendPushToUser(professionalId: string, payload: any) {
 /**
  * Creates an internal alert for last-minute cancellations (less than 2 hours).
  */
-async function createLastMinuteAlert(payload: any) {
+async function createLastMinuteAlert(payload: any): Promise<boolean> {
   const db = getDb();
   const { professionalId, clientName, serviceName, date, time, appointmentId } = payload;
   const apptId = appointmentId || payload.id;
 
   if (!professionalId || !date || !time || !apptId) {
     console.log('[ALERT] Missing data for last-minute check:', { professionalId, date, time, apptId });
-    return;
+    return false;
   }
 
   try {
@@ -86,35 +86,78 @@ async function createLastMinuteAlert(payload: any) {
       const alertSnap = await alertRef.get();
       if (alertSnap.exists) {
         console.log(`[ALERT] Alert already exists for ${apptId}`);
-        return;
+        return true;
       }
 
-      await alertRef.set({
-        professionalId,
-        appointmentId: apptId,
-        type: 'last_minute_cancellation',
-        clientName: clientName || 'Cliente',
-        serviceName: serviceName || 'Serviço',
-        scheduledDate: date,
-        scheduledTime: time,
-        hoursUntil: Math.round(diffHours * 10) / 10,
-        read: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
+      // 1. Create Firestore alert
+      try {
+        await alertRef.set({
+          professionalId,
+          appointmentId: apptId,
+          type: 'last_minute_cancellation',
+          clientName: clientName || 'Cliente',
+          serviceName: serviceName || 'Serviço',
+          scheduledAt: `${date} ${time}`,
+          hoursUntil: Math.round(diffHours * 10) / 10,
+          read: false,
+          createdAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log(`[ALERT] SUCCESS: Last-minute cancellation alert created for ${apptId}`);
+      } catch (err) {
+        console.error('[ALERT] Error creating Firestore alert:', err);
+      }
 
-      console.log(`[ALERT] SUCCESS: Last-minute cancellation alert created for ${apptId}`);
-      
-      // Also trigger a push
-      await sendPushToUser(professionalId, {
-        title: "Cancelamento de última hora!",
-        body: `${clientName} cancelou ${serviceName} às ${time}.`,
-        icon: "/icon-192.png",
-        data: { url: "/dashboard" }
-      });
+      // 2. Fetch professional data for remaining notifications
+      let proData: any = null;
+      try {
+        const proDoc = await db.collection('users').doc(professionalId).get();
+        if (proDoc.exists) {
+          proData = proDoc.data();
+        }
+      } catch (err) {
+        console.error('[ALERT] Error fetching professional data:', err);
+      }
+
+      // 3. Send WhatsApp notification
+      if (proData?.whatsapp) {
+        try {
+          const msg = buildLastMinuteCancellationMessage({
+            clienteNome: clientName || 'Cliente',
+            servicoNome: serviceName || 'Serviço',
+            horario: time,
+            hoursUntil: Math.round(diffHours * 10) / 10
+          });
+
+          await sendWhatsApp(db, proData.whatsapp, msg, {
+            appointmentId: apptId,
+            userId: professionalId,
+            type: 'last_minute_cancellation_pro'
+          });
+          console.log(`[ALERT] WhatsApp sent to professional for last-minute cancellation.`);
+        } catch (err) {
+          console.error('[ALERT] Error sending WhatsApp alert:', err);
+        }
+      }
+
+      // 4. Send push notification
+      try {
+        await sendPushToUser(professionalId, {
+          title: "🚨 Cancelamento de última hora!",
+          body: `${clientName} cancelou ${serviceName} com menos de 2h de antecedência.`,
+          icon: "/icon-192.png",
+          data: { url: "/dashboard" }
+        });
+        console.log(`[ALERT] Push notification sent for last-minute cancellation.`);
+      } catch (err) {
+        console.error('[ALERT] Error sending push notification alert:', err);
+      }
+
+      return true;
     }
   } catch (err) {
-    console.error('[ALERT] Error creating last-minute alert:', err);
+    console.error('[ALERT] Error in createLastMinuteAlert process:', err);
   }
+  return false;
 }
 
 import { 
@@ -123,6 +166,7 @@ import {
   buildReminderMessage24h, 
   buildWaitlistInviteMessage, 
   buildCancellationMessage, 
+  buildLastMinuteCancellationMessage,
   buildReviewRequestMessage 
 } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
@@ -527,7 +571,7 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
       const { professionalId, clientName, clientEmail, clientWhatsapp, serviceName, date, time, appointmentId, professionalSlug } = payload;
       
       // CREATE LAST MINUTE ALERT IF APPLICABLE
-      await createLastMinuteAlert(payload);
+      const isLastMinute = await createLastMinuteAlert(payload);
 
       const eventKeyPro = 'bookingCancelledProfessional';
       const eventKeyClient = 'bookingCancelledClient';
@@ -546,7 +590,7 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
         const waitlistCount = waitlistSnap.size;
         const profileUrl = pro?.slug ? `${baseUrl}/p/${pro.slug}` : undefined;
 
-        if (proPhone) {
+        if (proPhone && !isLastMinute) {
           const formattedDate = date.split('-').reverse().join('/');
           const msg = `Horário liberado! 🗓️\n\nA reserva de ${clientName} em ${formattedDate} às ${time} foi CANCELADA. Seu horário ficou disponível novamente.`;
           await sendWhatsApp(db, proPhone, msg, {

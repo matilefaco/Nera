@@ -143,6 +143,7 @@ export interface UserProfile {
   plan?: 'free' | 'essencial' | 'pro';
   planExpiresAt?: string; // ISO date
   trialStartedAt?: string;
+  trialEndsAt?: string; // ISO date or Timestamp string
   referralCode?: string; // código único de indicação
   referredBy?: string;   // código de quem indicou este usuário
   credits?: number;      // créditos acumulados em reais
