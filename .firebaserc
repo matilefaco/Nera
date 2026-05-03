@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "ai-studio-applet-webapp-bb725"
+  },
+  "targets": {
+    "ai-studio-applet-webapp-bb725": {
+      "hosting": {
+        "nera": [
+          "usenera"
+        ]
+      }
+    }
   }
 }
