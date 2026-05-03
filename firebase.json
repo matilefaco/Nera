@@ -16,6 +16,13 @@
         }
       },
       {
+        "source": "/p/**",
+        "function": {
+          "functionId": "api",
+          "region": "us-east1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
