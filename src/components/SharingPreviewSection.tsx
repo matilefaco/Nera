@@ -37,7 +37,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
   const previewTitle = formData.ogTitle || `${profile.name} | ${profile.category || profile.specialty || "Profissional Nera"}`;
   const previewDescription = formData.ogDescription || (profile.bio?.slice(0, 160) || `Agende um horário com ${profile.name} pelo Nera.`);
   const previewImage = formData.ogImageUrl || profile.avatar || "https://usenera.com/og-default.png";
-  const profileUrl = `nera.app/p/${profile.slug}`;
+  const profileUrl = `https://usenera.com/p/${profile.slug}`;
 
   const handleSave = async () => {
     const targetUid = user?.uid || profile.uid;
