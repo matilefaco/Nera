@@ -3,6 +3,112 @@ import path from "path";
 import fs from "fs";
 import cors from "cors";
 
+const PUBLIC_SITE_URL = "https://usenera.com";
+const DEFAULT_OG_TITLE = "Nera | Vitrine & Agendamento Premium";
+const DEFAULT_OG_DESCRIPTION = "Agende online com praticidade e elegância.";
+const DEFAULT_OG_IMAGE = `${PUBLIC_SITE_URL}/og-default.png`;
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function firstText(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+function toAbsoluteHttpsUrl(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) return DEFAULT_OG_IMAGE;
+
+  const raw = value.trim();
+  if (raw.startsWith("https://")) return raw;
+  if (raw.startsWith("http://")) return raw.replace(/^http:\/\//, "https://");
+  if (raw.startsWith("//")) return `https:${raw}`;
+  if (raw.startsWith("/")) return `${PUBLIC_SITE_URL}${raw}`;
+
+  return DEFAULT_OG_IMAGE;
+}
+
+function buildProfileMeta(slug: string, profile?: any) {
+  const canonicalUrl = `${PUBLIC_SITE_URL}/p/${encodeURIComponent(slug)}`;
+  const professionalName = firstText(profile?.name, profile?.displayName);
+
+  const title = firstText(
+    profile?.ogTitle,
+    profile?.shareTitle,
+    professionalName ? `${professionalName} | Agendamento Premium` : "",
+    DEFAULT_OG_TITLE
+  );
+
+  const description = firstText(
+    profile?.ogDescription,
+    profile?.shareDescription,
+    profile?.shortDescription,
+    profile?.headline,
+    profile?.bio,
+    DEFAULT_OG_DESCRIPTION
+  ).slice(0, 180);
+
+  const image = toAbsoluteHttpsUrl(
+    firstText(profile?.ogImageUrl, profile?.shareImageUrl, profile?.photoUrl, profile?.avatarUrl, profile?.avatar)
+  );
+
+  return { canonicalUrl, title, description, image };
+}
+
+async function findProfileForSlug(db: any, slug: string) {
+  const byUserSlug = await db.collection("users").where("slug", "==", slug).limit(1).get();
+  if (!byUserSlug.empty) return byUserSlug.docs[0].data();
+
+  const slugDoc = await db.collection("slugs").doc(slug).get();
+  if (!slugDoc.exists) return null;
+
+  const slugData = slugDoc.data() || {};
+  const uid = firstText(slugData.uid, slugData.userId, slugData.professionalId, slugData.ownerId);
+  if (!uid) return null;
+
+  const userDoc = await db.collection("users").doc(uid).get();
+  return userDoc.exists ? userDoc.data() : null;
+}
+
+function injectProfileMeta(html: string, meta: ReturnType<typeof buildProfileMeta>) {
+  const metaTags = `
+    <title>${escapeHtml(meta.title)}</title>
+    <meta name="description" content="${escapeHtml(meta.description)}" />
+    <link rel="canonical" href="${escapeHtml(meta.canonicalUrl)}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Nera" />
+    <meta property="og:title" content="${escapeHtml(meta.title)}" />
+    <meta property="og:description" content="${escapeHtml(meta.description)}" />
+    <meta property="og:image" content="${escapeHtml(meta.image)}" />
+    <meta property="og:image:secure_url" content="${escapeHtml(meta.image)}" />
+    <meta property="og:url" content="${escapeHtml(meta.canonicalUrl)}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtml(meta.title)}" />
+    <meta name="twitter:description" content="${escapeHtml(meta.description)}" />
+    <meta name="twitter:image" content="${escapeHtml(meta.image)}" />
+  `;
+
+  let nextHtml = html
+    .replace(/<title>.*?<\/title>/is, "")
+    .replace(/<meta\s+name=["']description["'][^>]*>/gi, "")
+    .replace(/<link\s+rel=["']canonical["'][^>]*>/gi, "")
+    .replace(/<meta\s+(?:property|name)=["'](?:og:[^"']+|twitter:[^"']+)["'][^>]*>/gi, "");
+
+  return nextHtml.includes("</head>")
+    ? nextHtml.replace("</head>", `${metaTags}\n</head>`)
+    : `${metaTags}\n${nextHtml}`;
+}
+
 export async function createServerApp() {
   // 1. Initial configuration (Move heavy logic here)
   const { config } = await import("dotenv");
@@ -69,47 +175,40 @@ export async function createServerApp() {
   app.use("/api", apiRouter);
 
   // 6. SSR for Professional Profiles
-  app.get("/p/:slug", async (req, res, next) => {
-    try {
-      const { slug } = req.params;
-      const db = firebaseAdmin.getDb();
-      if (!db) return next();
-      
-      const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
-      
-      if (snapshot.empty) return next();
-      
-      const prof = snapshot.docs[0].data() as any;
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+  app.get("/p/:slug", async (req, res) => {
+    const { slug } = req.params;
+    const indexPath = process.env.NODE_ENV === "production" 
+      ? path.join(process.cwd(), "dist", "index.html")
+      : path.join(process.cwd(), "index.html");
 
-      if (!fs.existsSync(indexPath)) return next();
-      let html = fs.readFileSync(indexPath, "utf-8");
-
-      const title = prof.name || "Profissional Nera";
-      const description = prof.bio?.slice(0, 160) || "Agende online";
-      const imageUrl = prof.photoUrl || prof.avatar || "https://usenera.com/og-default.png";
-
-      const metaTags = `
-        <title>${title}</title>
-        <meta name="description" content="${description}" />
-        <meta property="og:title" content="${title}" />
-        <meta property="og:description" content="${description}" />
-        <meta property="og:image" content="${imageUrl}" />
-        <meta name="twitter:card" content="summary_large_image" />
-      `;
-
-      if (html.includes("</head>")) {
-        html = html.replace("</head>", `${metaTags}\n</head>`);
-      }
-      
-      res.setHeader("Content-Type", "text/html");
-      return res.send(html);
-    } catch (err) {
-      console.error("[SSR ERROR]", err);
-      return next();
+    if (!fs.existsSync(indexPath)) {
+      return res.status(500).send("Profile page template unavailable");
     }
+
+    let profile: any = null;
+    try {
+      const db = firebaseAdmin.getDb();
+      if (db) profile = await findProfileForSlug(db, slug);
+    } catch (err) {
+      console.warn("[OG PROFILE] Firestore lookup failed; serving fallback OG", { slug, error: err instanceof Error ? err.message : String(err) });
+    }
+
+    const meta = buildProfileMeta(slug, profile);
+    const html = injectProfileMeta(fs.readFileSync(indexPath, "utf-8"), meta);
+
+    console.log("[OG PROFILE]", slug, {
+      title: meta.title,
+      description: meta.description,
+      image: meta.image,
+      url: meta.canonicalUrl,
+      hasProfile: Boolean(profile),
+    });
+
+    res.status(200);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=300");
+    res.setHeader("Accept-Ranges", "none");
+    return res.send(html);
   });
 
   // 7. Vite/Static serving
