@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "ai-studio-applet-webapp-bb725",
+    "target": "nera",
     "public": "dist",
     "ignore": [
       "firebase.json",
