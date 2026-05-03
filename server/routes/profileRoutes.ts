@@ -3,10 +3,8 @@ import { db, getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 import { isValidWhatsapp } from "../utils.js";
 import { PLAN_CONFIGS } from "../../src/constants/plans.js";
-import { validateProfilePayload, hasUndefinedDeep } from "../../src/lib/payloadValidators.js";
 
 const router = express.Router();
-const isProduction = process.env.NODE_ENV === "production";
 
 /**
  * Recursively removes undefined fields from an object or array.
@@ -30,26 +28,16 @@ const removeUndefinedDeep = (value: any): any => {
  * Transactional save that claims a slug and updates the user profile.
  */
 router.post("/save", async (req, res) => {
-  let uid: string;
-  let services: any[] | undefined;
-  let sanitizedProfile: any;
-  let slug: string;
+  const { uid, profileData, services } = req.body;
+  
+  console.log("[PROFILE_PUBLISH_PAYLOAD] Received for UID:", uid);
+  
+  const sanitizedProfile = removeUndefinedDeep(profileData || {});
+  const slug = sanitizedProfile?.slug?.toLowerCase()?.trim();
 
-  try {
-    const validated = validateProfilePayload(req.body);
-    uid = validated.uid;
-    services = validated.services;
-    sanitizedProfile = removeUndefinedDeep(validated.profileData || {});
-    slug = sanitizedProfile?.slug?.toLowerCase()?.trim();
-    if (hasUndefinedDeep(sanitizedProfile)) {
-      throw new Error("Payload de perfil contém valores undefined");
-    }
-  } catch (error: any) {
-    console.warn("[CRITICAL_ROUTE]", JSON.stringify({ route: "profile_publish", status: "failed", reason: error.message, uid: req.body?.uid ? String(req.body.uid).slice(0, 6) + "***" : null }));
-    return res.status(400).json({ error: error.message || "Payload de perfil inválido" });
+  if (!uid || !slug) {
+    return res.status(400).json({ error: "UID e Slug são obrigatórios." });
   }
-
-  console.log("[CRITICAL_ROUTE]", JSON.stringify({ route: "profile_publish", status: "started", uid: uid.slice(0, 6) + "***", slug }));
 
   try {
     console.log("[PROFILE SAVE] Starting transaction for UID:", uid, "Slug:", slug);
@@ -145,10 +133,10 @@ router.post("/save", async (req, res) => {
       return { success: true, slug };
     });
 
-    console.log("[CRITICAL_ROUTE]", JSON.stringify({ route: "profile_publish", status: "success", uid: uid.slice(0, 6) + "***", slug }));
+    console.log("[PROFILE SAVE] Transaction committed successfully for UID:", uid);
     res.json(result);
   } catch (err: any) {
-    console.error("[CRITICAL_ROUTE]", JSON.stringify({ route: "profile_publish", status: "failed", reason: err.message, uid: uid?.slice(0, 6) + "***", slug }));
+    console.error("[PROFILE_PUBLISH_ERROR]", err.message);
     const status = err.message.includes("já está sendo usado") ? 409 : 500;
     res.status(status).json({ error: err.message });
   }
@@ -238,7 +226,6 @@ router.get("/reservation/:slug", async (req, res) => {
 
 // --- NEW: DIAGNOSTIC ENDPOINT FOR RESERVATION ---
 router.get("/debug-reservation", async (req, res) => {
-  if (isProduction) return res.status(404).json({ error: "Not found" });
   try {
     const { slug } = req.query;
     if (!slug) return res.status(400).json({ error: "Missing slug or token" });

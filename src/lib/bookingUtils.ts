@@ -1,5 +1,5 @@
 
-import { Appointment, WorkingHours, BlockedSchedule } from '../types.js';
+import { Appointment, WorkingHours, BlockedSchedule } from '../types';
 
 export interface DayAvailability {
   availableSlots: string[];

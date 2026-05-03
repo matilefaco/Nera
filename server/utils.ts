@@ -170,52 +170,6 @@ export const aiRateLimit = new Map<string, { count: number, lastReset: number }>
 export const RATE_LIMIT_WINDOW = 60 * 1000;
 export const MAX_REQUESTS = 10;
 
-const maskPhone = (value: string): string => {
-  const digits = value.replace(/\D/g, '');
-  if (digits.length < 4) return "***";
-  return `***${digits.slice(-4)}`;
-};
-
-const maskEmail = (value: string): string => {
-  const [local, domain] = value.split('@');
-  if (!domain) return "***";
-  const localMask = local.length <= 2 ? `${local[0] || "*"}*` : `${local.slice(0, 2)}***`;
-  return `${localMask}@${domain}`;
-};
-
-export function redactSensitiveData<T = any>(input: T): T {
-  if (input === null || input === undefined) return input;
-  if (typeof input !== 'object') return input;
-  if (Array.isArray(input)) return input.map((item) => redactSensitiveData(item)) as T;
-
-  const tokenLikeKeys = ['token', 'publicToken', 'manageToken', 'authorization', 'apikey', 'apiKey', 'password', 'secret'];
-  const phoneLikeKeys = ['phone', 'whatsapp', 'clientWhatsapp', 'clientPhone'];
-  const emailLikeKeys = ['email', 'clientEmail', 'professionalEmail'];
-
-  const cloned: any = {};
-  for (const [key, value] of Object.entries(input as any)) {
-    if (value === null || value === undefined) {
-      cloned[key] = value;
-      continue;
-    }
-    const lowerKey = key.toLowerCase();
-    if (tokenLikeKeys.some((k) => lowerKey.includes(k.toLowerCase()))) {
-      cloned[key] = "***REDACTED***";
-      continue;
-    }
-    if (typeof value === 'string' && emailLikeKeys.some((k) => lowerKey.includes(k.toLowerCase()))) {
-      cloned[key] = maskEmail(value);
-      continue;
-    }
-    if (typeof value === 'string' && phoneLikeKeys.some((k) => lowerKey.includes(k.toLowerCase()))) {
-      cloned[key] = maskPhone(value);
-      continue;
-    }
-    cloned[key] = typeof value === 'object' ? redactSensitiveData(value) : value;
-  }
-  return cloned;
-}
-
 // NVIDIA AI Helper
 export async function callNvidiaAI(messages: any[], options: { model?: string, temperature?: number, max_tokens?: number } = {}) {
   const model = options.model || "meta/llama-3.1-8b-instruct";

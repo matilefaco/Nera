@@ -3,36 +3,6 @@ import path from "path";
 import fs from "fs";
 import cors from "cors";
 
-const PUBLIC_SITE_URL = "https://usenera.com";
-const DEFAULT_OG_IMAGE = `${PUBLIC_SITE_URL}/og-default.png`;
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function toAbsoluteHttpsUrl(value?: string | null): string | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.startsWith("//")) {
-    return `https:${trimmed}`;
-  }
-
-  try {
-    const parsed = new URL(trimmed, PUBLIC_SITE_URL);
-    if (parsed.protocol === "http:") parsed.protocol = "https:";
-    return parsed.toString();
-  } catch {
-    return null;
-  }
-}
-
 export async function createServerApp() {
   // 1. Initial configuration (Move heavy logic here)
   const { config } = await import("dotenv");
@@ -117,29 +87,17 @@ export async function createServerApp() {
       if (!fs.existsSync(indexPath)) return next();
       let html = fs.readFileSync(indexPath, "utf-8");
 
-      const canonicalUrl = `${PUBLIC_SITE_URL}/p/${encodeURIComponent(slug)}`;
-      const rawTitle = (prof.ogTitle || prof.shareTitle || (prof.name ? `${prof.name} | Agendamento Premium` : "") || "Nera | Vitrine & Agendamento Premium").toString().trim();
-      const rawDescription = (prof.ogDescription || prof.shortDescription || prof.headline || prof.bio || "Agende online com praticidade e elegância.").toString().trim();
-      const rawImage = prof.ogImageUrl || prof.shareImageUrl || prof.photoUrl || prof.avatar;
-
-      const title = escapeHtml(rawTitle.slice(0, 120) || "Nera | Vitrine & Agendamento Premium");
-      const description = escapeHtml(rawDescription.slice(0, 160) || "Agende online com praticidade e elegância.");
-      const imageUrl = escapeHtml(toAbsoluteHttpsUrl(rawImage) || DEFAULT_OG_IMAGE);
+      const title = prof.name || "Profissional Nera";
+      const description = prof.bio?.slice(0, 160) || "Agende online";
+      const imageUrl = prof.photoUrl || prof.avatar || "https://usenera.com/og-default.png";
 
       const metaTags = `
         <title>${title}</title>
         <meta name="description" content="${description}" />
-        <link rel="canonical" href="${canonicalUrl}" />
-        <meta property="og:type" content="website" />
         <meta property="og:title" content="${title}" />
         <meta property="og:description" content="${description}" />
         <meta property="og:image" content="${imageUrl}" />
-        <meta property="og:url" content="${canonicalUrl}" />
-        <meta property="og:site_name" content="Nera" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="${title}" />
-        <meta name="twitter:description" content="${description}" />
-        <meta name="twitter:image" content="${imageUrl}" />
       `;
 
       if (html.includes("</head>")) {
