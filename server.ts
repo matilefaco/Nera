@@ -89,15 +89,22 @@ export async function createServerApp() {
 
       const title = prof.name || "Profissional Nera";
       const description = prof.bio?.slice(0, 160) || "Agende online";
-      const imageUrl = prof.photoUrl || prof.avatar || "https://usenera.com/og-default.png";
+      
+      // OG Image Normalization - FORCING STATIC FALLBACK FOR 100% RELIABILITY
+      const ogImage = "https://usenera.com/og-default.png";
 
       const metaTags = `
         <title>${title}</title>
         <meta name="description" content="${description}" />
         <meta property="og:title" content="${title}" />
         <meta property="og:description" content="${description}" />
-        <meta property="og:image" content="${imageUrl}" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta property="og:image:secure_url" content="${ogImage}" />
+        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="${ogImage}" />
       `;
 
       if (html.includes("</head>")) {
