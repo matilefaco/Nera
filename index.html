@@ -4,6 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>nera | Vitrine & Agendamento Premium</title>
+    <script>
+      // 1. Force Unregister Service Workers (Production Fix)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('[DEBUG] ServiceWorker unregistered');
+          }
+        });
+      }
+
+      // 2. Global Error Handler for White Screen Diagnosis
+      window.onerror = function(msg, url, line, col, error) {
+        console.error('[CRITICAL] Global JS Error:', msg, 'at', url, ':', line, ':', col);
+        const debugDiv = document.createElement('div');
+        debugDiv.style.position = 'fixed';
+        debugDiv.style.bottom = '0';
+        debugDiv.style.background = 'red';
+        debugDiv.style.color = 'white';
+        debugDiv.style.padding = '10px';
+        debugDiv.style.zIndex = '10000';
+        debugDiv.style.fontSize = '12px';
+        debugDiv.textContent = 'ERRO DE RUNTIME: ' + msg;
+        document.body?.appendChild(debugDiv);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>

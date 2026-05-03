@@ -247,25 +247,6 @@ export default function Dashboard() {
     [appointments]
   );
 
-  const trialDaysLeft = useMemo(() => {
-    if (!profile?.trialEndsAt) return null;
-    try {
-      const endsAt = new Date(profile.trialEndsAt);
-      if (isNaN(endsAt.getTime())) return null;
-      
-      const now = new Date();
-      const d1 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const d2 = new Date(endsAt.getFullYear(), endsAt.getMonth(), endsAt.getDate());
-      
-      const diffTime = d2.getTime() - d1.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      return diffDays < 0 ? 0 : diffDays;
-    } catch (e) {
-      return null;
-    }
-  }, [profile?.trialEndsAt]);
-
   const monthlyStats = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -1269,49 +1250,6 @@ export default function Dashboard() {
         {/* HOJE SIMPLE VIEW */}
         {activeTab === "hoje" && (
           <div className="flex flex-col gap-8">
-            {/* Trial Warning Banner */}
-            {trialDaysLeft !== null && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={cn(
-                  "p-4 rounded-3xl border flex items-center justify-between gap-4 shadow-sm",
-                  trialDaysLeft > 0 ? "bg-brand-parchment border-brand-mist" : "bg-red-50 border-red-200"
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
-                    trialDaysLeft > 0 ? "bg-brand-linen text-brand-ink" : "bg-red-100 text-red-600"
-                  )}>
-                    {trialDaysLeft > 0 ? <Sparkles size={20} /> : <AlertCircle size={20} />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-[11px] font-bold text-brand-ink leading-tight">
-                      {trialDaysLeft > 0 
-                        ? `Seu período de teste grátis termina em ${trialDaysLeft} ${trialDaysLeft === 1 ? 'dia' : 'dias'}.` 
-                        : "Seu período de teste grátis expirou."}
-                    </p>
-                    <p className="text-[10px] text-brand-stone font-light italic">
-                      {trialDaysLeft > 0 
-                        ? "Aproveite para explorar todas as funções do Plano Pro!" 
-                        : "Faça o upgrade agora para manter seu acesso total."}
-                    </p>
-                  </div>
-                </div>
-                <Link 
-                  to="/planos" 
-                  className={cn(
-                    "px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest transition-all shrink-0",
-                    trialDaysLeft > 0 
-                      ? "bg-brand-ink text-white hover:bg-brand-stone" 
-                      : "bg-red-600 text-white hover:bg-red-700"
-                  )}
-                >
-                  {trialDaysLeft > 0 ? "Ver Planos" : "Fazer Upgrade"}
-                </Link>
-              </motion.div>
-            )}
             {/* Notificações Banner */}
             {!isSubscribed && !pushBannerDismissed && (
               <motion.div
