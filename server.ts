@@ -176,6 +176,14 @@ export async function createServerApp() {
 
   // 6. SSR for Professional Profiles
   app.get("/p/:slug", async (req, res) => {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+    res.setHeader("CDN-Cache-Control", "no-store");
+    res.setHeader("Firebase-Hosting-Cache-Control", "no-store");
+    res.setHeader("Accept-Ranges", "none");
+
     const { slug } = req.params;
     const indexPath = process.env.NODE_ENV === "production" 
       ? path.join(process.cwd(), "dist", "index.html")
@@ -206,8 +214,6 @@ export async function createServerApp() {
 
     res.status(200);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=300");
-    res.setHeader("Accept-Ranges", "none");
     return res.send(html);
   });
 
