@@ -68,7 +68,45 @@ export async function createServerApp() {
 
   app.use("/api", apiRouter);
 
-  // 6. SSR for Professional Profiles
+  // 6. Root-level OG Proxy
+  app.get("/og/p/:slugWithExt", async (req, res) => {
+    try {
+      const slug = req.params.slugWithExt.replace(/\.(jpg|jpeg|png)$/i, "");
+      const db = firebaseAdmin.getDb();
+      if (!db) return res.status(500).send("Database not initialized");
+
+      const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
+      const fallback = "https://usenera.com/og-default.jpg";
+
+      if (snapshot.empty) {
+        return res.redirect(fallback);
+      }
+
+      const prof = snapshot.docs[0].data() as any;
+      const imageUrl = prof.shareImage || prof.photoUrl || prof.avatar;
+
+      if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
+        return res.redirect(fallback);
+      }
+
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        return res.redirect(fallback);
+      }
+
+      const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+      const buffer = Buffer.from(await imageResponse.arrayBuffer());
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400"); // 7 days cache
+      return res.send(buffer);
+    } catch (err) {
+      console.error("[OG PROXY ERROR]", err);
+      return res.redirect("https://usenera.com/og-default.jpg");
+    }
+  });
+
+  // 7. SSR for Professional Profiles
   app.get("/p/:slug", async (req, res, next) => {
     try {
       const { slug } = req.params;
@@ -90,8 +128,8 @@ export async function createServerApp() {
       const title = prof.name || "Profissional Nera";
       const description = prof.bio?.slice(0, 160) || "Agende online";
       
-      // OG Image Normalization - FORCING STATIC FALLBACK FOR 100% RELIABILITY
-      const ogImage = "https://usenera.com/og-default.png";
+      // OG Image Normalization - USING DYNAMIC PROXY FOR RELIABILITY
+      const ogImage = `https://usenera.com/og/p/${slug}.jpg`;
 
       const metaTags = `
         <title>${title}</title>
@@ -100,7 +138,7 @@ export async function createServerApp() {
         <meta property="og:description" content="${description}" />
         <meta property="og:image" content="${ogImage}" />
         <meta property="og:image:secure_url" content="${ogImage}" />
-        <meta property="og:image:type" content="image/png" />
+        <meta property="og:image:type" content="image/jpeg" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
@@ -119,7 +157,7 @@ export async function createServerApp() {
     }
   });
 
-  // 7. Vite/Static serving
+  // 8. Vite/Static serving
   if (process.env.NODE_ENV !== "production") {
     const { createServer } = await import("vite");
     const vite = await createServer({
