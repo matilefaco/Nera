@@ -7,9 +7,19 @@ import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 const router = express.Router();
 
 const debugOnly = (req: any, res: any, next: any) => {
-  if (process.env.NODE_ENV === "production") {
+  const isProdEnv = process.env.NODE_ENV === "production";
+  const isFirebaseProd = process.env.GCLOUD_PROJECT && process.env.FUNCTIONS_EMULATOR !== "true";
+  
+  // Try to block if we know for sure it's production
+  if (isProdEnv || (isFirebaseProd && !process.env.NODE_ENV)) {
     return res.status(404).send("Not Found");
   }
+  
+  // Check the hostname as a fallback for SSR / Express
+  if (req.hostname && req.hostname.includes("usenera.com")) {
+    return res.status(404).send("Not Found");
+  }
+  
   return next();
 };
 
@@ -250,10 +260,11 @@ router.post("/public/create-booking", async (req, res) => {
 });
 
 // --- DIAGNOSTIC ENDPOINT FOR EMAILS ---
-router.get("/debug-booking-email", debugOnly, async (req, res) => {
+router.get("/debug-booking-email", debugOnly, async (req: any, res: any) => {
   try {
     const db = getDb();
-    const { appointmentId } = req.query;
+    const query = req.query || {};
+    const { appointmentId } = query;
     const debugInfo: any = {
       timestamp: new Date().toISOString(),
       env: {
