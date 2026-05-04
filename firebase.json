@@ -40,7 +40,7 @@
       "source": ".",
       "codebase": "default",
       "predeploy": [
-        "npm run build:functions"
+        "npm run build"
       ],
       "ignore": [
         "node_modules",
