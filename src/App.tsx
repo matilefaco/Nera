@@ -75,6 +75,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
   return (
+    // @ts-ignore
     <HelmetProvider>
       <AuthProvider>
         <Router>

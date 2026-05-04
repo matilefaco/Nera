@@ -27,6 +27,7 @@ import { WeekAvailability, WeeklyDayAvailability } from '../components/public/We
 import { ExpertIntro } from '../components/public/ExpertIntro';
 import { PaymentMethods } from '../components/public/PaymentMethods';
 import SEOHead from '../components/SEOHead';
+import { PublicProfileErrorBoundary } from '../components/public/PublicProfileErrorBoundary';
 
 const isDev = import.meta.env.DEV;
 const devLog = (...args: any[]) => isDev && console.log(...args);
@@ -164,8 +165,15 @@ const PublicProfileSkeleton = () => (
     </div>
   </div>
 );
-
 export default function PublicProfile() {
+  return (
+    <PublicProfileErrorBoundary>
+      <PublicProfileContent />
+    </PublicProfileErrorBoundary>
+  );
+}
+
+function PublicProfileContent() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const waitlistToken = searchParams.get('w');
@@ -452,7 +460,7 @@ export default function PublicProfile() {
             now
           });
 
-          const isWorkingDay = profile.workingHours.workingDays.includes(dayOfWeek);
+          const isWorkingDay = (profile.workingHours.workingDays || [1, 2, 3, 4, 5]).includes(dayOfWeek);
           
           let status: 'available' | 'low' | 'full' | 'closed' = 'available';
           if (!isWorkingDay) {

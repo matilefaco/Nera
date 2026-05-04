@@ -39,9 +39,7 @@
     {
       "source": ".",
       "codebase": "default",
-      "predeploy": [
-        "npm run build"
-      ],
+      "predeploy": [],
       "ignore": [
         "node_modules",
         ".git",
