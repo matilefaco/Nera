@@ -225,51 +225,8 @@ router.post("/public/create-booking", async (req, res) => {
     }
 });
 // --- DIAGNOSTIC ENDPOINT FOR EMAILS ---
-router.get("/debug-booking-email", debugOnly, async (req, res) => {
-    try {
-        const db = getDb();
-        const query = req.query || {};
-        const { appointmentId } = query;
-        const debugInfo = {
-            timestamp: new Date().toISOString(),
-            env: {
-                resendKeyPresent: !!process.env.RESEND_API_KEY,
-                emailFrom: process.env.EMAIL_FROM || "Nera <agenda@usenera.com>",
-                appUrl: process.env.APP_URL,
-                nodeEnv: process.env.NODE_ENV
-            }
-        };
-        if (appointmentId) {
-            debugInfo.appointmentId = appointmentId;
-            const apptDoc = await db.collection('appointments').doc(appointmentId).get();
-            if (apptDoc.exists) {
-                const data = apptDoc.data();
-                debugInfo.appointment = {
-                    status: data?.status,
-                    clientEmail: data?.clientEmail,
-                    clientName: data?.clientName,
-                    token: !!data?.token,
-                    professionalId: data?.professionalId
-                };
-                if (data?.professionalId) {
-                    const proDoc = await db.collection('users').doc(data.professionalId).get();
-                    if (proDoc.exists) {
-                        debugInfo.professional = {
-                            email: proDoc.data()?.email,
-                            name: proDoc.data()?.name
-                        };
-                    }
-                }
-            }
-            else {
-                debugInfo.error = "Appointment not found in Firestore";
-            }
-        }
-        res.json(debugInfo);
-    }
-    catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+router.get("/debug-booking-email", (req, res) => {
+    return res.status(404).send("Not Found");
 });
 // --- NEW: DIAGNOSTIC ENDPOINT FOR CONFIRMATION FLOW ---
 router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
