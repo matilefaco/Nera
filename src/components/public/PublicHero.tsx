@@ -36,9 +36,10 @@ export const PublicHero = ({
   const [showInterestPopup, setShowInterestPopup] = useState(false);
   const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
   
-  const firstName = profile.name.split(' ')[0];
-  const lastName = profile.name.split(' ').slice(1).join(' ');
-  const initials = profile.name.split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
+  const fullName = profile.name || '';
+  const firstName = fullName.split(' ')[0] || 'Profissional';
+  const lastName = fullName.split(' ').slice(1).join(' ');
+  const initials = fullName ? fullName.split(" ").map(w => w ? w[0] : "").filter(Boolean).slice(0, 2).join("").toUpperCase() : "P";
 
   useEffect(() => {
     const handleScroll = () => {

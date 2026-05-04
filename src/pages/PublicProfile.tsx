@@ -528,8 +528,6 @@ export default function PublicProfile() {
 
   if (loading) return <PublicProfileSkeleton />;
   
-  const theme = getTheme(profile?.profileTheme?.variant);
-
   if (!profile) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
       <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-10 border border-brand-mist shadow-sm">
@@ -545,6 +543,8 @@ export default function PublicProfile() {
       </div>
     </div>
   );
+
+  const theme = getTheme(profile?.profileTheme?.variant);
 
   return (
     <div 
