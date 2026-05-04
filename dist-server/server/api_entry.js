@@ -27,6 +27,23 @@ export const api = onRequest({
     minInstances: 0,
     cors: true,
 }, async (req, res) => {
+    const isProdEnv = process.env.GCLOUD_PROJECT && process.env.FUNCTIONS_EMULATOR !== "true";
+    const isHostProd = req.hostname && req.hostname.includes("usenera.com");
+    if (isProdEnv || isHostProd) {
+        const blockedDebugTerms = [
+            "debug",
+            "test-email",
+            "test-whatsapp",
+            "test-ai-service-description",
+            "fix-duplicate-slots",
+            "run-confirmation-email"
+        ];
+        const rawUrl = String(req.url || req.originalUrl || "");
+        const isBlockedDebugRoute = blockedDebugTerms.some((term) => rawUrl.includes(term));
+        if (isBlockedDebugRoute) {
+            return res.status(404).send("Not Found");
+        }
+    }
     try {
         const app = await createExpressApp();
         return app(req, res);
