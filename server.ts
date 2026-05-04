@@ -20,6 +20,27 @@ export async function createServerApp() {
     optionsSuccessStatus: 200
   }));
 
+  // Global protection for diagnostic routes
+  app.use((req, res, next) => {
+    const isProdEnv = process.env.GCLOUD_PROJECT && process.env.FUNCTIONS_EMULATOR !== "true";
+    const isHostProd = req.hostname && req.hostname.includes("usenera.com");
+    
+    if (isProdEnv || isHostProd) {
+      const blockedTerms = [
+        "debug",
+        "test-email",
+        "test-whatsapp",
+        "fix-duplicate-slots",
+        "run-confirmation-email",
+        "test-ai-service-description"
+      ];
+      if (blockedTerms.some(term => req.path.includes(term))) {
+        return res.status(404).send("Not Found");
+      }
+    }
+    next();
+  });
+
   // 2. Immediate Diagnostic Endpoints
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok", time: new Date().toISOString() });
