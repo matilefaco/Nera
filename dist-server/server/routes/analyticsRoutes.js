@@ -4,6 +4,12 @@ import { callNvidiaAI, aiRateLimit, RATE_LIMIT_WINDOW, MAX_REQUESTS, getServiceD
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { generateMonthlyReportPDF } from "../reports/monthlyReport.js";
 const router = express.Router();
+const debugOnly = (req, res, next) => {
+    if (process.env.NODE_ENV === "production") {
+        return res.status(404).send("Not Found");
+    }
+    return next();
+};
 router.post("/generate-content", checkPlanFeature('advancedDashboard'), async (req, res) => {
     const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
     // Simple rate limit check
@@ -87,7 +93,7 @@ router.post("/analyze-portfolio-image", checkPlanFeature('advancedDashboard'), a
         res.json({ category: "Portfólio" });
     }
 });
-router.get("/debug-ai", async (req, res) => {
+router.get("/debug-ai", debugOnly, async (req, res) => {
     const nvidiaKey = process.env.NVIDIA_API_KEY;
     const report = {
         nvidiaKeyPresent: !!nvidiaKey,
@@ -111,7 +117,7 @@ router.get("/debug-ai", async (req, res) => {
     }
     res.json(report);
 });
-router.get("/test-ai-service-description", async (req, res) => {
+router.get("/test-ai-service-description", debugOnly, async (req, res) => {
     const { serviceName } = req.query;
     if (!serviceName)
         return res.status(400).json({ error: "Missing serviceName" });

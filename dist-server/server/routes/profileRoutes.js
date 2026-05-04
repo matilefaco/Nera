@@ -4,6 +4,12 @@ import admin from "firebase-admin";
 import { isValidWhatsapp } from "../utils.js";
 import { PLAN_CONFIGS } from "../../src/constants/plans.js";
 const router = express.Router();
+const debugOnly = (req, res, next) => {
+    if (process.env.NODE_ENV === "production") {
+        return res.status(404).send("Not Found");
+    }
+    return next();
+};
 /**
  * Recursively removes undefined fields from an object or array.
  */
@@ -195,7 +201,7 @@ router.get("/reservation/:slug", async (req, res) => {
     }
 });
 // --- NEW: DIAGNOSTIC ENDPOINT FOR RESERVATION ---
-router.get("/debug-reservation", async (req, res) => {
+router.get("/debug-reservation", debugOnly, async (req, res) => {
     try {
         const { slug } = req.query;
         if (!slug)

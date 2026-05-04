@@ -12,6 +12,13 @@ import { generateMonthlyReportPDF } from "../reports/monthlyReport.js";
 
 const router = express.Router();
 
+const debugOnly = (req: any, res: any, next: any) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).send("Not Found");
+  }
+  return next();
+};
+
 router.post("/generate-content", checkPlanFeature('advancedDashboard'), async (req, res) => {
   const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
   
@@ -106,7 +113,7 @@ router.post("/analyze-portfolio-image", checkPlanFeature('advancedDashboard'), a
   }
 });
 
-router.get("/debug-ai", async (req, res) => {
+router.get("/debug-ai", debugOnly, async (req, res) => {
   const nvidiaKey = process.env.NVIDIA_API_KEY;
   const report = {
     nvidiaKeyPresent: !!nvidiaKey,
@@ -132,7 +139,7 @@ router.get("/debug-ai", async (req, res) => {
   res.json(report);
 });
 
-router.get("/test-ai-service-description", async (req, res) => {
+router.get("/test-ai-service-description", debugOnly, async (req, res) => {
   const { serviceName } = req.query;
   if (!serviceName) return res.status(400).json({ error: "Missing serviceName" });
 

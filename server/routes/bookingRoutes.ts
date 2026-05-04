@@ -6,6 +6,13 @@ import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 
 const router = express.Router();
 
+const debugOnly = (req: any, res: any, next: any) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).send("Not Found");
+  }
+  return next();
+};
+
 // --- HELPER FUNCTIONS FOR BACKEND BOOKING ---
 const normalizeId = (id: any): string => {
   return String(id || "").trim().replace(/^"+|"+$/g, "");
@@ -243,7 +250,7 @@ router.post("/public/create-booking", async (req, res) => {
 });
 
 // --- DIAGNOSTIC ENDPOINT FOR EMAILS ---
-router.get("/debug-booking-email", async (req, res) => {
+router.get("/debug-booking-email", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { appointmentId } = req.query;
@@ -291,7 +298,7 @@ router.get("/debug-booking-email", async (req, res) => {
 });
 
 // --- NEW: DIAGNOSTIC ENDPOINT FOR CONFIRMATION FLOW ---
-router.get("/debug-confirmation-email", async (req, res) => {
+router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { appointmentId } = req.query;
@@ -342,7 +349,7 @@ router.get("/debug-confirmation-email", async (req, res) => {
 });
 
 // --- NEW: EXECUTION ENDPOINT FOR CONFIRMATION EMAIL ---
-router.get("/run-confirmation-email", async (req, res) => {
+router.get("/run-confirmation-email", debugOnly, async (req, res) => {
   const db = getDb();
   const { appointmentId, token: queryToken } = req.query;
   const response: any = {
@@ -456,7 +463,7 @@ router.get("/run-confirmation-email", async (req, res) => {
 });
 
 // --- NEW: FULL AUDIT ENDPOINT ---
-router.get("/debug-confirmation-email-full", async (req, res) => {
+router.get("/debug-confirmation-email-full", debugOnly, async (req, res) => {
   const db = getDb();
   const { appointmentId } = req.query;
   const audit: any = {
@@ -534,7 +541,7 @@ router.get("/debug-confirmation-email-full", async (req, res) => {
   }
 });
 
-router.get("/fix-duplicate-slots", async (req, res) => {
+router.get("/fix-duplicate-slots", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { professionalId } = req.query;
@@ -617,7 +624,7 @@ router.get("/fix-duplicate-slots", async (req, res) => {
   }
 });
 
-router.get("/debug-slot-lock", async (req, res) => {
+router.get("/debug-slot-lock", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { professionalId, date, time } = req.query;
@@ -779,7 +786,7 @@ router.post("/appointments/:appointmentId/confirm", async (req, res) => {
 });
 
 // --- NEW: DIAGNOSTIC ENDPOINT FOR CAN BOOK SLOT ---
-router.get("/debug-can-book-slot", async (req, res) => {
+router.get("/debug-can-book-slot", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { professionalId, serviceId, date, time } = req.query;
@@ -871,7 +878,7 @@ router.get("/debug-can-book-slot", async (req, res) => {
   }
 });
 
-router.get("/debug-reservation-token", async (req, res) => {
+router.get("/debug-reservation-token", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { token } = req.query;
@@ -908,7 +915,7 @@ router.get("/debug-reservation-token", async (req, res) => {
   }
 });
 
-router.get("/debug-next-slot-full", async (req, res) => {
+router.get("/debug-next-slot-full", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { professionalId, serviceId } = req.query;
@@ -1012,7 +1019,7 @@ router.get("/debug-next-slot-full", async (req, res) => {
   }
 });
 
-router.get("/debug-bookable-slots", async (req, res) => {
+router.get("/debug-bookable-slots", debugOnly, async (req, res) => {
   try {
     const db = getDb();
     const { professionalId, serviceId, date } = req.query;

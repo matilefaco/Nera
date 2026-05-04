@@ -97,14 +97,12 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     const sig = req.headers["stripe-signature"];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     let event;
+    if (!webhookSecret || !sig) {
+        console.error('[STRIPE WEBHOOK ERROR] Missing webhookSecret or signature');
+        return res.status(400).send('Webhook Error: Missing verification details');
+    }
     try {
-        if (webhookSecret && sig) {
-            event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-        }
-        else {
-            // Fallback for dev without signature validation if desired, but better to be strict
-            event = JSON.parse(req.body.toString());
-        }
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     }
     catch (err) {
         console.error(`[STRIPE WEBHOOK ERROR] Verification failed: ${err.message}`);

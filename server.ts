@@ -107,6 +107,15 @@ export async function createServerApp() {
   });
 
   // 7. SSR for Professional Profiles
+  const escapeHtml = (unsafe: string) => {
+    return (unsafe || '').toString()
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  };
+
   app.get("/p/:slug", async (req, res, next) => {
     try {
       const { slug } = req.params;
@@ -125,11 +134,12 @@ export async function createServerApp() {
       if (!fs.existsSync(indexPath)) return next();
       let html = fs.readFileSync(indexPath, "utf-8");
 
-      const title = prof.name || "Profissional Nera";
-      const description = prof.bio?.slice(0, 160) || "Agende online";
+      const title = escapeHtml(prof.name || "Profissional Nera");
+      const description = escapeHtml(prof.bio?.slice(0, 160) || "Agende online");
+      const safeSlug = encodeURIComponent(slug);
       
       // OG Image Normalization - USING DYNAMIC PROXY FOR RELIABILITY
-      const ogImage = `https://usenera.com/og/p/${slug}.jpg`;
+      const ogImage = `https://usenera.com/og/p/${safeSlug}.jpg`;
 
       const metaTags = `
         <title>${title}</title>

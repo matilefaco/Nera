@@ -92,7 +92,13 @@ import { buildNewBookingMessageForPro, buildBookingConfirmedMessageForClient, bu
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 const router = express.Router();
-router.get("/debug-email", async (req, res) => {
+const debugOnly = (req, res, next) => {
+    if (process.env.NODE_ENV === "production") {
+        return res.status(404).send("Not Found");
+    }
+    return next();
+};
+router.get("/debug-email", debugOnly, async (req, res) => {
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.EMAIL_FROM || "Nera <agenda@usenera.com>";
     const appUrl = process.env.APP_URL;
@@ -104,7 +110,7 @@ router.get("/debug-email", async (req, res) => {
         nodeEnv: process.env.NODE_ENV
     });
 });
-router.get("/test-email", async (req, res) => {
+router.get("/test-email", debugOnly, async (req, res) => {
     console.log('[EMAIL] starting send (Test Endpoint)');
     const target = req.query.email || "matilefaco@hotmail.com";
     try {
@@ -133,17 +139,17 @@ router.get("/test-email", async (req, res) => {
 });
 // Mock for sendRawEmail which was deprecated in original server.ts
 function sendRawEmailDraft(...args) { console.warn("sendRawEmail is deprecated"); return { success: false }; }
-router.get("/test-email-real", async (req, res) => {
+router.get("/test-email-real", debugOnly, async (req, res) => {
     const target = "matilefaco@hotmail.com";
     const result = await sendRawEmailDraft(target, "Teste Nera funcionando", "Seu sistema de emails está ativo com domínio verificado.");
     res.status(result.success ? 200 : 500).json(result);
 });
-router.get("/test-email-gmail", async (req, res) => {
+router.get("/test-email-gmail", debugOnly, async (req, res) => {
     const target = "matilefaco1@gmail.com";
     const result = await sendRawEmailDraft(target, "Teste Nera GMAIL", "Teste de envio oficial para GMAIL através do sistema Nera.");
     res.status(result.success ? 200 : 500).json(result);
 });
-router.get("/test-email-hotmail-clean", async (req, res) => {
+router.get("/test-email-hotmail-clean", debugOnly, async (req, res) => {
     const target = "matilefaco@hotmail.com";
     const result = await sendRawEmailDraft(target, "Confirmação Nera", "Seu agendamento está confirmado.", {
         isHtml: true,
@@ -151,12 +157,12 @@ router.get("/test-email-hotmail-clean", async (req, res) => {
     });
     res.status(result.success ? 200 : 500).json(result);
 });
-router.get("/test-email-hotmail-plain", async (req, res) => {
+router.get("/test-email-hotmail-plain", debugOnly, async (req, res) => {
     const target = "matilefaco@hotmail.com";
     const result = await sendRawEmailDraft(target, "Confirmação Nera", "Seu agendamento no Nera foi confirmado com sucesso.", { isHtml: false });
     res.status(result.success ? 200 : 500).json(result);
 });
-router.get("/test-whatsapp", async (req, res) => {
+router.get("/test-whatsapp", debugOnly, async (req, res) => {
     const db = getDb();
     const { phone, message, type, simulateInbound } = req.query;
     if (!phone)
@@ -229,7 +235,7 @@ router.post("/zapi/webhook", async (req, res) => {
     }
     res.status(200).send("OK");
 });
-router.get("/debug-whatsapp", async (req, res) => {
+router.get("/debug-whatsapp", debugOnly, async (req, res) => {
     res.json({
         zapiInstanceId: !!process.env.ZAPI_INSTANCE_ID,
         zapiInstanceToken: !!process.env.ZAPI_INSTANCE_TOKEN || !!process.env.ZAPI_TOKEN,
