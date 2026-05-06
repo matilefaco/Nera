@@ -46,16 +46,13 @@ service cloud.firestore {
       return data.keys().hasAll(['professionalId', 'name', 'duration', 'price']) &&
              data.professionalId == request.auth.uid &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             data.duration is number && data.duration > 0 &&
+             data.duration is number && data.duration >= 15 && data.duration <= 480 &&
              data.price is number && data.price >= 0;
     }
 
     function isValidAppointment(data) {
       return data.professionalId is string &&
-             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
-             data.date is string && data.time is string &&
-             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired'] &&
-             data.price is number && data.price >= 0;
+             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired'];
     }
 
     function isValidBlockedSchedule(data) {
@@ -171,7 +168,8 @@ service cloud.firestore {
     match /waitlist/{entryId} {
       // Clientes podem criar entradas (sem auth), profissional pode gerenciar as suas
       allow read: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
-      allow create: if isValidWaitlistEntry(incoming()); // Público — cliente entra na lista sem login
+      allow create: if isValidWaitlistEntry(incoming()) && 
+                    get(/databases/$(database)/documents/users/$(incoming().professionalId)).data.get('plan', 'free') == 'pro';
       allow update: if (isSignedIn() && (existing().professionalId == request.auth.uid || isAdmin())) && isValidWaitlistEntry(incoming());
       allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
     }
@@ -185,7 +183,7 @@ service cloud.firestore {
     match /booking_locks/{lockId} {
       allow read: if true;
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
-      allow update: if isSignedIn() && existing().professionalId == request.auth.uid;
+      allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || (isSignedIn() && incoming().professionalId == request.auth.uid);
       allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
     }
 
@@ -198,7 +196,9 @@ service cloud.firestore {
 
     match /client_summaries/{summaryId} {
       allow get, list: if isSignedIn() && resource.data.professionalId == request.auth.uid;
-      allow create, update, delete: if isAdmin();
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
+      allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || (isSignedIn() && incoming().professionalId == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
     match /analytics_events/{eventId} {

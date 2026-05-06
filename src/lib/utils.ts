@@ -272,7 +272,7 @@ export function splitSmartBio(bio: string | undefined, limit: number = 140): { h
   const targetHeroLength = 120;
   
   // Regex to find sentences (ending in . ! or ?)
-  const sentences = trimmedBio.match(/[^.!?]+[.!?]+(?:\s+|\n|$)/g) || [trimmedBio];
+  const sentences = trimmedBio.match(/[^.!?]+[.!?]+(?:\\s+|\\n|$)/g) || [trimmedBio];
   
   let heroText = "";
   let currentIndex = 0;
@@ -316,8 +316,25 @@ export function splitSmartBio(bio: string | undefined, limit: number = 140): { h
 /**
  * Returns a relative date string in Portuguese (e.g., "há 2 semanas").
  */
-export function getRelativeDate(dateInput: string | Date): string {
-  const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+export function getRelativeDate(dateInput: any): string {
+  if (!dateInput) return "recentemente";
+  
+  let date: Date;
+  
+  if (dateInput instanceof Date) {
+    date = dateInput;
+  } else if (typeof dateInput === 'string' || typeof dateInput === 'number') {
+    date = new Date(dateInput);
+  } else if (dateInput && typeof dateInput.toDate === 'function') {
+    date = dateInput.toDate();
+  } else if (dateInput && dateInput.seconds) {
+    date = new Date(dateInput.seconds * 1000);
+  } else {
+    return "recentemente";
+  }
+
+  if (isNaN(date.getTime())) return "recentemente";
+
   const now = new Date();
   const diffInMs = now.getTime() - date.getTime();
   const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));

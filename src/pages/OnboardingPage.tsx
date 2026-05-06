@@ -11,7 +11,7 @@ import {
   CheckCircle2, ArrowRight, ArrowLeft, Sparkles,
   Camera, Plus, X, Globe, Copy, Share2, ExternalLink, AlertCircle, AlertTriangle
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import imageCompression from 'browser-image-compression';
 import { generateSlug, formatCurrency, cn, removeUndefinedDeep, getHumanError, cleanWhatsapp, buildWhatsappLink, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
 import Logo from '../components/Logo';
@@ -50,7 +50,7 @@ const CopyLinkButton = ({ slug }: { slug: string }) => {
   const handleCopy = () => {
     navigator.clipboard.writeText(`https://nera.app/p/${slug}`);
     setCopied(true);
-    toast.success('Link copiado!');
+    notify.success('Link copiado!');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -78,7 +78,7 @@ const EXPERIENCE_OPTIONS = [
 export default function OnboardingPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const TOTAL_STEPS = 5;
+  const TOTAL_STEPS = 3;
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
@@ -220,10 +220,8 @@ export default function OnboardingPage() {
 
   const stepDescriptions = [
     'Identidade',
-    'Localização',
-    'Serviços',
-    'Agenda',
-    'Revisão'
+    'Serviços e Local',
+    'Agenda e Publicação'
   ];
 
   // Step 3: Services
@@ -250,17 +248,18 @@ export default function OnboardingPage() {
       });
 
       // 1. If onboarding is already completed on server, App.tsx guard will handle redirect.
-      if (profile.onboardingCompleted && !isFinalizing && step !== 5) {
+      if (profile.onboardingCompleted && !isFinalizing && step !== 4) { // step 4 is considered out of bounds, meaning done. Or we check 3. It used to be 5.
+        // Actually we will just return if it's already completed.
         return;
       }
 
       // Sync specific onboarding fields not covered by common hook
       if (!loading && !isFinalizing) {
         if (profile.serviceAreaType) setServiceAreaType(profile.serviceAreaType);
-        if (profile.servicesDraft) setServices(profile.servicesDraft);
+        if ((profile as any).servicesDraft) setServices((profile as any).servicesDraft);
         if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
         if (profile.professionalIdentity?.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
-        if (profile.portfolio && profile.portfolio.length > 0) setPortfolio(profile.portfolio);
+        if (profile.portfolio && profile.portfolio.length > 0) setPortfolio(profile.portfolio as any);
         if (profile.onboardingStep !== undefined) setStep(profile.onboardingStep);
       }
     }
@@ -268,16 +267,20 @@ export default function OnboardingPage() {
 
   const generateIdentityContent = async () => {
     if (!name || !specialty) {
-      toast.error('Informe seu nome e especialidade primeiro.');
+      notify.error('Informe seu nome e especialidade primeiro.');
       return;
     }
     setIsGeneratingContent(true);
     console.log(`[BioAI] Generating for ${name} (${specialty}) with style: ${selectedBioStyle}`);
 
     try {
+      const token = await user?.getIdToken();
       const response = await fetch('/api/generate-content', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           name,
           specialty,
@@ -290,10 +293,10 @@ export default function OnboardingPage() {
       const data = await response.json();
       if (data.bio) setBio(data.bio);
       if (data.headline) setHeadline(data.headline);
-      toast.success('Sua marca foi personalizada com IA ✨');
+      notify.success('Sua marca foi personalizada com IA ✨');
     } catch (error: any) {
       console.error('[BioAI] Generation failed:', error);
-      toast.error(error.message === 'Muitas solicitações. Tente novamente em um minuto.' 
+      notify.error(error.message === 'Muitas solicitações. Tente novamente em um minuto.' 
         ? error.message 
         : 'O concierge está ocupado agora. Tente novamente em instantes.');
     } finally {
@@ -313,7 +316,7 @@ export default function OnboardingPage() {
       bio,
       headline,
       serviceMode,
-      paymentMethods,
+      paymentMethods: paymentMethods as any,
       onboardingStep: nextStepNum,
       workingHours: {
         startTime,
@@ -375,10 +378,10 @@ export default function OnboardingPage() {
           await saveProfilePartial(user.uid, { avatar: downloadUrl });
         }
         
-        toast.success('Foto atualizada com sucesso.');
+        notify.success('Foto atualizada com sucesso.');
       } catch (error: any) {
         console.error('[Avatar] upload flow failed:', error);
-        toast.error('Não foi possível salvar a imagem agora.');
+        notify.error('Não foi possível salvar a imagem agora.');
         // Revert preview on error
         setAvatarPreview(avatar);
       } finally {
@@ -398,11 +401,13 @@ export default function OnboardingPage() {
       const errors: Record<string, string> = {};
       if (!name.trim()) errors.name = 'O nome é obrigatório';
       if (!specialty.trim()) errors.specialty = 'Informe sua especialidade';
-      if (paymentMethods.length === 0) errors.paymentMethods = 'Selecione ao menos uma forma de pagamento';
+      if (!isValidWhatsapp(whatsapp)) {
+        errors.whatsapp = 'Número inválido. Use um formato brasileiro: (DDD) 9XXXX-XXXX';
+      }
       
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
-        toast.error('Por favor, preencha os campos destacados.');
+        notify.error('Por favor, preencha os campos destacados.');
         return;
       }
       
@@ -410,42 +415,44 @@ export default function OnboardingPage() {
       if (!bio && !headline) {
         generateIdentityContent();
       }
+      if (paymentMethods.length === 0) setPaymentMethods(['pix']);
     }
 
     if (step === 2) {
       const errors: Record<string, string> = {};
       if (!city.trim()) errors.city = 'Informe sua cidade';
       if (!neighborhood.trim()) errors.neighborhood = 'Informe seu bairro';
-      
-      // WhatsApp validation
-      if (!isValidWhatsapp(whatsapp)) {
-        errors.whatsapp = 'Número inválido. Use um formato brasileiro: (DDD) 9XXXX-XXXX';
-      }
 
       if (serviceMode !== 'home') {
         if (!studioAddress.street.trim()) errors.studioStreet = 'Informe a rua';
         if (!studioAddress.number.trim()) errors.studioNumber = 'Informe o número';
       }
 
-      if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        toast.error('Por favor, informe sua localização.');
-        return;
-      }
-    }
-
-    if (step === 3) {
-      const newServiceErrors = services.map(s => {
-        const errs: any = {};
-        if (!s.name.trim()) errs.name = 'Informe o nome do serviço';
-        if (!s.duration || Number(s.duration) <= 0) errs.duration = 'Selecione a duração. Ela define os horários disponíveis para suas clientes.';
-        if (!s.price.trim()) errs.price = 'Informe o preço';
-        return Object.keys(errs).length > 0 ? errs : null;
+      let hasServiceError = false;
+      const newServiceErrors = services.map((s, idx) => {
+        if (idx === 0 || s.name || s.duration || s.price) {
+          const errs: any = {};
+          if (!s.name.trim()) errs.name = 'Informe o nome do serviço';
+          if (!s.duration || Number(s.duration) < 15 || Number(s.duration) > 480) {
+            errs.duration = 'Duração inválida (15 a 480 min).';
+          }
+          if (!s.price.trim()) errs.price = 'Informe o preço';
+          
+          if (Object.keys(errs).length > 0) hasServiceError = true;
+          return Object.keys(errs).length > 0 ? errs : null;
+        }
+        return null;
       });
 
-      if (newServiceErrors.some(e => e !== null)) {
+      if (hasServiceError) {
         setServicesErrors(newServiceErrors);
-        toast.error('Preencha os dados dos seus serviços para continuar.');
+        notify.error('Preencha os dados do seu serviço principal.');
+        return;
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setFormErrors(errors);
+        notify.error('Por favor, informe sua localização.');
         return;
       }
     }
@@ -459,7 +466,7 @@ export default function OnboardingPage() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error('[Onboarding] Failed to move to next step:', error);
-      toast.error('Não foi possível salvar seu progresso agora.');
+      notify.error('Não foi possível salvar seu progresso agora.');
     } finally {
       setIsSavingStep(false);
     }
@@ -469,12 +476,6 @@ export default function OnboardingPage() {
 
   const handleFinish = async () => {
     setFormErrors({});
-
-    // 0. CHECK AVATAR
-    if (!avatar && !avatarSkipped) {
-      setShowAvatarModal(true);
-      return;
-    }
 
     if (!user || isFinalizing || profile?.onboardingCompleted) {
       console.log('[OnboardingSave] handleFinish blocked:', { 
@@ -495,24 +496,30 @@ export default function OnboardingPage() {
       if (!specialty.trim()) errors.specialty = 'Sua especialidade é obrigatória';
       if (!slug.trim()) errors.slug = 'O link da sua vitrine é obrigatório';
       if (slug.length < 3) errors.slug = 'O link deve ter pelo menos 3 caracteres';
+      if (!city.trim()) errors.city = 'A cidade é obrigatória';
+      if (!neighborhood.trim()) errors.neighborhood = 'O bairro é obrigatório';
       
       // WhatsApp validation
       if (!whatsapp || !isValidWhatsapp(whatsapp)) {
-        toast.error('Informe um WhatsApp válido (Ex: 11 99999-9999)');
+        notify.error('Informe um WhatsApp válido (Ex: 11 99999-9999)');
+        return;
+      }
+
+      if (workingDays.length === 0) {
+        notify.error('Selecione ao menos um dia de atendimento na agenda.');
         return;
       }
 
       const activeServices = services.filter(s => s.name.trim() !== '');
       if (activeServices.length === 0) {
         console.warn('[OnboardingSave] Validation failed: No active services');
-        toast.error('Adicione pelo menos um serviço na etapa anterior.');
-        setStep(3); // Go back to services if missing
+        notify.error('Cadastre pelo menos um serviço antes de publicar.');
         return;
       }
 
       if (Object.keys(errors).length > 0) {
         setFormErrors(errors);
-        toast.error('Revise os campos destacados para publicar sua vitrine.');
+        notify.error('Revise os campos destacados para publicar sua vitrine.');
         
         // Auto-scroll to first error
         setTimeout(() => {
@@ -526,9 +533,9 @@ export default function OnboardingPage() {
     } catch (err) {
       console.error('[OnboardingSave] Validation error:', err);
       if (err instanceof z.ZodError) {
-        toast.error(err.issues[0].message);
+        notify.error(err.issues[0].message);
       } else {
-        toast.error(getHumanError(err));
+        notify.error(err);
       }
       return;
     }
@@ -545,7 +552,7 @@ export default function OnboardingPage() {
       neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
       slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       whatsapp: cleanWhatsapp(whatsapp),
-      paymentMethods,
+      paymentMethods: (paymentMethods.length > 0 ? paymentMethods : ['pix']) as any,
       bio: bio.trim(),
       headline: headline.trim(),
       instagram: instagram.trim().replace('@', ''),
@@ -578,16 +585,16 @@ export default function OnboardingPage() {
       } as ProfessionalIdentity,
       published: true, // Explicitly marked as published
       onboardingCompleted: true,
-      onboardingStep: 6,
+      onboardingStep: 3, // Changed from 6 to 3
       indexable: true,
       planRank: profile?.planRank || 0,
-      avatarSkipped: avatar ? false : avatarSkipped,
+      avatarSkipped: avatar ? false : true, // If no avatar, consider skipped
       updatedAt: new Date().toISOString()
     };
 
     const rawServicesData = activeServices.map(service => ({
       name: service.name.trim(),
-      duration: Number(service.duration) || 60,
+      duration: Number(service.duration) || 0,
       price: Number(service.price) || 0,
       description: (service.description || '').trim()
     }));
@@ -603,9 +610,18 @@ export default function OnboardingPage() {
     };
 
     try {
+      if (!auth.currentUser) {
+        notify.error("Sua sessão expirou. Entre novamente para salvar.");
+        setIsFinalizing(false);
+        return;
+      }
+      const token = await auth.currentUser.getIdToken(true);
       const response = await fetch('/api/profile/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
 
@@ -616,9 +632,9 @@ export default function OnboardingPage() {
         throw new Error(typeof responseBody === 'object' ? responseBody.error : responseBody);
       }
 
-      setStep(6);
+      setStep(4); // Advance to completion viewing step
     } catch (error: any) {
-      toast.error(getHumanError(error));
+      notify.error(error);
     } finally {
       setIsFinalizing(false);
       setLoading(false);
@@ -631,18 +647,14 @@ export default function OnboardingPage() {
     
     setIsFinalizing(true);
     try {
-      // Ensure onboardingCompleted is set via local state for UI consistency
-      // The API already set it in Firestore, but we confirm here
-      console.log('[ONBOARDING] Final check before dashboard...');
       await saveProfilePartial(user.uid, { 
         onboardingCompleted: true,
-        onboardingStep: 6
+        onboardingStep: 3
       });
       console.log('[ONBOARDING] Navigation starting...');
       navigate('/dashboard');
     } catch (error) {
       console.error('[ONBOARDING ERROR] final step failed:', error);
-      // Even if this partial save fails, we should try to navigate if handleFinish worked
       navigate('/dashboard');
     } finally {
       setIsFinalizing(false);
@@ -650,7 +662,7 @@ export default function OnboardingPage() {
   };
 
   const addService = () => {
-    setServices([...services, { name: '', duration: '60', price: '', description: '' }]);
+    setServices([...services, { name: '', duration: '', price: '', description: '' }]);
   };
 
   const updateService = (index: number, field: string, value: string) => {
@@ -674,12 +686,12 @@ export default function OnboardingPage() {
 
   const addArea = () => {
     if (!newAreaName.trim()) {
-      toast.error('Informe o nome do bairro.');
+      notify.error('Informe o nome do bairro.');
       return;
     }
 
     if (pricingStrategy !== 'none' && !newAreaFee) {
-      toast.error('Por favor, informe o valor adicional.');
+      notify.error('Por favor, informe o valor adicional.');
       return;
     }
 
@@ -688,7 +700,7 @@ export default function OnboardingPage() {
     );
 
     if (isDuplicate) {
-      toast.error('Este bairro já foi adicionado.');
+      notify.error('Este bairro já foi adicionado.');
       return;
     }
 
@@ -701,7 +713,7 @@ export default function OnboardingPage() {
     
     setNewAreaName('');
     setNewAreaFee('');
-    toast.success('Bairro adicionado com sucesso.');
+    notify.success('Bairro adicionado com sucesso.');
   };
 
   const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -751,10 +763,10 @@ export default function OnboardingPage() {
           item.id === tempId ? { id: docId, url: downloadUrl, category: autoCategory || specialty || 'Geral' } : item
         ));
 
-        toast.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
+        notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
       } catch (error: any) {
         console.error('[Portfolio] upload failed:', error);
-        toast.error('Não foi possível carregar a imagem.');
+        notify.error('Não foi possível carregar a imagem.');
         setPortfolio(prev => prev.filter(item => item.id !== tempId));
       } finally {
         setUploadingImage(false);
@@ -774,16 +786,16 @@ export default function OnboardingPage() {
       console.log('[Portfolio] Removing item:', id);
       const itemToDelete = portfolio.find(item => item.id === id);
       if (itemToDelete) {
-        await deletePortfolioItem(user.uid, itemToDelete);
+        await deletePortfolioItem(user.uid, itemToDelete as any);
       } else {
         // Fallback for subcollection if somehow mixed
         await deleteDoc(doc(db, 'users', user.uid, 'portfolio', id));
       }
       setPortfolio(prev => prev.filter(item => item.id !== id));
-      toast.success('Imagem removida.');
+      notify.success('Imagem removida.');
     } catch (err) {
       console.error('[Portfolio] Error removing:', err);
-      toast.error('Não foi possível remover a imagem.');
+      notify.error('Não foi possível remover a imagem.');
     } finally {
       setDeletingId(null);
     }
@@ -873,8 +885,8 @@ export default function OnboardingPage() {
               />
 
               <FormIdentity
-                title="Sua identidade profissional"
-                subtitle="Monte seu perfil com ajuda da IA. Depois você poderá ajustar tudo do seu jeito."
+                title="Vamos montar sua presença"
+                subtitle="Primeiro, o essencial para suas clientes te encontrarem."
                 name={name}
                 setName={setName}
                 specialty={specialty}
@@ -901,17 +913,15 @@ export default function OnboardingPage() {
                 setSelectedBioStyle={setSelectedBioStyle}
                 paymentMethods={paymentMethods}
                 setPaymentMethods={setPaymentMethods}
-                instagram={instagram}
-                setInstagram={setInstagram}
-                instagramStatus={instagramStatus}
-                instagramConfirmed={instagramConfirmed}
-                setInstagramConfirmed={setInstagramConfirmed}
+                whatsapp={whatsapp}
+                setWhatsapp={setWhatsapp}
+                showLabels={true}
                 errors={formErrors}
               />
 
               <button 
                 onClick={nextStep}
-                disabled={!name || !specialty || !slug || uploadingImage || isSavingStep || slugStatus !== 'available' || paymentMethods.length === 0}
+                disabled={!name || !specialty || !slug || !whatsapp || uploadingImage || isSavingStep || slugStatus !== 'available'}
                 className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
               >
                 {isSavingStep || uploadingImage ? (
@@ -932,9 +942,18 @@ export default function OnboardingPage() {
               exit={{ opacity: 0, y: -10 }}
               className="w-full space-y-12"
             >
+              <FormServices
+                title="Seu principal serviço"
+                subtitle="Cadastre o serviço que você mais realiza. Os demais você pode adicionar depois."
+                services={services}
+                setServices={setServices as any}
+                errors={servicesErrors}
+                workingHours={{ startTime, endTime }}
+              />
+
               <FormLocation
                 title="Onde você atende"
-                subtitle="Informe sua cidade, bairro e forma de atendimento para suas clientes saberem como te encontrar."
+                subtitle="Informe como será o atendimento desse serviço."
                 city={city}
                 setCity={setCity}
                 neighborhood={neighborhood}
@@ -943,8 +962,8 @@ export default function OnboardingPage() {
                 setServiceMode={setServiceMode}
                 studioAddress={studioAddress}
                 setStudioAddress={setStudioAddress}
-                serviceAreaType={serviceAreaType}
-                setServiceAreaType={setServiceAreaType}
+                serviceAreaType={serviceAreaType as any}
+                setServiceAreaType={setServiceAreaType as any}
                 serviceAreas={serviceAreas}
                 setServiceAreas={setServiceAreas}
                 pricingStrategy={pricingStrategy}
@@ -958,107 +977,6 @@ export default function OnboardingPage() {
                 formatCurrency={formatCurrency}
                 errors={formErrors}
               />
-
-              <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
-                <div className="space-y-1">
-                  <h3 className="text-xl font-serif text-brand-ink">Dados de Contato</h3>
-                  <p className="text-xs text-brand-stone font-light">Como as clientes podem te encontrar fora da plataforma.</p>
-                </div>
-                
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                      WhatsApp de Contato <span className="text-brand-terracotta">*</span>
-                    </label>
-                    <input 
-                      type="tel" 
-                      value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 
-                      onChange={(e) => {
-                        const cleaned = cleanWhatsapp(e.target.value);
-                        if (cleaned.length <= 11) {
-                          setWhatsapp(cleaned);
-                        }
-                      }} 
-                      placeholder="(11) 99999-9999" 
-                      className={cn(
-                        "w-full px-6 py-4 bg-brand-parchment border rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light",
-                        formErrors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>
-                    <div className={cn(
-                      "flex items-center gap-2 bg-brand-parchment p-4 rounded-[20px] border transition-all",
-                      instagramStatus === 'valid' ? "border-green-200 ring-1 ring-green-100" :
-                      instagramStatus === 'invalid' ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
-                      "border-brand-mist shadow-sm"
-                    )}>
-                      <span className="text-brand-stone text-sm ml-1">@</span>
-                      <input 
-                        type="text" 
-                        value={instagram} 
-                        onChange={(e) => setInstagram(normalizeInstagram(e.target.value))} 
-                        placeholder="seu.usuario" 
-                        className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-sm placeholder:font-light" 
-                      />
-                      <AnimatePresence mode="wait">
-                        {instagramStatus === 'valid' && (
-                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                            <CheckCircle2 size={18} className="text-green-500 mr-1" />
-                          </motion.div>
-                        )}
-                        {instagramStatus === 'invalid' && (
-                          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                            <X size={18} className="text-brand-terracotta mr-1" />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
-                    {instagramStatus === 'invalid' && (
-                      <p className="text-[10px] text-brand-terracotta font-medium ml-1 flex items-center gap-1.5">
-                        <AlertCircle size={12} />
-                        Use apenas letras, números, ponto e underline
-                      </p>
-                    )}
-
-                    {instagramStatus === 'valid' && (
-                      <div className="space-y-3 pt-1 ml-1">
-                        <div className="space-y-1">
-                          <a 
-                            href={`https://instagram.com/${instagram}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-xs text-brand-terracotta underline flex items-center gap-1.5"
-                          >
-                            Confirmar: @{instagram} ↗
-                          </a>
-                          <p className="text-[10px] text-brand-stone font-light italic">
-                            Clique para confirmar que é o seu perfil
-                          </p>
-                        </div>
-                        
-                        <label className="flex items-center gap-2.5 cursor-pointer group">
-                          <div className="relative flex items-center justify-center">
-                            <input 
-                              type="checkbox" 
-                              checked={instagramConfirmed} 
-                              onChange={(e) => setInstagramConfirmed(e.target.checked)}
-                              className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all"
-                            />
-                            <CheckCircle2 size={10} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity" />
-                          </div>
-                          <span className="text-[10px] text-brand-stone font-medium uppercase tracking-wider group-hover:text-brand-ink transition-colors">
-                            Confirmei que o perfil acima é o meu
-                          </span>
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
 
               <div className="flex gap-4">
                 <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
@@ -1094,48 +1012,11 @@ export default function OnboardingPage() {
               exit={{ opacity: 0, y: -10 }}
               className="w-full space-y-10"
             >
-              <FormServices
-                title="Seus serviços e preços"
-                subtitle="Cadastre os serviços que você oferece com duração e valor."
-                services={services}
-                setServices={setServices}
-                errors={servicesErrors}
-                workingHours={{ startTime, endTime }}
-              />
-
-              <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
-                  <ArrowLeft size={24} />
-                </button>
-                <button 
-                  onClick={nextStep}
-                  disabled={isSavingStep || services.some(s => !s.name || !s.price)}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
-                >
-                  {isSavingStep ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                      <Sparkles size={18} />
-                    </motion.div>
-                  ) : <ArrowRight size={18} />}
-                  {isSavingStep ? 'Salvando...' : 'Próximo passo'}
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 4 && (
-            <motion.div 
-              key="step4"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
               <div className="text-center space-y-4">
                 <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
                   <Clock size={32} />
                 </div>
-                <h1 className="text-4xl font-serif font-normal text-brand-ink">Seus horários de atendimento</h1>
+                <h1 className="text-4xl font-serif font-normal text-brand-ink">Dias e Horários</h1>
                 <p className="text-brand-stone font-light text-center">Defina sua disponibilidade inicial. Depois você poderá ajustar dias e horários quando quiser.</p>
               </div>
 
@@ -1193,218 +1074,8 @@ export default function OnboardingPage() {
                   <ArrowLeft size={24} />
                 </button>
                 <button 
-                  onClick={nextStep}
-                  disabled={isSavingStep || workingDays.length === 0}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
-                >
-                  {isSavingStep ? (
-                    <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                      <Sparkles size={18} />
-                    </motion.div>
-                  ) : <ArrowRight size={18} />}
-                  {isSavingStep ? 'Salvando...' : 'Próximo passo'}
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 5 && (
-            <motion.div 
-              key="step5"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="w-full space-y-10"
-            >
-              <FormIdentity
-                title="Seu perfil está pronto"
-                subtitle="Revise suas informações e publique sua página profissional."
-                name={name}
-                setName={setName}
-                specialty={specialty}
-                setSpecialty={setSpecialty}
-                avatar={avatar}
-                avatarPreview={avatarPreview}
-                uploadingImage={uploadingImage}
-                onAvatarClick={() => avatarInputRef.current?.click()}
-                inputRef={avatarInputRef}
-                onFileUpload={handleFileUpload}
-                slug={slug}
-                setSlug={setSlug}
-                slugStatus={slugStatus}
-                slugMessage={slugMessage}
-                slugSuggestions={slugSuggestions}
-                onSelectSuggestion={(val) => setSlug(val)}
-                headline={headline}
-                setHeadline={setHeadline}
-                bio={bio}
-                setBio={setBio}
-                onGenerateBio={generateIdentityContent}
-                isGeneratingBio={isGeneratingContent}
-                selectedBioStyle={selectedBioStyle}
-                setSelectedBioStyle={setSelectedBioStyle}
-                paymentMethods={paymentMethods}
-                setPaymentMethods={setPaymentMethods}
-                whatsapp={whatsapp}
-                setWhatsapp={setWhatsapp}
-                instagram={instagram}
-                setInstagram={setInstagram}
-                instagramStatus={instagramStatus}
-                instagramConfirmed={instagramConfirmed}
-                setInstagramConfirmed={setInstagramConfirmed}
-                showLabels={true}
-                errors={formErrors}
-              />
-
-              {slug && (
-                <a
-                  href={`/p/${slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-widest text-brand-terracotta hover:underline mt-3"
-                >
-                  <ExternalLink size={12} />
-                  Visualizar como vai ficar
-                </a>
-              )}
-
-              {/* Mini Preview */}
-              <div className="bg-brand-ink p-8 rounded-[40px] text-brand-white flex items-center gap-6 shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full -mr-16 -mt-16 blur-2xl" />
-                <div className="w-16 h-16 bg-brand-linen rounded-full overflow-hidden shrink-0 border border-brand-mist/20 relative z-10">
-                  {avatarPreview || avatar ? (
-                    <img src={avatarPreview || avatar} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-[#A85C3A] to-[#C47A5A] flex items-center justify-center">
-                      <span className="text-brand-white font-serif text-xl border-brand-white/20 select-none">
-                        {name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0 relative z-10">
-                  <h4 className="font-serif italic text-lg truncate">{name || 'Seu Nome'}</h4>
-                  <p className="text-[10px] text-brand-mist uppercase tracking-widest truncate">{specialty || 'Sua Especialidade'}</p>
-                  <div className="flex gap-2 mt-3">
-                    <div className="w-7 h-7 rounded-full bg-brand-white/10 flex items-center justify-center"><Instagram size={14} /></div>
-                    <div className="w-7 h-7 rounded-full bg-brand-white/10 flex items-center justify-center"><MessageCircle size={14} /></div>
-                  </div>
-                </div>
-                <div className="bg-brand-terracotta px-4 py-2 rounded-full text-[8px] font-medium uppercase tracking-widest relative z-10">Preview</div>
-              </div>
-
-              {qualityIssues.length > 0 && (
-                <div className="p-5 bg-amber-50 rounded-[32px] border border-amber-100 mb-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-amber-600 mb-3 ml-1">
-                    Antes de publicar
-                  </p>
-                  <ul className="space-y-4">
-                    {qualityIssues.map((issue, i) => (
-                      <li key={i} className="flex flex-col gap-2 text-[11px]">
-                        <div className="flex items-start gap-2.5 text-brand-ink/80">
-                          <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
-                          <span className="leading-relaxed font-medium">{issue.message}</span>
-                        </div>
-                        {issue.link && (
-                          <button
-                            onClick={() => {
-                              if (typeof issue.link === 'number') {
-                                setStep(issue.link);
-                              } else {
-                                navigate(issue.link);
-                              }
-                            }}
-                            className="self-start text-[10px] font-bold text-brand-terracotta underline ml-6"
-                          >
-                            {issue.action}
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="text-[9px] text-brand-stone/60 mt-4 italic ml-1">
-                    Você pode publicar assim mesmo e corrigir depois.
-                  </p>
-                </div>
-              )}
-
-              {/* Revision Checklist */}
-              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm space-y-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1 px-3 bg-brand-linen text-brand-ink rounded-full text-[8px] font-bold uppercase tracking-widest">Checklist de Publicação</div>
-                </div>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="text-green-500"><CheckCircle2 size={16} /></div>
-                      <span className="text-[11px] text-brand-ink font-medium">Nome e especialidade</span>
-                    </div>
-                    <span className="text-[9px] text-brand-stone font-bold uppercase tracking-widest">OK</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="text-green-500"><CheckCircle2 size={16} /></div>
-                      <span className="text-[11px] text-brand-ink font-medium">Localização e contato</span>
-                    </div>
-                    <span className="text-[9px] text-brand-stone font-bold uppercase tracking-widest">OK</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {services.filter(s => s.name.trim() !== '').length > 0 ? (
-                        <div className="text-green-500"><CheckCircle2 size={16} /></div>
-                      ) : (
-                        <div className="text-brand-terracotta"><AlertCircle size={16} /></div>
-                      )}
-                      <span className="text-[11px] text-brand-ink font-medium">Ao menos 1 serviço cadastrado</span>
-                    </div>
-                    <span className="text-[9px] text-brand-stone font-bold uppercase tracking-widest">
-                      {services.filter(s => s.name.trim() !== '').length} Serviço(s)
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {avatar ? (
-                        <div className="text-green-500"><CheckCircle2 size={16} /></div>
-                      ) : (
-                        <div className="text-brand-terracotta/60"><AlertCircle size={16} /></div>
-                      )}
-                      <span className={cn(
-                        "text-[11px] font-medium",
-                        avatar ? "text-brand-ink" : "text-brand-stone italic"
-                      )}>Foto de perfil</span>
-                    </div>
-                    <span className={cn(
-                      "text-[9px] font-bold uppercase tracking-widest",
-                      avatar ? "text-brand-stone" : "text-brand-terracotta"
-                    )}>{avatar ? "OK" : "Pendente"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {bio.trim().length > 20 ? (
-                        <div className="text-green-500"><CheckCircle2 size={16} /></div>
-                      ) : (
-                        <div className="text-brand-terracotta/60"><AlertCircle size={16} /></div>
-                      )}
-                      <span className={cn(
-                        "text-[11px] font-medium",
-                        bio.trim().length > 20 ? "text-brand-ink" : "text-brand-stone italic"
-                      )}>Biografia detalhada</span>
-                    </div>
-                    <span className={cn(
-                      "text-[9px] font-bold uppercase tracking-widest",
-                      bio.trim().length > 20 ? "text-brand-stone" : "text-brand-terracotta"
-                    )}>{bio.trim().length > 20 ? "OK" : "Curta"}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-4">
-                <button onClick={prevStep} className="p-6 bg-brand-white rounded-full text-brand-stone border border-brand-mist hover:border-brand-stone transition-all shadow-sm">
-                  <ArrowLeft size={24} />
-                </button>
-                <button 
                   onClick={handleFinish}
-                  disabled={loading || isFinalizing || slugStatus !== 'available'}
+                  disabled={loading || isFinalizing || slugStatus !== 'available' || workingDays.length === 0}
                   className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
                 >
                   {isFinalizing ? (
@@ -1415,16 +1086,16 @@ export default function OnboardingPage() {
                       <span>Publicando...</span>
                     </>
                   ) : (
-                    <>Publicar meu perfil <CheckCircle2 size={18} /></>
+                    <>Publicar minha agenda <CheckCircle2 size={18} /></>
                   )}
                 </button>
               </div>
             </motion.div>
           )}
 
-          {step === 6 && (
+          {step === 4 && (
             <motion.div 
-              key="step6"
+              key="step4"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="w-full space-y-12 text-center"
@@ -1493,71 +1164,6 @@ export default function OnboardingPage() {
           )}
         </AnimatePresence>
       </main>
-
-      {/* Avatar Blocker Modal */}
-      <AnimatePresence>
-        {showAvatarModal && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
-              exit={{ opacity: 0 }}
-              onClick={() => setShowAvatarModal(false)}
-              className="absolute inset-0 bg-brand-ink/80 backdrop-blur-sm"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm bg-brand-white rounded-[40px] p-10 shadow-2xl overflow-hidden border border-brand-mist text-center"
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full -mr-16 -mt-16 blur-2xl" />
-              
-              <div className="relative z-10 space-y-8">
-                <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto shadow-sm border border-brand-mist">
-                  <Camera size={36} />
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="font-serif text-3xl text-brand-ink">Adicione sua foto</h3>
-                  <p className="text-brand-stone font-light text-sm leading-relaxed">
-                    Profissionais com foto recebem <span className="font-bold text-brand-ink underline decoration-brand-terracotta/30">3x mais agendamentos</span>. Sua foto é sua primeira impressão.
-                  </p>
-                </div>
-
-                <div className="flex flex-col gap-4">
-                  <button 
-                    onClick={() => {
-                      setShowAvatarModal(false);
-                      setStep(1);
-                      setTimeout(() => {
-                        avatarInputRef.current?.click();
-                      }, 500);
-                    }}
-                    className="w-full py-6 bg-brand-ink text-brand-white rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-xl flex items-center justify-center gap-2"
-                  >
-                    Adicionar Foto Agora <Sparkles size={14} />
-                  </button>
-                  
-                  <button 
-                    onClick={() => {
-                      setAvatarSkipped(true);
-                      setShowAvatarModal(false);
-                      // Use a timeout to ensure state settles before calling handleFinish
-                      setTimeout(() => {
-                        handleFinish();
-                      }, 100);
-                    }}
-                    className="w-full py-4 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
-                  >
-                    Usar inicial por enquanto
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Debug Overlay - Only visible during development/debugging if showDebugHUD is true */}
       {process.env.NODE_ENV === 'development' && (window as any).showDebugHUD && (

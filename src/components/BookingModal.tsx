@@ -12,7 +12,7 @@ import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } fr
 import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, WaitlistEntry } from '../types';
 import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage } from '../lib/utils';
 import { getAvailableSlots, canBookSlot } from '../lib/bookingUtils';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { SERVICE_MODES, getServiceModeShortLabel } from '../lib/copy';
 import PremiumButton from './PremiumButton';
 import WaitlistModal from './WaitlistModal';
@@ -29,8 +29,12 @@ interface BookingModalProps {
 
 import BookingStep from './BookingStep';
 
+import { PLAN_CONFIGS, PlanType } from '../constants/plans';
+
 export default function BookingModal({ profile, services, onClose, open, initialService, initialDate, waitlistEntry }: BookingModalProps) {
   const [step, setStep] = useState(1);
+  const profilePlan = (profile?.plan || 'free') as PlanType;
+  const features = PLAN_CONFIGS[profilePlan]?.features;
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -278,7 +282,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
         setSelectedDate('');
         setSelectedTime('');
         setStep(3);
-        toast.error('Este horário não está mais disponível.', {
+        notify.error('Este horário não está mais disponível.', undefined, {
           description: 'A profissional pode ter recebido outra reserva ou alterado a agenda. Por favor, escolha um novo horário.'
         });
       }
@@ -382,7 +386,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       }
 
       setAppliedCoupon(coupon);
-      toast.success(`Cupom "${coupon.code}" aplicado!`);
+      notify.success(`Cupom "${coupon.code}" aplicado!`);
     } catch (err) { 
       console.error('Error checking coupon:', err);
       setCouponError('Erro ao verificar cupom.'); 
@@ -425,15 +429,18 @@ export default function BookingModal({ profile, services, onClose, open, initial
     const unsubBlocked = onSnapshot(
       query(blockedRef, where('professionalId', '==', profile.uid)),
       (snap) => {
-        const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-        // Filtrar bloqueios aplicáveis para esta data
-        const dayBlocked = allBlocked.filter(b => {
-          const isToday = b.date === selectedDate;
-          const isRecurring = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-          return isToday || isRecurring;
-        });
-        setBlockedSchedules(dayBlocked);
-      }
+        try {
+          const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+const dayBlocked = allBlocked.filter(b => {
+                const isToday = b.date === selectedDate;
+                const isRecurring = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+                return isToday || isRecurring;
+              });
+setBlockedSchedules(dayBlocked);
+        } catch (err) {
+          console.error("Error in onSnapshot callback:", err);
+        }
+      }, (error) => { console.error("Firestore onSnapshot error:", error); }
     );
 
     // Listener de agendamentos para excluir slots ocupados
@@ -446,9 +453,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
     );
     
     const unsubAppts = onSnapshot(apptsQ, (snapshot) => {
-      setDayAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment)));
-      setIsLoadingSlots(false);
-    });
+      try {
+        setDayAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment)));
+setIsLoadingSlots(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     return () => {
       unsubBlocked();
@@ -493,7 +504,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
         service: selectedService, 
         profileId: profile?.uid 
       });
-      toast.error('Dados de agendamento incompletos ou inválidos.');
+      notify.error('Dados de agendamento incompletos ou inválidos.');
       return;
     }
     
@@ -506,13 +517,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
     }
 
     if (!isBaseValid || !isAddressValid) {
-      toast.error('Por favor, preencha todos os campos obrigatórios corretamente.');
+      notify.error('Por favor, preencha todos os campos obrigatórios corretamente.');
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(clientEmail.trim())) {
-      toast.error('O e-mail informado parece não ser válido.');
+      notify.error('O e-mail informado parece não ser válido.');
       return;
     }
 
@@ -529,7 +540,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       });
 
       if (!availabilityCheck.canBook) {
-        toast.error('Este horário não está mais disponível.', {
+        notify.error('Este horário não está mais disponível.', undefined, {
           description: availabilityCheck.reason || 'Por favor, escolha outro horário.'
         });
         setStep(1);
@@ -566,7 +577,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
         professionalWhatsapp: profile.whatsapp,
         serviceId: selectedService.id,
         serviceName: selectedService.name,
-        duration: selectedService.duration,
+        duration: Number(selectedService.duration) || 60,
         price: selectedService.price,
         travelFee: selectedArea?.fee || 0,
         totalPrice: totalPrice,
@@ -639,7 +650,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
             paymentMethods: paymentMethodsList
           }
         })
-      });
+      }).catch(e => console.error(e));
       
       // If booking from waitlist, mark it as booked
       if (waitlistEntry?.id) {
@@ -735,7 +746,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                           const dayOfWeek = date.getDay();
                           const isWorkingDay = profile?.workingHours?.workingDays?.includes(dayOfWeek);
                           return (
-                            <button key={offset} onClick={() => { if (!isWorkingDay) { toast.info('A profissional não atende neste dia'); return; } setSelectedDate(dateStr); }} className={cn("min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0", isSelected ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105" : isWorkingDay ? "bg-brand-parchment border-brand-mist hover:border-brand-ink" : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed")}>
+                            <button key={offset} onClick={() => { if (!isWorkingDay) { notify.info('A profissional não atende neste dia'); return; } setSelectedDate(dateStr); }} className={cn("min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0", isSelected ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105" : isWorkingDay ? "bg-brand-parchment border-brand-mist hover:border-brand-ink" : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed")}>
                               <span className={cn("text-[8px] font-bold uppercase tracking-widest mb-1", isWorkingDay ? "opacity-40" : "opacity-20")}>{date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
                               <span className={cn("text-lg font-serif", !isWorkingDay && "opacity-40")}>{date.getDate()}</span>
                             </button>
@@ -745,7 +756,15 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
                       <div className="grid grid-cols-3 gap-2 sm:gap-3">
                         {selectedDate ? (
-                          availableSlots.length > 0 ? (
+                          isLoadingSlots ? (
+                            <>
+                              {[1, 2, 3, 4, 5, 6].map(i => (
+                                <div key={i} className="py-3.5 rounded-xl border border-brand-mist bg-brand-mist/10 animate-pulse h-[42px] flex items-center justify-center">
+                                  <div className="h-3 w-12 bg-brand-mist/40 rounded-full"></div>
+                                </div>
+                              ))}
+                            </>
+                          ) : availableSlots.length > 0 ? (
                             availableSlots.map(time => (
                               <button key={time} onClick={() => setSelectedTime(time)} className={cn("py-3.5 rounded-xl border transition-all text-[11px] font-bold flex items-center justify-center gap-1.5", selectedTime === time ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-stone")}>
                                 <Clock size={12} className={selectedTime === time ? "text-brand-terracotta" : "text-brand-mist/40"} />
@@ -753,12 +772,19 @@ export default function BookingModal({ profile, services, onClose, open, initial
                               </button>
                             ))
                           ) : (
-                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
-                              <p className="text-[10px] text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura neste dia</p>
-                              <button onClick={() => setIsWaitlistOpen(true)} className="flex items-center gap-2 bg-brand-ink text-brand-white px-5 py-3 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-xl mx-auto">
-                                <Zap size={12} className="fill-brand-terracotta text-brand-terracotta" /> Entrar na Lista
-                              </button>
-                            </div>
+                            features?.waitlist ? (
+                              <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                                <p className="text-[10px] text-brand-terracotta font-bold uppercase tracking-widest mb-2">Alta procura neste dia</p>
+                                <button onClick={() => setIsWaitlistOpen(true)} className="flex items-center gap-2 bg-brand-ink text-brand-white px-5 py-3 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-xl mx-auto">
+                                  <Zap size={12} className="fill-brand-terracotta text-brand-terracotta" /> Entrar na Lista
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                                <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">Não há horários disponíveis neste dia.</p>
+                                <p className="text-[9px] text-brand-stone/60">Escolha outra data ou fale diretamente com a profissional.</p>
+                              </div>
+                            )
                           )
                         ) : (
                           <div className="col-span-3 py-10 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
@@ -768,7 +794,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       </div>
                     </div>
 
-                    <PremiumButton className="w-full mt-8 hidden md:flex" variant="terracotta" disabled={!selectedService || !selectedDate || !selectedTime} onClick={() => setStep(2)}>
+                    <PremiumButton className="w-full mt-8 hidden md:flex" variant="terracotta" disabled={!selectedService || !selectedDate || !selectedTime || isLoadingSlots} onClick={() => setStep(2)}>
                       Próximo Passo <ArrowRight size={18} className="ml-1" />
                     </PremiumButton>
                   </div>
@@ -1024,7 +1050,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                   </div>
 
                   {/* DEBUG PANEL FOR MOBILE DEV/PREVIEW ONLY */}
-                  {(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'))) && step === 3 && (
+                  {(import.meta.env.DEV === true && typeof window !== 'undefined' && window.location.hostname.includes('localhost')) && step === 3 && (
                     <div className="mb-10 p-4 bg-brand-linen rounded-2xl border border-brand-mist text-left">
                       <div className="flex justify-between items-center mb-2">
                         <h4 className="text-[9px] font-bold text-brand-stone uppercase tracking-widest">Debug Info (DEV ONLY)</h4>
@@ -1074,7 +1100,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 variant="terracotta" 
                 className="w-full py-7" 
                 disabled={
-                  (step === 1 && (!selectedService || !selectedDate || !selectedTime)) || 
+                  (step === 1 && (!selectedService || !selectedDate || !selectedTime || isLoadingSlots)) || 
                   (step === 2 && (!clientName || !clientPhone || !clientEmail || (isHomeService && (!addressStreet || !addressNumber))))
                 } 
                 loading={step === 3 && bookingLoading} 
@@ -1228,7 +1254,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm"><Heart size={24} className="fill-brand-terracotta/10" /></div>
                 <h4 className="text-lg font-serif text-brand-ink mb-2">Gostou da experiência? Indique uma amiga.</h4>
                 <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">Compartilhe sua descoberta com quem você ama</p>
-                <PremiumButton variant="primary" className="w-full py-5 !text-[10px]" onClick={() => { const url = window.location.origin + '/p/' + (profile?.slug || ''); const text = `Te recomendo essa profissional ✨`; const fullText = `${text} Reserve online aqui: ${url}`; if (navigator.share) { navigator.share({ title: profile?.name, text: text, url: url }).catch(() => { navigator.clipboard.writeText(fullText); toast.success('Link de indicação copiado!'); }); } else { navigator.clipboard.writeText(fullText); toast.success('Link de indicação copiado!'); } }}>Compartilhar perfil <Share2 size={14} className="ml-1" /></PremiumButton>
+                <PremiumButton variant="primary" className="w-full py-5 !text-[10px]" onClick={() => { const url = window.location.origin + '/p/' + (profile?.slug || ''); const text = `Te recomendo essa profissional ✨`; const fullText = `${text} Reserve online aqui: ${url}`; if (navigator.share) { navigator.share({ title: profile?.name, text: text, url: url }).catch(() => { navigator.clipboard.writeText(fullText); notify.success('Link de indicação copiado!'); }); } else { navigator.clipboard.writeText(fullText); notify.success('Link de indicação copiado!'); } }}>Compartilhar perfil <Share2 size={14} className="ml-1" /></PremiumButton>
               </div>
               <button onClick={() => { setStep(1); setSelectedService(null); setSelectedDate(''); setSelectedTime(''); setBookingSuccess(false); onClose(); }} className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors">Voltar para o perfil</button>
             </div>

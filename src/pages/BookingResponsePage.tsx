@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
-import { db, confirmAppointmentAtomic, declineAppointmentAtomic, handleBookingError } from '../firebase';
+import { db, handleBookingError, auth } from '../firebase';
 import { motion } from 'motion/react';
 import { Check, X, Calendar, Clock, User, MessageCircle, MapPin, Sparkles } from 'lucide-react';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { cn } from '../lib/utils';
+import { Appointment } from '../types';
+import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 export default function BookingResponsePage() {
   const { appointmentId } = useParams();
@@ -13,7 +15,7 @@ export default function BookingResponsePage() {
   const [appointment, setAppointment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [result, setResult] = useState<'confirmed' | 'cancelled_by_professional' | null>(null);
+  const [result, setResult] = useState<Appointment['status'] | null>(null);
 
   useEffect(() => {
     const fetchAppointment = async () => {
@@ -22,15 +24,15 @@ export default function BookingResponsePage() {
         const docRef = doc(db, 'appointments', appointmentId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          const data = docSnap.data();
+          const data = docSnap.data() as Appointment;
           setAppointment(data);
-          if (data.status !== 'pending') {
-            setResult(data.status === 'confirmed' ? 'confirmed' : 'cancelled_by_professional');
+          if (data.status !== APPOINTMENT_STATUS.PENDING) {
+            setResult(data.status === APPOINTMENT_STATUS.CONFIRMED ? APPOINTMENT_STATUS.CONFIRMED : APPOINTMENT_STATUS.CANCELLED_BY_PROFESSIONAL);
           }
         }
       } catch (error) {
         console.error('Error fetching appointment:', error);
-        toast.error('Não foi possível carregar as informações agora.');
+        notify.error('Não foi possível carregar as informações agora.');
       } finally {
         setLoading(false);
       }
@@ -39,26 +41,59 @@ export default function BookingResponsePage() {
     fetchAppointment();
   }, [appointmentId]);
 
-  const handleResponse = async (decision: 'confirmed' | 'cancelled_by_professional') => {
-    if (!appointmentId) return;
+  const handleResponse = async (decision: typeof APPOINTMENT_STATUS.CONFIRMED | typeof APPOINTMENT_STATUS.CANCELLED_BY_PROFESSIONAL) => {
+    if (!appointmentId || processing) return;
+    
+    // Attempt to get the current user to pass their token
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      notify.error("Para responder via link, você precisa estar logado na sua conta.");
+      return;
+    }
+
     setProcessing(true);
-    console.log(`[CONFIRM APPOINTMENT] initiating handleResponse for ${appointmentId} in BookingResponsePage`);
+    console.info("[CONFIRM FLOW]", {
+      appointmentId,
+      mode: "backend_only",
+      decision
+    });
     
     try {
-      if (decision === 'confirmed') {
-        await confirmAppointmentAtomic(appointmentId, appointment.professionalId);
+      const token = await currentUser.getIdToken(true);
+
+      if (decision === APPOINTMENT_STATUS.CONFIRMED) {
+        const res = await fetch(`/api/appointments/${appointmentId}/confirm`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ professionalId: currentUser.uid })
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Erro ao confirmar (${res.status})`);
+        }
       } else {
-        await declineAppointmentAtomic(appointmentId, appointment.professionalId);
+        const res = await fetch(`/api/appointments/${appointmentId}/decline`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!res.ok) {
+           const errData = await res.json().catch(() => ({}));
+           throw new Error(errData.error || `Erro ao recusar (${res.status})`);
+        }
       }
       setResult(decision);
-      toast.success(decision === 'confirmed' ? 'Reserva confirmada com sucesso.' : 'Reserva marcada como indisponível.');
+      notify.success(decision === APPOINTMENT_STATUS.CONFIRMED ? 'Reserva confirmada com sucesso.' : 'Reserva marcada como indisponível.');
     } catch (error: any) {
-      console.error(`[CONFIRM ERROR RAW]`, {
-        message: error.message,
-        appointmentId: appointmentId,
-        stack: error.stack
-      });
-      handleBookingError(error);
+      console.error("[RESPONSE FLOW ERROR]", error);
+      notify.error(error.message || 'Não foi possível concluir. Tente novamente.');
     } finally {
       setProcessing(false);
     }
@@ -93,16 +128,16 @@ export default function BookingResponsePage() {
           animate={{ scale: 1, opacity: 1 }}
           className={cn(
             "w-20 h-20 rounded-full flex items-center justify-center mb-8",
-            result === 'confirmed' ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+            result === APPOINTMENT_STATUS.CONFIRMED ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
           )}
         >
-          {result === 'confirmed' ? <Check size={40} /> : <X size={40} />}
+          {result === APPOINTMENT_STATUS.CONFIRMED ? <Check size={40} /> : <X size={40} />}
         </motion.div>
         <h1 className="text-3xl font-serif text-brand-ink mb-4">
-          {result === 'confirmed' ? 'Reserva Confirmada' : 'Indisponível'}
+          {result === APPOINTMENT_STATUS.CONFIRMED ? 'Reserva Confirmada' : 'Indisponível'}
         </h1>
         <p className="text-brand-stone max-w-xs mb-10">
-          {result === 'confirmed' 
+          {result === APPOINTMENT_STATUS.CONFIRMED 
             ? 'O horário foi bloqueado na sua agenda e a cliente foi notificada.' 
             : 'A cliente foi notificada que este horário não está disponível.'}
         </p>
@@ -195,14 +230,14 @@ export default function BookingResponsePage() {
 
         <div className="grid grid-cols-1 gap-4">
           <button
-            onClick={() => handleResponse('confirmed')}
+            onClick={() => handleResponse(APPOINTMENT_STATUS.CONFIRMED)}
             disabled={processing}
             className="w-full py-6 bg-brand-ink text-brand-white rounded-2xl font-medium flex items-center justify-center gap-3 hover:bg-brand-espresso transition-all disabled:opacity-50"
           >
             {processing ? 'Processando...' : <><Check size={20} /> Confirmar Reserva</>}
           </button>
           <button
-            onClick={() => handleResponse('cancelled_by_professional')}
+            onClick={() => handleResponse(APPOINTMENT_STATUS.CANCELLED_BY_PROFESSIONAL)}
             disabled={processing}
             className="w-full py-6 bg-brand-white text-brand-stone border border-brand-mist rounded-2xl font-medium flex items-center justify-center gap-3 hover:bg-brand-parchment transition-all disabled:opacity-50"
           >

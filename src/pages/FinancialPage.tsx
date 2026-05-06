@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { isCancelledStatus, isPendingStatus, isCompletedStatus, isConfirmedLikeStatus, isRevenueStatus } from '../constants/appointmentStatus';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { 
   DollarSign, TrendingUp, Calendar, Users, 
   ChevronDown, ChevronUp, Download, PieChart,
@@ -11,13 +12,18 @@ import {
 import { formatCurrency, cn } from '../lib/utils';
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
-import { toast } from 'sonner';
+import { PageErrorBoundary } from '../components/PageErrorBoundary';
+import { exportFinancialCsv } from '../lib/exportCsv';
+import { FinancialSkeleton } from '../components/ui/FinancialSkeleton';
+import { notify } from '../lib/notify';
 
 interface MonthlyGroup {
   monthKey: string; // YYYY-MM
   monthLabel: string; // "Março 2024"
   revenue: number;
   plannedRevenue: number;
+  pendingRevenue: number;
+  cancelledRevenue: number;
   appointmentsCount: number;
   ticketAverage: number;
   appointments: Appointment[];
@@ -32,19 +38,41 @@ export default function FinancialPage() {
   useEffect(() => {
     if (!user) return;
 
-    const q = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      orderBy('date', 'desc')
-    );
+    const fetchFinancialData = async () => {
+      setLoading(true);
+      try {
+        const now = new Date();
+        const past = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+        const startDateStr = past.toISOString().split('T')[0];
+        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const endDateStr = end.toISOString().split('T')[0];
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-      setAppointments(docs);
-      setLoading(false);
-    });
+        const q = query(
+          collection(db, 'appointments'),
+          where('professionalId', '==', user.uid),
+          where('date', '>=', startDateStr),
+          where('date', '<=', endDateStr)
+        );
 
-    return () => unsubscribe();
+        const snapshot = await getDocs(q);
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+        
+        // Order in memory
+        docs.sort((a, b) => b.date.localeCompare(a.date));
+        
+        setAppointments(docs);
+      } catch (err: any) {
+        if (err.message && err.message.includes('index')) {
+          console.warn('[FinancialPage] Firestore index required: appointments professionalId ASC, date ASC');
+        } else {
+          console.error('[FinancialPage] Failed to load financial appointments', err);
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFinancialData();
   }, [user]);
 
   const monthlyGroups = useMemo(() => {
@@ -52,9 +80,6 @@ export default function FinancialPage() {
     const monthsNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
     appointments.forEach(appt => {
-      // Exclude cancelled/expired
-      if (['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'rejected'].includes(appt.status)) return;
-
       const [year, month] = appt.date.split('-');
       const monthKey = `${year}-${month}`;
       
@@ -64,6 +89,8 @@ export default function FinancialPage() {
           monthLabel: `${monthsNames[parseInt(month) - 1]} ${year}`,
           revenue: 0,
           plannedRevenue: 0,
+          pendingRevenue: 0,
+          cancelledRevenue: 0,
           appointmentsCount: 0,
           ticketAverage: 0,
           appointments: []
@@ -72,11 +99,15 @@ export default function FinancialPage() {
 
       const value = (appt.price || 0) + (appt.travelFee || 0);
 
-      if (appt.status === 'completed') {
+      if (isCancelledStatus(appt.status)) {
+        groups[monthKey].cancelledRevenue += value;
+      } else if (isCompletedStatus(appt.status)) {
         groups[monthKey].revenue += value;
         groups[monthKey].appointmentsCount++;
-      } else if (appt.status === 'confirmed' || appt.status === 'accepted') {
+      } else if (isConfirmedLikeStatus(appt.status)) {
         groups[monthKey].plannedRevenue += value;
+      } else if (isPendingStatus(appt.status)) {
+        groups[monthKey].pendingRevenue += value;
       }
 
       groups[monthKey].appointments.push(appt);
@@ -110,9 +141,29 @@ export default function FinancialPage() {
     };
   }, [monthlyGroups]);
 
+  const servicesRevenue = useMemo(() => {
+    // Filter by current month appointments to match "seu mês" text, or fallback to all if needed?
+    // Let's use current month to be exact to the requested text.
+    const currentAppointments = currentMonthData.current?.appointments || [];
+    const validAppts = currentAppointments.filter(a => isRevenueStatus(a.status));
+
+    const grouped: Record<string, { serviceName: string, revenue: number, count: number }> = {};
+
+    validAppts.forEach(appt => {
+      const name = appt.serviceName || 'Serviço';
+      if (!grouped[name]) {
+        grouped[name] = { serviceName: name, revenue: 0, count: 0 };
+      }
+      grouped[name].revenue += (Number(appt.price) || 0);
+      grouped[name].count += 1;
+    });
+
+    return Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
+  }, [currentMonthData]);
+
   const handleExportCSV = (group: MonthlyGroup) => {
     if (profile?.plan === 'free' || !profile?.plan) {
-      toast.error('Opa! Exportação de relatórios é um recurso Pro. Que tal fazer o upgrade?');
+      notify.error('Opa! Exportação de relatórios é um recurso Pro. Que tal fazer o upgrade?');
       return;
     }
 
@@ -132,7 +183,7 @@ export default function FinancialPage() {
       const csvContent = [
         headers.join(','),
         ...rows.map(r => r.join(','))
-      ].join('\n');
+      ].join('\\n');
 
       const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
@@ -143,33 +194,40 @@ export default function FinancialPage() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success('Relatório exportado com sucesso!');
+      notify.success('Relatório exportado com sucesso!');
     } catch (err) {
-      toast.error('Erro ao exportar relatório.');
+      notify.error('Erro ao exportar relatório.');
     }
   };
 
   if (loading) {
-    return (
-      <AppLayout activeRoute="financial">
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="w-12 h-12 border-2 border-brand-terracotta border-t-transparent rounded-full animate-spin" />
-        </div>
-      </AppLayout>
-    );
+    return <FinancialSkeleton />;
   }
 
   return (
     <AppLayout activeRoute="financial">
+      <PageErrorBoundary 
+        title="Não foi possível carregar seu financeiro." 
+      >
       <div className="p-6 md:p-12 pb-32 max-w-5xl mx-auto w-full">
-        <header className="mb-12">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-brand-linen rounded-xl text-brand-terracotta">
-              <DollarSign size={24} />
+        <header className="mb-12 flex flex-col md:flex-row md:items-start justify-between gap-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-brand-linen rounded-xl text-brand-terracotta">
+                <DollarSign size={24} />
+              </div>
+              <h1 className="text-4xl font-serif text-brand-ink">Financeiro</h1>
             </div>
-            <h1 className="text-4xl font-serif text-brand-ink">Financeiro</h1>
+            <p className="text-brand-stone font-light italic">Seu histórico de receita e saúde do seu negócio.</p>
           </div>
-          <p className="text-brand-stone font-light italic">Seu histórico de receita e saúde do seu negócio.</p>
+          <div>
+            <button
+              onClick={() => user && exportFinancialCsv(user.uid)}
+              className="px-6 py-4 bg-brand-white text-brand-ink text-[10px] font-bold uppercase tracking-widest hover:border-brand-mist border-brand-mist shadow-sm border rounded-full transition-all flex items-center justify-center gap-2"
+            >
+              Exportar CSV
+            </button>
+          </div>
         </header>
 
         {monthlyGroups.length === 0 ? (
@@ -271,6 +329,53 @@ export default function FinancialPage() {
               </div>
             </div>
 
+            {/* Receita por Serviço Section */}
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xl font-serif text-brand-ink mb-1">Receita por serviço</h3>
+                <p className="text-sm text-brand-stone font-light">Veja quais serviços mais movimentam seu mês.</p>
+              </div>
+
+              {servicesRevenue.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {servicesRevenue.map((srv, idx) => (
+                    <motion.div
+                      key={srv.serviceName + idx}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex flex-col justify-between"
+                    >
+                      <div className="mb-4">
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-brand-stone mb-1 line-clamp-1">
+                          {srv.serviceName}
+                        </p>
+                        <p className="text-2xl font-serif text-brand-ink">
+                          {formatCurrency(srv.revenue)}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] text-brand-stone">
+                        <span className="font-medium bg-brand-linen/50 px-2 py-1 rounded-md">
+                          {srv.count} {srv.count === 1 ? 'agendamento' : 'agendamentos'}
+                        </span>
+                        {srv.count > 0 && (
+                          <span className="italic font-light">
+                            Méd. {formatCurrency(srv.revenue / srv.count)}
+                          </span>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-brand-white p-8 rounded-3xl border border-brand-mist border-dashed text-center">
+                  <p className="text-sm text-brand-stone font-light max-w-sm mx-auto">
+                    Assim que seus atendimentos forem confirmados, seus serviços mais fortes aparecem aqui.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Monthly History Accordion */}
             <div className="space-y-4">
               <h3 className="text-xl font-serif text-brand-ink flex items-center gap-2">
@@ -299,6 +404,16 @@ export default function FinancialPage() {
                         <div>
                           <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Realizado</span>
                           <span className="text-sm font-bold text-brand-ink">{formatCurrency(group.revenue)}</span>
+                        </div>
+                        
+                        <div className="hidden sm:block">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Aprovação</span>
+                          <span className="text-sm font-medium text-brand-stone">{formatCurrency(group.pendingRevenue)}</span>
+                        </div>
+                        
+                        <div className="hidden md:block">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Cancelado</span>
+                          <span className="text-sm font-medium text-brand-stone opacity-60">{formatCurrency(group.cancelledRevenue)}</span>
                         </div>
                         
                         <div className="hidden sm:block">
@@ -397,6 +512,7 @@ export default function FinancialPage() {
           </div>
         )}
       </div>
+      </PageErrorBoundary>
     </AppLayout>
   );
 }

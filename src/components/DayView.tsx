@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Clock, Lock, Info, Plus, AlertCircle, Zap, Calendar as CalendarIcon, Check } from 'lucide-react';
 import { cn, formatLocalDate, formatDateKey, getTodayLocale } from '../lib/utils';
 import { Appointment } from '../types';
+import { isConfirmedLikeStatus, isCompletedStatus, isPendingStatus } from '../constants/appointmentStatus';
 
 interface DayViewProps {
   appointments: Appointment[];
@@ -33,7 +34,19 @@ export default function DayView({
   }, []);
 
   const getDayData = () => {
-    const dayAppointments = appointments.filter(a => ['confirmed', 'accepted', 'completed', 'pending', 'pending_confirmation'].includes(a.status));
+    let dayAppointments = appointments.filter(a => isConfirmedLikeStatus(a.status) || isCompletedStatus(a.status) || isPendingStatus(a.status));
+    
+    // Prevent overlapping: if a slot has confirmed/completed, hide the pending ones
+    const confirmedTimes = new Set(dayAppointments.filter(a => isConfirmedLikeStatus(a.status) || isCompletedStatus(a.status)).map(a => a.time));
+    
+    const originalCount = dayAppointments.length;
+    dayAppointments = dayAppointments.filter(a => {
+      if (isPendingStatus(a.status) && confirmedTimes.has(a.time)) {
+        console.warn(`[DayView] Hiding overlapping pending appointment at ${a.time} due to existing confirmed appointment.`);
+        return false;
+      }
+      return true;
+    });
     const dayOfWeek = new Date(date + 'T00:00:00').getDay();
     const dayBlocks = blockedSchedules.filter(b => {
       const isDateMatch = b.date === date;
@@ -181,7 +194,9 @@ export default function DayView({
                     </div>
                   )}
 
-                  {appts.map((app, appIdx) => (
+                  {appts.map((app, appIdx) => {
+                    const isConfirmedOrCompleted = isConfirmedLikeStatus(app.status) || isCompletedStatus(app.status);
+                    return (
                     <motion.div
                       key={app.id}
                       layoutId={app.id}
@@ -191,7 +206,7 @@ export default function DayView({
                       }}
                       className={cn(
                         "absolute inset-x-1 inset-y-1.5 rounded-2xl p-4 cursor-pointer shadow-sm border flex items-center gap-4 transition-all hover:scale-[1.01] active:scale-[0.98]",
-                        app.status === 'confirmed' || app.status === 'completed'
+                        isConfirmedOrCompleted
                           ? "bg-brand-ink text-white border-brand-ink shadow-brand-ink/10"
                           : "bg-white text-brand-ink border-brand-mist hover:border-brand-terracotta",
                         appIdx > 0 && "translate-x-3 translate-y-3 shadow-2xl z-10"
@@ -199,9 +214,9 @@ export default function DayView({
                     >
                       <div className={cn(
                         "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                        app.status === 'confirmed' || app.status === 'completed' ? "bg-white/10" : "bg-brand-linen/40"
+                        isConfirmedOrCompleted ? "bg-white/10" : "bg-brand-linen/40"
                       )}>
-                        <Clock size={16} className={app.status === 'confirmed' || app.status === 'completed' ? "text-white" : "text-brand-terracotta"} />
+                        <Clock size={16} className={isConfirmedOrCompleted ? "text-white" : "text-brand-terracotta"} />
                       </div>
                       
                       <div className="flex-1 min-w-0">
@@ -211,23 +226,23 @@ export default function DayView({
                           </p>
                           <p className={cn(
                             "text-[10px] font-mono",
-                            app.status === 'confirmed' || app.status === 'completed' ? "text-white/60" : "text-brand-stone"
+                            isConfirmedOrCompleted ? "text-white/60" : "text-brand-stone"
                           )}>
                             {app.time}
                           </p>
                         </div>
                         <p className={cn(
                           "text-[9px] truncate uppercase tracking-widest mt-1",
-                          app.status === 'confirmed' || app.status === 'completed' ? "text-white/40" : "text-brand-stone"
+                          isConfirmedOrCompleted ? "text-white/40" : "text-brand-stone"
                         )}>
                           {app.serviceName}
                         </p>
                       </div>
 
-                      {app.status === 'pending' && <AlertCircle size={14} className="text-red-500 shrink-0" />}
-                      {(app.status === 'confirmed' || app.status === 'completed') && <Check size={14} className="text-brand-terracotta shrink-0" />}
+                      {isPendingStatus(app.status) && <AlertCircle size={14} className="text-red-500 shrink-0" />}
+                      {isConfirmedOrCompleted && <Check size={14} className="text-brand-terracotta shrink-0" />}
                     </motion.div>
-                  ))}
+                  )})}
                 </div>
               </div>
             );

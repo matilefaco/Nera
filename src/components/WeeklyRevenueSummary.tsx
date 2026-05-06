@@ -9,7 +9,8 @@ import { formatCurrency, cn, getTodayLocale, parseLocalDate } from '../lib/utils
 import { Appointment, UserProfile } from '../types';
 import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
+import { isRevenueStatus, isPendingStatus, isCompletedStatus, isConfirmedLikeStatus } from '../constants/appointmentStatus';
 
 interface WeeklyRevenueSummaryProps {
   appointments: Appointment[];
@@ -59,7 +60,7 @@ export default function WeeklyRevenueSummary({
 
     // Today
     if (app.date === todayStr) {
-      if (['confirmed', 'completed', 'accepted'].includes(app.status)) {
+      if (isRevenueStatus(app.status)) {
         acc.todayRevenue += appValue;
         acc.todayCount++;
       }
@@ -68,25 +69,25 @@ export default function WeeklyRevenueSummary({
 
     // This Week
     if (appDate >= startOfWeek) {
-      if (['confirmed', 'completed', 'accepted'].includes(app.status)) {
+      if (isRevenueStatus(app.status)) {
         acc.weekRevenue += appValue;
         acc.weekCount++;
       }
-      if (['pending'].includes(app.status)) {
+      if (isPendingStatus(app.status)) {
         acc.weekProjected += appValue;
       }
     }
 
     // This Month
     if (appDate >= startOfMonth) {
-      if (['confirmed', 'completed', 'accepted'].includes(app.status)) {
+      if (isRevenueStatus(app.status)) {
         acc.monthRevenue += appValue;
       }
     }
 
     // Prev Month
     if (appDate >= startOfPrevMonth && appDate <= endOfPrevMonth) {
-      if (['confirmed', 'completed', 'accepted'].includes(app.status)) {
+      if (isRevenueStatus(app.status)) {
         acc.prevMonthRevenue += appValue;
       }
     }
@@ -119,10 +120,10 @@ export default function WeeklyRevenueSummary({
       await updateDoc(doc(db, 'users', userId), {
         monthlyRevenueGoal: value
       });
-      toast.success('Meta mensal atualizada! 🎯');
+      notify.success('Meta mensal atualizada! 🎯');
       setIsSettingGoal(false);
     } catch (err) {
-      toast.error('Erro ao salvar meta.');
+      notify.error('Erro ao salvar meta.');
     }
   };
 
@@ -261,7 +262,7 @@ export default function WeeklyRevenueSummary({
                     key={app.id}
                     className={cn(
                       "bg-brand-white p-5 rounded-[24px] border border-brand-mist flex items-center justify-between group transition-all",
-                      app.status === 'pending' && "opacity-60 grayscale-[0.5]"
+                      isPendingStatus(app.status) && "opacity-60 grayscale-[0.5]"
                     )}
                   >
                     <div className="flex items-center gap-6">
@@ -286,12 +287,12 @@ export default function WeeklyRevenueSummary({
                       </div>
                       <div className={cn(
                         "w-10 h-10 rounded-full flex items-center justify-center transition-all",
-                        app.status === 'completed' ? "bg-green-50 text-green-600" :
-                        app.status === 'confirmed' ? "bg-blue-50 text-blue-600" :
+                        isCompletedStatus(app.status) ? "bg-green-50 text-green-600" :
+                        isConfirmedLikeStatus(app.status) ? "bg-blue-50 text-blue-600" :
                         "bg-brand-linen text-brand-stone"
                       )}>
-                        {app.status === 'completed' ? <CheckCircle2 size={18} /> : 
-                         app.status === 'pending' ? <AlertCircle size={18} /> :
+                        {isCompletedStatus(app.status) ? <CheckCircle2 size={18} /> : 
+                         isPendingStatus(app.status) ? <AlertCircle size={18} /> :
                          <Calendar size={18} />}
                       </div>
                     </div>

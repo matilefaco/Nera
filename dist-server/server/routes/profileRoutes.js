@@ -3,6 +3,7 @@ import { getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 import { isValidWhatsapp } from "../utils.js";
 import { PLAN_CONFIGS } from "../../src/constants/plans.js";
+import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
 const router = express.Router();
 const debugOnly = (req, res, next) => {
     if (process.env.NODE_ENV === "production") {
@@ -28,8 +29,9 @@ const removeUndefinedDeep = (value) => {
  * POST /api/profile/save
  * Transactional save that claims a slug and updates the user profile.
  */
-router.post("/save", async (req, res) => {
-    const { uid, profileData, services } = req.body;
+router.post("/save", requireFirebaseAuth, async (req, res) => {
+    const { profileData, services } = req.body;
+    const uid = req.uid;
     console.log("[PROFILE_PUBLISH_PAYLOAD] Received for UID:", uid);
     const sanitizedProfile = removeUndefinedDeep(profileData || {});
     const slug = sanitizedProfile?.slug?.toLowerCase()?.trim();

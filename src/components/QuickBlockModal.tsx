@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, Lock, Settings, ChevronRight, Sun, Zap, Moon, Calendar, Clock } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import PremiumButton from './PremiumButton';
 import { cn } from '../lib/utils';
 
@@ -83,7 +83,7 @@ export default function QuickBlockModal({
         createdAt: serverTimestamp()
       });
 
-      toast.success(`Agenda bloqueada com sucesso!`);
+      notify.success(`Agenda bloqueada com sucesso!`);
       // Update analytics
       addDoc(collection(db, 'analytics_events'), {
         professionalId,
@@ -95,7 +95,7 @@ export default function QuickBlockModal({
 
       onClose();
     } catch (e) {
-      toast.error('Erro ao bloquear horário.');
+      notify.error('Erro ao bloquear horário.');
     } finally {
       setLoading(false);
     }

@@ -22,7 +22,7 @@ export const checkPlanFeature = (featureName) => {
                 whatsappNotifications: activePlan === 'essencial' || activePlan === 'pro',
                 advancedDashboard: activePlan === 'pro',
                 waitlist: activePlan === 'pro',
-                antiNoShow: activePlan === 'pro',
+                antiNoShow: activePlan === 'essencial' || activePlan === 'pro',
                 coupons: activePlan === 'essencial' || activePlan === 'pro',
                 analytics: activePlan === 'pro',
                 reports: activePlan === 'pro',

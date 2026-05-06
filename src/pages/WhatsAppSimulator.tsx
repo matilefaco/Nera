@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { 
-  Send, ShieldAlert, Smartphone, CheckCircle2, 
-  AlertCircle, Loader2, TestTube2, MessageSquare,
-  ArrowLeft, Search, RefreshCcw
-} from 'lucide-react';
+import { MessageSquare, RefreshCcw, Search, ShieldAlert, Smartphone, Send, CheckCircle2, AlertCircle, Loader2, TestTube2, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import PremiumButton from '../components/PremiumButton';
 import { db } from '../firebase';
+import { notify } from '../lib/notify';
 import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestore';
 
 const EVENT_TYPES = [
@@ -36,8 +33,12 @@ export default function WhatsAppSimulator() {
       limit(5)
     );
     const unsubOut = onSnapshot(qOut, (snap) => {
-      setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+      try {
+        setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     const qIn = query(
       collection(db, 'whatsapp_inbound_logs'),
@@ -45,8 +46,12 @@ export default function WhatsAppSimulator() {
       limit(5)
     );
     const unsubIn = onSnapshot(qIn, (snap) => {
-      setInboundLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+      try {
+        setInboundLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     return () => {
       unsubOut();
@@ -55,7 +60,7 @@ export default function WhatsAppSimulator() {
   }, []);
 
   const triggerTest = async (type: string) => {
-    if (!phone) return alert('Insira um número de WhatsApp');
+    if (!phone) return notify.warning('Insira um número de WhatsApp');
     setLoading(type);
     setResult(null);
 
@@ -72,7 +77,7 @@ export default function WhatsAppSimulator() {
   };
 
   const simulateInbound = async () => {
-    if (!phone || !inboundMsg) return alert('Insira telefone e mensagem');
+    if (!phone || !inboundMsg) return notify.warning('Insira telefone e mensagem');
     setLoading('inbound');
     setResult(null);
 

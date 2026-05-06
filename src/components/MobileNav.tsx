@@ -7,30 +7,13 @@ import {
   List, 
   User 
 } from 'lucide-react';
-import { db } from '../firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
+import { usePendingAppointments } from '../contexts/PendingAppointmentsContext';
 
 export default function MobileNav() {
   const location = useLocation();
   const { user } = useAuth();
-  const [pendingCount, setPendingCount] = useState(0);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      where('status', '==', 'pending')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setPendingCount(snapshot.docs.length);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
+  const { pendingCount } = usePendingAppointments();
   
   const navItems = [
     { icon: LayoutDashboard, label: 'Painel', path: '/dashboard', id: 'dashboard' },

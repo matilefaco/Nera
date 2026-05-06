@@ -33,19 +33,23 @@ export default function ReferralsPage() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          name: data.name || 'Nova Profissional',
-          email: data.email || '',
-          createdAt: data.createdAt || new Date().toISOString(),
-          plan: data.plan || 'free'
-        } as ReferralRecord;
-      });
-      setReferrals(docs);
-      setLoading(false);
-    });
+      try {
+        const docs = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              name: data.name || 'Nova Profissional',
+              email: data.email || '',
+              createdAt: data.createdAt || new Date().toISOString(),
+              plan: data.plan || 'free'
+            } as ReferralRecord;
+          });
+setReferrals(docs);
+setLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     return () => unsubscribe();
   }, [profile?.referralCode]);

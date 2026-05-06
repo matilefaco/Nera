@@ -10,7 +10,7 @@ import {
   Star, CheckCircle2, Sparkles, AlertCircle, 
   ChevronRight, Heart, MessageSquare, ShieldCheck, User
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { formatCurrency, cn } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
@@ -94,13 +94,13 @@ export default function ReviewPage() {
         // 2. Fetch professional info
         const profDoc = await getDoc(doc(db, 'users', requestData.professionalId));
         if (profDoc.exists()) {
-          setProfessional(profDoc.data());
+          setProfessional(profDoc.data() as any);
         }
 
         // 3. Fetch booking info
         const bookingDoc = await getDoc(doc(db, 'appointments', requestData.bookingId));
         if (bookingDoc.exists()) {
-          setBooking(bookingDoc.data());
+          setBooking(bookingDoc.data() as any);
         }
 
       } catch (err) {
@@ -125,90 +125,39 @@ export default function ReviewPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) {
-      toast.error('Por favor, deixe sua avaliação.');
+      notify.error('Por favor, deixe sua avaliação.');
       return;
     }
 
     setSubmitting(true);
     try {
-      // 1. Create the review
       const reviewData = {
-        bookingId: request.bookingId,
-        professionalId: request.professionalId,
         serviceId: booking?.serviceId || '',
         serviceName: booking?.serviceName || '',
         rating,
         tags: selectedTags,
         comment: comment.trim(),
         publicDisplayMode: publicMode,
-        publicApproved: true, // Auto-approve for now
         firstName: request.clientDisplayName?.split(' ')[0] || 'Cliente',
-        neighborhood: request.clientNeighborhood || '',
-        createdAt: new Date().toISOString()
+        neighborhood: request.clientNeighborhood || ''
       };
 
-      await addDoc(collection(db, 'reviews'), reviewData);
-
-      // 2. Update request status
-      await updateDoc(doc(db, 'review_requests', request.id), {
-        status: 'submitted',
-        submittedAt: new Date().toISOString()
+      const res = await fetch(`/api/public/reviews/${token}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reviewData)
       });
 
-      // 3. Update professional stats
-      const statsRef = doc(db, 'review_stats', request.professionalId);
-      const statsDoc = await getDoc(statsRef);
-
-      if (statsDoc.exists()) {
-        const currentStats = statsDoc.data();
-        const newTotalReviews = (currentStats.totalReviews || 0) + 1;
-        const newAverageRating = ((currentStats.averageRating || 0) * (currentStats.totalReviews || 0) + rating) / newTotalReviews;
-        
-        // Simple tag aggregation logic (could be more complex)
-        const updatedTags = [...(currentStats.topTags || [])];
-        selectedTags.forEach(tag => {
-          if (!updatedTags.includes(tag)) updatedTags.push(tag);
-        });
-
-        await updateDoc(statsRef, {
-          averageRating: Number(newAverageRating.toFixed(1)),
-          totalReviews: newTotalReviews,
-          topTags: updatedTags.slice(0, 5),
-          updatedAt: new Date().toISOString()
-        });
-
-        // 4. Sync to user profile for directory/sorting
-        const userRef = doc(db, 'users', request.professionalId);
-        await updateDoc(userRef, {
-          averageRating: Number(newAverageRating.toFixed(1)),
-          totalReviews: newTotalReviews,
-          topTags: updatedTags.slice(0, 5)
-        });
-      } else {
-        const initialStats = {
-          professionalId: request.professionalId,
-          averageRating: rating,
-          totalReviews: 1,
-          totalCompletedBookings: 1,
-          topTags: selectedTags.slice(0, 5),
-          updatedAt: new Date().toISOString()
-        };
-        await setDoc(statsRef, initialStats);
-
-        // 4. Sync to user profile
-        const userRef = doc(db, 'users', request.professionalId);
-        await updateDoc(userRef, {
-          averageRating: rating,
-          totalReviews: 1,
-          topTags: selectedTags.slice(0, 5)
-        });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ao enviar avaliação`);
       }
 
       setSuccess(true);
-      toast.success('Obrigada por compartilhar sua experiência!');
-    } catch (err) {
+      notify.success('Obrigada por compartilhar sua experiência!');
+    } catch (err: any) {
       console.error('Error submitting review:', err);
-      toast.error('Não foi possível enviar agora. Tente novamente.');
+      notify.error(err.message || 'Não foi possível enviar agora. Tente novamente.');
     } finally {
       setSubmitting(false);
     }

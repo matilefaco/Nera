@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
 import { cn, formatDateKey, formatLocalDate } from '../lib/utils';
 import { Appointment } from '../types';
+import { isConfirmedLikeStatus, isCompletedStatus, isPendingStatus } from '../constants/appointmentStatus';
 
 interface MonthViewProps {
   currentDate: string;
@@ -54,8 +55,8 @@ export default function MonthView({
 
   const getDayStats = (dateKey: string) => {
     const dayAppts = appointments.filter(a => a.date === dateKey);
-    const confirmed = dayAppts.filter(a => a.status === 'confirmed' || a.status === 'completed').length;
-    const pending = dayAppts.filter(a => a.status === 'pending').length;
+    const confirmed = dayAppts.filter(a => isConfirmedLikeStatus(a.status) || isCompletedStatus(a.status)).length;
+    const pending = dayAppts.filter(a => isPendingStatus(a.status)).length;
     const isBlocked = blockedSchedules.some(b => b.date === dateKey && !b.isRecurring);
     
     return { confirmed, pending, isBlocked };

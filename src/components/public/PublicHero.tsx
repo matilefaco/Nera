@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { toast } from 'sonner';
+import { notify } from '../../lib/notify';
 import { ShieldCheck, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award, MessageCircle } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
@@ -16,6 +16,7 @@ interface PublicHeroProps {
   heroBio?: string;
   stats?: { averageRating: number; totalCompletedBookings: number; totalReviews?: number } | null;
   isAgendaFull?: boolean;
+  hasWaitlistFeature?: boolean;
   onWaitlistClick?: () => void;
   totalWeeklySlots?: number | null;
 }
@@ -28,6 +29,7 @@ export const PublicHero = ({
   heroBio,
   stats,
   isAgendaFull,
+  hasWaitlistFeature,
   onWaitlistClick,
   totalWeeklySlots
 }: PublicHeroProps) => {
@@ -64,7 +66,7 @@ export const PublicHero = ({
   );
 
   const interestPopupText = (() => {
-    if (totalWeeklySlots === 0) return "A agenda está fechada. Você pode entrar na lista de espera.";
+    if (totalWeeklySlots === 0) return hasWaitlistFeature ? "A agenda está fechada. Você pode entrar na lista de espera." : "Não há horários disponíveis no momento. Fale com a profissional.";
     if (totalWeeklySlots !== null && totalWeeklySlots <= 5) return `Restam apenas ${totalWeeklySlots} vaga${totalWeeklySlots === 1 ? "" : "s"} esta semana.`;
     if (totalWeeklySlots !== null && totalWeeklySlots <= 10) return `A agenda de ${firstName} está quase cheia esta semana.`;
     return `A agenda da ${firstName} costuma fechar rápido esta semana.`;
@@ -238,12 +240,26 @@ export const PublicHero = ({
               </motion.div>
             </div>
           ) : isAgendaFull ? (
-            <div className="inline-flex items-center gap-3 bg-brand-linen border border-brand-terracotta/20 px-5 py-3 rounded-full shadow-sm">
-              <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/40" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
-                Alta procura no momento • <span className="text-brand-terracotta">Novos horários em breve</span>
-              </span>
-            </div>
+            hasWaitlistFeature ? (
+              <div className="inline-flex items-center gap-3 bg-brand-linen border border-brand-terracotta/20 px-5 py-3 rounded-full shadow-sm">
+                <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/40" />
+                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
+                  Alta procura no momento • <span className="text-brand-terracotta">Novos horários em breve</span>
+                </span>
+              </div>
+            ) : (
+              <div className="inline-flex flex-col md:flex-row md:items-center gap-3 bg-brand-linen border border-brand-mist px-5 py-3 rounded-2xl md:rounded-full shadow-sm max-w-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/40 shrink-0" />
+                  <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
+                    Não há horários disponíveis
+                  </span>
+                </div>
+                <span className="text-[9px] text-brand-stone/60 leading-tight">
+                  Escolha outra data ou fale diretamente com a profissional.
+                </span>
+              </div>
+            )
           ) : null}
 
           <p className="body-text text-brand-stone max-w-sm">
@@ -253,11 +269,11 @@ export const PublicHero = ({
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-6">
               <PremiumButton
-                onClick={() => isAgendaFull ? onWaitlistClick?.() : onBookingClick(services[0])}
+                onClick={() => isAgendaFull && hasWaitlistFeature ? onWaitlistClick?.() : onBookingClick(services[0])}
                 variant="terracotta"
                 className="px-10 py-5 text-[10px] tracking-[0.22em] shadow-xl"
               >
-                {isAgendaFull ? 'Entrar na lista de espera' : 'Agendar horário'}
+                {isAgendaFull && hasWaitlistFeature ? 'Entrar na lista de espera' : 'Agendar horário'}
                 <ChevronRight size={14} className="ml-2" />
               </PremiumButton>
 
@@ -453,7 +469,7 @@ export const PublicHero = ({
                             onClick={() => {
                               const addr = `${profile.studioAddress!.street}, ${profile.studioAddress!.number} - ${profile.studioAddress!.neighborhood}, ${profile.studioAddress!.city}`;
                               navigator.clipboard.writeText(addr);
-                              toast.success('Endereço copiado!');
+                              notify.success('Endereço copiado!');
                             }}
                             className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-linen/50 border border-brand-mist/30 rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all"
                           >

@@ -19,7 +19,7 @@ export const PLAN_CONFIGS = {
             whatsappNotifications: true,
             advancedDashboard: false,
             waitlist: false,
-            antiNoShow: false,
+            antiNoShow: true,
             coupons: true,
             analytics: false,
             reports: false,

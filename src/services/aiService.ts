@@ -1,4 +1,5 @@
 import { Service, PortfolioItem } from '../types';
+import { auth } from '../firebase';
 
 /**
  * AI Service to handle all intelligence features using NVIDIA API via backend proxy.
@@ -14,9 +15,13 @@ export async function generateServiceDescription(params: {
   const timeoutId = setTimeout(() => controller.abort(), 22000); // Slightly longer than backend
 
   try {
+    const token = await auth.currentUser?.getIdToken(true);
     const response = await fetch('/api/ai/service-description', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(params),
       signal: controller.signal
     });
@@ -42,9 +47,13 @@ export async function generateServiceDescription(params: {
 
 export async function categorizeService(serviceName: string): Promise<string> {
   try {
+    const token = await auth.currentUser?.getIdToken(true);
     const response = await fetch('/api/ai/categorize-service', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ serviceName }),
     });
 
@@ -66,9 +75,13 @@ export async function analyzePortfolio(params: {
   specialty?: string;
 }): Promise<string> {
   try {
+    const token = await auth.currentUser?.getIdToken(true);
     const response = await fetch('/api/ai/analyze-portfolio-image', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(params),
     });
 
@@ -89,9 +102,13 @@ export async function categorizePortfolioItem(params: {
   description?: string;
 }): Promise<string> {
   try {
+    const token = await auth.currentUser?.getIdToken(true);
     const response = await fetch('/api/ai/categorize-portfolio-item', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(params),
     });
 

@@ -27,7 +27,7 @@ export function useProfileForm(profile: UserProfile | null) {
     privacyMode: 'reveal_after_booking'
   });
   const [serviceAreas, setServiceAreas] = useState<any[]>(profile?.serviceAreas || []);
-  const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'specific_neighborhoods'>(profile?.serviceAreaType || 'city_wide');
+  const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>(profile?.serviceAreaType || 'city_wide');
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>(profile?.pricingStrategy || 'none');
   const [differentials, setDifferentials] = useState<string[]>(profile?.professionalIdentity?.differentials || []);
   

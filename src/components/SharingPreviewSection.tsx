@@ -1,245 +1,231 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Camera, Save, Info, Smartphone, MessageCircle, AlertCircle, Share2, Copy, Check } from 'lucide-react';
+import { Copy, ExternalLink, MessageCircle, Instagram, QrCode, Download, Check, Share2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { UserProfile } from '../types';
-import { db } from '../firebase';
-import { doc, updateDoc } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { cn } from '../lib/utils';
-import { useAuth } from '../AuthContext';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface SharingPreviewSectionProps {
   profile: UserProfile;
 }
 
 export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
-  const { user } = useAuth();
-  const [formData, setFormData] = useState({
-    ogTitle: profile.ogTitle || '',
-    ogDescription: profile.ogDescription || '',
-    ogImageUrl: profile.ogImageUrl || profile.avatar || '',
-    ogCtaText: profile.ogCtaText || '',
-  });
-
-  const [isSaving, setIsSaving] = useState(false);
-  const [showSavingSuccess, setShowSavingSuccess] = useState(false);
-
-  useEffect(() => {
-    setFormData({
-      ogTitle: profile.ogTitle || '',
-      ogDescription: profile.ogDescription || '',
-      ogImageUrl: profile.ogImageUrl || profile.avatar || '',
-      ogCtaText: profile.ogCtaText || '',
-    });
-  }, [profile.ogTitle, profile.ogDescription, profile.ogImageUrl, profile.avatar, profile.ogCtaText]);
-
-  // Fallbacks for preview
-  const previewTitle = formData.ogTitle || `${profile.name} | ${profile.category || profile.specialty || "Profissional Nera"}`;
-  const previewDescription = formData.ogDescription || (profile.bio?.slice(0, 160) || `Agende um horário com ${profile.name} pelo Nera.`);
-  const previewImage = formData.ogImageUrl || profile.avatar || "https://usenera.com/og-default.png";
-  const profileUrl = `nera.app/p/${profile.slug}`;
-
-  const handleSave = async () => {
-    const targetUid = user?.uid || profile.uid;
-    if (!targetUid) {
-      toast.error('Usuário não identificado.');
-      return;
-    }
-    
-    setIsSaving(true);
-    try {
-      await updateDoc(doc(db, 'users', targetUid), {
-        ogTitle: formData.ogTitle,
-        ogDescription: formData.ogDescription,
-        ogImageUrl: formData.ogImageUrl,
-        ogCtaText: formData.ogCtaText,
-        ogUpdatedAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      setShowSavingSuccess(true);
-      toast.success('Configurações de compartilhamento salvas!');
-      setTimeout(() => setShowSavingSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error saving OG data:', error);
-      toast.error('Erro ao salvar.');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  const profileUrl = `https://usenera.com/p/${profile.slug}`;
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null);
+  const [copiedStory, setCopiedStory] = useState<number | null>(null);
+  const qrRef = useRef<HTMLDivElement>(null);
 
   const handleCopyLink = () => {
-    const url = `https://usenera.com/p/${profile.slug}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Link copiado!');
+    navigator.clipboard.writeText(profileUrl);
+    setCopiedLink(true);
+    notify.success('Link copiado!');
+    setTimeout(() => setCopiedLink(false), 2000);
   };
 
+  const handleCopyText = (text: string, type: 'template' | 'story', index: number) => {
+    navigator.clipboard.writeText(text);
+    notify.success('Copiado!');
+    if (type === 'template') {
+      setCopiedTemplate(index);
+      setTimeout(() => setCopiedTemplate(null), 2000);
+    } else {
+      setCopiedStory(index);
+      setTimeout(() => setCopiedStory(null), 2000);
+    }
+  };
+
+  const handleDownloadQR = () => {
+    if (!qrRef.current) return;
+    const svg = qrRef.current.querySelector('svg');
+    if (!svg) return;
+    
+    // Convert SVG to data url
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    
+    img.onload = () => {
+      canvas.width = img.width + 40; // Add padding
+      canvas.height = img.height + 40;
+      if (ctx) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 20, 20);
+        const pngFile = canvas.toDataURL("image/png");
+        const downloadLink = document.createElement("a");
+        downloadLink.download = `QR_Nera_${profile.slug}.png`;
+        downloadLink.href = `${pngFile}`;
+        downloadLink.click();
+      }
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  const whatsappTemplates = [
+    `Minha agenda online já está disponível ✨\nAgora você pode escolher horário e agendar diretamente pelo link:\n${profileUrl}`,
+    `Organizei minha agenda online pra facilitar os agendamentos 🤎\nVocê pode escolher o melhor horário por aqui:\n${profileUrl}`,
+    `Pra ficar mais fácil pra vocês, meus horários agora ficam disponíveis online ✨\nAgende pelo link:\n${profileUrl}`
+  ];
+
+  const storyIdeas = [
+    "Agenda aberta da semana ✨",
+    "Agora dá pra agendar online 🤎",
+    "Escolha seu horário direto pelo link",
+    "Minha agenda online já está no ar"
+  ];
+
+  const defaultWhatsappShare = encodeURIComponent(`Minha agenda online já está disponível! Agende seu horário comigo pelo link: ${profileUrl}`);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-10">
+      
+      {/* 1. SEU LINK */}
       <div className="bg-white rounded-[32px] p-8 border border-brand-mist shadow-sm">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta">
             <Share2 size={20} />
           </div>
           <div>
-            <h3 className="text-xl font-serif text-brand-ink">Preview de Compartilhamento</h3>
-            <p className="text-xs text-brand-stone font-light italic">Personalize como seu link aparece no WhatsApp e Instagram.</p>
+            <h3 className="text-xl font-serif text-brand-ink">Seu Link</h3>
+            <p className="text-xs text-brand-stone font-light italic">Esse é o seu endereço oficial de agendamentos.</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {/* Edit Form */}
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-2 block">Título do Card</label>
-                <input
-                  type="text"
-                  value={formData.ogTitle}
-                  onChange={(e) => setFormData(prev => ({ ...prev, ogTitle: e.target.value }))}
-                  placeholder={profile.name}
-                  className="w-full px-4 py-3 bg-brand-linen/30 border border-brand-mist rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-terracotta text-sm"
-                />
-                <p className="text-[10px] text-brand-stone mt-1">Ex: "Unhas Incríveis com ${profile.name.split(' ')[0]}"</p>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-2 block">Descrição Curta</label>
-                <textarea
-                  value={formData.ogDescription}
-                  onChange={(e) => setFormData(prev => ({ ...prev, ogDescription: e.target.value }))}
-                  placeholder="Especialista em..."
-                  rows={3}
-                  className="w-full px-4 py-3 bg-brand-linen/30 border border-brand-mist rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-terracotta text-sm resize-none"
-                />
-                <p className="text-[10px] text-brand-stone mt-1">Máximo 160 caracteres sugerido.</p>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-2 block">Texto de Chamada (CTA)</label>
-                <input
-                  type="text"
-                  value={formData.ogCtaText}
-                  onChange={(e) => setFormData(prev => ({ ...prev, ogCtaText: e.target.value }))}
-                  placeholder="Agende seu horário online"
-                  className="w-full px-4 py-3 bg-brand-linen/30 border border-brand-mist rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-terracotta text-sm"
-                />
-                <p className="text-[10px] text-brand-stone mt-1">Opcional. Ex: "Garanta sua vaga para essa semana!"</p>
-              </div>
-
-              <div>
-                <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-2 block">URL da Imagem de Preview</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={formData.ogImageUrl}
-                    onChange={(e) => setFormData(prev => ({ ...prev, ogImageUrl: e.target.value }))}
-                    placeholder="https://..."
-                    className="flex-1 px-4 py-3 bg-brand-linen/30 border border-brand-mist rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-terracotta text-sm"
-                  />
-                  {profile.avatar && (
-                    <button 
-                      onClick={() => setFormData(prev => ({ ...prev, ogImageUrl: profile.avatar || '' }))}
-                      className="px-3 py-2 bg-brand-linen text-brand-ink text-[10px] font-bold uppercase rounded-xl hover:bg-brand-parchment transition-all"
-                    >
-                      Usar Avatar
-                    </button>
-                  )}
-                </div>
-                <p className="text-[10px] text-brand-stone mt-1">Recomendado: 1200x630px. Use uma foto profissional ou do seu espaço.</p>
-              </div>
-            </div>
-
+        <div className="bg-brand-linen/30 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-4 justify-between border border-brand-mist">
+          <div className="text-sm font-medium text-brand-ink truncate">
+            {profileUrl}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={handleSave}
-              disabled={isSaving}
+              onClick={handleCopyLink}
               className={cn(
-                "w-full py-4 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2",
-                showSavingSuccess 
-                  ? "bg-green-500 text-white" 
-                  : "bg-brand-ink text-white hover:bg-brand-ink/90 shadow-lg shadow-brand-ink/10"
+                "px-5 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+                copiedLink ? "bg-green-500 text-white" : "bg-white text-brand-ink border border-brand-mist hover:bg-brand-linen"
               )}
             >
-              {isSaving ? (
-                <>Salvando...</>
-              ) : showSavingSuccess ? (
-                <><Check size={16} /> Salvo com sucesso!</>
-              ) : (
-                <><Save size={16} /> Salvar Alterações</>
-              )}
+              {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+              {copiedLink ? "Copiado" : "Copiar"}
             </button>
-          </div>
-
-          {/* Preview Section */}
-          <div className="space-y-6">
-            <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-2 block flex items-center gap-2">
-              <Smartphone size={14} /> Preview no WhatsApp
-            </label>
-            
-            <div className="bg-[#E5DDD5] p-6 rounded-[32px] relative overflow-hidden">
-                {/* Chat bubble simulation */}
-                <div className="flex flex-col gap-2 max-w-[85%] ml-auto">
-                    <div className="bg-[#DCF8C6] p-2 rounded-lg shadow-sm border border-[#C6E6A3] relative">
-                         {/* Link Card Styling */}
-                         <div className="bg-[#F0F2F5]/80 rounded-sm overflow-hidden border border-black/5">
-                            <div className="aspect-[1.91/1] w-full bg-brand-stone/10 overflow-hidden relative">
-                                <img 
-                                    src={previewImage} 
-                                    alt="Preview" 
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = 'https://usenera.com/og-default.png';
-                                    }}
-                                />
-                            </div>
-                            <div className="p-2 border-l-4 border-brand-terracotta bg-white/40">
-                                <h4 className="text-[13px] font-bold text-[#111b21] line-clamp-1">{previewTitle}</h4>
-                                <p className="text-[12px] text-[#667781] line-clamp-2 leading-tight mt-0.5">{previewDescription}</p>
-                                <p className="text-[10px] text-[#667781] mt-1">{profileUrl}</p>
-                            </div>
-                         </div>
-                         
-                         <div className="pt-1 flex flex-col gap-1">
-                            <p className="text-[13px] text-[#111b21]">Confira meu novo site de agendamentos! ✨</p>
-                            {formData.ogCtaText && (
-                                <p className="text-[12px] text-brand-terracotta font-medium italic">
-                                    {formData.ogCtaText}
-                                </p>
-                            )}
-                            <div className="flex items-center justify-end">
-                                <span className="text-[10px] text-[#667781] shrink-0">12:45</span>
-                            </div>
-                         </div>
-                    </div>
-                </div>
-
-                <div className="mt-8 bg-white/80 backdrop-blur-sm p-4 rounded-2xl flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-brand-linen rounded-xl flex items-center justify-center text-brand-terracotta">
-                            <MessageCircle size={20} />
-                        </div>
-                        <div>
-                            <p className="text-[11px] font-bold text-brand-ink">Peça para uma amiga testar!</p>
-                            <p className="text-[10px] text-brand-stone">Envie seu link e veja o card em ação.</p>
-                        </div>
-                    </div>
-                    <button 
-                        onClick={handleCopyLink}
-                        className="px-4 py-2 bg-brand-ink text-white text-[9px] font-bold uppercase rounded-full hover:bg-brand-ink/90 transition-all"
-                    >
-                        Copiar Link
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3">
-                <Info size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-amber-800 leading-relaxed italic">
-                    <strong>Dica Nera:</strong> O WhatsApp às vezes demora alguns minutos para "limpar o cache" e mostrar a nova imagem. Se não atualizar na hora, aguarde um pouco ou tente enviar para um contato diferente.
-                </p>
-            </div>
+            <a
+              href={profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-2.5 bg-brand-ink text-white rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 transition-all flex items-center gap-2"
+            >
+              <ExternalLink size={14} />
+              Abrir
+            </a>
           </div>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* 2. TEMPLATES WHATSAPP */}
+        <div className="bg-white rounded-[32px] p-8 border border-brand-mist shadow-sm flex flex-col h-full">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-[#E8F8EE] rounded-full flex items-center justify-center text-[#25D366]">
+              <MessageCircle size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-serif text-brand-ink">Mensagem pronta para clientes</h3>
+              <p className="text-[11px] text-brand-stone font-light italic">Copie e envie no WhatsApp.</p>
+            </div>
+          </div>
+
+          <div className="flex-1 space-y-4">
+            {whatsappTemplates.map((template, index) => (
+              <div key={index} className="bg-[#F0F2F5]/80 p-4 rounded-2xl border border-brand-mist/50 relative group">
+                <p className="text-[13px] text-[#111b21] whitespace-pre-wrap font-sans pr-10">{template}</p>
+                <button
+                  onClick={() => handleCopyText(template, 'template', index)}
+                  className="absolute right-3 top-3 p-2 bg-white rounded-full shadow-sm text-brand-stone hover:text-brand-ink transition-all"
+                  title="Copiar mensagem"
+                >
+                  {copiedTemplate === index ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <a 
+            href={`https://wa.me/?text=${defaultWhatsappShare}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 w-full py-4 bg-[#25D366] text-white rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 hover:bg-[#20BE5C] shadow-lg shadow-[#25D366]/20"
+          >
+            <MessageCircle size={16} />
+            Compartilhar no WhatsApp
+          </a>
+        </div>
+
+        {/* 3. STORIES E QR CODE */}
+        <div className="space-y-8 flex flex-col">
+          {/* STORIES */}
+          <div className="bg-white rounded-[32px] p-8 border border-brand-mist shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-gradient-to-tr from-[#FEDA75] via-[#D62976] to-[#962FBF] rounded-full flex items-center justify-center text-white">
+                <Instagram size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-serif text-brand-ink">Ideias para Stories</h3>
+                <p className="text-[11px] text-brand-stone font-light italic">Adicione no Instagram com o adesivo de Link.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {storyIdeas.map((idea, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-brand-linen/30 rounded-xl border border-brand-mist/50 gap-4">
+                  <span className="text-[13px] text-brand-ink font-medium">{idea}</span>
+                  <button
+                    onClick={() => handleCopyText(idea, 'story', index)}
+                    className="p-1.5 text-brand-stone hover:text-brand-ink transition-colors flex items-center justify-center gap-1 bg-white rounded-md border border-brand-mist shrink-0 min-w-[70px]"
+                  >
+                    {copiedStory === index ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
+                    <span className="text-[9px] font-bold uppercase">{copiedStory === index ? "Copiado" : "Copiar"}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* QR CODE */}
+          <div className="bg-white rounded-[32px] p-8 border border-brand-mist shadow-sm flex-1 flex flex-col items-center justify-center text-center">
+            <div className="mb-4 flex flex-col items-center">
+              <h3 className="text-lg font-serif text-brand-ink">QR Code Elegante</h3>
+              <p className="text-[11px] text-brand-stone font-light italic max-w-[220px] mx-auto mt-1">
+                Deixe no seu espaço para clientes agendarem pelo celular.
+              </p>
+            </div>
+
+            <div 
+              ref={qrRef}
+              className="p-4 bg-white border-2 border-brand-mist rounded-2xl mb-6 shadow-sm inline-block"
+            >
+              <QRCodeSVG 
+                value={profileUrl} 
+                size={140}
+                bgColor="#ffffff"
+                fgColor="#2B2B2B"
+                level="Q"
+                includeMargin={false}
+              />
+            </div>
+
+            <button
+              onClick={handleDownloadQR}
+              className="px-6 py-3 w-full sm:w-auto bg-brand-linen text-brand-ink rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all flex items-center justify-center gap-2 mt-auto border border-brand-mist"
+            >
+              <Download size={14} />
+              Baixar QR Code
+            </button>
+          </div>
+        </div>
+      </div>
+      
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { addToWaitlist } from '../firebase';
 import { UserProfile, Service, WaitlistEntry } from '../types';
 import { cn, formatDateKey, getTodayLocale, formatLocalDate } from '../lib/utils';
 import PremiumButton from './PremiumButton';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 
 interface WaitlistModalProps {
   open: boolean;
@@ -53,7 +53,7 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
 
   const handleJoin = async () => {
     if (!formData.clientName || !formData.clientWhatsapp) {
-      toast.error('Preencha seu nome e WhatsApp.');
+      notify.error('Preencha seu nome e WhatsApp.');
       return;
     }
     
@@ -66,7 +66,7 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
       });
       setStep('success');
     } catch (e) {
-      toast.error('Erro ao entrar na lista. Tente novamente.');
+      notify.error('Erro ao entrar na lista. Tente novamente.');
     } finally {
       setLoading(false);
     }

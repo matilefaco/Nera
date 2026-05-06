@@ -6,7 +6,7 @@ import AppLayout from '../components/AppLayout';
 import PremiumButton from '../components/PremiumButton';
 import { useAuth } from '../AuthContext';
 import { formatCurrency } from '../lib/utils';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { PLANS } from '../config/plans';
 
 export default function PlansPage() {
@@ -17,10 +17,10 @@ export default function PlansPage() {
 
   useEffect(() => {
     if (searchParams.get('success')) {
-      toast.success('Assinatura processada com sucesso! Bem-vinda ao seleto grupo Nera Pro.');
+      notify.success('Assinatura processada com sucesso! Bem-vinda ao seleto grupo Nera Pro.');
     }
     if (searchParams.get('canceled')) {
-      toast.error('O processo de assinatura foi cancelado.');
+      notify.error('O processo de assinatura foi cancelado.');
     }
   }, [searchParams]);
 
@@ -28,12 +28,12 @@ export default function PlansPage() {
 
   const copyReferral = () => {
     navigator.clipboard.writeText(referralLink);
-    toast.success('Link de indicação copiado!');
+    notify.success('Link de indicação copiado!');
   };
 
   const handleUpgrade = async (planType: 'essencial' | 'pro') => {
     if (!user || !profile) {
-      toast.error('Erro ao identificar usuária. Tente novamente.');
+      notify.error('Erro ao identificar usuária. Tente novamente.');
       return;
     }
 
@@ -53,11 +53,11 @@ export default function PlansPage() {
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
-        toast.error(data.error || 'Erro ao iniciar checkout.');
+        notify.error(data.error || 'Erro ao iniciar checkout.');
       }
     } catch (err) {
       console.error('Checkout error:', err);
-      toast.error('Não foi possível conectar com o servidor de pagamentos.');
+      notify.error('Não foi possível conectar com o servidor de pagamentos.');
     } finally {
       setLoadingPlan(null);
     }

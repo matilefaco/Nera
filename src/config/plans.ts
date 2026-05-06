@@ -46,9 +46,8 @@ export const PLANS: Plan[] = [
     features: [
       { text: 'Agendamentos ilimitados' },
       { text: 'Notificações WhatsApp' },
-      { text: 'Lista de espera' },
       { text: 'Bloqueio de horários' },
-      { text: 'Lembrete 24h anti-no-show' },
+      { text: 'Lembrete automático 24h (reduz faltas)' },
       { text: 'Histórico de clientes' }
     ],
     cta: 'Testar Essencial por 15 dias'
@@ -64,6 +63,7 @@ export const PLANS: Plan[] = [
     tagline: 'Nera Elite',
     features: [
       { text: 'Tudo do Essencial, com recursos para crescer mais rápido', isHighlight: true },
+      { text: 'Lista de espera inteligente para preencher horários vagos automaticamente' },
       { text: 'Cupons de desconto' },
       { text: 'Relatório mensal em PDF' },
       { text: 'Link de indicação premiado' },

@@ -36,7 +36,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       whatsappNotifications: true,
       advancedDashboard: false,
       waitlist: false,
-      antiNoShow: false,
+      antiNoShow: true,
       coupons: true,
       analytics: false,
       reports: false,

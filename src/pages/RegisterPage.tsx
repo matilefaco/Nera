@@ -6,7 +6,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { User as UserIcon, Mail, Lock, ArrowRight, Sparkles, LogOut, Gift } from 'lucide-react';
 import { useAuth } from '../AuthContext';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { generateSlug, getHumanError, generateReferralCode } from '../lib/utils';
 import Logo from '../components/Logo';
 
@@ -48,12 +48,12 @@ export default function RegisterPage() {
       } else {
         const errorMsg = data.details || data.error || 'Erro ao iniciar checkout do plano selecionado.';
         console.error('[SIGNUP FLOW ERROR] Server response:', errorMsg);
-        toast.error(errorMsg, { duration: 6000 });
+        notify.error(errorMsg, undefined, { duration: 6000 });
         navigate('/onboarding');
       }
     } catch (err: any) {
       console.error('[SIGNUP FLOW FETCH ERROR]:', err);
-      toast.error('Erro de conexão ao iniciar checkout.');
+      notify.error(err, 'Erro de conexão ao iniciar checkout.');
       navigate('/onboarding');
     }
   };
@@ -98,7 +98,7 @@ export default function RegisterPage() {
       }
 
       console.log('[SIGNUP FLOW] Completed (Google)');
-      toast.success('Que prazer ter você conosco! Bem-vinda à Nera.', {
+      notify.success('Que prazer ter você conosco! Bem-vinda à Nera.', {
         icon: <Sparkles className="text-brand-terracotta" size={18} />
       });
       
@@ -106,7 +106,7 @@ export default function RegisterPage() {
 
     } catch (error: any) {
       console.error('[SIGNUP FLOW] Fatal error:', error);
-      toast.error(`${getHumanError(error)} (${error.code || 'unknown'})`);
+      notify.error(error, "Não foi possível criar sua conta.");
     } finally {
       setLoading(false);
     }
@@ -162,7 +162,7 @@ export default function RegisterPage() {
 
       console.log('[SIGNUP FLOW] Completed manual registration');
       
-      toast.success('Perfil criado com sucesso. Vamos começar?', {
+      notify.success('Perfil criado com sucesso. Vamos começar?', {
         icon: <Sparkles className="text-brand-terracotta" size={18} />
       });
       
@@ -170,7 +170,7 @@ export default function RegisterPage() {
 
     } catch (error: any) {
       console.error('[SIGNUP FLOW] Manual registration error:', error);
-      toast.error(`${getHumanError(error)} (${error.code || 'unknown'})`);
+      notify.error(error, "Não foi possível registrar.");
     } finally {
       setLoading(false);
     }
@@ -178,7 +178,7 @@ export default function RegisterPage() {
 
   const handleLogoutAndStay = async () => {
     await signOut(auth);
-    toast.success('Até breve!');
+    notify.success('Até breve!');
   };
 
   return (

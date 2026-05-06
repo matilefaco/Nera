@@ -1,5 +1,6 @@
 
 import { Appointment, WorkingHours, BlockedSchedule } from '../types';
+import { isRevenueStatus, isPendingStatus, isActiveSlotStatus } from '../constants/appointmentStatus';
 
 export interface DayAvailability {
   availableSlots: string[];
@@ -195,7 +196,7 @@ export function getBookableSlotsForDate({
   // 2. Appointments (Confirmados, pendentes, concluídos e aceitos bloqueiam publicamente)
   // Regra de Produto Nera: Se existe qualquer reserva no horário (inclusive pendente), o slot não aparece como livre.
   appointments.forEach(appt => {
-    if (appt.date === date && ['confirmed', 'completed', 'accepted', 'pending'].includes(appt.status)) {
+    if (appt.date === date && isActiveSlotStatus(appt.status)) {
       const [h, m] = appt.time.split(':').map(Number);
       const start = h * 60 + m;
       const duration = Number(appt.duration) || 60;
@@ -258,8 +259,8 @@ export function getDayAvailability(params: GetAvailableSlotsParams): DayAvailabi
   return {
     availableSlots: slots,
     availableCount: slots.length,
-    confirmedCount: params.appointments.filter(a => a.date === params.selectedDate && ['confirmed', 'completed'].includes(a.status)).length,
-    pendingCount: params.appointments.filter(a => a.date === params.selectedDate && a.status === 'pending').length,
+    confirmedCount: params.appointments.filter(a => a.date === params.selectedDate && isRevenueStatus(a.status)).length,
+    pendingCount: params.appointments.filter(a => a.date === params.selectedDate && isPendingStatus(a.status)).length,
     blockedCount: getBlockedRanges(params.selectedDate, params.blockedSchedules || []).length,
     nextAvailableSlot: slots[0] || null,
     isToday: params.selectedDate === getLocalDateStr(),

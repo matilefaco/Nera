@@ -5,7 +5,7 @@ import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, signOu
 import { auth } from '../firebase';
 import { Mail, Lock, ArrowRight, Sparkles, LogOut } from 'lucide-react';
 import { useAuth } from '../AuthContext';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { getHumanError } from '../lib/utils';
 import Logo from '../components/Logo';
 
@@ -26,15 +26,14 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       console.log('[LOGIN FLOW] Google success for user:', result.user.email);
-      toast.success('Que bom ter você de volta!');
+      notify.success('Que bom ter você de volta!');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('[LOGIN FLOW] Google login error:', error);
       console.error('[LOGIN FLOW] Error Code:', error.code);
       console.error('[LOGIN FLOW] Error Message:', error.message);
       
-      const humanMessage = getHumanError(error);
-      toast.error(`${humanMessage} (${error.code || 'unknown'})`);
+            notify.error(error);
     } finally {
       setLoading(false);
     }
@@ -49,15 +48,14 @@ export default function LoginPage() {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       console.log('[LOGIN FLOW] Manual success for user:', result.user.email);
-      toast.success('Que bom ter você de volta!');
+      notify.success('Que bom ter você de volta!');
       navigate('/dashboard');
     } catch (error: any) {
       console.error('[LOGIN FLOW] Manual login error:', error);
       console.error('[LOGIN FLOW] Error Code:', error.code);
       console.error('[LOGIN FLOW] Error Message:', error.message);
 
-      const humanMessage = getHumanError(error);
-      toast.error(`${humanMessage} (${error.code || 'unknown'})`);
+            notify.error(error);
     } finally {
       setLoading(false);
     }
@@ -65,7 +63,7 @@ export default function LoginPage() {
 
   const handleLogoutAndStay = async () => {
     await signOut(auth);
-    toast.success('Até breve!');
+    notify.success('Até breve!');
   };
 
   return (

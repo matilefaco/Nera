@@ -200,11 +200,13 @@ export const FormServices = ({
                     )}
                   </AnimatePresence>
                   
-                  {errors[index]?.duration && (
-                    <div className="mt-1">
-                      <FormError message="Selecione a duração. Ela define os horários disponíveis para suas clientes." />
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {errors[index]?.duration && (
+                      <div className="mt-1">
+                        <FormError message={errors[index]?.duration} />
+                      </div>
+                    )}
+                  </AnimatePresence>
 
                   <div className="bg-brand-linen/40 p-5 rounded-3xl border border-dashed border-brand-mist/50 mt-4">
                     <p className="text-[10px] text-brand-stone font-medium leading-relaxed uppercase tracking-widest mb-2">

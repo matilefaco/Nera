@@ -76,17 +76,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         
         // Use onSnapshot for real-time updates
         unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
-          console.log('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());
-          if (docSnap.exists()) {
-            const data = docSnap.data() as UserProfile;
-            setProfile({ ...data, uid: docSnap.id });
-          } else {
-            console.log('[AuthContext] Profile document does not exist yet.');
-            setProfile(null);
+          try {
+            console.log('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());
+if (docSnap.exists()) {
+                    const data = docSnap.data() as UserProfile;
+                    setProfile({ ...data, uid: docSnap.id });
+                  } else {
+                    console.log('[AuthContext] Profile document does not exist yet.');
+                    setProfile(null);
+                  }
+setLoading(false);
+setIsAuthReady(true);
+clearTimeout(safetyTimeout);
+          } catch (err) {
+            console.error("Error in onSnapshot callback:", err);
           }
-          setLoading(false);
-          setIsAuthReady(true);
-          clearTimeout(safetyTimeout);
         }, (error) => {
           console.error("[AuthContext] Error listening to profile:", error);
           setLoading(false);

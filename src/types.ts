@@ -108,7 +108,7 @@ export interface UserProfile {
     state?: string;
     reference: string;
     
-    // Complementary info
+  // Complementary info
     hasParking?: boolean;
     parkingInfo?: string;
     hasAccessibility?: boolean;
@@ -116,6 +116,7 @@ export interface UserProfile {
     isSafeLocation?: boolean;
     locationNotes?: string;
     privacyMode?: 'public_full' | 'neighborhood_only';
+    googleMapsLink?: string;
   };
   
   onboardingCompleted?: boolean;
@@ -128,6 +129,11 @@ export interface UserProfile {
   averageRating?: number;
   totalReviews?: number;
   topTags?: string[];
+  
+  whatsappNotificationsEnabled?: boolean;
+  studioCity?: string;
+  address?: AddressData;
+  servicesDraft?: Service[];
   
   waitlistMode?: 'auto' | 'manual';
   callmebotApiKey?: string;
@@ -173,7 +179,8 @@ export interface Review {
   publicApproved: boolean;
   firstName: string;
   neighborhood?: string;
-  createdAt: string;
+  locationLabel?: string;
+  createdAt: string | any;
 }
 
 export interface Appointment {
@@ -200,7 +207,7 @@ export interface Appointment {
   /** @deprecated Use object structure for address instead of plain string. Use parseAddress helper. */
   address?: AddressData | string;
   
-  status: 'pending' | 'accepted' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'cancelled_by_professional' | 'completed' | 'expired';
+  status: 'pending' | 'accepted' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'cancelled_by_professional' | 'completed' | 'expired' | 'no_show';
   notes?: string;
   
   clientConfirmedAt?: any; // When client hits "confirm presence"
@@ -237,6 +244,7 @@ export interface Appointment {
 
   createdAt: Timestamp | Date | string | FieldValue;
   updatedAt?: Timestamp | Date | string | FieldValue;
+  isHomecare?: boolean;
 }
 
 export interface BlockedSchedule {
@@ -330,6 +338,10 @@ export interface ClientSummary {
   confirmedAppointments: number;
   cancelledAppointments: number;
   noShowCount: number;
+  noShows?: number;
+  isHomecare?: boolean;
+  services?: string[];
+  segment?: 'diamond' | 'gold' | 'silver' | 'bronze' | 'new' | 'churn_risk' | 'lost';
   totalSpent: number;
   lastAppointmentDate: string;
   lastServiceName: string;

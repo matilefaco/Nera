@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, confirmAppointmentAtomic, declineAppointmentAtomic, cancelConfirmedAppointmentAtomic, handleBookingError, createManualAppointment, updateAppointmentStatus } from '../firebase';
+import { db, handleBookingError, createManualAppointment, updateAppointmentStatus, sanitizeAppointment } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs, getDoc, limit } from 'firebase/firestore';
 import { 
   Calendar, Clock, MessageCircle, 
@@ -12,10 +12,11 @@ import {
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn, cleanWhatsapp } from '../lib/utils';
+import { isPendingStatus, isCancelledStatus, isConfirmedLikeStatus, isCompletedStatus, isActiveSlotStatus, isInactiveStatus } from '../constants/appointmentStatus';
 import { getAvailableSlots as getAvailableSlotsOld, getDayAvailability } from '../lib/bookingUtils';
 import { getAvailableSlots, IntelligentFit } from '../utils/scheduleSuggestions';
 import PremiumButton from '../components/PremiumButton';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { Appointment } from '../types';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
@@ -27,11 +28,15 @@ import MonthView from '../components/MonthView';
 
 import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 import WaitlistCentralModal from '../components/WaitlistCentralModal';
+import { exportAppointmentsCsv } from '../lib/exportCsv';
 import QuickBlockModal from '../components/QuickBlockModal';
 import { FirstVisitTip } from '../components/FirstVisitTip';
 
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import UpgradeModal from '../components/UpgradeModal';
+import { PageErrorBoundary } from '../components/PageErrorBoundary';
+import { AgendaSkeleton } from '../components/ui/AgendaSkeleton';
 
 export default function AgendaPage() {
   const { user, profile } = useAuth();
@@ -43,6 +48,7 @@ export default function AgendaPage() {
     checkFeatureAccess,
     openUpgradeModal
   } = useUpgradeTriggers();
+  const { features } = usePlanFeatures();
 
   const [view, setView] = useState<'month' | 'week' | 'day'>(() => {
     const saved = localStorage.getItem('nera_agenda_view') as any;
@@ -53,6 +59,8 @@ export default function AgendaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dateFromUrl = searchParams.get('date');
   const appointmentIdFromUrl = searchParams.get('appointment');
+
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [appointments, setAppointments] = useState<any[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
@@ -111,6 +119,7 @@ export default function AgendaPage() {
   const [manualPhone, setManualPhone] = useState('');
   const [manualService, setManualService] = useState('');
   const [manualPrice, setManualPrice] = useState('');
+  const [handledIds, setHandledIds] = useState<string[]>([]);
   const [manualDate, setManualDate] = useState(selectedDate);
   const [manualTime, setManualTime] = useState('');
   const [services, setServices] = useState<any[]>([]);
@@ -168,11 +177,11 @@ export default function AgendaPage() {
         setSearchCode('');
       } else {
         console.log(`[RESERVATION SEARCH] found: false`);
-        toast.error('Nenhuma reserva encontrada com esse código.');
+        notify.error('Nenhuma reserva encontrada com esse código.');
       }
     } catch (err) {
       console.error('[RESERVATION SEARCH] Error:', err);
-      toast.error('Erro ao buscar reserva.');
+      notify.error('Erro ao buscar reserva.');
     } finally {
       setIsSearchingCode(false);
     }
@@ -194,6 +203,8 @@ export default function AgendaPage() {
     );
     getDocs(q).then(snap => {
       setServices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }).catch(err => {
+      console.error("[AgendaPage] Failed to fetch services:", err);
     });
   }, [user]);
 
@@ -209,34 +220,45 @@ export default function AgendaPage() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      setAppointments(docs);
-      
-      // Audit for conflicts
-      const audit: Record<string, Appointment[]> = {};
-      docs.forEach(a => {
-        if (['confirmed', 'accepted'].includes(a.status)) {
-          if (!audit[a.time]) audit[a.time] = [];
-          audit[a.time].push(a);
-        }
-      });
-      const foundConflicts = Object.values(audit).filter(list => list.length > 1);
-      setConflicts(foundConflicts);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+setAppointments(docs);
+const audit: Record<string, Appointment[]> = {};
+docs.forEach(a => {
+            if (isConfirmedLikeStatus(a.status)) {
+              if (!audit[a.time]) audit[a.time] = [];
+              audit[a.time].push(a);
+            }
+          });
+const foundConflicts = Object.values(audit).filter(list => list.length > 1);
+setConflicts(foundConflicts);
+setIsInitialLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+        setIsInitialLoading(false);
+      }
+    }, (error) => {
+      console.error('[AgendaPage] Subscription error (appointments q):', error);
+      setIsInitialLoading(false);
     });
 
     const blockedRef = collection(db, 'blocked_schedules');
     const dayOfWeek = parseLocalDate(selectedDate).getDay();
 
     const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', user.uid)), (snap) => {
-      const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      
-      const dayBlocked = allBlocked.filter(b => {
-        const isToday = b.date === selectedDate;
-        const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-        return isToday || isRecurringToday;
-      });
-
-      setBlockedSchedules(dayBlocked);
+      try {
+        const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+const dayBlocked = allBlocked.filter(b => {
+            const isToday = b.date === selectedDate;
+            const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+            return isToday || isRecurringToday;
+          });
+setBlockedSchedules(dayBlocked);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[AgendaPage] Subscription error (blockedSchedules day):', error);
     });
 
     return () => {
@@ -245,24 +267,65 @@ export default function AgendaPage() {
     };
   }, [user, selectedDate]);
 
-  // Fetch all appointments for week/month view
+  // Fetch all appointments for week/month view with a safe window
   useEffect(() => {
     if (!user) return;
     
-    // For week/month view, we might want a larger window, but let's stick to a reasonable range correctly filtered or just use the current selected month/week
+    // We base the window on 'selectedDate' (which is YYYY-MM-DD)
+    const baseDate = new Date(selectedDate + 'T12:00:00');
+    
+    // Calculate visibleStart: 30 days before baseDate
+    const start = new Date(baseDate);
+    start.setDate(start.getDate() - 30);
+    const visibleStartStr = start.toISOString().split('T')[0];
+    
+    // Calculate visibleEnd: 60 days after baseDate
+    const end = new Date(baseDate);
+    end.setDate(end.getDate() + 60);
+    const visibleEndStr = end.toISOString().split('T')[0];
+
     const q = query(
       collection(db, 'appointments'),
       where('professionalId', '==', user.uid),
-      orderBy('time', 'asc')
+      where('date', '>=', visibleStartStr),
+      where('date', '<=', visibleEndStr)
     );
 
     const unsubAll = onSnapshot(q, (snapshot) => {
-      setAllAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        // Sort in memory to avoid complex index requirements while keeping standard behavior
+        docs.sort((a, b) => {
+          if (a.date === b.date) {
+            return (a.time || '').localeCompare(b.time || '');
+          }
+          return (a.date || '').localeCompare(b.date || '');
+        });
+        setAllAppointments(docs);
+        setIsInitialLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+        setIsInitialLoading(false);
+      }
+    }, (error) => {
+      console.error('[AgendaPage] Subscription error (allAppointments):', error);
+      setIsInitialLoading(false);
+      // Fallback: If missing index, try to gracefully fallback to manual filtering
+      if (error.message.includes('index')) {
+        console.warn('[AgendaPage] Firestore index required: appointments professionalId ASC, date ASC');
+        // Em produção, não exibir tela vermelha. Manter o estado seguro vazio ou dados anteriores.
+      }
     });
 
     const blockedRef = collection(db, 'blocked_schedules');
     const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', user.uid)), (snap) => {
-      setAllBlockedSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      try {
+        setAllBlockedSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[AgendaPage] Subscription error (allBlockedSchedules):', error);
     });
 
     return () => {
@@ -325,17 +388,17 @@ export default function AgendaPage() {
     if (!user) return;
     try {
       await deleteDoc(doc(db, 'blocked_schedules', id));
-      toast.success('Bloqueio removido.');
+      notify.success('Bloqueio removido.');
     } catch {
-      toast.error('Não foi possível remover o bloqueio.');
+      notify.error('Não foi possível remover o bloqueio.');
     }
   };
 
   // Smart Suggestions
   const recommendedSlots = React.useMemo(() => {
-    if (!manualService || !manualDate || !profile?.workingHours) return { bestSlot: null, otherSlots: [] };
+    if (!manualService || !manualDate || !profile?.workingHours) return { bestSlot: null, otherSlots: [], intelligentFits: [] };
     const selectedSvc = services.find(s => s.id === manualService);
-    const duration = selectedSvc?.duration || 60;
+    const duration = Number(selectedSvc?.duration) || 60;
     
     // Use the custom helper for Phase 2 (Ranking)
     return getAvailableSlots({
@@ -349,19 +412,19 @@ export default function AgendaPage() {
 
   const handleApplyFit = (fit: IntelligentFit) => {
     if (fit.type === 'adjustment' && fit.adjustment) {
-      toast.info(
+      notify.info(
         `Oportunidade Nera: Mova ${fit.adjustment.clientName} das ${fit.adjustment.originalTime} para as ${fit.adjustment.newTime}. Isso liberará as ${fit.time} para este novo atendimento.`,
         { duration: 8000 }
       );
     } else {
       setManualTime(fit.time);
-      toast.success('Horário de encaixe selecionado!');
+      notify.success('Horário de encaixe selecionado!');
     }
   };
 
   const handleCreateManual = async () => {
     if (!user || !manualClient || !manualDate || !manualTime) {
-      toast.error('Preencha nome da cliente, data e horário.');
+      notify.error('Preencha nome da cliente, data e horário.');
       return;
     }
     setIsCreating(true);
@@ -373,7 +436,7 @@ export default function AgendaPage() {
         clientWhatsapp: cleanWhatsapp(manualPhone),
         serviceId: manualService || 'manual',
         serviceName: selectedSvc?.name || manualService || 'Atendimento Manual',
-        duration: selectedSvc?.duration || 60,
+        duration: Number(selectedSvc?.duration) || 60,
         price: Number(manualPrice) || selectedSvc?.price || 0,
         travelFee: 0,
         totalPrice: Number(manualPrice) || selectedSvc?.price || 0,
@@ -382,12 +445,12 @@ export default function AgendaPage() {
         locationType: 'studio',
         notes: 'Agendamento criado manualmente'
       });
-      toast.success(`Agendamento de ${manualClient} criado para ${manualTime}.`);
+      notify.success(`Agendamento de ${manualClient} criado para ${manualTime}.`);
       setManualClient(''); setManualPhone(''); setManualService('');
       setManualPrice(''); setManualTime('');
       setIsManualModalOpen(false);
     } catch {
-      toast.error('Não foi possível criar o agendamento.');
+      notify.error('Não foi possível criar o agendamento.');
     } finally {
       setIsCreating(false);
     }
@@ -397,8 +460,21 @@ export default function AgendaPage() {
     if (!user) return;
     setLoading(app.id);
     try {
-      await updateAppointmentStatus(app.id, 'completed');
-      const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const idToken = await user.getIdToken();
+      const res = await fetch(`/api/appointments/${app.id}/complete`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ao concluir (${res.status})`);
+      }
+
+      const token = Array.from(window.crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
       await addDoc(collection(db, 'review_requests'), {
         bookingId: app.id,
         professionalId: user.uid,
@@ -408,14 +484,20 @@ export default function AgendaPage() {
         status: 'pending',
         createdAt: new Date().toISOString()
       });
-      toast.success('Experiência finalizada! Link de feedback pronto para envio.');
+      
+      notify.success('Experiência finalizada! Redirecionando para envio de convite de avaliação.');
       const reviewLink = `${window.location.origin}/review/${token}`;
       try {
         await navigator.clipboard.writeText(reviewLink);
-        toast.success('Link de avaliação copiado!');
+        notify.success('Link de avaliação copiado para área de transferência!');
       } catch {
-        toast.success('Avaliação registrada!');
+        // Ignorar erro do clipboard
       }
+      
+      const text = `Oi, ${app.clientName} 🤎\nObrigada pela visita de hoje.\nSe puder, deixe sua avaliação por aqui:\n${reviewLink}`;
+      window.open(`https://wa.me/55${cleanWhatsapp(app.clientWhatsapp)}?text=${encodeURIComponent(text)}`, '_blank');
+      setIsDetailsOpen(false);
+
     } catch (err) {
       handleBookingError(err);
     } finally {
@@ -424,28 +506,73 @@ export default function AgendaPage() {
   };
 
   const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled_by_professional', appointment?: any) => {
+    if (loading === id) return;
+    
+    if (!user?.uid) {
+      notify.error("Sessão expirada. Entre novamente.");
+      return;
+    }
+    
     setLoading(id);
-    console.log(`[CONFIRM APPOINTMENT] initiating handleRespond for ${id} in AgendaPage`);
+    
+    // Optimistic Update immediately
+    setOptimisticUpdates(prev => ({ ...prev, [id]: decision }));
     
     try {
+      const token = await user.getIdToken(true);
+      
       if (decision === 'confirmed') {
-        if (!user?.uid) {
-          console.error("[AGENDA CONFIRM] No user UID available");
-          toast.error("Sessão expirada. Entre novamente.");
-          return;
+        const res = await fetch(`/api/appointments/${id}/confirm`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ professionalId: user.uid })
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Erro ao confirmar (${res.status})`);
         }
-        await confirmAppointmentAtomic(id, user.uid);
-        toast.success('Reserva confirmada!');
+        notify.success('Reserva confirmada!');
       } else {
         if (appointment?.status === 'confirmed') {
-          await cancelConfirmedAppointmentAtomic(id, user?.uid || '');
+          const res = await fetch(`/api/appointments/${id}/cancel-by-professional`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            }
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Erro ao cancelar (${res.status})`);
+          }
         } else {
-          await declineAppointmentAtomic(id, user?.uid || '');
+          const res = await fetch(`/api/appointments/${id}/decline`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${token}`,
+              "Content-Type": "application/json"
+            }
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `Erro ao recusar (${res.status})`);
+          }
         }
-        toast.success('Reserva cancelada.');
+        notify.success('Reserva marcada como indisponível.');
       }
     } catch (err: any) {
-      handleBookingError(err);
+      // Revert optimistic update
+      setOptimisticUpdates(prev => {
+        const reset = { ...prev };
+        delete reset[id];
+        return reset;
+      });
+      console.error("[AGENDA FLOW ERROR]", err);
+      notify.error(err, 'Não foi possível concluir. Tente novamente.');
     } finally {
       setLoading(null);
     }
@@ -455,7 +582,7 @@ export default function AgendaPage() {
     if (!user) return;
     setNotifyingWaitlist(time);
     try {
-      toast.info(`Buscando clientes para as ${time}...`, {
+      notify.info(`Buscando clientes para as ${time}...`, {
         description: 'Notificando prioritários compatíveis.'
       });
     } finally {
@@ -463,33 +590,43 @@ export default function AgendaPage() {
     }
   };
 
-  const confirmedAppts = appointments.filter(a => ['confirmed', 'completed'].includes(a.status));
-  const pendingRequests = appointments.filter(a => a.status === 'pending');
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, string>>({});
+
+  const displayedAppointments = React.useMemo(() => {
+    return appointments.map(app => {
+      if (optimisticUpdates[app.id]) {
+        return { ...app, status: optimisticUpdates[app.id] as any };
+      }
+      return app;
+    });
+  }, [appointments, optimisticUpdates]);
+
+  const confirmedAppts = displayedAppointments.filter(a => isConfirmedLikeStatus(a.status) || isCompletedStatus(a.status));
+  const pendingRequests = displayedAppointments.filter(a => isPendingStatus(a.status));
 
   // Mapped Timeline items
   const timelineItems = React.useMemo(() => {
     const items: any[] = [];
-    const blockingStatuses = ['confirmed', 'accepted', 'completed', 'pending_conflict', 'pending', 'pending_confirmation'];
     
     // Calculate slots with multiple confirmed/pending appointments
     const counts: Record<string, number> = {};
-    appointments.forEach(a => {
-      if (blockingStatuses.includes(a.status)) {
+    displayedAppointments.forEach(a => {
+      if (isActiveSlotStatus(a.status)) {
         counts[a.time] = (counts[a.time] || 0) + 1;
       }
     });
 
     // Add appointments
-    appointments.forEach(app => {
+    displayedAppointments.forEach(app => {
       // Don't show cancelled or rejected here to keep timeline clean
-      if (['cancelled_by_client', 'cancelled_by_professional', 'rejected', 'expired'].includes(app.status)) return;
+      if (isInactiveStatus(app.status)) return;
 
       items.push({
         type: 'appointment',
         time: app.time,
         data: app,
         status: app.status,
-        hasConflict: (counts[app.time] > 1 && blockingStatuses.includes(app.status)) || app.status === 'pending_conflict'
+        hasConflict: (counts[app.time] > 1 && isActiveSlotStatus(app.status)) || app.status === 'pending_conflict'
       });
     });
 
@@ -508,7 +645,7 @@ export default function AgendaPage() {
     openSlots.forEach(slot => {
       // Filter out slots that already have an appointment or a block starting exactly at this time
       // Regra crítica: se houver QUALQUER appointment bloqueante, remove o slot livre.
-      const hasStrictMeeting = appointments.some(a => a.time === slot && blockingStatuses.includes(a.status));
+      const hasStrictMeeting = displayedAppointments.some(a => a.time === slot && isActiveSlotStatus(a.status));
       const hasStrictBlock = blockedSchedules.some(b => b.startTime === slot);
       
       if (!hasStrictMeeting && !hasStrictBlock) {
@@ -520,7 +657,7 @@ export default function AgendaPage() {
     });
 
     return items.sort((a, b) => a.time.localeCompare(b.time));
-  }, [appointments, blockedSchedules, openSlots]);
+  }, [displayedAppointments, blockedSchedules, openSlots]);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -545,8 +682,16 @@ export default function AgendaPage() {
     }
   };
 
+  if (isInitialLoading) {
+    return <AgendaSkeleton />;
+  }
+
   return (
     <AppLayout activeRoute="agenda">
+      <PageErrorBoundary 
+        title="Não foi possível carregar sua agenda agora." 
+        message="Sincronizar a agenda sofreu um breve desencontro. Recarregar costuma resolver."
+      >
       <FirstVisitTip 
         pageKey="agenda"
         title="Sua agenda visual"
@@ -598,6 +743,13 @@ export default function AgendaPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => user && exportAppointmentsCsv(user.uid)}
+              className="hidden md:flex px-4 py-2.5 bg-brand-white border border-brand-mist/50 rounded-xl text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm items-center justify-center mr-2"
+              title="Exportar meus agendamentos (últimos 12 meses)"
+            >
+              Exportar CSV
+            </button>
             <button 
               onClick={() => handleNavigate('prev')} 
               className="w-10 h-10 bg-brand-white border border-brand-mist/50 flex items-center justify-center rounded-2xl text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm"
@@ -683,7 +835,7 @@ export default function AgendaPage() {
             <WeekView 
               appointments={allAppointments}
               blockedSchedules={allBlockedSchedules}
-              workingHours={profile?.workingHours || {}}
+              workingHours={profile?.workingHours as any}
               weekStart={weekStart}
               selectedDate={selectedDate}
               onSelectAppointment={(appt) => { setSelectedAppointment(appt); setIsDetailsOpen(true); }}
@@ -757,16 +909,14 @@ export default function AgendaPage() {
                 >
                   <Share2 size={12} /> Divulgar agenda
                 </button>
-                <button 
-                   onClick={() => {
-                     if (checkFeatureAccess('waitlist')) {
-                       setIsWaitlistOpen(true);
-                     }
-                   }}
-                   className="flex-1 py-3 bg-brand-white border border-brand-mist text-brand-stone rounded-xl text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2"
-                >
-                  <Users size={12} /> Ver espera
-                </button>
+                {features.waitlist && (
+                  <button 
+                     onClick={() => setIsWaitlistOpen(true)}
+                     className="flex-1 py-3 bg-brand-white border border-brand-mist text-brand-stone rounded-xl text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                  >
+                    <Users size={12} /> Ver espera
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -857,7 +1007,7 @@ export default function AgendaPage() {
         selectedDate={selectedDate}
         professionalId={user?.uid || ''}
         appointments={appointments}
-        workingHours={profile?.workingHours || {}}
+        workingHours={profile?.workingHours as any}
         initialStartTime={blockStartTime}
         initialEndTime={blockEndTime}
       />
@@ -1051,13 +1201,13 @@ export default function AgendaPage() {
                         )}
 
                         {/* --- INTELLIGENT FITS SECTION --- */}
-                        {recommendedSlots.intelligentFits.filter(f => f.type === 'adjustment' || (f.type === 'direct' && f.time !== recommendedSlots.bestSlot?.time)).length > 0 && (
+                        {(recommendedSlots.intelligentFits || []).filter(f => f.type === 'adjustment' || (f.type === 'direct' && f.time !== recommendedSlots.bestSlot?.time)).length > 0 && (
                           <div className="pt-4 border-t border-brand-mist/20">
                             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-4 flex items-center gap-2">
                               <Sparkles size={12} className="text-brand-terracotta" /> Oportunidades de Encaixe
                             </p>
                             <div className="space-y-3">
-                              {recommendedSlots.intelligentFits.filter(f => f.type === 'adjustment' || (f.type === 'direct' && f.time !== recommendedSlots.bestSlot?.time)).map((fit, idx) => (
+                              {(recommendedSlots.intelligentFits || []).filter(f => f.type === 'adjustment' || (f.type === 'direct' && f.time !== recommendedSlots.bestSlot?.time)).map((fit, idx) => (
                                 <button
                                   key={idx}
                                   onClick={() => handleApplyFit(fit)}
@@ -1149,15 +1299,15 @@ export default function AgendaPage() {
                   <div className="flex items-center gap-2">
                     <span className={cn(
                       "px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest",
-                      selectedAppointment.status === 'confirmed' ? "bg-green-100 text-green-700" :
-                      selectedAppointment.status === 'pending' ? "bg-orange-100 text-orange-700 animate-pulse" :
-                      selectedAppointment.status === 'completed' ? "bg-brand-linen text-brand-ink" :
+                      isConfirmedLikeStatus(selectedAppointment.status) ? "bg-green-100 text-green-700" :
+                      isPendingStatus(selectedAppointment.status) ? "bg-orange-100 text-orange-700 animate-pulse" :
+                      isCompletedStatus(selectedAppointment.status) ? "bg-brand-linen text-brand-ink" :
                       "bg-brand-mist/20 text-brand-stone"
                     )}>
-                      {selectedAppointment.status === 'confirmed' ? 'Confirmado' :
-                       selectedAppointment.status === 'pending' ? 'Pendente' :
+                      {isConfirmedLikeStatus(selectedAppointment.status) ? 'Confirmado' :
+                       isPendingStatus(selectedAppointment.status) && selectedAppointment.status !== 'pending_confirmation' ? 'Pendente' :
                        selectedAppointment.status === 'pending_confirmation' ? 'Aguardando Cliente' :
-                       selectedAppointment.status === 'completed' ? 'Concluído' :
+                       isCompletedStatus(selectedAppointment.status) ? 'Concluído' :
                        selectedAppointment.status}
                     </span>
                     {selectedAppointment.clientConfirmed24h && (
@@ -1314,26 +1464,37 @@ export default function AgendaPage() {
                     onClick={async () => {
                       const url = `${window.location.origin}/r/${selectedAppointment.token || selectedAppointment.manageSlug}`;
                       await navigator.clipboard.writeText(url);
-                      toast.success('Link de gerenciamento copiado!');
+                      notify.success('Link de gerenciamento copiado!');
                     }}
                     className="w-full py-4 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen rounded-2xl transition-all border border-brand-mist flex items-center justify-center gap-2"
                   >
                      Copiar Link da Cliente
                   </button>
 
-                  {selectedAppointment.status !== 'completed' && (
+                  {isConfirmedLikeStatus(selectedAppointment.status) && (
+                    <PremiumButton 
+                      variant="primary"
+                      className="w-full py-4 mt-4"
+                      onClick={() => handleComplete(selectedAppointment)}
+                      disabled={loading === selectedAppointment.id}
+                    >
+                      {loading === selectedAppointment.id ? 'Finalizando...' : 'Finalizar Atendimento'}
+                    </PremiumButton>
+                  )}
+
+                  {!isCompletedStatus(selectedAppointment.status) && (
                     <button 
                       onClick={() => {
                         handleRespond(selectedAppointment.id, 'cancelled_by_professional', selectedAppointment);
                         setIsDetailsOpen(false);
                       }}
-                      className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-rose hover:bg-brand-rose/5 rounded-xl transition-all"
+                      className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-rose hover:bg-brand-rose/5 rounded-xl transition-all mt-3"
                     >
                       {selectedAppointment.status === 'pending' ? 'Recusar Pedido' : 'Cancelar Atendimento'}
                     </button>
                   )}
 
-                  {selectedAppointment.status === 'confirmed' && (() => {
+                  {isConfirmedLikeStatus(selectedAppointment.status) && (() => {
                     const [h, m] = selectedAppointment.time.split(':').map(Number);
                     const apptDate = new Date(selectedAppointment.date + 'T00:00:00');
                     const apptTime = new Date(apptDate);
@@ -1345,15 +1506,18 @@ export default function AgendaPage() {
                         onClick={async () => {
                           setLoading(selectedAppointment.id);
                           try {
-                            await updateDoc(doc(db, 'appointments', selectedAppointment.id), {
+                            const updatePayload = {
                               noShow: true,
-                              status: 'cancelled_by_professional', // or maintain confirmed but with noShow flag
+                              status: 'cancelled_by_professional' as const, // or maintain confirmed but with noShow flag
                               updatedAt: serverTimestamp()
-                            });
-                            toast.success('Cliente marcado como No-Show. Isso ficará registrado no histórico.');
+                            };
+                            const safeUpdate = sanitizeAppointment(updatePayload, true);
+                            await updateDoc(doc(db, 'appointments', selectedAppointment.id), safeUpdate);
+                            setAppointments(prev => prev.filter(a => a.id !== selectedAppointment.id));
+                            notify.success('Cliente marcado como No-Show. Isso ficará registrado no histórico.');
                             setIsDetailsOpen(false);
                           } catch (err) {
-                            toast.error('Erro ao marcar no-show.');
+                            notify.error('Erro ao marcar no-show.');
                           } finally {
                             setLoading(null);
                           }
@@ -1377,6 +1541,7 @@ export default function AgendaPage() {
         feature={upgradeFeature}
         count={usageCount}
       />
+      </PageErrorBoundary>
     </AppLayout>
   );
 }

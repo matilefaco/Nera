@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../AuthContext';
-import { db, confirmAppointmentAtomic, declineAppointmentAtomic, handleBookingError, checkAndExpireAppointments } from '../firebase';
+import { db, handleBookingError, checkAndExpireAppointments } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 import { 
   Calendar, Clock, Users, LogOut, 
@@ -14,13 +14,14 @@ import {
   ExternalLink, MoreHorizontal
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/utils';
 import { getClientScore } from '../lib/clientUtils';
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { Zap } from 'lucide-react';
+import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
@@ -37,6 +38,8 @@ export default function PendingRequestsPage() {
   const [isConfirmRejectOpen, setIsConfirmRejectOpen] = useState(false);
   const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
 
+  const [handledIds, setHandledIds] = useState<string[]>([]);
+
   const { isSubscribed, isSupported, requestPermission } = usePushNotifications();
   const [isPushLoading, setIsPushLoading] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
@@ -48,7 +51,7 @@ export default function PendingRequestsPage() {
       setIsPushLoading(true);
       const success = await requestPermission();
       if (success) {
-        toast.success('Notificações ativadas!');
+        notify.success('Notificações ativadas!');
       }
     } catch (error) {
       console.error(error);
@@ -102,9 +105,13 @@ export default function PendingRequestsPage() {
     );
 
     const unsubscribe = onSnapshot(qPending, (snapshot) => {
-      const incomingDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      setTruePending(incomingDocs);
-      setLoading(false);
+      try {
+        const incomingDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+setTruePending(incomingDocs);
+setLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
     }, (error) => {
       console.error('[PendingRequests] Subscription error:', error);
       setLoading(false);
@@ -118,8 +125,14 @@ export default function PendingRequestsPage() {
     );
 
     const unsubAll = onSnapshot(qAll, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      setAllAppointments(docs);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+setAllAppointments(docs);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[PendingRequests] Subscription error (qAll):', error);
     });
 
     return () => {
@@ -136,9 +149,9 @@ export default function PendingRequestsPage() {
       const heldItem = confirmedId ? prev.find(p => p.id === confirmedId) : null;
       
       const currentIds = new Set(truePending.map(d => d.id));
-      const finalDocs = [...truePending];
+      const finalDocs = [...truePending].filter(req => req.id === confirmedId || !handledIds.includes(req.id));
 
-      if (heldItem && !currentIds.has(heldItem.id)) {
+      if (heldItem && !currentIds.has(heldItem.id) && (heldItem.id === confirmedId || !handledIds.includes(heldItem.id))) {
         finalDocs.push(heldItem);
       }
 
@@ -149,7 +162,7 @@ export default function PendingRequestsPage() {
         return (a.time || "").localeCompare(b.time || "");
       });
     });
-  }, [truePending, confirmedId]);
+  }, [truePending, confirmedId, handledIds]);
 
   // Internal notification listener for waitlist alerts
   useEffect(() => {
@@ -167,7 +180,7 @@ export default function PendingRequestsPage() {
         window.history.replaceState({}, '', window.location.pathname);
 
         if (action === 'confirm') {
-          handleRespond(id, 'confirmed', target);
+          handleRespond(id, APPOINTMENT_STATUS.CONFIRMED, target);
         } else if (action === 'reject') {
           setRequestToReject(target);
           setIsConfirmRejectOpen(true);
@@ -179,57 +192,79 @@ export default function PendingRequestsPage() {
     }
   }, [loading, localRequests]);
 
-  const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled_by_professional', appointment?: any) => {
-    setProcessingId(id);
-    console.log(`[CONFIRM APPOINTMENT] initiating handleRespond for ${id} in PendingRequestsPage`);
+  const handleRespond = async (id: string, decision: typeof APPOINTMENT_STATUS.CONFIRMED | typeof APPOINTMENT_STATUS.CANCELLED_BY_PROFESSIONAL, appointment?: any) => {
+    if (processingId === id) return;
     
-    if (appointment) {
-      console.log(`[CONFIRM PRECHECK]`, {
-        appointmentId: id,
-        professionalId: appointment.professionalId,
-        serviceId: appointment.serviceId,
-        date: appointment.date || appointment.appointmentDate || appointment.selectedDate || appointment.scheduledDate,
-        time: appointment.time || appointment.appointmentTime || appointment.selectedTime || appointment.startTime,
-        status: appointment.status,
-        clientName: appointment.clientName
-      });
+    if (!user?.uid) {
+      notify.error("Sessão expirada. Entre novamente.");
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+
+    setProcessingId(id);
+
+    // Optimistic Update immediately
+    if (decision === APPOINTMENT_STATUS.CONFIRMED) {
+      setConfirmedId(id);
+      setHandledIds(prev => [...prev, id]);
+    } else {
+      setHandledIds(prev => [...prev, id]);
+      setIsConfirmRejectOpen(false);
+      setRequestToReject(null);
     }
 
     try {
-      if (decision === 'confirmed') {
-        if (!user?.uid) {
-          console.error("[PENDING CONFIRM] No user UID available");
-          toast.error("Sessão expirada. Entre novamente.");
-          setTimeout(() => navigate('/login'), 2000);
-          return;
+      const token = await user.getIdToken(true);
+      
+      if (decision === APPOINTMENT_STATUS.CONFIRMED) {
+        const res = await fetch(`/api/appointments/${id}/confirm`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ professionalId: user.uid })
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Erro ao confirmar (${res.status})`);
         }
-        await confirmAppointmentAtomic(id, user.uid);
-        setConfirmedId(id);
-        console.log(`[CONFIRM FLOW] SUCCESS: Booking ${id} confirmed.`);
-        toast.success(`Reserva confirmada! ID: ${id}`);
+        
+        notify.success(`Reserva confirmada! ID: ${id}`);
         // Transition to WhatsApp CTA after the check animation
         setTimeout(() => {
           setWhatsappCtaId(id);
         }, 1200);
       } else {
-        await declineAppointmentAtomic(id, user?.uid || '');
-        toast.success('Reserva marcada como indisponível.');
-        setIsConfirmRejectOpen(false);
-        setRequestToReject(null);
+        const res = await fetch(`/api/appointments/${id}/decline`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!res.ok) {
+           const errData = await res.json().catch(() => ({}));
+           throw new Error(errData.error || `Erro ao recusar (${res.status})`);
+        }
+        
+        notify.success('Reserva marcada como indisponível.');
       }
       
       if (selectedRequest?.id === id) {
         setIsModalOpen(false);
       }
     } catch (error: any) {
-      console.error(`[CONFIRM ERROR RAW]`, {
-        message: error.message,
-        appointmentId: id,
-        stack: error.stack
-      });
-      handleBookingError(error);
-      setConfirmedId(null);
-      setWhatsappCtaId(null);
+      // Revert optimistic
+      setHandledIds(prev => prev.filter(hid => hid !== id));
+      if (decision === APPOINTMENT_STATUS.CONFIRMED) {
+        setConfirmedId(null);
+        setWhatsappCtaId(null);
+      }
+      console.error("[PENDING FLOW ERROR]", error);
+      notify.error(error.message || 'Não foi possível concluir. Tente novamente.');
     } finally {
       setProcessingId(null);
     }
@@ -444,7 +479,7 @@ export default function PendingRequestsPage() {
                     <div className="flex flex-col gap-3 mt-auto pt-4">
                       <div className="flex gap-3">
                         <button 
-                          onClick={() => handleRespond(request.id, 'confirmed', request)}
+                          onClick={() => handleRespond(request.id, APPOINTMENT_STATUS.CONFIRMED, request)}
                           disabled={!!processingId}
                           className="flex-[3] py-5 bg-brand-ink text-brand-white rounded-[24px] text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                         >
@@ -627,7 +662,7 @@ export default function PendingRequestsPage() {
                                         )}
                                         <button 
                                           onClick={() => {
-                                            const addr = `${selectedRequest.address.street}, ${selectedRequest.address.number}, ${selectedRequest.address.neighborhood}, ${selectedRequest.address.city}`;
+                                            const addr = `${(selectedRequest.address as any).street}, ${(selectedRequest.address as any).number}, ${(selectedRequest.address as any).neighborhood}, ${(selectedRequest.address as any).city}`;
                                             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
                                           }}
                                           className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
@@ -642,7 +677,7 @@ export default function PendingRequestsPage() {
                                         {(selectedRequest.address || selectedRequest.neighborhood) && (
                                           <button 
                                             onClick={() => {
-                                              const addr = selectedRequest.address || selectedRequest.neighborhood;
+                                              const addr = (selectedRequest.address as any) || selectedRequest.neighborhood;
                                               window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
                                             }}
                                             className="mt-4 flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
@@ -725,7 +760,7 @@ export default function PendingRequestsPage() {
 
                 <div className="mt-16 pt-10 border-t border-brand-mist/60 flex flex-col sm:flex-row gap-5">
                   <button 
-                    onClick={() => handleRespond(selectedRequest.id, 'confirmed', selectedRequest)}
+                    onClick={() => handleRespond(selectedRequest.id, APPOINTMENT_STATUS.CONFIRMED, selectedRequest)}
                     disabled={!!processingId}
                     className="flex-[2] py-6 bg-brand-ink text-brand-white rounded-full text-[12px] font-bold uppercase tracking-[0.2em] hover:bg-brand-espresso transition-all shadow-2xl shadow-brand-ink/20 disabled:opacity-50 flex items-center justify-center gap-3 active:scale-95"
                   >
@@ -781,7 +816,7 @@ export default function PendingRequestsPage() {
               </p>
               <div className="flex flex-col gap-3">
                 <button 
-                  onClick={() => handleRespond(requestToReject.id, 'cancelled_by_professional', requestToReject)}
+                  onClick={() => handleRespond(requestToReject.id, APPOINTMENT_STATUS.CANCELLED_BY_PROFESSIONAL, requestToReject)}
                   disabled={!!processingId}
                   className="w-full py-5 bg-brand-terracotta text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg shadow-brand-terracotta/20"
                 >

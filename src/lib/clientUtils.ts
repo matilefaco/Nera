@@ -1,4 +1,5 @@
 import { Appointment } from '../types';
+import { isCompletedStatus, isCancelledStatus } from '../constants/appointmentStatus';
 
 export function getClientScore(appointments: Appointment[], whatsapp: string) {
   const cleanWhatsapp = whatsapp.replace(/\D/g, '');
@@ -9,9 +10,9 @@ export function getClientScore(appointments: Appointment[], whatsapp: string) {
     return apptWhatsapp === cleanWhatsapp;
   });
   
-  const completed = clientAppts.filter(a => a.status === 'completed').length;
+  const completed = clientAppts.filter(a => isCompletedStatus(a.status)).length;
   const noShow = clientAppts.filter(a => 
-    a.status === 'cancelled' && 
+    isCancelledStatus(a.status) && 
     a.cancellationReason?.toLowerCase().includes('no-show')
   ).length;
   

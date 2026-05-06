@@ -26,7 +26,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
               ))}
             </div>
             <span className="text-[11px] font-bold uppercase tracking-widest text-brand-stone opacity-60">
-              {stats?.totalReviews || reviews.length} avaliações
+              {Math.max(stats?.totalReviews || 0, reviews.length)} avaliações
             </span>
           </div>
         </div>
@@ -78,10 +78,12 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
                 <div className="text-[13px] font-semibold text-brand-ink">
                   {review.publicDisplayMode === 'named' ? (review.firstName || 'Cliente Nera') : 'Cliente Nera'}
                 </div>
-                <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-50">
-                  <MapPin size={8} />
-                  {review.neighborhood ? `${review.neighborhood}, São Paulo` : 'São Paulo'}
-                </div>
+                {(review.locationLabel || review.neighborhood) && (
+                  <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-50 mt-1">
+                    <MapPin size={8} />
+                    {review.locationLabel || review.neighborhood}
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, auth, confirmAppointmentAtomic, declineAppointmentAtomic, handleBookingError, inviteFromWaitlist, updateAppointmentStatus } from '../firebase';
+import { db, auth, handleBookingError, inviteFromWaitlist, updateAppointmentStatus } from '../firebase';
 import { 
   collection, query, where, onSnapshot, orderBy, doc, updateDoc, 
   addDoc, deleteDoc, serverTimestamp, limit 
@@ -14,15 +14,16 @@ import {
   AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { 
   formatCurrency, getTodayLocale, buildWhatsappLink, 
-  generateWaitlistInviteMessage, cn, formatDateKey, parseLocalDate 
+  generateWaitlistInviteMessage, cn, formatDateKey, parseLocalDate, cleanWhatsapp
 } from '../lib/utils';
 import { getClientScore } from '../lib/clientUtils';
 import HelpTooltip from '../components/HelpTooltip';
 import Logo from '../components/Logo';
 import { Appointment, WaitlistEntry, BlockedSchedule, AnalyticsEvent, Service, WhatsAppLog } from '../types';
+import { isRevenueStatus, isPendingStatus, isCompletedStatus, isConfirmedLikeStatus } from '../constants/appointmentStatus';
 import { AnimatePresence } from 'motion/react';
 import AppLayout from '../components/AppLayout';
 import { ActivationChecklist } from '../components/ActivationChecklist';
@@ -33,9 +34,13 @@ import UpgradeModal from '../components/UpgradeModal';
 import PremiumButton from '../components/PremiumButton';
 import WeeklyRevenueSummary from '../components/WeeklyRevenueSummary';
 import InstallPrompt from '../components/InstallPrompt';
+import { usePendingAppointments } from '../contexts/PendingAppointmentsContext';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { getAvailableSlots, getDayAvailability } from '../lib/bookingUtils';
+import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { FirstVisitTip } from '../components/FirstVisitTip';
+import { DashboardSkeleton } from '../components/ui/DashboardSkeleton';
+import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
 
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
@@ -80,13 +85,35 @@ export default function Dashboard() {
 
   const [confirmedToday, setConfirmedToday] = useState<Appointment[]>([]);
   const [dailyRevenue, setDailyRevenue] = useState(0);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [pendingRequests, setPendingRequests] = useState<Appointment[]>([]);
+  const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, string>>({});
+
+  const { pendingAppointments: pendingRequests, pendingCount: contextPendingCount } = usePendingAppointments();
   const [selectedRequest, setSelectedRequest] = useState<Appointment | null>(null);
-  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
-  const [prevMonthlyRevenue, setPrevMonthlyRevenue] = useState(0);
-  const [returningThisWeek, setReturningThisWeek] = useState(0);
-  const [totalClientsCount, setTotalClientsCount] = useState(0);
+
+  const displayedPending = useMemo(() => {
+    return pendingRequests.filter(req => !optimisticUpdates[req.id]);
+  }, [pendingRequests, optimisticUpdates]);
+  const pendingCount = displayedPending.length;
+
+  const displayedConfirmedToday = useMemo(() => {
+    const today = getTodayLocale();
+    const confirmed = [...confirmedToday];
+    
+    // Add pending requests that were optimistically confirmed today
+    pendingRequests.forEach(req => {
+      if (optimisticUpdates[req.id] === 'confirmed' && req.date === today && !confirmed.find(c => c.id === req.id)) {
+        confirmed.push({ ...req, status: 'confirmed' });
+      }
+    });
+    
+    // Remove if optimistically cancelled
+    return confirmed.filter(req => optimisticUpdates[req.id] !== 'cancelled_by_professional').sort((a,b) => a.time.localeCompare(b.time));
+  }, [confirmedToday, pendingRequests, optimisticUpdates]);
+
+  const displayedDailyRevenue = useMemo(() => {
+    return displayedConfirmedToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0);
+  }, [displayedConfirmedToday]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [confirmedId, setConfirmedId] = useState<string | null>(null);
@@ -94,6 +121,7 @@ export default function Dashboard() {
   const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
@@ -109,6 +137,17 @@ export default function Dashboard() {
   const [blockedSchedules, setBlockedSchedules] = useState<BlockedSchedule[]>([]);
   const [referralLink, setReferralLink] = useState('');
   const [analyticsEvents, setAnalyticsEvents] = useState<AnalyticsEvent[]>([]);
+  const {
+    confirmedAppointments,
+    totalClientsCount,
+    monthlyRevenue,
+    prevMonthlyRevenue,
+    returningThisWeek,
+    monthlyStats,
+    servicesByMonth,
+    daysSinceLastAppointment,
+    growthMetrics
+  } = useDashboardMetrics(appointments, analyticsEvents);
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -125,8 +164,14 @@ export default function Dashboard() {
     );
 
     const unsubAlerts = onSnapshot(qAlerts, (snap) => {
-      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setAlerts(docs);
+      try {
+        const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+setAlerts(docs);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[Dashboard] Subscription error on qAlerts:', error);
     });
 
     return () => unsubAlerts();
@@ -153,173 +198,27 @@ export default function Dashboard() {
     );
 
     const unsubAnalytics = onSnapshot(qAnalytics, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
-      setAnalyticsEvents(docs);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
+setAnalyticsEvents(docs);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[Dashboard] Subscription error on qAnalytics:', error);
     });
 
     return () => unsubAnalytics();
   }, [user]);
 
-  const growthMetrics = useMemo(() => {
-    if (analyticsEvents.length === 0 && appointments.length === 0) return null;
 
-    const now = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(now.getDate() - 7);
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(now.getDate() - 30);
 
-    const visits30d = analyticsEvents.filter(e => e.type === 'visit' && e.timestamp?.toDate() > thirtyDaysAgo).length;
-    const visits7d = analyticsEvents.filter(e => e.type === 'visit' && e.timestamp?.toDate() > sevenDaysAgo).length;
-    const clicksBook = analyticsEvents.filter(e => e.type === 'click_book' && e.timestamp?.toDate() > thirtyDaysAgo).length;
-    
-    // 3. MÉTRICAS DE CRESCIMENTO: contando apenas status válidos (confirmados, concluídos ou aceitos) conforme solicitado
-    const appointments30d = appointments.filter(a => 
-      new Date(a.date) > thirtyDaysAgo && 
-      ['confirmed', 'completed', 'accepted'].includes(a.status)
-    ).length;
-    
-    // Conversion rate: appointments / visits
-    const convRate = visits30d > 0 ? (appointments30d / visits30d) * 100 : 0;
 
-    // Origin
-    const origins = analyticsEvents.reduce((acc: any, curr) => {
-      acc[curr.origin] = (acc[curr.origin] || 0) + 1;
-      return acc;
-    }, {});
-    const mainOrigin = Object.entries(origins).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || 'Direto';
 
-    // Best service (Current month performance)
-    const currentMonthForTop = now.getMonth();
-    const currentYearForTop = now.getFullYear();
-    const monthlyAppsForTop = appointments.filter(a => {
-      if (!a.date) return false;
-      const d = new Date(a.date + 'T12:00:00');
-      return d.getMonth() === currentMonthForTop && 
-             d.getFullYear() === currentYearForTop && 
-             ['confirmed', 'completed', 'accepted'].includes(a.status);
-    });
-
-    const services = monthlyAppsForTop.reduce((acc: any, curr) => {
-      acc[curr.serviceName] = (acc[curr.serviceName] || 0) + 1;
-      return acc;
-    }, {});
-    const topService = Object.entries(services).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || '-';
-
-    // Best time
-    const times = appointments.reduce((acc: any, curr) => {
-      const hour = curr.time.split(':')[0] + ':00';
-      acc[hour] = (acc[hour] || 0) + 1;
-      return acc;
-    }, {});
-    const bestTime = Object.entries(times).sort((a: any, b: any) => b[1] - a[1])[0]?.[0] || '-';
-
-    // Weakest day
-    const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-    const dayCounts = appointments.reduce((acc: any, curr) => {
-      const day = new Date(curr.date).getDay();
-      acc[day] = (acc[day] || 0) + 1;
-      return acc;
-    }, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }); // Skip Sunday if needed, but here 1-6 are common
-    
-    const weakestDayIndex = Object.entries(dayCounts).sort((a: any, b: any) => a[1] - b[1])[0]?.[0];
-    const weakestDay = weakestDayIndex ? dayNames[parseInt(weakestDayIndex)] : '-';
-
-    const growthInsight = convRate > 5 
-      ? "Sua conversão está acima da média! Tente aumentar sua vitrine com mais fotos para converter ainda mais."
-      : "Seu volume de visitas é bom, mas a conversão pode melhorar. Ajuste os nomes dos seus serviços para torná-los mais atraentes.";
-
-    return {
-      visits7d,
-      visits30d,
-      clicksBook,
-      convRate,
-      topService,
-      bestTime,
-      weakestDay,
-      growthInsight,
-      mainOrigin: mainOrigin === 'instagram' ? 'Instagram' : mainOrigin === 'direct' ? 'Direto' : 'Outros'
-    };
-  }, [analyticsEvents, appointments]);
-
-  const confirmedAppointments = useMemo(() => 
-    appointments.filter(a => a.status === 'confirmed'),
-    [appointments]
-  );
-
-  const monthlyStats = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    
-    const monthlyApps = appointments.filter(a => {
-      if (!a.date) return false;
-      const d = new Date(a.date + 'T12:00:00');
-      return d.getMonth() === currentMonth && 
-             d.getFullYear() === currentYear && 
-             (a.status === 'confirmed' || a.status === 'completed');
-    });
-
-    const clients = new Set(monthlyApps.map(a => 
-      a.clientWhatsapp?.replace(/\D/g, '') || a.clientEmail || a.clientName
-    ));
-
-    return {
-      count: monthlyApps.length,
-      clientsCount: clients.size
-    };
-  }, [appointments]);
-
-  const servicesByMonth = useMemo(() => {
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-
-    const monthlyApps = appointments.filter(a => {
-      if (!a.date) return false;
-      const d = new Date(a.date + 'T12:00:00');
-      return d.getMonth() === currentMonth && 
-             d.getFullYear() === currentYear && 
-             ['confirmed', 'completed', 'accepted'].includes(a.status);
-    });
-
-    const statsMap: Record<string, { count: number, revenue: number }> = {};
-    
-    monthlyApps.forEach(appt => {
-      const name = appt.serviceName;
-      if (!statsMap[name]) {
-        statsMap[name] = { count: 0, revenue: 0 };
-      }
-      statsMap[name].count += 1;
-      statsMap[name].revenue += (appt.price || 0) + (appt.travelFee || 0);
-    });
-
-    return Object.entries(statsMap)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [appointments]);
-
-  const daysSinceLastAppointment = useMemo(() => {
-    const completedOrConfirmed = appointments
-      .filter(a => (a.status === 'confirmed' || a.status === 'completed') && a.date)
-      .sort((a, b) => b.date.localeCompare(a.date));
-
-    if (completedOrConfirmed.length === 0) return null;
-
-    const lastDate = new Date(completedOrConfirmed[0].date + 'T12:00:00');
-    const today = new Date();
-    today.setHours(12, 0, 0, 0);
-    
-    const diffTime = today.getTime() - lastDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    return diffDays >= 0 ? diffDays : null;
-  }, [appointments]);
 
   const getContextualTip = () => {
     if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
-    if (confirmedToday.length === 0) return 'Nenhuma reserva hoje. Que tal compartilhar seu link nos Stories para atrair clientes?';
+    if (displayedConfirmedToday.length === 0) return 'Nenhuma reserva hoje. Que tal compartilhar seu link nos Stories para atrair clientes?';
     
     const variations = [
       "Adicione novas fotos ao portfólio para mostrar a evolução do seu trabalho.",
@@ -349,27 +248,17 @@ export default function Dashboard() {
       orderBy('time', 'asc')
     );
 
-    // Query: All pending appointments
-    const qPending = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      where('status', '==', 'pending'),
-      orderBy('date', 'asc'),
-      orderBy('time', 'asc')
-    );
-
     const unsubToday = onSnapshot(qToday, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      // 1. RECEITA DIÁRIA: Incluindo tanto confirmados quanto já concluídos no faturamento e na lista de hoje
-      const relevantToday = docs.filter(a => a.status === 'confirmed' || a.status === 'completed');
-      setConfirmedToday(relevantToday);
-      setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0));
-    });
-
-    const unsubPending = onSnapshot(qPending, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      setPendingCount(docs.length);
-      setPendingRequests(docs);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+const relevantToday = docs.filter(a => isRevenueStatus(a.status));
+setConfirmedToday(relevantToday);
+setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0));
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[Dashboard] Subscription error on qToday:', error);
     });
 
     // Query: Unconfirmed for tomorrow
@@ -385,8 +274,14 @@ export default function Dashboard() {
     );
 
     const unsubUnconfirmed = onSnapshot(qUnconfirmed, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-      setUnconfirmedTomorrow(docs);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+setUnconfirmedTomorrow(docs);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[Dashboard] Subscription error on qUnconfirmed:', error);
     });
 
     // Query: All appointments to calculate metrics
@@ -398,60 +293,15 @@ export default function Dashboard() {
     );
 
     const unsubAll = onSnapshot(qAll, (snapshot) => {
-      const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-      setAppointments(appointmentsData);
-      
-      const clientMap = new Map();
-      const todayStr = getTodayLocale();
-
-      appointmentsData.forEach((app) => {
-        const key = app.clientWhatsapp?.replace(/\D/g, '') || app.clientEmail || app.clientName;
-        if (!clientMap.has(key)) {
-          clientMap.set(key, { lastDate: app.date });
-        }
-        const c = clientMap.get(key);
-        if (app.date > c.lastDate) c.lastDate = app.date;
-      });
-
-      setTotalClientsCount(clientMap.size);
-
-      // Faturamento Mensal & Retenção
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-      const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-      let mRevenue = 0;
-      let pRevenue = 0;
-      let retWeek = 0;
-
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      const nextWeekStr = nextWeek.toISOString().split('T')[0];
-
-      appointmentsData.forEach(app => {
-        if (app.status !== 'confirmed' && app.status !== 'completed') return;
-        
-        const appDate = new Date(app.date + 'T12:00:00');
-        const appMonth = appDate.getMonth();
-        const appYear = appDate.getFullYear();
-
-        if (appMonth === currentMonth && appYear === currentYear) {
-          mRevenue += (app.price || 0) + (app.travelFee || 0);
-        } else if (appMonth === prevMonth && appYear === prevMonthYear) {
-          pRevenue += (app.price || 0) + (app.travelFee || 0);
-        }
-
-        if (app.date >= todayStr && app.date <= nextWeekStr && app.status === 'confirmed') {
-          retWeek++;
-        }
-      });
-
-      setMonthlyRevenue(mRevenue);
-      setPrevMonthlyRevenue(pRevenue);
-      setReturningThisWeek(retWeek);
-    });
+      try {
+        const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+setAppointments(appointmentsData);
+// Metrics calculation moved to hook
+setIsInitialLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     // Sync Profile Settings
     if (profile) {
@@ -472,8 +322,14 @@ export default function Dashboard() {
     );
 
     const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
-      setWaitlist(docs);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
+setWaitlist(docs);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[Dashboard] Subscription error on qWaitlist:', error);
     });
 
     // Query: Blocked Schedules
@@ -482,14 +338,18 @@ export default function Dashboard() {
     const qBlocked = query(blockedRef, where('professionalId', '==', user.uid));
     
     const unsubBlocked = onSnapshot(qBlocked, (snap) => {
-      const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const todayBlocked = allBlocked.filter(b => {
-        const isToday = b.date === today;
-        const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-        return isToday || isRecurringToday;
-      });
-      setBlockedSchedules(todayBlocked);
-    });
+      try {
+        const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        const todayBlocked = allBlocked.filter(b => {
+            const isToday = b.date === today;
+            const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+            return isToday || isRecurringToday;
+        });
+        setBlockedSchedules(todayBlocked);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error('[Dashboard] Subscription error on qBlocked:', error); });
 
     // Query: Inactive clients from summaries
     const thirtyDaysAgo = new Date();
@@ -505,9 +365,15 @@ export default function Dashboard() {
     );
 
     const unsubInactive = onSnapshot(qInactive, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setInactiveClientsCount(docs.length);
-      setInactiveClients(docs);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+setInactiveClientsCount(docs.length);
+setInactiveClients(docs);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[Dashboard] Subscription error on qInactive:', error);
     });
 
     // Query: All services
@@ -517,43 +383,49 @@ export default function Dashboard() {
     );
 
     const unsubServices = onSnapshot(qServices, (snapshot) => {
-      const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
-      
-      // 1. Filtragem básica (active, name, price, duration)
-      const filtered = rawServices.filter((s: any) => 
-        s.active !== false &&
-        s.name?.trim() &&
-        Number(s.price) > 0 &&
-        Number(s.duration) > 0
-      );
-
-      // 2. Deduplicação por normalized(name)
-      const grouped = new Map<string, any[]>();
-      filtered.forEach(s => {
-        const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)!.push(s);
-      });
-
-      const uniqueServices = Array.from(grouped.values()).map(list => {
-        if (list.length === 1) return list[0];
-        
-        // Critérios de desempate se houver duplicados:
-        // 1. Tem descrição
-        // 2. Mais recente (updatedAt ou createdAt)
-        return [...list].sort((a, b) => {
-          const aDesc = !!(a as any).description?.trim();
-          const bDesc = !!(b as any).description?.trim();
-          if (aDesc !== bDesc) return aDesc ? -1 : 1;
-          
-          const aTime = new Date((a as any).updatedAt || (a as any).createdAt || 0).getTime();
-          const bTime = new Date((b as any).updatedAt || (b as any).createdAt || 0).getTime();
-          return bTime - aTime;
-        })[0];
-      });
-
-      setServices(uniqueServices);
-    });
+      try {
+        const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
+const filtered = rawServices.filter((s: any) => 
+            s.active !== false &&
+            s.name?.trim() &&
+            Number(s.price) > 0
+          ).map((s: any) => {
+            let parsedDuration = Number(s.duration) || 0;
+            if (parsedDuration < 15 || parsedDuration > 480) parsedDuration = 60;
+            return {
+              ...s,
+              duration: parsedDuration
+            };
+          }, (error) => {
+          console.error('[Dashboard] Subscription error on qServices:', error);
+        });
+const grouped = new Map<string, any[]>();
+filtered.forEach(s => {
+            const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(s);
+          });
+const uniqueServices = Array.from(grouped.values()).map(list => {
+            if (list.length === 1) return list[0];
+            
+            // Critérios de desempate se houver duplicados:
+            // 1. Tem descrição
+            // 2. Mais recente (updatedAt ou createdAt)
+            return [...list].sort((a, b) => {
+              const aDesc = !!(a as any).description?.trim();
+              const bDesc = !!(b as any).description?.trim();
+              if (aDesc !== bDesc) return aDesc ? -1 : 1;
+              
+              const aTime = new Date((a as any).updatedAt || (a as any).createdAt || 0).getTime();
+              const bTime = new Date((b as any).updatedAt || (b as any).createdAt || 0).getTime();
+              return bTime - aTime;
+            })[0];
+          });
+setServices(uniqueServices);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     // Query: WhatsApp Logs
     const qWl = query(
@@ -564,13 +436,18 @@ export default function Dashboard() {
     );
 
     const unsubWl = onSnapshot(qWl, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
-      setWhatsappLogs(docs);
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
+setWhatsappLogs(docs);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      console.error('[Dashboard] Subscription error on qWl:', error);
     });
 
     return () => {
       unsubToday();
-      unsubPending();
       unsubUnconfirmed();
       unsubAll();
       unsubWaitlist();
@@ -596,39 +473,55 @@ export default function Dashboard() {
   const freeSlotsToday = availability?.availableCount || 0;
 
   const handleRespond = async (id: string, decision: 'confirmed' | 'cancelled_by_professional', appointment?: any) => {
-    setProcessingId(id);
-    devLog(`[CONFIRM APPOINTMENT] initiating handleRespond for ${id} in Dashboard`);
+    if (processingId === id) return;
     
-    if (appointment) {
-      devLog(`[CONFIRM PRECHECK]`, {
-        appointmentId: id,
-        professionalId: appointment.professionalId,
-        serviceId: appointment.serviceId,
-        date: appointment.date || appointment.appointmentDate || appointment.selectedDate || appointment.scheduledDate,
-        time: appointment.time || appointment.appointmentTime || appointment.selectedTime || appointment.startTime,
-        status: appointment.status,
-        clientName: appointment.clientName
-      });
+    if (!user?.uid) {
+      notify.error("Sessão expirada. Entre novamente.");
+      setTimeout(() => window.location.href = '/login', 2000);
+      return;
     }
 
+    setProcessingId(id);
+    
+    // Optimistic UI Update immediately
+    setOptimisticUpdates(prev => ({ ...prev, [id]: decision }));
+
     try {
+      const token = await user.getIdToken(true);
+      
       if (decision === 'confirmed') {
-        if (!user?.uid) {
-          // Relativamente crítico pois impede operação, mas logger padrão é console.error
-          console.error("[DASHBOARD CONFIRM] No user UID available");
-          toast.error("Sessão expirada. Entre novamente.");
-          setTimeout(() => window.location.href = '/login', 2000);
-          return;
+        const res = await fetch(`/api/appointments/${id}/confirm`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ professionalId: user.uid })
+        });
+        
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `Erro ao confirmar (${res.status})`);
         }
-        await confirmAppointmentAtomic(id, user.uid);
+        
         setConfirmedId(id);
-        devLog(`[CONFIRM FLOW] SUCCESS: Booking ${id} confirmed.`);
-        toast.success(`Reserva confirmada! ID: ${id}`);
-        // Allow some time for the success state to be visible before it's removed by snapshot
+        notify.success(`Reserva confirmada! ID: ${id}`);
         await new Promise(resolve => setTimeout(resolve, 800));
       } else {
-        await declineAppointmentAtomic(id, user?.uid || '');
-        toast.success('Reserva marcada como indisponível.');
+        const res = await fetch(`/api/appointments/${id}/decline`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (!res.ok) {
+           const errData = await res.json().catch(() => ({}));
+           throw new Error(errData.error || `Erro ao recusar (${res.status})`);
+        }
+        
+        notify.success('Reserva marcada como indisponível.');
         setIsConfirmRejectOpen(false);
         setRequestToReject(null);
       }
@@ -637,10 +530,14 @@ export default function Dashboard() {
         setIsModalOpen(false);
       }
     } catch (error: any) {
-      // Critical error capture - keeping console.error but remove debug raw stack if desired, 
-      // but the prompt says maintain console.error for critical ops catch.
-      console.error(`[CONFIRM ERROR]`, error.message);
-      handleBookingError(error);
+      // Revert optimistic update on failure
+      setOptimisticUpdates(prev => {
+        const reset = { ...prev };
+        delete reset[id];
+        return reset;
+      });
+      console.error("[DASHBOARD FLOW ERROR]", error);
+      notify.error(error, 'Não foi possível concluir. Tente novamente.');
     } finally {
       setProcessingId(null);
       setConfirmedId(null);
@@ -656,9 +553,9 @@ export default function Dashboard() {
         waitlistMode: newMode,
         updatedAt: new Date().toISOString()
       });
-      toast.success(`Lista de espera: modo ${newMode === 'auto' ? 'Automático' : 'Manual'} ativado`);
+      notify.success(`Lista de espera: modo ${newMode === 'auto' ? 'Automático' : 'Manual'} ativado`);
     } catch (e) {
-      toast.error('Erro ao atualizar configuração.');
+      notify.error('Erro ao atualizar configuração.');
     }
   };
 
@@ -678,9 +575,9 @@ export default function Dashboard() {
       );
       
       window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
-      toast.success('Convite enviado!');
+      notify.success('Convite enviado!');
     } catch (e) {
-      toast.error('Erro ao enviar convite.');
+      notify.error('Erro ao enviar convite.');
     } finally {
       setProcessingId(null);
     }
@@ -698,22 +595,55 @@ export default function Dashboard() {
   const ongoingAppt = useMemo(() => {
     if (activeTab !== 'hoje') return null;
     const now = new Date();
-    return confirmedToday.find(appt => {
-      if (appt.status !== 'confirmed') return false;
+    return displayedConfirmedToday.find(appt => {
+      if (!isConfirmedLikeStatus(appt.status)) return false;
       const [h, m] = appt.time.split(':').map(Number);
       const apptDate = new Date();
       apptDate.setHours(h, m, 0);
       const diff = (now.getTime() - apptDate.getTime()) / (1000 * 60);
       return diff >= 0 && diff <= 90; // Active within 90 minutes of start
     });
-  }, [confirmedToday, activeTab]);
+  }, [displayedConfirmedToday, activeTab]);
 
-  const handleComplete = async (id: string) => {
-    setProcessingId(id);
+  const handleComplete = async (app: Appointment) => {
+    setProcessingId(app.id);
     try {
-      await updateAppointmentStatus(id, 'completed'); 
-      setConfirmedId(id); // Re-using state for completion visual
-      toast.success('Atendimento finalizado. Avaliação enviada para a cliente.');
+      const idToken = await user?.getIdToken();
+      const res = await fetch(`/api/appointments/${app.id}/complete`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${idToken}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ao concluir (${res.status})`);
+      }
+
+      const token = Array.from(window.crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
+      await addDoc(collection(db, 'review_requests'), {
+        bookingId: app.id,
+        professionalId: user!.uid,
+        clientDisplayName: app.clientName,
+        clientNeighborhood: app.neighborhood || '',
+        token,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+
+      setConfirmedId(app.id);
+      notify.success('Atendimento finalizado. Preparando envio de avaliação.');
+      
+      const reviewLink = `${window.location.origin}/review/${token}`;
+      try {
+        await navigator.clipboard.writeText(reviewLink);
+      } catch {}
+      
+      const text = `Oi, ${app.clientName} 🤎\nObrigada pela visita de hoje.\nSe puder, deixe sua avaliação por aqui:\n${reviewLink}`;
+      window.open(`https://wa.me/55${cleanWhatsapp(app.clientWhatsapp || '')}?text=${encodeURIComponent(text)}`, '_blank');
+      
       await new Promise(resolve => setTimeout(resolve, 800));
     } catch (error) {
       handleBookingError(error);
@@ -745,9 +675,9 @@ export default function Dashboard() {
       console.log("[PUSH BUTTON] requestPermission finished. Success:", success);
 
       if (success) {
-        toast.success('Notificações ativadas com sucesso!');
+        notify.success('Notificações ativadas com sucesso!');
       } else if (Notification.permission === 'denied') {
-        toast.error('Notificações bloqueadas no navegador. Ative as permissões nas configurações do site.');
+        notify.error('Notificações bloqueadas no navegador. Ative as permissões nas configurações do site.');
       }
     } catch (error: any) {
       console.error("[PUSH BUTTON ERROR]", error);
@@ -774,9 +704,11 @@ export default function Dashboard() {
       setIsReportLoading(true);
       if (!user?.uid) return;
       
+      const token = await user.getIdToken();
       const response = await fetch(`/api/reports/monthly?month=${currentMonthISO}&professionalId=${user.uid}`, {
         headers: {
-          'x-professional-id': user.uid
+          'x-professional-id': user.uid,
+          'Authorization': `Bearer ${token}`
         }
       });
       
@@ -793,17 +725,25 @@ export default function Dashboard() {
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      toast.success('Relatório gerado com sucesso!');
+      notify.success('Relatório gerado com sucesso!');
     } catch (error: any) {
       console.error("[REPORT ERROR]", error);
-      toast.error(error.message || 'Erro ao baixar relatório. Tente novamente.');
+      notify.error(error, 'Erro ao baixar relatório. Tente novamente.');
     } finally {
       setIsReportLoading(false);
     }
   };
 
+  if (isInitialLoading) {
+    return <DashboardSkeleton />;
+  }
+
   return (
     <AppLayout activeRoute="dashboard">
+      <PageErrorBoundary 
+        title="Não foi possível carregar este painel." 
+        message="Tivemos um contratempo ao gerar suas métricas. Recarregar costuma resolver."
+      >
       <FirstVisitTip 
         pageKey="dashboard"
         title="Sua central de operações"
@@ -917,11 +857,16 @@ export default function Dashboard() {
           <button 
             onClick={() => setActiveTab("hoje")}
             className={cn(
-              "px-5 py-2 rounded-full transition-all flex items-center gap-2",
+              "px-5 py-2 rounded-full transition-all flex items-center gap-2 relative",
               activeTab === "hoje" ? "bg-white shadow-sm text-brand-ink" : "text-brand-stone"
             )}
           >
             Hoje
+            {pendingCount > 0 && (
+              <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 bg-red-500 text-white rounded-full text-[8px] font-bold animate-pulse">
+                {pendingCount}
+              </span>
+            )}
           </button>
           <button 
             onClick={() => setActiveTab("geral")}
@@ -931,11 +876,7 @@ export default function Dashboard() {
             )}
           >
             Geral
-            {pendingCount > 0 ? (
-              <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 bg-red-500 text-white rounded-full text-[8px] font-bold animate-pulse">
-                {pendingCount}
-              </span>
-            ) : inactiveClientsCount > 0 && (
+            {inactiveClientsCount > 0 && (
               <span className="w-1.5 h-1.5 bg-brand-terracotta rounded-full" />
             )}
           </button>
@@ -1359,7 +1300,7 @@ export default function Dashboard() {
 
             {/* Resumo Financeiro Hoje */}
             <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
-              {confirmedToday.length === 0 && (
+              {displayedConfirmedToday.length === 0 && (
                 <div className="mb-6 pb-6 border-b border-brand-linen">
                   <p className="text-sm font-serif text-brand-ink italic">Dia tranquilo até agora — vamos preencher?</p>
                   {daysSinceLastAppointment !== null && (
@@ -1372,11 +1313,11 @@ export default function Dashboard() {
               <div className="grid grid-cols-2 gap-8 divide-x divide-brand-linen">
                 <div>
                   <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Faturamento Hoje</p>
-                  <p className="text-3xl font-serif text-brand-ink">{formatCurrency(dailyRevenue)}</p>
+                  <p className="text-3xl font-serif text-brand-ink">{formatCurrency(displayedDailyRevenue)}</p>
                 </div>
                 <div className="pl-8">
                   <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Agendamentos</p>
-                  <p className="text-3xl font-serif text-brand-ink">{confirmedToday.length}</p>
+                  <p className="text-3xl font-serif text-brand-ink">{displayedConfirmedToday.length}</p>
                 </div>
               </div>
               
@@ -1404,9 +1345,9 @@ export default function Dashboard() {
                 <h3 className="text-[10px] font-bold text-brand-stone uppercase tracking-[0.3em]">Agenda de Hoje</h3>
               </div>
 
-              {confirmedToday.length > 0 ? (
+              {displayedConfirmedToday.length > 0 ? (
                 <div className="space-y-4">
-                  {confirmedToday.map((appt) => (
+                  {displayedConfirmedToday.map((appt) => (
                     <div 
                       key={appt.id} 
                       className={cn(
@@ -1424,19 +1365,19 @@ export default function Dashboard() {
                           <p className="text-xs text-brand-stone italic">{appt.serviceName}</p>
                           <span className={cn(
                             "text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block",
-                            appt.status === 'completed' ? "text-brand-terracotta bg-white" : 
-                            ['confirmed', 'accepted'].includes(appt.status) ? "text-green-600 bg-green-50" : "text-brand-stone bg-brand-linen"
+                            isCompletedStatus(appt.status) ? "text-brand-terracotta bg-white" : 
+                            isConfirmedLikeStatus(appt.status) ? "text-green-600 bg-green-50" : "text-brand-stone bg-brand-linen"
                           )}>
-                            {appt.status === 'completed' ? 'Concluído ✓' : 
-                             ['confirmed', 'accepted'].includes(appt.status) ? 'Confirmado' : appt.status}
+                            {isCompletedStatus(appt.status) ? 'Concluído ✓' : 
+                             isConfirmedLikeStatus(appt.status) ? 'Confirmado' : appt.status}
                           </span>
                         </div>
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        {appt.status === 'confirmed' && isPastTime(appt.time) && (
+                        {isConfirmedLikeStatus(appt.status) && isPastTime(appt.time) && (
                           <button
-                            onClick={() => handleComplete(appt.id)}
+                            onClick={() => handleComplete(appt)}
                             disabled={processingId === appt.id}
                             className="flex items-center gap-1.5 px-4 py-2 bg-brand-terracotta text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all active:scale-95"
                           >
@@ -1594,26 +1535,28 @@ export default function Dashboard() {
 
                 <div className="flex flex-col gap-6">
                   {/* Waitlist Status */}
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest flex items-center">
-                        Lista de Espera
-                        <HelpTooltip content="Clientes que pediram vaga quando sua agenda estava cheia. Avise quando abrir um horário." />
-                      </span>
-                      {waitlist && waitlist.length > 0 ? (
-                        <button onClick={() => setIsWaitlistModalOpen(true)} className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver {waitlist.length}</button>
-                      ) : (
-                        <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-40">Vazia</span>
+                  {features.waitlist && (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest flex items-center">
+                          Lista de Espera
+                          <HelpTooltip content="Clientes que pediram vaga quando sua agenda estava cheia. Avise quando abrir um horário." />
+                        </span>
+                        {waitlist && waitlist.length > 0 ? (
+                          <button onClick={() => setIsWaitlistModalOpen(true)} className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver {waitlist.length}</button>
+                        ) : (
+                          <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-40">Vazia</span>
+                        )}
+                      </div>
+                      {waitlist && waitlist.length > 0 && (
+                        <div className="bg-brand-parchment/30 p-4 rounded-2xl border border-brand-mist/50">
+                          <p className="text-[10px] text-brand-ink leading-tight font-medium">
+                            {waitlist[0].clientName} aguarda por {waitlist[0].period === 'any' ? 'um horário' : waitlist[0].period}
+                          </p>
+                        </div>
                       )}
                     </div>
-                    {waitlist && waitlist.length > 0 && (
-                      <div className="bg-brand-parchment/30 p-4 rounded-2xl border border-brand-mist/50">
-                        <p className="text-[10px] text-brand-ink leading-tight font-medium">
-                          {waitlist[0].clientName} aguarda por {waitlist[0].period === 'any' ? 'um horário' : waitlist[0].period}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {/* Blocked Status */}
                   <div className="flex flex-col gap-3">
@@ -1897,18 +1840,18 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-serif text-brand-ink italic">Sua Agenda de Hoje</h3>
                 <span className="text-[10px] text-brand-stone font-bold uppercase tracking-widest px-3 py-1 bg-brand-linen rounded-full">
-                  {confirmedToday.length} Atendimentos
+                  {displayedConfirmedToday.length} Atendimentos
                 </span>
               </div>
 
               <div className="space-y-4">
-                {confirmedToday.length > 0 ? (
-                  confirmedToday.map((appt) => (
+                {displayedConfirmedToday.length > 0 ? (
+                  displayedConfirmedToday.map((appt) => (
                     <div 
                       key={appt.id} 
                       className={cn(
                         "bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex items-center justify-between group transition-all hover:border-brand-terracotta",
-                        appt.status === 'concluido' && "opacity-60 bg-brand-parchment/30"
+                        isCompletedStatus(appt.status) && "opacity-60 bg-brand-parchment/30"
                       )}
                     >
                       <div className="flex items-center gap-5">
@@ -1920,7 +1863,7 @@ export default function Dashboard() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-bold text-brand-ink">{appt.clientName}</h4>
-                            {appt.status === 'concluido' && <Check size={12} className="text-green-600" />}
+                            {isCompletedStatus(appt.status) && <Check size={12} className="text-green-600" />}
                           </div>
                           <p className="text-xs text-brand-stone italic">{appt.serviceName}</p>
                           <div className="flex items-center gap-3 mt-1.5">
@@ -2134,9 +2077,9 @@ export default function Dashboard() {
                       onClick={async () => {
                         try {
                           await deleteDoc(doc(db, 'blocked_schedules', block.id));
-                          toast.success('Agenda liberada com sucesso.');
+                          notify.success('Agenda liberada com sucesso.');
                         } catch {
-                          toast.error('Erro ao liberar agenda.');
+                          notify.error('Erro ao liberar agenda.');
                         }
                       }}
                       className="p-2.5 text-brand-stone/40 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -2262,7 +2205,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 bg-brand-parchment border border-brand-mist rounded-2xl p-4">
               <span className="text-[11px] text-brand-stone font-mono truncate flex-1">{referralLink}</span>
               <button
-                onClick={() => { navigator.clipboard.writeText(referralLink); toast.success('Link copiado!'); }}
+                onClick={() => { navigator.clipboard.writeText(referralLink); notify.success('Link copiado!'); }}
                 className="flex items-center gap-2 px-5 py-2.5 bg-brand-ink text-brand-white rounded-2xl text-[9px] font-bold uppercase tracking-widest shrink-0 hover:bg-brand-espresso transition-all"
               >
                 <Copy size={12} /> Copiar
@@ -2329,7 +2272,7 @@ export default function Dashboard() {
                   onClick={() => {
                     const url = `https://nera.app/p/${profile?.slug}`;
                     navigator.clipboard.writeText(url);
-                    toast.success('Link copiado. Abra o Instagram e cole nos seus Stories!');
+                    notify.success('Link copiado. Abra o Instagram e cole nos seus Stories!');
                     setIsShareModalOpen(false);
                   }}
                   className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
@@ -2350,7 +2293,7 @@ export default function Dashboard() {
                   onClick={() => {
                     const url = `https://nera.app/p/${profile?.slug}`;
                     navigator.clipboard.writeText(url);
-                    toast.success('Link copiado para a área de transferência.');
+                    notify.success('Link copiado para a área de transferência.');
                     setIsShareModalOpen(false);
                   }}
                   className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
@@ -2500,17 +2443,18 @@ export default function Dashboard() {
                        </div>
                     </div>
                     
-                    <PremiumButton 
-                      feature="waitlist"
-                      onClick={() => setIsWaitlistModalOpen(true)}
-                      className="p-5 bg-brand-linen rounded-[24px] border border-brand-mist flex flex-col items-start gap-2 hover:bg-brand-white transition-all group"
-                    >
-                      <p className="text-[10px] text-brand-terracotta uppercase tracking-widest font-bold">Vaga Presa?</p>
-                      <div className="flex items-center gap-2">
-                         <Users size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-                         <span className="text-[10px] text-brand-ink uppercase tracking-widest">Avisar Lista de Espera</span>
-                      </div>
-                    </PremiumButton>
+                    {features.waitlist && (
+                      <button 
+                        onClick={() => setIsWaitlistModalOpen(true)}
+                        className="p-5 bg-brand-linen rounded-[24px] border border-brand-mist flex flex-col items-start gap-2 hover:bg-brand-white transition-all group"
+                      >
+                        <p className="text-[10px] text-brand-terracotta uppercase tracking-widest font-bold">Vaga Presa?</p>
+                        <div className="flex items-center gap-2">
+                           <Users size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                           <span className="text-[10px] text-brand-ink uppercase tracking-widest">Avisar Lista de Espera</span>
+                        </div>
+                      </button>
+                    )}
                   </div>
 
                   <div className="pt-6 border-t border-brand-mist space-y-3">
@@ -2737,7 +2681,7 @@ export default function Dashboard() {
         selectedDate={getTodayLocale()}
         professionalId={user?.uid || ''}
         appointments={appointments}
-        workingHours={profile?.workingHours || {}}
+        workingHours={profile?.workingHours as any}
       />
 
       <QuickBlockModal
@@ -2785,7 +2729,11 @@ export default function Dashboard() {
         feature={upgradeFeature}
         count={usageCount}
         totalClients={totalClientsCount}
-        averageTicket={appointments.length > 0 ? monthlyRevenue / appointments.length : 0}
+        averageTicket={
+          appointments.filter(a => isRevenueStatus(a.status)).length > 0 
+            ? monthlyRevenue / appointments.filter(a => isRevenueStatus(a.status)).length 
+            : 0
+        }
       />
 
       {/* Floating Action Button for active appointment */}
@@ -2796,7 +2744,7 @@ export default function Dashboard() {
             animate={{ scale: 1, opacity: 1 }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => handleComplete(ongoingAppt.id)}
+            onClick={() => handleComplete(ongoingAppt)}
             disabled={processingId === ongoingAppt.id}
             className="w-14 h-14 bg-brand-terracotta text-white rounded-full shadow-2xl flex items-center justify-center relative group"
           >
@@ -2807,6 +2755,7 @@ export default function Dashboard() {
           </motion.button>
         </div>
       )}
+      </PageErrorBoundary>
     </AppLayout>
   );
 }

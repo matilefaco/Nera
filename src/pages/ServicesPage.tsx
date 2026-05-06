@@ -9,17 +9,20 @@ import {
   Wand2, Loader2, AlertCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { formatCurrency, getHumanError, cn } from '../lib/utils';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
-import { UserProfile } from '../types';
+import { UserProfile, Service } from '../types';
 import { generateServiceDescription } from '../services/aiService';
 import { FirstVisitTip } from '../components/FirstVisitTip';
+import { PageErrorBoundary } from '../components/PageErrorBoundary';
+import { Skeleton } from '../components/ui/Skeleton';
 
 export default function ServicesPage() {
   const { user, profile } = useAuth();
   const [services, setServices] = useState<any[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
@@ -67,51 +70,59 @@ export default function ServicesPage() {
 
     const q = query(collection(db, 'services'), where('professionalId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
-      
-      // 1. Filtragem básica (active, name, price, duration)
-      const filtered = rawServices.filter((s: any) => 
-        s.active !== false &&
-        s.name?.trim() &&
-        Number(s.price) > 0 &&
-        Number(s.duration) > 0
-      );
-
-      // 2. Deduplicação por professionalId + normalized(name)
-      // Como já estamos filtrando por user.uid, comparamos apenas o nome normalizado
-      const grouped = new Map<string, any[]>();
-      filtered.forEach((s: any) => {
-        const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
-        if (!grouped.has(key)) grouped.set(key, []);
-        grouped.get(key)!.push(s);
-      });
-
-      const uniqueServices = Array.from(grouped.values()).map(list => {
-        if (list.length === 1) return list[0];
-        
-        // Critérios de desempate se houver duplicados:
-        // 1. Tem descrição
-        // 2. Mais recente (updatedAt ou createdAt)
-        // 3. Primeiro da lista
-        return [...list].sort((a, b) => {
-          const aDesc = !!a.description?.trim();
-          const bDesc = !!b.description?.trim();
-          if (aDesc !== bDesc) return aDesc ? -1 : 1;
-          
-          const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-          const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-          return bTime - aTime;
-        })[0];
-      });
-
-      setServices(uniqueServices);
+      try {
+        const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[];
+        const filtered = rawServices.filter(s => 
+            s.active !== false &&
+            s.name?.trim() &&
+            Number(s.price) > 0
+          ).map((s) => {
+            let parsedDuration = Number(s.duration) || 0;
+            if (parsedDuration < 15 || parsedDuration > 480) parsedDuration = 60;
+            return {
+              ...s,
+              duration: parsedDuration
+            };
+          });
+const grouped = new Map<string, any[]>();
+filtered.forEach((s: any) => {
+            const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!grouped.has(key)) grouped.set(key, []);
+            grouped.get(key)!.push(s);
+          });
+const uniqueServices = Array.from(grouped.values()).map(list => {
+            if (list.length === 1) return list[0];
+            
+            // Critérios de desempate se houver duplicados:
+            // 1. Tem descrição
+            // 2. Mais recente (updatedAt ou createdAt)
+            // 3. Primeiro da lista
+            return [...list].sort((a, b) => {
+              const aDesc = !!a.description?.trim();
+              const bDesc = !!b.description?.trim();
+              if (aDesc !== bDesc) return aDesc ? -1 : 1;
+              
+              const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
+              const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
+              return bTime - aTime;
+            })[0];
+          });
+setServices(uniqueServices);
+setIsInitialLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+        setIsInitialLoading(false);
+      }
+    }, (error) => { 
+        console.error("Firestore onSnapshot error:", error); 
+        setIsInitialLoading(false);
     });
     return () => unsubscribe();
   }, [user]);
 
   const generateAIDescription = async () => {
     if (!name) {
-      toast.error('Dê um nome ao serviço primeiro.');
+      notify.error('Dê um nome ao serviço primeiro.');
       return;
     }
 
@@ -134,19 +145,19 @@ export default function ServicesPage() {
         setDescription(sanitized.slice(0, 160));
         
         if (result.source === 'fallback') {
-          toast.success('Geramos uma sugestão básica. Você pode editar antes de salvar.', {
+          notify.success('Geramos uma sugestão básica. Você pode editar antes de salvar.', {
             icon: '⚠️',
             style: { border: '1px solid #EAB308', color: '#854D0E', fontSize: '12px' }
           });
         } else {
-          toast.success('Descrição gerada com IA! ✨');
+          notify.success('Descrição gerada com IA! ✨');
         }
       } else {
-        toast.error('Não foi possível gerar no momento.');
+        notify.error('Não foi possível gerar no momento.');
       }
     } catch (error) {
       console.error('[AI Generation] Error:', error);
-      toast.error('Não foi possível gerar a descrição agora.');
+      notify.error('Não foi possível gerar a descrição agora.');
     } finally {
       setIsGeneratingAI(false);
     }
@@ -156,9 +167,9 @@ export default function ServicesPage() {
     e.preventDefault();
     setDurationError(false);
 
-    if (!duration || Number(duration) <= 0) {
+    if (!duration || Number(duration) < 15 || Number(duration) > 480) {
       setDurationError(true);
-      toast.error('Selecione a duração do serviço.');
+      notify.error('Informe a duração do serviço (entre 15 e 480 min).');
       return;
     }
 
@@ -175,7 +186,7 @@ export default function ServicesPage() {
     });
 
     if (!professionalId) {
-      toast.error('Sessão expirada. Por favor, faça login novamente.');
+      notify.error('Sessão expirada. Por favor, faça login novamente.');
       setLoading(false);
       return;
     }
@@ -198,7 +209,7 @@ export default function ServicesPage() {
         const docRef = doc(db, 'services', editingId);
         await updateDoc(docRef, serviceData);
         console.log('[SERVICE SAVE] update success');
-        toast.success('Serviço atualizado com sucesso.');
+        notify.success('Serviço atualizado com sucesso.');
       } else {
         const colRef = collection(db, 'services');
         await addDoc(colRef, {
@@ -206,13 +217,13 @@ export default function ServicesPage() {
           createdAt: new Date().toISOString()
         });
         console.log('[SERVICE SAVE] create success');
-        toast.success('Novo serviço adicionado com sucesso.');
+        notify.success('Novo serviço adicionado com sucesso.');
       }
       closeModal();
     } catch (error: any) {
       console.error('[SERVICE SAVE] failed:', error);
       const errorMessage = getHumanError(error) || 'Não foi possível salvar o serviço. Verifique os dados e tente novamente.';
-      toast.error(errorMessage);
+      notify.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -224,12 +235,12 @@ export default function ServicesPage() {
     setLoading(true);
     try {
       await deleteDoc(doc(db, 'services', serviceToDelete));
-      toast.success('Serviço removido.');
+      notify.success('Serviço removido.');
       setIsDeleteModalOpen(false);
       setServiceToDelete(null);
     } catch (error: any) {
       console.error('[ServicesDelete] Error:', error);
-      toast.error('Não foi possível concluir agora. Tente novamente.');
+      notify.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -264,6 +275,9 @@ export default function ServicesPage() {
 
   return (
     <AppLayout activeRoute="services">
+      <PageErrorBoundary 
+        title="Não foi possível carregar seus serviços." 
+      >
       <FirstVisitTip 
         pageKey="services"
         title="Seus serviços"
@@ -284,7 +298,31 @@ export default function ServicesPage() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          {services.length > 0 ? (
+          {isInitialLoading ? (
+            <>
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-brand-white p-10 rounded-[40px] border border-brand-mist/50 shadow-sm overflow-hidden flex flex-col justify-between min-h-[220px]">
+                  <div className="flex justify-between items-start mb-8">
+                    <div className="flex-1 pr-6 space-y-4">
+                      <Skeleton className="h-8 w-48" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-5/6" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Skeleton className="w-11 h-11 rounded-2xl" />
+                      <Skeleton className="w-11 h-11 rounded-2xl" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-8 pt-8 border-t border-brand-mist/50">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="h-6 w-24" />
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : services.length > 0 ? (
             services.map(service => (
               <motion.div 
                 key={service.id} 
@@ -490,7 +528,7 @@ export default function ServicesPage() {
 
                       {durationError && (
                         <div className="flex items-center gap-1.5 text-[10px] text-brand-terracotta font-bold uppercase tracking-wider ml-1">
-                          <AlertCircle size={12} /> Selecione a duração. Ela define os horários disponíveis para suas clientes.
+                          <AlertCircle size={12} /> Informe a duração do serviço (15 a 480 min).
                         </div>
                       )}
 
@@ -537,6 +575,7 @@ export default function ServicesPage() {
           )}
         </AnimatePresence>
       </div>
+      </PageErrorBoundary>
     </AppLayout>
   );
 }

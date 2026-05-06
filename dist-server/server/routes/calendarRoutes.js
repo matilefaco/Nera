@@ -1,6 +1,7 @@
 import express from "express";
 import { google } from "googleapis";
 import { getDb } from "../firebaseAdmin.js";
+import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
 const router = express.Router();
 const SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
 function getOAuthClient(redirectUri) {
@@ -98,14 +99,19 @@ router.get("/status", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post("/toggle", async (req, res) => {
+router.post("/toggle", requireFirebaseAuth, async (req, res) => {
     const db = getDb();
+    const uid = req.uid;
     const { professionalId, enabled } = req.body;
-    if (!professionalId) {
+    if (professionalId && professionalId !== uid) {
+        return res.status(403).json({ error: "Permissão negada" });
+    }
+    const targetId = uid || professionalId;
+    if (!targetId) {
         return res.status(400).json({ error: "Missing professionalId" });
     }
     try {
-        await db.collection("users").doc(professionalId).update({
+        await db.collection("users").doc(targetId).update({
             "integrations.google_calendar.enabled": enabled,
         });
         res.json({ success: true });
@@ -114,14 +120,19 @@ router.post("/toggle", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-router.post("/disconnect", async (req, res) => {
+router.post("/disconnect", requireFirebaseAuth, async (req, res) => {
     const db = getDb();
+    const uid = req.uid;
     const { professionalId } = req.body;
-    if (!professionalId) {
+    if (professionalId && professionalId !== uid) {
+        return res.status(403).json({ error: "Permissão negada" });
+    }
+    const targetId = uid || professionalId;
+    if (!targetId) {
         return res.status(400).json({ error: "Missing professionalId" });
     }
     try {
-        await db.collection("users").doc(professionalId).update({
+        await db.collection("users").doc(targetId).update({
             "integrations.google_calendar": null,
         });
         res.json({ success: true });

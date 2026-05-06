@@ -7,6 +7,7 @@ import {
 import { auth, db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
+import { usePendingAppointments } from '../contexts/PendingAppointmentsContext';
 import Logo from './Logo';
 import MobileNav from './MobileNav';
 import { cn } from '../lib/utils';
@@ -24,7 +25,7 @@ const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in ms
 export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [pendingCount, setPendingCount] = useState(0);
+  const { pendingCount } = usePendingAppointments();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
 
   // Session Timeout Logic
@@ -50,22 +51,6 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
       if (timeoutId) clearTimeout(timeoutId);
       events.forEach(event => window.removeEventListener(event, resetTimer));
     };
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      where('status', '==', 'pending')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setPendingCount(snapshot.docs.length);
-    });
-
-    return () => unsubscribe();
   }, [user]);
 
   const handleLogout = async (message?: string) => {

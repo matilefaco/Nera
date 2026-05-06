@@ -17,7 +17,7 @@ import { Coupon, Service } from '../types';
 import AppLayout from '../components/AppLayout';
 import PremiumButton from '../components/PremiumButton';
 import { formatCurrency, cn } from '../lib/utils';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { FirstVisitTip } from '../components/FirstVisitTip';
 
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
@@ -59,10 +59,14 @@ export default function CouponsPage() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
-      setCoupons(data.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
-      setLoading(false);
-    });
+      try {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
+setCoupons(data.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
+setLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     const fetchServices = async () => {
       const sQuery = query(collection(db, 'services'), where('professionalId', '==', user.uid));
@@ -79,7 +83,7 @@ export default function CouponsPage() {
     if (!user) return;
 
     if (!code.trim() || !value) {
-      toast.error('Preencha o código e o valor do cupom.');
+      notify.error('Preencha o código e o valor do cupom.');
       return;
     }
 
@@ -88,7 +92,7 @@ export default function CouponsPage() {
       // Check if code already exists for this pro
       const existing = coupons.find(c => c.code === code.trim().toUpperCase());
       if (existing) {
-        toast.error('Você já tem um cupom com este código.');
+        notify.error('Você já tem um cupom com este código.');
         setIsCreating(false);
         return;
       }
@@ -107,12 +111,12 @@ export default function CouponsPage() {
         createdAt: serverTimestamp()
       });
 
-      toast.success('Cupom criado com sucesso!');
+      notify.success('Cupom criado com sucesso!');
       setIsModalOpen(false);
       resetForm();
     } catch (err) {
       console.error('Error creating coupon:', err);
-      toast.error('Erro ao criar cupom.');
+      notify.error('Erro ao criar cupom.');
     } finally {
       setIsCreating(false);
     }
@@ -134,18 +138,18 @@ export default function CouponsPage() {
       await updateDoc(doc(db, 'coupons', coupon.id), {
         active: !coupon.active
       });
-      toast.success(`Cupom ${!coupon.active ? 'ativado' : 'desativado'}!`);
+      notify.success(`Cupom ${!coupon.active ? 'ativado' : 'desativado'}!`);
     } catch (err) {
-      toast.error('Erro ao atualizar status.');
+      notify.error('Erro ao atualizar status.');
     }
   };
 
   const handleDeleteCoupon = async (id: string) => {
     try {
       await deleteDoc(doc(db, 'coupons', id));
-      toast.success('Cupom excluído.');
+      notify.success('Cupom excluído.');
     } catch (err) {
-      toast.error('Erro ao excluir cupom.');
+      notify.error('Erro ao excluir cupom.');
     } finally {
       setIsDeleting(null);
     }

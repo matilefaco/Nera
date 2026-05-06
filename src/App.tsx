@@ -9,12 +9,23 @@ import {
 import { Toaster } from 'sonner';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider, useAuth } from './AuthContext';
+import { PendingAppointmentsProvider } from './contexts/PendingAppointmentsContext';
+import { AppErrorBoundary } from './components/AppErrorBoundary';
 import AppLoadingScreen from './components/AppLoadingScreen';
+import { runtimeLogger } from './lib/runtimeDiagnostics';
 
 // Pages (to be created)
 import LandingPage from './pages/LandingPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+
+function RouteLogger() {
+  const location = useLocation();
+  React.useEffect(() => {
+    runtimeLogger.log('route_change', { path: location.pathname });
+  }, [location.pathname]);
+  return null;
+}
 import Dashboard from './pages/Dashboard';
 import ServicesPage from './pages/ServicesPage';
 import ProfilePage from './pages/ProfilePage';
@@ -78,11 +89,14 @@ export default function App() {
     // @ts-ignore
     <HelmetProvider>
       <AuthProvider>
-        <Router>
-          <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
-            <Routes>
-              {/* ... routes ... */}
-              <Route path="/" element={<LandingPage />} />
+        <PendingAppointmentsProvider>
+          <Router>
+            <RouteLogger />
+            <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
+              <AppErrorBoundary>
+                <Routes>
+                {/* ... routes ... */}
+                <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/p/:slug" element={<PublicProfile />} />
@@ -168,10 +182,12 @@ export default function App() {
                   <a href="/" className="px-6 py-2 bg-brand-rose text-white rounded-full">Voltar ao início</a>
                 </div>
               } />
-            </Routes>
-            <Toaster position="top-center" richColors />
-          </div>
+                </Routes>
+              </AppErrorBoundary>
+              <Toaster position="top-center" richColors />
+            </div>
         </Router>
+        </PendingAppointmentsProvider>
       </AuthProvider>
     </HelmetProvider>
   );

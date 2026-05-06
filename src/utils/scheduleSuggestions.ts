@@ -65,7 +65,7 @@ export function getAvailableSlots({
     if (appt.date === date && !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'rejected', 'expired'].includes(appt.status)) {
       const [h, m] = appt.time.split(':').map(Number);
       const start = h * 60 + m;
-      const duration = appt.duration || 60;
+      const duration = Number(appt.duration) || 60;
       occupiedSegments.push({ start, end: start + duration });
     }
   });
@@ -161,7 +161,7 @@ export function getAvailableSlots({
         // Get original appointment info for adjustments
         const prevAppt = appointments.find(a => {
           const [h, m] = a.time.split(':').map(Number);
-          return a.date === date && h * 60 + m + (a.duration || 60) === current.end;
+          return a.date === date && h * 60 + m + (Number(a.duration) || 60) === current.end;
         });
         const nextAppt = appointments.find(a => {
           const [h, m] = a.time.split(':').map(Number);
@@ -257,7 +257,7 @@ function minutesToTime(totalMinutes: number): string {
 }
 
 function getApptDuration(id: string, appointments: Appointment[]): number {
-  return appointments.find(a => a.id === id)?.duration || 60;
+  return Number(appointments.find(a => a.id === id)?.duration) || 60;
 }
 
 function getTodayLocale(): string {

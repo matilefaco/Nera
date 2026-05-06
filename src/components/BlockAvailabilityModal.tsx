@@ -8,10 +8,11 @@ import {
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { cn, getTodayLocale, getTodayLocaleTime } from '../lib/utils';
 import { BlockedSchedule, Appointment, WorkingHours } from '../types';
 import PremiumButton from './PremiumButton';
+import { isCancelledStatus } from '../constants/appointmentStatus';
 
 interface BlockAvailabilityModalProps {
   open: boolean;
@@ -77,7 +78,7 @@ export default function BlockAvailabilityModal({
     const conflicting = appointments.filter(appt => {
       // Filter by date if it matches
       if (appt.date !== date) return false;
-      if (appt.status === 'cancelled') return false;
+      if (isCancelledStatus(appt.status)) return false;
       const apptStart = timeToMinutes(appt.time);
       const apptEnd = apptStart + (appt.duration || 60);
       return Math.max(sMinutes, apptStart) < Math.min(eMinutes, apptEnd);
@@ -136,10 +137,10 @@ export default function BlockAvailabilityModal({
       };
 
       await addDoc(collection(db, 'blocked_schedules'), blockData);
-      toast.success('Horário bloqueado com sucesso.');
+      notify.success('Horário bloqueado com sucesso.');
       onClose();
     } catch (e) {
-      toast.error('Erro ao bloquear horário.');
+      notify.error('Erro ao bloquear horário.');
     } finally {
       setLoading(false);
     }
@@ -171,14 +172,14 @@ export default function BlockAvailabilityModal({
             updatedAt: serverTimestamp()
           });
         }
-        toast.success(`${conflicts.length} agendamentos cancelados e horário bloqueado.`);
+        notify.success(`${conflicts.length} agendamentos cancelados e horário bloqueado.`);
       } else {
-        toast.success('Horário bloqueado com sucesso.');
+        notify.success('Horário bloqueado com sucesso.');
       }
 
       onClose();
     } catch (e) {
-      toast.error('Erro ao bloquear horário.');
+      notify.error('Erro ao bloquear horário.');
     } finally {
       setLoading(false);
     }

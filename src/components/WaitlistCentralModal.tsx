@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { db, inviteFromWaitlist } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { cn, buildWhatsappLink, formatLocalDate } from '../lib/utils';
 import { WaitlistEntry } from '../types';
 import PremiumButton from './PremiumButton';
@@ -46,10 +46,14 @@ export default function WaitlistCentralModal({
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaitlistEntry));
-      setEntries(docs);
-      setLoading(false);
-    });
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WaitlistEntry));
+setEntries(docs);
+setLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     return () => unsubscribe();
   }, [open, professionalId]);
@@ -63,19 +67,19 @@ export default function WaitlistCentralModal({
 
   const handleInvite = async (entry: WaitlistEntry) => {
     if (!targetTime) {
-      toast.error('Selecione um horário na agenda para convidar.');
+      notify.error('Selecione um horário na agenda para convidar.');
       return;
     }
     try {
       await inviteFromWaitlist(entry.id, targetTime);
-      toast.success(`Convite enviado para ${entry.clientName}!`);
+      notify.success(`Convite enviado para ${entry.clientName}!`);
       
       const msg = `Oi ${entry.clientName}! 🌟 Vimos que você está na nossa lista de espera. Acabou de surgir uma vaga para ${entry.serviceName} dia ${formatLocalDate(entry.requestedDate, { day: 'numeric', month: 'numeric' })} às ${targetTime}. Tem interesse?`;
       window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
       
       onClose();
     } catch {
-      toast.error('Erro ao enviar convite.');
+      notify.error('Erro ao enviar convite.');
     }
   };
 

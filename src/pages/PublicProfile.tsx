@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
+import { PLAN_CONFIGS, PlanType } from '../constants/plans';
 import { db, createBookingRequest, handleBookingError, logAnalyticsEvent } from '../firebase';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -9,7 +10,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, cn, buildWhatsappLink, splitSmartBio } from '../lib/utils';
 import { getTheme } from '../lib/themes';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import Logo from '../components/Logo';
 import PremiumButton from '../components/PremiumButton';
 import BookingModal from '../components/BookingModal';
@@ -145,22 +146,20 @@ const MOCK_STATS = {
   topTags: ['Excelência', 'Pontualidade', 'Ambiente Acolhedor']
 };
 
+import { Skeleton } from '../components/ui/Skeleton';
+
 const PublicProfileSkeleton = () => (
   <div className="min-h-screen bg-brand-parchment flex flex-col items-center pt-40 px-6">
     <div className="relative mb-16">
-      <div className="w-56 h-72 rounded-[60px] bg-brand-linen/60 border-8 border-brand-white shadow-2xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer" />
-      </div>
+      <Skeleton className="w-56 h-72 rounded-[60px] border-8 border-brand-white shadow-2xl" />
     </div>
     <div className="flex flex-col items-center w-full max-w-4xl space-y-12 mb-20 text-center">
       <div className="space-y-4">
-        <div className="h-4 w-40 bg-brand-linen/60 rounded-full mx-auto animate-pulse" />
-        <div className="h-10 w-64 bg-brand-linen/80 rounded-xl mx-auto animate-pulse" />
+        <Skeleton className="h-4 w-40 rounded-full mx-auto" />
+        <Skeleton className="h-10 w-64 rounded-xl mx-auto" />
       </div>
       <div className="w-full space-y-6">
-        <div className="h-20 md:h-32 w-full bg-brand-linen/40 rounded-[40px] animate-pulse overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full animate-shimmer" />
-        </div>
+        <Skeleton className="h-20 md:h-32 w-full rounded-[40px]" />
       </div>
     </div>
   </div>
@@ -203,7 +202,10 @@ function PublicProfileContent() {
   const [isAgendaFull, setIsAgendaFull] = useState(false);
   const [activeWaitlistEntry, setActiveWaitlistEntry] = useState<any>(null);
 
-  const { heroBio, aboutBio } = React.useMemo(() => {
+  const profilePlan = (profile?.plan || 'free') as PlanType;
+  const features = PLAN_CONFIGS[profilePlan]?.features;
+
+  const { hero: heroBio, about: aboutBio } = React.useMemo(() => {
     return splitSmartBio(profile?.bio);
   }, [profile?.bio]);
 
@@ -278,9 +280,15 @@ function PublicProfileContent() {
               s.active !== false && 
               s.name?.trim() && 
               (s.price ?? 0) > 0 && 
-              (s.duration ?? 0) > 0 && 
               s.professionalId
-            );
+            ).map(s => {
+              let parsedDuration = Number(s.duration) || 0;
+              if (parsedDuration < 15 || parsedDuration > 480) parsedDuration = 60;
+              return {
+                ...s,
+                duration: parsedDuration
+              };
+            });
 
             // Deduplicate: Group by professionalId + normalized name
             const normalizedGroups = new Map<string, Service[]>();
@@ -364,7 +372,7 @@ function PublicProfileContent() {
       } catch (error) {
         console.error("Critical error fetching public profile:", error);
         // Only show error for critical failure (user not found or total DB failure)
-        toast.error('Não foi possível carregar as informações do perfil.');
+        notify.error('Não foi possível carregar as informações do perfil.');
       } finally {
         setLoading(false);
       }
@@ -388,9 +396,9 @@ function PublicProfileContent() {
               setActiveWaitlistEntry({ id: snap.docs[0].id, ...entry });
               setPreSelectedService(services.find(s => s.id === entry.serviceId) || null);
               setIsBookingModalOpen(true);
-              toast.success('Sua vaga reservada está te esperando! ✨');
+              notify.success('Sua vaga reservada está te esperando! ✨');
             } else {
-              toast.error('Este convite de espera expirou.');
+              notify.error('Este convite de espera expirou.');
             }
           }
         }
@@ -609,7 +617,7 @@ function PublicProfileContent() {
                 if (profile && profile.uid !== 'mock-helena') {
                   logAnalyticsEvent(profile.uid, 'click_book_sticky');
                 }
-                if (urgencyInfo?.isAgendaFull) {
+                if (urgencyInfo?.isAgendaFull && features?.waitlist) {
                   setIsWaitlistOpen(true);
                 } else {
                   if (services.length > 0) setPreSelectedService(services[0]);
@@ -619,7 +627,7 @@ function PublicProfileContent() {
               className="flex items-center gap-3 bg-brand-ink text-brand-white px-7 py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.18em] shadow-2xl hover:bg-brand-terracotta transition-all whitespace-nowrap active:scale-95"
             >
               <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta animate-pulse" />
-              {urgencyInfo?.isAgendaFull ? 'Fila de espera' : 'Reservar agora'}
+              {urgencyInfo?.isAgendaFull && features?.waitlist ? 'Fila de espera' : 'Reservar agora'}
               <ArrowRight size={14} />
             </button>
           </motion.div>
@@ -632,11 +640,11 @@ function PublicProfileContent() {
         nextSlot={nextSlot} 
         heroBio={heroBio}
         stats={stats}
-        isAgendaFull={urgencyInfo?.isAgendaFull}
+        isAgendaFull={urgencyInfo?.isAgendaFull && features?.waitlist}
         totalWeeklySlots={totalWeeklySlots}
-        onWaitlistClick={() => setIsWaitlistOpen(true)}
+        onWaitlistClick={() => features?.waitlist && setIsWaitlistOpen(true)}
         onBookingClick={(s) => { 
-          if (urgencyInfo?.isAgendaFull) {
+          if (urgencyInfo?.isAgendaFull && features?.waitlist) {
             setIsWaitlistOpen(true);
           } else {
             if(s) setPreSelectedService(s); 
@@ -650,7 +658,7 @@ function PublicProfileContent() {
           services={services} 
           profile={profile}
           onSelectService={(s) => { 
-            if (urgencyInfo?.isAgendaFull) {
+            if (urgencyInfo?.isAgendaFull && features?.waitlist) {
               setIsWaitlistOpen(true);
             } else {
               setPreSelectedService(s); 
@@ -673,7 +681,7 @@ function PublicProfileContent() {
         portfolio={profile.portfolio || []} 
         specialty={profile.professionalIdentity?.mainSpecialty || profile.specialty}
         onBookingClick={() => {
-          if (urgencyInfo?.isAgendaFull) {
+          if (urgencyInfo?.isAgendaFull && features?.waitlist) {
             setIsWaitlistOpen(true);
           } else {
             setIsBookingModalOpen(true);
@@ -692,14 +700,14 @@ function PublicProfileContent() {
             logAnalyticsEvent(profile.uid, 'week_calendar_click');
           }
           const day = weeklyAvailability.find(d => d.date === date);
-          if (day?.status === 'full') {
+          if (day?.status === 'full' && features?.waitlist) {
             setIsWaitlistOpen(true);
           } else if (day?.status !== 'closed') {
             setSelectedInitialDate(date);
             if (services.length > 0) setPreSelectedService(services[0]);
             setIsBookingModalOpen(true);
           } else {
-            toast.info('A profissional não atende neste dia.');
+            notify.info('A profissional não atende neste dia.');
           }
         }}
       />
@@ -712,7 +720,7 @@ function PublicProfileContent() {
             if (profile && profile.uid !== 'mock-helena') {
               logAnalyticsEvent(profile.uid, 'click_book_final');
             }
-            if (urgencyInfo?.isAgendaFull) {
+            if (urgencyInfo?.isAgendaFull && features?.waitlist) {
               setIsWaitlistOpen(true);
             } else {
               setIsBookingModalOpen(true);
@@ -724,7 +732,7 @@ function PublicProfileContent() {
 
       <div className="h-32 md:hidden" /> {/* Bottom spacing for mobile CTA */}
 
-      {urgencyInfo?.isAgendaFull && (
+      {urgencyInfo?.isAgendaFull && features?.waitlist && (
         <section className="px-6 pb-20 -mt-10">
           <motion.div 
             initial={{ opacity: 0, y: 30 }}

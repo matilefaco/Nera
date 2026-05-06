@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
+import { isRevenueStatus, isCancelledStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { db, updateClientSummaryFromAppointment } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
 import { 
@@ -10,15 +11,17 @@ import {
 } from 'lucide-react';
 import { formatCurrency, buildWhatsappLink, cn } from '../lib/utils';
 import AppLayout from '../components/AppLayout';
-import AppLoadingScreen from '../components/AppLoadingScreen';
+import { ListCardSkeleton } from '../components/ui/ListCardSkeleton';
 import { ClientSummary, Appointment } from '../types';
 import PremiumButton from '../components/PremiumButton';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
+import { exportClientsCsv } from '../lib/exportCsv';
 
 const PAGE_SIZE = 50;
 
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
+import { PageErrorBoundary } from '../components/PageErrorBoundary';
 
 export default function ClientsPage() {
   const { user, profile } = useAuth();
@@ -31,7 +34,6 @@ export default function ClientsPage() {
   } = useUpgradeTriggers();
 
   const [clients, setClients] = useState<ClientSummary[]>([]);
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [filterService, setFilterService] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,27 +43,17 @@ export default function ClientsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [isMigrating, setIsMigrating] = useState(false);
 
-  // Fetch appointments to get unique services and enrich client data
-  useEffect(() => {
-    if (!user) return;
-    const q = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const appts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-      setAppointments(appts);
-    });
-    return () => unsubscribe();
-  }, [user]);
-
   const uniqueServices = useMemo(() => {
     const s = new Set<string>();
-    appointments.forEach(a => {
-      if (a.serviceName) s.add(a.serviceName);
+    clients.forEach((c: any) => {
+      if (c.services && Array.isArray(c.services)) {
+        c.services.forEach((srv: string) => s.add(srv));
+      } else if (c.lastServiceName) {
+        s.add(c.lastServiceName);
+      }
     });
     return Array.from(s).sort();
-  }, [appointments]);
+  }, [clients]);
 
   const isActive = (c: ClientSummary) => {
     if (!c.lastAppointmentDate) return false;
@@ -101,10 +93,27 @@ export default function ClientsPage() {
       }
 
       const snapshot = await getDocs(q);
-      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ClientSummary));
+      const docs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return { 
+          id: doc.id,
+          ...data,
+          clientName: data.clientName || 'Cliente',
+          clientPhone: data.clientPhone || '',
+          totalSpent: typeof data.totalSpent === 'number' ? data.totalSpent : 0,
+          totalAppointments: typeof data.totalAppointments === 'number' ? data.totalAppointments : 0,
+          lastAppointmentDate: data.lastAppointmentDate ? new Date(data.lastAppointmentDate).toISOString() : new Date().toISOString()
+        } as ClientSummary;
+      });
       
       if (isNextPage) {
-        setClients(prev => [...prev, ...docs]);
+        setClients(prev => {
+          const uniqueDocs = [...prev];
+          docs.forEach(doc => {
+            if (!uniqueDocs.find(d => d.id === doc.id)) uniqueDocs.push(doc);
+          });
+          return uniqueDocs;
+        });
       } else {
         setClients(docs);
       }
@@ -112,18 +121,110 @@ export default function ClientsPage() {
       setLastVisible(snapshot.docs[snapshot.docs.length - 1] || null);
       setHasMore(snapshot.docs.length === PAGE_SIZE);
 
-      // If no clients found, maybe we need migration?
+      // If no clients found or index error, we'll try to fallback
       if (!isNextPage && snapshot.empty) {
-        // Check if there are any appointments at all
-        const apptQuery = query(collection(db, 'appointments'), where('professionalId', '==', user.uid), limit(1));
-        const apptSnap = await getDocs(apptQuery);
-        if (!apptSnap.empty) {
-          console.warn('[ClientsPage] Summary collection is empty but appointments exist. Suggesting migration.');
-        }
+        throw new Error('empty_summaries');
       }
-    } catch (err) {
-      console.error('[ClientsPage] Fetch error:', err);
-      toast.error('Erro ao carregar clientes.');
+    } catch (err: any) {
+      if (err.message && (err.message.includes('index') || err.message.includes('empty_summaries'))) {
+        if (err.message.includes('index')) {
+          console.warn('[ClientsPage] Composite index required for client_summaries: professionalId ASC, lastAppointmentDate DESC. Falling back to appointments derivation.');
+        }
+        
+        // Fallback: derive clients from appointments collection safely
+        try {
+          const now = new Date();
+          const past = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+          const fallbackStartDateStr = past.toISOString().split('T')[0];
+
+          const apptQuery = query(
+            collection(db, 'appointments'),
+            where('professionalId', '==', user.uid),
+            where('date', '>=', fallbackStartDateStr),
+            orderBy('date', 'desc'),
+            limit(500)
+          );
+          const apptSnap = await getDocs(apptQuery);
+          
+          if (!apptSnap.empty) {
+            const derivedClients = new Map<string, ClientSummary>();
+            
+            apptSnap.docs.forEach(doc => {
+              const appt = doc.data() as Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string };
+              if (!appt.clientName) return;
+              
+              const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
+              const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
+              
+              const existing = derivedClients.get(key) || {
+                id: `derived_${key}`,
+                professionalId: user.uid,
+                clientKey: key,
+                clientName: appt.clientName || 'Cliente',
+                clientPhone: phone,
+                clientEmail: appt.clientEmail || appt.customerEmail || '',
+                totalAppointments: 0,
+                confirmedAppointments: 0,
+                cancelledAppointments: 0,
+                noShowCount: 0,
+                totalSpent: 0,
+                firstAppointmentDate: appt.date,
+                lastAppointmentDate: appt.date,
+                lastServiceId: appt.serviceId || '',
+                lastServiceName: appt.serviceName || '',
+                segment: 'new',
+                notes: '',
+                services: []
+              } as unknown as ClientSummary;
+              
+              const isConfirmed = isRevenueStatus(appt.status);
+              const isCancelled = isCancelledStatus(appt.status);
+              const isNoShow = appt.status === APPOINTMENT_STATUS.NO_SHOW;
+              
+              if (isConfirmed || isCancelled || isNoShow) {
+                existing.totalAppointments += 1;
+              }
+
+              if (isConfirmed) {
+                existing.confirmedAppointments += 1;
+                existing.totalSpent += (Number(appt.price) || 0);
+              }
+              if (isNoShow) existing.noShowCount += 1;
+              if (isCancelled) existing.cancelledAppointments += 1;
+              
+              if (!existing.services) existing.services = [];
+              if (!existing.services.includes(appt.serviceName) && appt.serviceName) {
+                existing.services.push(appt.serviceName);
+              }
+              
+              if (new Date(appt.date) > new Date(existing.lastAppointmentDate)) {
+                existing.lastAppointmentDate = appt.date;
+                existing.lastServiceName = appt.serviceName || '';
+              }
+              if (new Date(appt.date) < new Date(existing.firstAppointmentDate)) {
+                existing.firstAppointmentDate = appt.date;
+              }
+              
+              derivedClients.set(key, existing);
+            });
+            
+            const docs = Array.from(derivedClients.values()).sort((a, b) => 
+              new Date(b.lastAppointmentDate).getTime() - new Date(a.lastAppointmentDate).getTime()
+            );
+            
+            setClients(docs);
+            setHasMore(false);
+          } else {
+            setClients([]);
+          }
+        } catch (fallbackErr) {
+          console.error('[ClientsPage] Fallback also failed', fallbackErr);
+          notify.error('Erro ao carregar clientes. Tente novamente mais tarde.');
+        }
+      } else {
+        console.error('[ClientsPage] Failed to load clients', err);
+        notify.error('Erro ao carregar clientes. Tente novamente mais tarde.');
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -138,7 +239,7 @@ export default function ClientsPage() {
   const handleMigrate = async () => {
     if (!user) return;
     setIsMigrating(true);
-    toast.info('Iniciando atualização inteligente da base de clientes...', {
+    notify.info('Iniciando atualização inteligente da base de clientes...', {
       description: 'Isso pode levar alguns instantes.'
     });
 
@@ -149,20 +250,100 @@ export default function ClientsPage() {
       const appointments = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
 
       let count = 0;
-      // We process them one by one or in small batches to avoid transaction overload if it was a real migration tool, 
-      // but here we have the helper.
-      for (const appt of appointments) {
-        await updateClientSummaryFromAppointment(appt);
+      
+      const batchMap = new Map<string, any>();
+      
+      for (const appt of appointments as Array<Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string }>) {
+        if (!appt.clientName) continue;
+        
+        const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
+        const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
+        const summaryId = `${user.uid}_${key}`;
+        
+        const existing = batchMap.get(summaryId) || {
+          professionalId: user.uid,
+          clientKey: key,
+          clientName: appt.clientName || 'Cliente',
+          clientPhone: phone,
+          clientEmail: appt.clientEmail || appt.customerEmail || '',
+          totalAppointments: 0,
+          confirmedAppointments: 0,
+          cancelledAppointments: 0,
+          noShowCount: 0,
+          totalSpent: 0,
+          firstAppointmentDate: appt.date,
+          lastAppointmentDate: appt.date,
+          lastServiceId: appt.serviceId || '',
+          lastServiceName: appt.serviceName || '',
+          segment: 'new',
+          notes: '',
+          services: []
+        };
+        
+        const isConfirmed = isRevenueStatus(appt.status);
+        const isCancelled = isCancelledStatus(appt.status);
+        const isNoShow = appt.status === APPOINTMENT_STATUS.NO_SHOW;
+        
+        if (isConfirmed || isCancelled || isNoShow) {
+          existing.totalAppointments += 1;
+        }
+
+        if (isConfirmed) {
+          existing.confirmedAppointments += 1;
+          existing.totalSpent += (Number(appt.price) || 0);
+        }
+        if (isNoShow) existing.noShowCount += 1;
+        if (isCancelled) existing.cancelledAppointments += 1;
+        
+        if (!existing.services) existing.services = [];
+        if (!existing.services.includes(appt.serviceName) && appt.serviceName) {
+          existing.services.push(appt.serviceName);
+        }
+        
+        if (new Date(appt.date) > new Date(existing.lastAppointmentDate)) {
+          existing.lastAppointmentDate = appt.date;
+          existing.lastServiceId = appt.serviceId || '';
+          existing.lastServiceName = appt.serviceName || '';
+        }
+        if (new Date(appt.date) < new Date(existing.firstAppointmentDate)) {
+          existing.firstAppointmentDate = appt.date;
+        }
+        
+        batchMap.set(summaryId, existing);
         count++;
       }
+      
+      // Write to Firestore in batches
+      const { writeBatch, doc } = await import('firebase/firestore');
+      const chunks = Array.from(batchMap.entries()).reduce((resultArray, item, index) => { 
+        const chunkIndex = Math.floor(index/500);
+        if(!resultArray[chunkIndex]) {
+          resultArray[chunkIndex] = []; // start a new chunk
+        }
+        resultArray[chunkIndex].push(item);
+        return resultArray;
+}, [] as [string, any][][]);
+      
+      for (const chunk of chunks) {
+        const batch = writeBatch(db);
+        chunk.forEach(([id, data]) => {
+          const ref = doc(db, 'client_summaries', id);
+          batch.set(ref, data, { merge: true });
+        });
+        await batch.commit();
+      }
 
-      toast.success('Base de clientes sincronizada!', {
-        description: `${count} agendamentos processados.`
+      notify.success('Base de clientes sincronizada!', {
+        description: `${batchMap.size} clientes únicos processados a partir de ${count} reservas.`
       });
+      
+      // Refresh the page data
+      setClients([]);
+      setLastVisible(null);
       fetchClients(); // Refresh
     } catch (err) {
       console.error('[Migration] Failed:', err);
-      toast.error('Falha na migração automática.');
+      notify.error('Falha na migração automática.');
     } finally {
       setIsMigrating(false);
     }
@@ -183,19 +364,7 @@ export default function ClientsPage() {
   }, [clients]);
 
   const enrichedClients = useMemo(() => {
-    const today = new Date();
-    const last90Days = new Date();
-    last90Days.setDate(today.getDate() - 90);
-    const last90DaysStr = last90Days.toISOString().split('T')[0];
-
     return clients.map(c => {
-      const clientAppts = appointments.filter(a => 
-        (a.clientWhatsapp && a.clientWhatsapp === c.clientPhone) || 
-        (a.clientEmail && a.clientEmail === c.clientEmail)
-      );
-      
-      const services = Array.from(new Set(clientAppts.map(a => a.serviceName)));
-      const appts90 = clientAppts.filter(a => a.date >= last90DaysStr && ['confirmed', 'completed', 'paid'].includes(a.status)).length;
       const daysSince = c.lastAppointmentDate ? getDaysSinceLastVisit(c.lastAppointmentDate) : 999;
       
       // Segmentation Logic
@@ -203,7 +372,7 @@ export default function ClientsPage() {
       
       if (c.totalSpent >= segmentationThresholds.threshold20 || c.totalSpent >= (segmentationThresholds.avgTicket * 3)) {
         segment = 'vip';
-      } else if (appts90 >= 3) {
+      } else if (c.confirmedAppointments >= 3) {
         segment = 'recurring';
       } else if (daysSince > 60) {
         segment = 'inactive';
@@ -215,9 +384,12 @@ export default function ClientsPage() {
         segment = 'new';
       }
 
-      return { ...c, services, segment, appts90, daysSince };
+      // We rely on confirmedAppointments for 'appts90' proxy in UI since we don't fetch all appts to filter precisely by 90 days.
+      const appts90 = c.confirmedAppointments;
+
+      return { ...c, segment, appts90, daysSince };
     });
-  }, [clients, appointments, segmentationThresholds]);
+  }, [clients, segmentationThresholds]);
 
   const filteredClients = useMemo(() => {
     return enrichedClients
@@ -234,24 +406,42 @@ export default function ClientsPage() {
       .sort((a, b) => {
         // Sort priority: Segment (VIP first), then LTV
         const segmentWeight = { vip: 0, recurring: 1, active: 2, new: 3, at_risk: 4, inactive: 5 };
-        const weightA = (segmentWeight as any)[a.segment] ?? 10;
-        const weightB = (segmentWeight as any)[b.segment] ?? 10;
+        const weightA = segmentWeight[a.segment as keyof typeof segmentWeight] ?? 10;
+        const weightB = segmentWeight[b.segment as keyof typeof segmentWeight] ?? 10;
         
         if (weightA !== weightB) return weightA - weightB;
         return (b.totalSpent || 0) - (a.totalSpent || 0);
       });
   }, [enrichedClients, searchTerm, filterService, filterStatus]);
 
-  if (loading && clients.length === 0) {
-    return (
-      <AppLayout activeRoute="clients">
-        <AppLoadingScreen message="Sincronizando seus relacionamentos..." />
-      </AppLayout>
-    );
-  }
+      if (loading && clients.length === 0) {
+        return (
+          <AppLayout activeRoute="clients">
+            <div className="p-6 md:p-12 pb-32 max-w-5xl mx-auto w-full">
+              <header className="mb-12">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-brand-linen rounded-xl text-brand-terracotta">
+                    <Users size={24} />
+                  </div>
+                  <h1 className="text-4xl font-serif text-brand-ink">Seus Clientes</h1>
+                </div>
+                <p className="text-brand-stone font-light italic">Carregando seus relacionamentos...</p>
+              </header>
+              <div className="flex flex-col gap-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <ListCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
+          </AppLayout>
+        );
+      }
 
   return (
     <AppLayout activeRoute="clients">
+      <PageErrorBoundary 
+        title="Não foi possível carregar seus clientes." 
+      >
       <div className="p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
@@ -259,17 +449,27 @@ export default function ClientsPage() {
             <p className="text-brand-stone font-light text-sm">Base inteligente de clientes com histórico e LTV.</p>
           </div>
           
-          {clients.length === 0 && !loading && (
-            <PremiumButton 
-              onClick={handleMigrate} 
-              disabled={isMigrating}
-              variant="linen" 
-              className="text-[10px] py-4 px-6 flex items-center gap-2"
-            >
-              {isMigrating ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              Sincronizar Base Histórica
-            </PremiumButton>
-          )}
+          <div className="flex flex-col md:flex-row gap-4">
+            {clients.length > 0 && (
+              <button 
+                onClick={() => user && exportClientsCsv(user.uid)}
+                className="px-6 py-4 bg-brand-white text-brand-ink text-[10px] font-bold uppercase tracking-widest hover:border-brand-mist border-brand-mist shadow-sm border rounded-full transition-all flex items-center justify-center gap-2"
+              >
+                Exportar CSV
+              </button>
+            )}
+            {clients.length === 0 && !loading && (
+              <PremiumButton 
+                onClick={handleMigrate} 
+                disabled={isMigrating}
+                variant="linen" 
+                className="text-[10px] py-4 px-6 flex items-center gap-2"
+              >
+                {isMigrating ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Sincronizar Base Histórica
+              </PremiumButton>
+            )}
+          </div>
         </header>
 
         {/* Opportunity Card */}
@@ -360,14 +560,15 @@ export default function ClientsPage() {
                     .sort((a,b) => b.totalSpent - a.totalSpent)
                     .slice(0, 10);
                   
-                  toast.info(`Iniciando reativação de ${top10.length} clientes VIP...`, {
+                  notify.info(`Iniciando reativação de ${top10.length} clientes VIP...`, {
                     description: "Abriremos o WhatsApp de cada uma com uma mensagem personalizada."
                   });
 
                   // Sequence them (opening multiple tabs at once might be blocked, but we'll try or provide a list)
                   top10.forEach((c, i) => {
                     setTimeout(() => {
-                      const msg = `Oi ${c.clientName.split(' ')[0]} 💛 tudo bem? Faz um tempinho que você não vem nos visitar. Que tal garantir um horário essa semana para renovar seu autocuidado?`;
+                      const profileUrl = profile?.slug ? `https://usenera.com/p/${profile.slug}` : 'https://usenera.com';
+                      const msg = `Oi, ${c.clientName.split(' ')[0]} ✨\nFaz um tempinho desde o seu último atendimento e lembrei de você 🤎\nMinha agenda está disponível:\n${profileUrl}`;
                       window.open(buildWhatsappLink(c.clientPhone, msg), '_blank');
                     }, i * 1500);
                   });
@@ -394,7 +595,7 @@ export default function ClientsPage() {
               ].map(f => (
                 <button
                   key={f.id}
-                  onClick={() => setFilterStatus(f.id as any)}
+                  onClick={() => setFilterStatus(f.id as typeof filterStatus)}
                   className={cn(
                     "px-6 py-3 rounded-2xl text-[9px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap",
                     filterStatus === f.id
@@ -483,13 +684,13 @@ export default function ClientsPage() {
                           </div>
                         )}
                         {client.segment === 'at_risk' && (
-                          <div className="bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full border border-orange-100 text-[8px] font-bold">
+                          <div className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold">
                             EM RISCO
                           </div>
                         )}
-                        {client.segment === 'inactive' && (
-                          <div className="bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100 text-[8px] font-bold">
-                            INATIVA
+                        {(client.segment === 'inactive' || getDaysSinceLastVisit(client.lastAppointmentDate) >= 30) && (
+                          <div className="bg-brand-linen/50 text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold flex items-center gap-1">
+                            INATIVA ({getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS)
                           </div>
                         )}
                         {client.noShowCount > 0 && (
@@ -510,22 +711,41 @@ export default function ClientsPage() {
                   </div>
                   
                   <div className="flex items-center gap-2">
-                    <a 
-                      href={buildWhatsappLink(client.clientPhone, getDaysSinceLastVisit(client.lastAppointmentDate) >= 30 ? `Oi ${client.clientName.split(' ')[0]} 💛 faz um tempinho desde seu último atendimento. Se quiser, posso te mostrar horários disponíveis esta semana.` : `Oi ${client.clientName.split(' ')[0]} ✨ tudo bem?`)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(
-                        "p-3 md:p-4 rounded-2xl transition-all border flex items-center gap-2",
-                        getDaysSinceLastVisit(client.lastAppointmentDate) >= 30 
-                          ? "bg-brand-terracotta text-white border-brand-terracotta shadow-md hover:bg-brand-sienna hover:scale-105"
-                          : "text-brand-ink hover:bg-brand-linen border-transparent hover:border-brand-mist"
-                      )}
-                    >
-                      <MessageCircle size={20} />
-                      {getDaysSinceLastVisit(client.lastAppointmentDate) >= 30 && (
-                        <span className="text-[8px] font-bold uppercase tracking-widest hidden md:inline">Reativar</span>
-                      )}
-                    </a>
+                    {(() => {
+                      const isInactive = getDaysSinceLastVisit(client.lastAppointmentDate) >= 30;
+                      const hasPhone = !!client.clientPhone && client.clientPhone.length >= 10;
+                      const profileUrl = profile?.slug ? `https://usenera.com/p/${profile.slug}` : 'https://usenera.com';
+                      const templates = [
+                        `Oi, ${client.clientName.split(' ')[0]} 🤎\nPassei aqui pra te avisar que minha agenda está aberta novamente ✨\nSe quiser reservar um horário, você pode agendar por aqui:\n${profileUrl}`,
+                        `Oi, ${client.clientName.split(' ')[0]} ✨\nFaz um tempinho desde o seu último atendimento e lembrei de você 🤎\nMinha agenda está disponível:\n${profileUrl}`,
+                        `Oi, ${client.clientName.split(' ')[0]} ✨\nAgenda aberta da semana. Se quiser escolher um horário com calma, deixei meu link aqui:\n${profileUrl}`
+                      ];
+                      const msg = isInactive ? templates[client.clientName.length % templates.length] : `Oi, ${client.clientName.split(' ')[0]} ✨ tudo bem?`;
+                      
+                      return (
+                        <a 
+                          href={hasPhone ? buildWhatsappLink(client.clientPhone, msg) : '#'}
+                          target={hasPhone ? "_blank" : undefined}
+                          rel={hasPhone ? "noopener noreferrer" : undefined}
+                          className={cn(
+                            "p-3 md:p-4 rounded-2xl transition-all border flex items-center gap-2",
+                            !hasPhone ? "opacity-50 cursor-not-allowed text-brand-stone bg-brand-linen border-brand-mist" :
+                            isInactive 
+                              ? "bg-brand-terracotta text-white border-brand-terracotta shadow-md hover:bg-brand-sienna hover:scale-105"
+                              : "text-brand-ink hover:bg-brand-linen border-transparent hover:border-brand-mist"
+                          )}
+                          title={!hasPhone ? "Cliente sem telefone cadastrado" : isInactive ? "Reativar cliente via WhatsApp" : "Enviar mensagem no WhatsApp"}
+                          onClick={(e) => {
+                            if (!hasPhone) e.preventDefault();
+                          }}
+                        >
+                          <MessageCircle size={20} />
+                          {isInactive && (
+                            <span className="text-[8px] font-bold uppercase tracking-widest hidden md:inline">Reativar</span>
+                          )}
+                        </a>
+                      );
+                    })()}
                   </div>
                 </motion.div>
               ))}
@@ -559,6 +779,7 @@ export default function ClientsPage() {
         feature={upgradeFeature}
         count={usageCount}
       />
+      </PageErrorBoundary>
     </AppLayout>
   );
 }

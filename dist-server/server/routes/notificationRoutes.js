@@ -1,4 +1,5 @@
 import express from "express";
+import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { sendProfessionalNewBookingEmail, sendBookingPendingEmail, sendBookingCancelledEmail, sendBookingRescheduledEmail, sendBookingReminder24hEmail, sendReviewRequestEmail, sendConfirmationRequest24hEmail, sendRetentionEmail } from "../emails/sendEmail.js";
@@ -91,6 +92,10 @@ async function createLastMinuteAlert(payload) {
 import { buildNewBookingMessageForPro, buildBookingConfirmedMessageForClient, buildReminderMessage24h, buildWaitlistInviteMessage, buildCancellationMessage, buildReviewRequestMessage } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
+// Tokens públicos de acesso precisam ser criptograficamente seguros. Não usar Math.random.
+function generateSecureToken(bytes = 16) {
+    return randomBytes(bytes).toString("hex");
+}
 const router = express.Router();
 const debugOnly = (req, res, next) => {
     if (process.env.NODE_ENV === "production") {
@@ -815,7 +820,7 @@ router.get('/cron/review-requests', async (req, res) => {
             const apptId = docSnap.id;
             const clientPhone = appt.clientWhatsapp;
             if (clientPhone) {
-                const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                const token = generateSecureToken(24);
                 const reviewUrl = `${baseUrl}/review/${token}`;
                 await db.collection('review_requests').add({
                     professionalId: appt.professionalId,

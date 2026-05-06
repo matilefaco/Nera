@@ -1,6 +1,8 @@
 import express from "express";
 import { google } from "googleapis";
 import { getDb } from "../firebaseAdmin.js";
+import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
+import { logger, maskUid } from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -82,7 +84,7 @@ router.get("/callback", async (req, res) => {
       </html>
     `);
   } catch (err: any) {
-    console.error("[CALENDAR CALLBACK ERROR]", err.message);
+    logger.error("CALENDAR", "Failed to process OAuth callback", { requestId: req.requestId, professionalId: maskUid(professionalId), error: err });
     res.send(`
       <html>
         <body>
@@ -118,16 +120,23 @@ router.get("/status", async (req, res) => {
   }
 });
 
-router.post("/toggle", async (req, res) => {
+router.post("/toggle", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const db = getDb();
+  const uid = req.uid;
   const { professionalId, enabled } = req.body;
 
-  if (!professionalId) {
+  if (professionalId && professionalId !== uid) {
+    return res.status(403).json({ error: "Permissão negada" });
+  }
+
+  const targetId = uid || professionalId;
+
+  if (!targetId) {
     return res.status(400).json({ error: "Missing professionalId" });
   }
 
   try {
-    await db.collection("users").doc(professionalId).update({
+    await db.collection("users").doc(targetId).update({
       "integrations.google_calendar.enabled": enabled,
     });
     res.json({ success: true });
@@ -136,16 +145,23 @@ router.post("/toggle", async (req, res) => {
   }
 });
 
-router.post("/disconnect", async (req, res) => {
+router.post("/disconnect", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const db = getDb();
+  const uid = req.uid;
   const { professionalId } = req.body;
 
-  if (!professionalId) {
+  if (professionalId && professionalId !== uid) {
+    return res.status(403).json({ error: "Permissão negada" });
+  }
+
+  const targetId = uid || professionalId;
+
+  if (!targetId) {
     return res.status(400).json({ error: "Missing professionalId" });
   }
 
   try {
-    await db.collection("users").doc(professionalId).update({
+    await db.collection("users").doc(targetId).update({
       "integrations.google_calendar": null,
     });
     res.json({ success: true });
@@ -164,7 +180,7 @@ export async function createGoogleCalendarEvent(appointment: any, professionalId
     const integration = userDoc.data()?.integrations?.google_calendar;
 
     if (!integration || !integration.tokens || !integration.enabled) {
-      console.log(`[CALENDAR] Skipping event creation for user ${professionalId} (Integration disabled)`);
+      logger.info("CALENDAR", "Skipping event creation (Integration disabled or missing tokens)", { professionalId: maskUid(professionalId) });
       return;
     }
 
@@ -221,7 +237,7 @@ Mensagem: ${appointment.clientMessage || "Nenhuma"}
       requestBody: event,
     });
 
-    console.log(`[CALENDAR] Event created: ${response.data.htmlLink}`);
+    logger.info("CALENDAR", "Event created successfully", { professionalId: maskUid(professionalId) });
     
     // Save event ID to appointment
     await db.collection("appointments").doc(appointment.id).update({
@@ -230,7 +246,7 @@ Mensagem: ${appointment.clientMessage || "Nenhuma"}
 
     return response.data;
   } catch (err: any) {
-    console.error("[GOOGLE CALENDAR EVENT FAILED]", err.message);
+    logger.error("CALENDAR", "Google Calendar event creation failed", { professionalId: maskUid(professionalId), error: err });
   }
 }
 

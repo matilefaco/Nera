@@ -19,8 +19,9 @@ import { doc, getDoc, collection, query, where, onSnapshot, getDocs, limit } fro
 import { Appointment, UserProfile, Service } from '../types';
 import PremiumButton from '../components/PremiumButton';
 import { formatCurrency, formatLocalDate, buildWhatsappLink, cn } from '../lib/utils';
+import { isCancelledStatus, isPendingStatus, isRevenueStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { getAvailableSlots } from '../lib/bookingUtils';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 
 export default function ManageBookingPage() {
   const { id, token } = useParams<{ id?: string, token?: string }>();
@@ -59,12 +60,12 @@ export default function ManageBookingPage() {
           setAppointment(prev => prev ? { 
             ...prev, 
             clientConfirmed24h: true, 
-            status: 'confirmed' 
+            status: APPOINTMENT_STATUS.CONFIRMED 
           } : null);
-          toast.success('Presença confirmada com sucesso! ✨');
+          notify.success('Presença confirmada com sucesso! ✨');
         } catch (err) {
           console.error('[AUTO_ACTION] Error confirming presence:', err);
-          toast.error('Erro ao confirmar presença automaticamente.');
+          notify.error('Erro ao confirmar presença automaticamente.');
         } finally {
           setActionLoading(false);
           setIsAutoProcessed(true);
@@ -166,21 +167,29 @@ export default function ManageBookingPage() {
     );
 
     const unsubAppts = onSnapshot(qAppts, (snap) => {
-      setDayAppointments(snap.docs.map(d => d.data() as Appointment));
-    });
+      try {
+        setDayAppointments(snap.docs.map(d => d.data() as Appointment));
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     const blockedRef = collection(db, 'blocked_schedules');
     const dayOfWeek = selectedDate ? new Date(selectedDate + 'T12:00:00').getDay() : null;
 
     const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', professional.uid)), (snap) => {
-      const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-      const dayBlocked = allBlocked.filter(b => {
-        const isToday = b.date === selectedDate;
-        const isRecurringToday = dayOfWeek !== null && b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-        return isToday || isRecurringToday;
-      });
-      setBlockedSchedules(dayBlocked);
-    });
+      try {
+        const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+const dayBlocked = allBlocked.filter(b => {
+            const isToday = b.date === selectedDate;
+            const isRecurringToday = dayOfWeek !== null && b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+            return isToday || isRecurringToday;
+          });
+setBlockedSchedules(dayBlocked);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
     return () => {
       unsubAppts();
@@ -192,7 +201,7 @@ export default function ManageBookingPage() {
     if (!professional?.workingHours || !selectedDate || !appointment) return [];
     return getAvailableSlots({
       selectedDate,
-      serviceDuration: appointment.duration || 60,
+      serviceDuration: Number(appointment.duration) || 60,
       workingHours: professional.workingHours,
       appointments: dayAppointments,
       blockedSchedules
@@ -204,9 +213,9 @@ export default function ManageBookingPage() {
     setActionLoading(true);
     try {
       await confirmPresenceByClient(appointment.id);
-      toast.success('Presença confirmada! Nos vemos em breve. 💛');
+      notify.success('Presença confirmada! Nos vemos em breve. 💛');
     } catch (e) {
-      toast.error('Erro ao confirmar presença');
+      notify.error('Erro ao confirmar presença');
     } finally {
       setActionLoading(false);
     }
@@ -216,11 +225,11 @@ export default function ManageBookingPage() {
     if (!appointment?.id) return;
     setActionLoading(true);
     try {
-      await cancelBookingByClient(appointment.id, reason);
-      toast.success('Reserva cancelada.');
+      await cancelBookingByClient(token || appointment.manageSlug || appointment.token || appointment.id, reason);
+      notify.success('Reserva cancelada.');
       setView('main');
     } catch (e) {
-      toast.error('Erro ao cancelar');
+      notify.error('Erro ao cancelar');
     } finally {
       setActionLoading(false);
     }
@@ -231,13 +240,13 @@ export default function ManageBookingPage() {
     setActionLoading(true);
     try {
       await rescheduleBookingByClient(appointment.id, selectedDate, selectedTime);
-      toast.success('Horário alterado com sucesso!');
+      notify.success('Horário alterado com sucesso!');
       setView('main');
     } catch (e: any) {
       if (e.message === 'Horário indisponível') {
-        toast.error('Este horário acabou de ser preenchido. Escolha outro.');
+        notify.error('Este horário acabou de ser preenchido. Escolha outro.');
       } else {
-        toast.error('Erro ao remarcar');
+        notify.error('Erro ao remarcar');
       }
     } finally {
       setActionLoading(false);
@@ -262,7 +271,7 @@ export default function ManageBookingPage() {
         <h2 className="text-2xl font-serif text-brand-ink mb-2">Ops! Reserva não encontrada</h2>
         <p className="text-sm text-brand-stone font-light italic mb-8">O link pode ter expirado ou a reserva foi removida.</p>
         
-        {diagnosticResults && (
+        {(import.meta.env.DEV === true && typeof window !== 'undefined' && window.location.hostname.includes('localhost')) && diagnosticResults && (
           <div className="w-full max-w-md bg-brand-linen/60 border border-brand-mist/50 p-6 rounded-[32px] mb-8 text-left space-y-4 overflow-hidden shadow-sm">
             <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone border-b border-brand-mist pb-2">Diagnostic Data (Admin/Dev)</p>
             <p className="text-[9px] font-mono text-brand-stone break-all">Slug tried: <span className="text-brand-terracotta">{diagnosticResults.token}</span></p>
@@ -279,10 +288,10 @@ export default function ManageBookingPage() {
     );
   }
 
-  const isCancelled = ['cancelled', 'cancelled_by_professional', 'cancelled_by_client', 'expired', 'rejected'].includes(appointment.status);
-  const isCompleted = appointment.status === 'completed';
-  const isPending = appointment.status === 'pending';
-  const isConfirmed = appointment.status === 'confirmed' || appointment.status === 'accepted';
+  const isCancelled = isCancelledStatus(appointment.status);
+  const isCompleted = appointment.status === 'completed'; // Existent explicit check
+  const isPending = isPendingStatus(appointment.status);
+  const isConfirmed = isRevenueStatus(appointment.status) && !isCompleted;
   const isPast = new Date(appointment.date) < new Date(new Date().toISOString().split('T')[0]);
 
   const handleCalendarAdd = () => {
@@ -593,7 +602,7 @@ export default function ManageBookingPage() {
                         onClick={() => {
                           const addr = `${professional.studioAddress?.street}, ${professional.studioAddress?.number}, ${professional.studioAddress?.complement ? `${professional.studioAddress.complement}, ` : ''}${professional.studioAddress?.neighborhood}, ${professional.studioAddress?.city}`;
                           navigator.clipboard.writeText(addr);
-                          toast.success('Endereço copiado!');
+                          notify.success('Endereço copiado!');
                         }}
                         className="flex items-center justify-center gap-2 py-3.5 bg-brand-white border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all shadow-sm"
                       >
@@ -633,7 +642,7 @@ export default function ManageBookingPage() {
                     <button 
                       onClick={() => {
                         navigator.clipboard.writeText(`${window.location.origin}/r/${appointment.token}`);
-                        toast.success('Link copiado!');
+                        notify.success('Link copiado!');
                       }}
                       className="p-2 hover:bg-brand-white rounded-lg text-brand-stone transition-colors"
                     >
@@ -666,7 +675,7 @@ export default function ManageBookingPage() {
                         navigator.share({ title: professional.name, text, url });
                       } else {
                         navigator.clipboard.writeText(`${text} : ${url}`);
-                        toast.success('Link copiado!');
+                        notify.success('Link copiado!');
                       }
                     }}
                     className={cn(

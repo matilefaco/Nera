@@ -1,0 +1,176 @@
+import * as crypto from "crypto";
+
+export type LogLevel = "info" | "warn" | "error";
+
+export type LogScope =
+  | "BOOKING"
+  | "APPOINTMENT"
+  | "PROFILE"
+  | "REVIEW"
+  | "PAYMENT"
+  | "STRIPE"
+  | "EMAIL"
+  | "WHATSAPP"
+  | "CORS"
+  | "SSR"
+  | "CLEANUP"
+  | "AUTH"
+  | "CALENDAR"
+  | "AI"
+  | "SERVER"
+  | "FIRESTORE"
+  | "DEBUG"
+  | "SYSTEM"
+  | "PUSH"
+  | "ALERT"
+  | "NOTIFICATION"
+  | "CRON"
+  | "HEALTH";
+
+export interface LogPayload {
+  requestId?: string;
+  userId?: string;
+  professionalId?: string;
+  appointmentId?: string;
+  status?: string;
+  meta?: any;
+  error?: unknown;
+}
+
+export function maskEmail(email?: string): string {
+  if (!email || typeof email !== "string") return "";
+  const parts = email.split("@");
+  if (parts.length !== 2) return "***";
+  const name = parts[0];
+  const domain = parts[1];
+  if (name.length <= 2) return `***@${domain}`;
+  return `${name.substring(0, 2)}***@${domain}`;
+}
+
+export function maskPhone(phone?: string): string {
+  if (!phone || typeof phone !== "string") return "";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length <= 4) return "****";
+  return `***${digits.slice(-4)}`;
+}
+
+export function maskToken(token?: string): string {
+  if (!token || typeof token !== "string") return "";
+  if (token.length <= 6) return "***";
+  return `${token.substring(0, 6)}***`;
+}
+
+export function maskUid(uid?: string): string {
+  if (!uid || typeof uid !== "string") return "";
+  if (uid.length <= 6) return "***";
+  return `${uid.substring(0, 6)}***`;
+}
+
+export function sanitizeMeta(meta: any): any {
+  if (!meta || typeof meta !== "object") return meta;
+
+  const sensitiveKeys = [
+    "authorization",
+    "bearer",
+    "token",
+    "accesstoken",
+    "refreshtoken",
+    "idtoken",
+    "manageslug",
+    "reviewtoken",
+    "phone",
+    "whatsapp",
+    "email",
+    "clientemail",
+    "clientphone",
+    "stripesecret",
+    "secret",
+    "password",
+    "rawbody",
+  ];
+
+  if (Array.isArray(meta)) {
+    return meta.map(sanitizeMeta);
+  }
+
+  const sanitized: any = {};
+  for (const [key, value] of Object.entries(meta)) {
+    const lowerKey = key.toLowerCase();
+    const isSensitive = sensitiveKeys.some((s) => lowerKey.includes(s));
+
+    if (isSensitive) {
+      if (lowerKey.includes("email")) sanitized[key] = maskEmail(value as string);
+      else if (lowerKey.includes("phone") || lowerKey.includes("whatsapp")) sanitized[key] = maskPhone(value as string);
+      else sanitized[key] = maskToken(value as string);
+    } else if (typeof value === "object" && value !== null) {
+      sanitized[key] = sanitizeMeta(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+
+  return sanitized;
+}
+
+function processError(error: unknown): any {
+  if (!error) return undefined;
+  if (error instanceof Error) {
+    const errObj: any = {
+      name: error.name,
+      message: sanitizeMeta({ msg: error.message }).msg || error.message,
+    };
+    if ((error as any).code) errObj.code = (error as any).code;
+    if ((error as any).status) errObj.status = (error as any).status;
+    if (process.env.NODE_ENV !== "production") {
+      errObj.stack = error.stack;
+    }
+    return errObj;
+  }
+  if (typeof error === "string") return { message: error };
+  if (typeof error === "object") {
+      const obj = error as any;
+      return {
+          name: obj.name,
+          message: obj.message || obj.error,
+          code: obj.code,
+          status: obj.status
+      }
+  }
+  return { message: "Unknown error" };
+}
+
+function writeLog(level: LogLevel, scope: LogScope, message: string, payload?: LogPayload) {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level,
+    scope,
+    message,
+    requestId: payload?.requestId,
+    userId: maskUid(payload?.userId),
+    professionalId: maskUid(payload?.professionalId),
+    appointmentId: payload?.appointmentId,
+    status: payload?.status,
+    meta: sanitizeMeta(payload?.meta),
+    error: processError(payload?.error),
+  };
+
+  const logString = JSON.stringify(logEntry);
+
+  switch (level) {
+    case "info":
+      console.info(logString);
+      break;
+    case "warn":
+      console.warn(logString);
+      break;
+    case "error":
+      console.error(logString);
+      break;
+  }
+}
+
+export const logger = {
+  info: (scope: LogScope, message: string, payload?: LogPayload) => writeLog("info", scope, message, payload),
+  warn: (scope: LogScope, message: string, payload?: LogPayload) => writeLog("warn", scope, message, payload),
+  error: (scope: LogScope, message: string, payload?: LogPayload) => writeLog("error", scope, message, payload),
+};

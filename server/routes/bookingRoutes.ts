@@ -1,8 +1,13 @@
+import { bookingRateLimiter } from "../middleware/rateLimiter.js";
 import express from "express";
+import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
+import { logger, maskEmail, maskPhone, maskToken, maskUid } from "../utils/logger.js";
 import { sendBookingConfirmedEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
+import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
+import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
 
 const router = express.Router();
 
@@ -35,8 +40,14 @@ const getClientKey = (phone?: string, email?: string, name?: string): string => 
   return `name-${(name || 'anon').toLowerCase().replace(/\s+/g, '-')}`;
 };
 
+
+// Tokens públicos de acesso precisam ser criptograficamente seguros. Não usar Math.random.
+function generateSecureToken(bytes: number = 16): string {
+  return randomBytes(bytes).toString("hex");
+}
+
 const generateRandomSuffix = (length: number = 4) => {
-  return Math.random().toString(36).substring(2, 2 + length).toUpperCase();
+  return generateSecureToken(Math.ceil(length / 2)).substring(0, length).toUpperCase();
 };
 
 const generateReservationCode = (date: string) => {
@@ -54,6 +65,51 @@ const removeEmptyFields = (obj: any): any => {
   return newObj;
 };
 
+function getBookingLockId(appointment: any): string | null {
+  const dateAttr = appointment.date || appointment.appointmentDate || appointment.selectedDate || appointment.scheduledDate;
+  const timeAttr = appointment.time || appointment.appointmentTime || appointment.selectedTime || appointment.startTime;
+  if (!appointment?.professionalId || !dateAttr || !timeAttr) return null;
+  const cleanTime = String(timeAttr).replace(":", "");
+  return appointment.professionalId + "_" + dateAttr + "_" + cleanTime;
+}
+
+const sanitizeAppointment = (data: any, isUpdate = false): any => {
+  const sanitized = { ...data };
+
+  if (!isUpdate || sanitized.clientName !== undefined) {
+    sanitized.clientName = typeof sanitized.clientName === 'string' && sanitized.clientName.trim() !== '' 
+      ? sanitized.clientName.trim() 
+      : 'Cliente';
+  }
+
+  if (!isUpdate || sanitized.price !== undefined) {
+    sanitized.price = Number(sanitized.price) || 0;
+  }
+
+  if (!isUpdate || sanitized.status !== undefined) {
+    const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed', 'cancelled_by_professional', 'cancelled_by_client', 'declined', 'accepted', 'pending_conflict'];
+    if (!validStatuses.includes(sanitized.status)) {
+      sanitized.status = 'pending';
+    }
+  }
+
+  if (!isUpdate && !sanitized.professionalId) {
+    throw new Error('professionalId é obrigatório');
+  }
+
+  if (!isUpdate && !sanitized.createdAt) {
+    sanitized.createdAt = admin.firestore.FieldValue.serverTimestamp();
+  }
+
+  Object.keys(sanitized).forEach(key => {
+    if (sanitized[key] === undefined) {
+      delete sanitized[key];
+    }
+  });
+
+  return sanitized;
+};
+
 async function updateClientSummaryInternal(transaction: admin.firestore.Transaction, appointment: any, professionalId: string, isNew: boolean, oldStatus?: string, preFetchedSnap?: admin.firestore.DocumentSnapshot) {
   const db = getDb();
   const clientKey = getClientKey(appointment.clientWhatsapp, appointment.clientEmail, appointment.clientName);
@@ -64,7 +120,7 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
   let summary = summarySnap.exists ? summarySnap.data() as any : {
     professionalId,
     clientKey,
-    clientName: appointment.clientName,
+    clientName: appointment.clientName || 'Cliente',
     clientPhone: appointment.clientWhatsapp || '',
     clientEmail: appointment.clientEmail || '',
     totalAppointments: 0,
@@ -72,9 +128,9 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
     cancelledAppointments: 0,
     noShowCount: 0,
     totalSpent: 0,
-    lastAppointmentDate: appointment.date,
-    lastServiceName: appointment.serviceName,
-    firstAppointmentDate: appointment.date,
+    lastAppointmentDate: appointment.date || '',
+    lastServiceName: appointment.serviceName || '',
+    firstAppointmentDate: appointment.date || '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -89,8 +145,8 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
     }
   }
 
-  const wasConfirmed = oldStatus === 'confirmed' || oldStatus === 'accepted' || oldStatus === 'completed';
-  const isNowConfirmed = status === 'confirmed' || status === 'accepted' || status === 'completed';
+  const wasConfirmed = isRevenueStatus(oldStatus);
+  const isNowConfirmed = isRevenueStatus(status);
 
   if (isNowConfirmed && !wasConfirmed) {
     summary.confirmedAppointments += 1;
@@ -100,8 +156,8 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
     summary.totalSpent = Math.max(0, summary.totalSpent - price);
   }
 
-  if (status === 'cancelled' || status === 'cancelled_by_client' || status === 'cancelled_by_professional') {
-    if (oldStatus !== 'cancelled' && oldStatus !== 'cancelled_by_client' && oldStatus !== 'cancelled_by_professional') {
+  if (isCancelledStatus(status)) {
+    if (!isCancelledStatus(oldStatus)) {
       summary.cancelledAppointments += 1;
     }
   }
@@ -110,12 +166,12 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
     summary.noShowCount += 1;
   }
 
-  if (!summary.lastAppointmentDate || new Date(appointment.date) >= new Date(summary.lastAppointmentDate)) {
-    summary.lastAppointmentDate = appointment.date;
-    summary.lastServiceName = appointment.serviceName;
-    summary.clientName = appointment.clientName || summary.clientName;
-    summary.clientPhone = appointment.clientWhatsapp || summary.clientPhone;
-    summary.clientEmail = appointment.clientEmail || summary.clientEmail;
+  if (!summary.lastAppointmentDate || new Date(appointment.date || '') >= new Date(summary.lastAppointmentDate)) {
+    summary.lastAppointmentDate = appointment.date || '';
+    summary.lastServiceName = appointment.serviceName || '';
+    summary.clientName = appointment.clientName || summary.clientName || 'Cliente';
+    summary.clientPhone = appointment.clientWhatsapp || summary.clientPhone || '';
+    summary.clientEmail = appointment.clientEmail || summary.clientEmail || '';
   }
 
   summary.updatedAt = new Date().toISOString();
@@ -133,13 +189,26 @@ router.get("/public/booking-health", (req, res) => {
   });
 });
 
-router.post("/public/create-booking", async (req, res) => {
+router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
   const db = getDb();
   const appointmentData = req.body;
-  console.log("BOOKING PAYLOAD RECEBIDO:", JSON.stringify(appointmentData, null, 2));
+  
+  logger.info("BOOKING", "Booking payload received", {
+   requestId: req.requestId,
+   professionalId: maskUid(appointmentData.professionalId),
+   meta: {
+    hasClientName: Boolean(appointmentData.clientName),
+    clientPhone: maskPhone(appointmentData.clientWhatsapp || appointmentData.clientPhone),
+    clientEmail: maskEmail(appointmentData.clientEmail),
+    serviceId: appointmentData.serviceId,
+    date: appointmentData.date,
+    time: appointmentData.time,
+    status: appointmentData.status
+   }
+  });
   
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
-    console.error(`[API_BOOKING] REJECTED: Missing fields`, appointmentData);
+    logger.warn("BOOKING", "Rejected missing fields", { meta: { hasName: Boolean(appointmentData?.clientName) } });
     return res.status(400).json({ error: "Dados de agendamento incompletos (professionalId, date ou time ausentes)" });
   }
 
@@ -147,7 +216,7 @@ router.post("/public/create-booking", async (req, res) => {
     const cleanedData = removeEmptyFields(appointmentData);
     const apptRef = db.collection('appointments').doc();
     const reservationCode = generateReservationCode(appointmentData.date);
-    const manageSlug = reservationCode.toLowerCase();
+    const manageSlug = generateSecureToken(24);
 
     const finalData: any = {
       ...cleanedData,
@@ -163,34 +232,35 @@ router.post("/public/create-booking", async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
-    console.log(`[API_BOOKING] Transaction starting. ApptID: ${apptRef.id}`);
+    logger.info("BOOKING", "Transaction starting");
 
     await db.runTransaction(async (transaction) => {
       // Professional Check
       const proRef = db.collection('users').doc(appointmentData.professionalId);
       const proSnap = await transaction.get(proRef);
       if (!proSnap.exists) {
-        console.error(`BOOKING ERROR: Professional not found: ${appointmentData.professionalId}`);
+        logger.error("BOOKING", `Professional not found: ${appointmentData.professionalId}`);
         throw new Error(`Profissional não encontrado (${appointmentData.professionalId}). Verifique se o perfil existe.`);
       }
 
       // Service Check & Official Price
       if (!appointmentData.serviceId) {
-        console.error(`BOOKING ERROR: Missing serviceId`);
+        logger.error("BOOKING", `Missing serviceId`);
         throw new Error('ID do serviço não fornecido.');
       }
       const serviceRef = db.collection('services').doc(appointmentData.serviceId);
       const serviceSnap = await transaction.get(serviceRef);
       if (!serviceSnap.exists) {
-        console.error(`BOOKING ERROR: Service not found: ${appointmentData.serviceId}`);
+        logger.error("BOOKING", `Service not found: ${appointmentData.serviceId}`);
         throw new Error(`Serviço não encontrado (${appointmentData.serviceId}). Verifique se o serviço ainda existe.`);
       }
       const service = serviceSnap.data() as any;
 
       // Ownership check (Critical for data integrity after migration)
       if (normalizeId(service.professionalId) !== normalizeId(appointmentData.professionalId)) {
-        console.warn(`[API_BOOKING] ID MISMATCH: Service ${appointmentData.serviceId} belongs to ${service.professionalId}, but booking requested for ${appointmentData.professionalId}.`);
+        logger.warn("BOOKING", `ID MISMATCH: Service ${appointmentData.serviceId} belongs to ${service.professionalId}, but booking requested for ${appointmentData.professionalId}.`);
         // If they are different, we should probably follow the service's owner to avoid orphan appointments
+
         // but for now we just log and use the service's proId as the source of truth if needed
       }
 
@@ -208,6 +278,23 @@ router.post("/public/create-booking", async (req, res) => {
         couponSnap = await transaction.get(couponRef);
       }
 
+      // Check Booking Lock (Must be before writes)
+      const lockId = getBookingLockId(finalData);
+      let lockRef: admin.firestore.DocumentReference | null = null;
+      if (lockId) {
+        lockRef = db.collection('booking_locks').doc(lockId);
+        const lockSnap = await transaction.get(lockRef);
+        if (lockSnap.exists) {
+          throw new Error('SLOT_LOCKED:Este horário acabou de ser reservado. Escolha outro horário.');
+        }
+      }
+
+      // Read Client Summary
+      const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
+      const summaryId = `${appointmentData.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
+
       // 2. LOGIC & WRITES
       if (couponSnap && couponSnap.exists) {
         const coupon = couponSnap.data() as any;
@@ -219,8 +306,25 @@ router.post("/public/create-booking", async (req, res) => {
         });
       }
 
+      // Create Booking Lock
+      if (lockRef) {
+        transaction.set(lockRef, {
+          professionalId: finalData.professionalId,
+          date: finalData.date,
+          time: finalData.time,
+          appointmentId: apptRef.id,
+          serviceId: finalData.serviceId || 'unknown',
+          status: 'pending',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      // Sanitize before inserting to enforce schemas
+      const safeData = sanitizeAppointment(finalData, false);
+      
       // Create Appointment
-      transaction.set(apptRef, finalData);
+      transaction.set(apptRef, safeData);
 
       // Create reservation_links
       const linkRef = db.collection('reservation_links').doc(manageSlug);
@@ -234,14 +338,10 @@ router.post("/public/create-booking", async (req, res) => {
       });
 
       // Update Client Summary
-      const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
-      const summaryId = `${appointmentData.professionalId}_${clientKey}`;
-      const summaryRef = db.collection('client_summaries').doc(summaryId);
-      const summarySnap = await transaction.get(summaryRef);
-      await updateClientSummaryInternal(transaction, finalData, appointmentData.professionalId, true, undefined, summarySnap);
+      await updateClientSummaryInternal(transaction, safeData, appointmentData.professionalId, true, undefined, summarySnap);
     });
 
-    console.log(`[API_BOOKING] SUCCESS: Committed Appt ${apptRef.id}`);
+    logger.info("BOOKING", `SUCCESS: Committed Appt ${apptRef.id}`);
 
     res.json({
       success: true,
@@ -251,11 +351,164 @@ router.post("/public/create-booking", async (req, res) => {
     });
 
   } catch (err: any) {
-    console.error("BOOKING ERROR:", err.message);
+    if (err.message && err.message.includes('SLOT_LOCKED:')) {
+      return res.status(409).json({ error: err.message.replace('SLOT_LOCKED:', '') });
+    }
+    logger.error("BOOKING", "BOOKING ERROR", {
+      requestId: req.requestId,
+      error: err
+    });
     res.status(500).json({ 
       error: err.message,
       code: err.code || null
     });
+  }
+});
+
+// --- NEW: PUBLIC ENDPOINT TO SUBMIT REVIEW ---
+router.post("/public/reviews/:token/submit", async (req, res) => {
+  const db = getDb();
+  const { token } = req.params;
+  const { 
+    rating, 
+    tags, 
+    comment, 
+    publicDisplayMode, 
+    firstName, 
+    neighborhood,
+    serviceId,
+    serviceName
+  } = req.body;
+
+  if (!token || !rating) {
+    return res.status(400).json({ error: "Token e rating são obrigatórios." });
+  }
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Find review request
+      const q = db.collection('review_requests').where('token', '==', token).limit(1);
+      const requestSnaps = await transaction.get(q);
+      
+      if (requestSnaps.empty) {
+        throw new Error('Solicitação de avaliação não encontrada ou inválida.');
+      }
+      
+      const requestDoc = requestSnaps.docs[0];
+      const requestData = requestDoc.data();
+      
+      if (requestData.status === 'submitted') {
+        throw new Error('Esta avaliação já foi enviada.');
+      }
+      if (requestData.status === 'expired') {
+        throw new Error('Este link de avaliação expirou.');
+      }
+
+      const professionalId = requestData.professionalId;
+      const reviewRef = db.collection('reviews').doc();
+      const statsRef = db.collection('review_stats').doc(professionalId);
+      
+      // READS MUST BE BEFORE WRITES
+      const statsDoc = await transaction.get(statsRef);
+      const apptRef = db.collection('appointments').doc(requestData.bookingId);
+      const apptDoc = await transaction.get(apptRef);
+      const profRef = db.collection('users').doc(professionalId);
+      const profDoc = await transaction.get(profRef);
+      
+      let locationLabel = '';
+      if (profDoc.exists && apptDoc.exists) {
+        const prof = profDoc.data()!;
+        const appt = apptDoc.data()!;
+        
+        const locType = appt.locationType;
+        if (locType === 'home' || locType === 'domicilio') {
+           const apptNeigh = appt.neighborhood || neighborhood || '';
+           const city = prof.city || '';
+           if (apptNeigh && city) locationLabel = `${apptNeigh}, ${city}`;
+           else if (city) locationLabel = city;
+        } else {
+           // studio
+           const profNeigh = prof.neighborhood || '';
+           const city = prof.city || '';
+           if (profNeigh && city) locationLabel = `${profNeigh}, ${city}`;
+           else if (city) locationLabel = city;
+        }
+      }
+
+      // 2. Create the review
+      transaction.set(reviewRef, {
+        bookingId: requestData.bookingId,
+        professionalId: professionalId,
+        serviceId: serviceId || '',
+        serviceName: serviceName || '',
+        rating: Number(rating),
+        tags: tags || [],
+        comment: comment ? String(comment).trim() : '',
+        publicDisplayMode: publicDisplayMode || 'named',
+        publicApproved: true,
+        firstName: firstName || 'Cliente',
+        neighborhood: neighborhood || '',
+        locationLabel: locationLabel,
+        createdAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 3. Complete the request
+      transaction.update(requestDoc.ref, {
+        status: 'submitted',
+        submittedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 4. Update the review stats
+      let newAverageRating = Number(rating);
+      let newTotalReviews = 1;
+      let newTopTags = tags ? tags.slice(0, 5) : [];
+      
+      if (statsDoc.exists) {
+        const currentStats = statsDoc.data()!;
+        newTotalReviews = (currentStats.totalReviews || 0) + 1;
+        newAverageRating = ((currentStats.averageRating || 0) * (currentStats.totalReviews || 0) + rating) / newTotalReviews;
+        
+        const updatedTags = [...(currentStats.topTags || [])];
+        if (tags) {
+          tags.forEach((tag: string) => {
+            if (!updatedTags.includes(tag)) updatedTags.push(tag);
+          });
+        }
+        newTopTags = updatedTags.slice(0, 5);
+
+        transaction.update(statsRef, {
+          averageRating: Number(newAverageRating.toFixed(1)),
+          totalReviews: newTotalReviews,
+          topTags: newTopTags,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        transaction.set(statsRef, {
+          professionalId: professionalId,
+          averageRating: rating,
+          totalReviews: 1,
+          totalCompletedBookings: 1,
+          topTags: newTopTags,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      // 5. Sync simple stats to user profile
+      const userRef = db.collection('users').doc(professionalId);
+      transaction.update(userRef, {
+        averageRating: Number(newAverageRating.toFixed(1)),
+        totalReviews: newTotalReviews,
+        topTags: newTopTags
+      });
+
+      return { success: true };
+    });
+
+    logger.info("REVIEW", "Review submitted successfully", { meta: { reviewToken: maskToken(token) } });
+    res.json(result);
+  } catch (err: any) {
+    logger.error("REVIEW", "Submit review error", { error: err, meta: { reviewToken: maskToken(token) } });
+    res.status(400).json({ error: err.message || "Não foi possível enviar agora. Tente novamente." });
   }
 });
 
@@ -275,11 +528,9 @@ router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
     const apptDoc = await db.collection('appointments').doc(appointmentId as string).get();
     
     if (!apptDoc.exists) {
-      console.log('FAILED (not found)');
-      return res.status(404).json({ error: "Appointment not found" });
+            return res.status(404).json({ error: "Appointment not found" });
     }
-    console.log('SUCCESS');
-
+    
     const data = apptDoc.data();
     const result: any = {
       appointmentId,
@@ -301,16 +552,14 @@ router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
       process.stdout.write(`[FIRESTORE READ] Attempting to read users/${data.professionalId}... `);
       const proDoc = await db.collection('users').doc(data.professionalId).get();
       if (proDoc.exists) {
-        console.log('SUCCESS');
-        result.professionalEmail = proDoc.data()?.email;
+                result.professionalEmail = proDoc.data()?.email;
       } else {
-        console.log('FAILED (not found)');
-      }
+              }
     }
 
     res.json(result);
   } catch (err: any) {
-    console.error('[FIRESTORE ERROR]', err.message);
+    logger.error("FIRESTORE", "Query error", { error: err });
     res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
@@ -423,7 +672,7 @@ router.get("/run-confirmation-email", debugOnly, async (req, res) => {
     }
 
   } catch (err: any) {
-    console.error(`[DEBUG RUN] Failed:`, err.message);
+    logger.error("DEBUG", "Debug run failed", { error: err });
     response.error = err.message;
     return res.status(400).json(response);
   }
@@ -514,7 +763,7 @@ router.get("/fix-duplicate-slots", debugOnly, async (req, res) => {
     const { professionalId } = req.query;
     if (!professionalId) return res.status(400).json({ error: "Missing professionalId" });
 
-    console.log(`[FIX DUPLICATES] Scanning for ${professionalId}...`);
+    logger.info("SYSTEM", "Fix duplicates scan starting", { professionalId: maskUid(professionalId as string) });
     
     const apptsSnap = await db.collection('appointments')
       .where('professionalId', '==', professionalId)
@@ -566,11 +815,14 @@ router.get("/fix-duplicate-slots", debugOnly, async (req, res) => {
       // Flag losers as conflicts
       for (const loser of losers) {
         try {
-          await db.collection('appointments').doc(loser.id).update({
+          const updatePayload = {
             status: 'pending_conflict', // specific status for manual resolution
             conflictReason: `Conflito com a reserva ${winner.id}`,
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
-          });
+          };
+          const safeUpdate = sanitizeAppointment(updatePayload, true);
+
+          await db.collection('appointments').doc(loser.id).update(safeUpdate);
           conflicts.push({ id: loser.id, key });
         } catch (err: any) {
           errors.push({ id: loser.id, error: err.message });
@@ -608,8 +860,8 @@ router.get("/debug-slot-lock", debugOnly, async (req, res) => {
       .get();
 
     const allApps = apptsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    const activeApps = allApps.filter((a: any) => ['confirmed', 'accepted', 'completed', 'pending_conflict'].includes(a.status));
-    const pendingApps = allApps.filter((a: any) => a.status === 'pending');
+    const activeApps = allApps.filter((a: any) => isActiveSlotStatus(a.status) || a.status === 'pending_conflict');
+    const pendingApps = allApps.filter((a: any) => isPendingStatus(a.status));
 
     res.json({
       lockId,
@@ -625,48 +877,35 @@ router.get("/debug-slot-lock", debugOnly, async (req, res) => {
 });
 
 // --- NEW: ATOMIC APPOINTMENT CONFIRMATION ENDPOINT ---
-router.post("/appointments/:appointmentId/confirm", async (req, res) => {
+router.post("/appointments/:appointmentId/confirm", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const db = getDb();
   const { appointmentId } = req.params;
   const { professionalId } = req.body;
+  const uid = req.uid;
 
-  console.log(`[CONFIRM APPOINTMENT] Request received for ${appointmentId} from ${professionalId}`);
-
-  if (!professionalId) {
-    return res.status(400).json({ error: "Dados incompletos: professionalId ausente" });
-  }
+  logger.info("BOOKING", "Confirm request received", { professionalId: maskUid(professionalId as string) });
 
   try {
-    console.log(`[CONFIRM ENDPOINT HIT] appointmentId: ${appointmentId}, professionalId: ${professionalId}`);
-    
+        
     const result = await db.runTransaction(async (transaction) => {
       const apptRef = db.collection('appointments').doc(appointmentId);
       const apptDoc = await transaction.get(apptRef);
 
       if (!apptDoc.exists) {
-        console.error(`[CONFIRM TRANSACTION] Appointment ${appointmentId} NOT FOUND`);
+        logger.error("BOOKING", "Appointment not found during confirm transaction");
         throw { status: 404, message: "Reserva não encontrada." };
       }
 
-      const data = apptDoc.data();
+      const data: any = apptDoc.data();
       if (!data) {
-        console.error(`[CONFIRM TRANSACTION] Appointment ${appointmentId} has NO DATA`);
+        logger.error("BOOKING", "Appointment has no data during confirm transaction");
         throw { status: 400, message: "Dados da reserva inválidos." };
       }
 
-      console.log(`[CONFIRM PRECHECK]`, {
-        appointmentId: appointmentId,
-        professionalId: data.professionalId,
-        serviceId: data.serviceId,
-        date: data.date || data.appointmentDate || data.selectedDate || data.scheduledDate,
-        time: data.time || data.appointmentTime || data.selectedTime || data.startTime,
-        status: data.status,
-        clientName: data.clientName
-      });
-
-      // Permission check
-      if (data.professionalId !== professionalId) {
-        console.error(`[CONFIRM TRANSACTION] Permission Denied: Appt proId=${data.professionalId}, Payload proId=${professionalId}`);
+      
+      // Permission check using Auth UID, completely disregarding payload professionalId for authorization
+      if (data.professionalId !== uid) {
+        logger.warn("BOOKING", "Confirm permission denied");
         throw { status: 403, message: "Você não tem permissão para confirmar esta reserva." };
       }
 
@@ -675,28 +914,36 @@ router.post("/appointments/:appointmentId/confirm", async (req, res) => {
       const timeAttr = data.time || data.appointmentTime || data.selectedTime || data.startTime;
 
       if (!dateAttr || !timeAttr) {
-        console.error(`[CONFIRM TRANSACTION] Missing date/time. date=${dateAttr}, time=${timeAttr}`);
+        logger.error("BOOKING", "Missing date/time configuration");
         throw { status: 400, message: `Dados incompletos: ${!dateAttr ? 'date' : 'time'} ausente` };
       }
 
+      // IMPORTANTE: Firestore transactions exigem todos os reads antes dos writes.
+      // 1. READS
       // Check for existing lock
       const cleanTime = timeAttr.replace(':', '');
       const lockId = `${data.professionalId}_${dateAttr}_${cleanTime}`;
       const lockRef = db.collection('booking_locks').doc(lockId);
       
-      console.log(`[CONFIRM TRANSACTION] Checking lock at: ${lockId}`);
-      const lockSnap = await transaction.get(lockRef);
+            const lockSnap = await transaction.get(lockRef);
+
+      // Read Client Summary
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
 
       const blockingStatuses = ['confirmed', 'accepted', 'completed'];
 
       if (lockSnap.exists) {
         const lockData = lockSnap.data();
         if (lockData && lockData.appointmentId !== appointmentId && blockingStatuses.includes(lockData.status)) {
-          console.warn(`[CONFIRM TRANSACTION] FAIL: Slot occupied by ${lockData.appointmentId}`);
+          logger.warn("BOOKING", "Confirm failed, slot occupied");
           throw { status: 409, message: "Este horário acabou de ser ocupado por outra cliente." };
         }
       }
 
+      // 2. WRITES
       // Update Appointment data
       const updatePayload: any = {
         status: "confirmed",
@@ -705,13 +952,13 @@ router.post("/appointments/:appointmentId/confirm", async (req, res) => {
         date: dateAttr,
         time: timeAttr
       };
+      
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
 
-      console.log(`[CONFIRM TRANSACTION] Updating appointment ${appointmentId}...`);
-      transaction.update(apptRef, updatePayload);
+            transaction.update(apptRef, safeUpdate);
 
       // Create/Update the lock
-      console.log(`[CONFIRM TRANSACTION] Creating/Updating lock ${lockId}...`);
-      transaction.set(lockRef, {
+            transaction.set(lockRef, {
         professionalId: data.professionalId,
         date: dateAttr,
         time: timeAttr,
@@ -722,10 +969,13 @@ router.post("/appointments/:appointmentId/confirm", async (req, res) => {
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
+      const updatedData = { ...data, ...updatePayload };
+      await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
+
       return { success: true, appointmentId, lockId, status: "confirmed" };
     });
 
-    console.log(`[CONFIRM ENDPOINT SUCCESS] for ${appointmentId}`);
+    logger.info("BOOKING", "Confirm finished successfully");
     
     // Create Google Calendar event (don't await to avoid delaying the response)
     // We could fetch the appointment data again, or pass the data we had
@@ -740,15 +990,230 @@ router.post("/appointments/:appointmentId/confirm", async (req, res) => {
     const status = err.status || 500;
     const message = err.message || "Erro interno do servidor";
     
-    console.error(`[CONFIRM ENDPOINT ERROR]`, {
-      code: status,
-      message,
-      appointmentId,
-      professionalId,
-      stack: err.stack
-    });
+    logger.error("BOOKING", "Confirm endpoint error", { error: err });
 
     return res.status(status).json({ error: message, code: status });
+  }
+});
+
+// --- NEW: COMPLETE APPOINTMENT ENDPOINT ---
+router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const { appointmentId } = req.params;
+  const uid = req.uid;
+
+  logger.info("BOOKING", "Complete request received");
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const apptRef = db.collection('appointments').doc(appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists) {
+        throw { status: 404, message: "Agenda não encontrada." };
+      }
+
+      const data = apptDoc.data()!;
+
+      if (data.professionalId !== uid) {
+        throw { status: 403, message: "Você não tem permissão." };
+      }
+
+      if (data.status !== 'confirmed' && data.status !== 'accepted') {
+        throw { status: 400, message: `Apenas atendimentos confirmados/aceitos podem ser concluídos. Status: ${data.status}` };
+      }
+
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
+
+      const updatePayload: any = {
+        status: "completed",
+        completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
+
+      transaction.update(apptRef, safeUpdate);
+      
+      const updatedData = { ...data, ...safeUpdate };
+      await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
+
+      return { success: true, appointmentId, status: "completed" };
+    });
+
+    logger.info("BOOKING", "Complete success");
+    return res.json(result);
+
+  } catch (err: any) {
+    logger.error("BOOKING", "Complete endpoint error", { error: err });
+    const status = err.status || 500;
+    const message = err.message || "Erro ao concluir atendimento";
+    res.status(status).json({ error: message, details: err });
+  }
+});
+
+// --- NEW: DECLINE APPOINTMENT BY PROFESSIONAL ENDPOINT ---
+router.post("/appointments/:appointmentId/decline", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const { appointmentId } = req.params;
+  const uid = req.uid;
+
+  logger.info("BOOKING", "Decline request received");
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const apptRef = db.collection('appointments').doc(appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
+      const data: any = apptDoc.data();
+
+      if (data.professionalId !== uid) {
+        throw { status: 403, message: "Você não tem permissão." };
+      }
+
+      if (data.status !== 'pending') {
+        throw { status: 400, message: `Transição de ${data.status} para recusada não permitida.` };
+      }
+
+      // IMPORTANTE: Firestore transactions exigem todos os reads antes dos writes.
+      // 1. READS
+      let shouldDeleteLock = false;
+      let deleteLockRef: admin.firestore.DocumentReference | null = null;
+      
+      const lockId = getBookingLockId(data);
+      if (lockId) {
+        deleteLockRef = db.collection('booking_locks').doc(lockId);
+        const lockSnap = await transaction.get(deleteLockRef);
+        if (lockSnap.exists) {
+           if (lockSnap.data()?.appointmentId === appointmentId) {
+             shouldDeleteLock = true;
+           } else {
+                        }
+        }
+      }
+
+      // Read Client Summary
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
+
+      // 2. WRITES
+      if (shouldDeleteLock && deleteLockRef) {
+        transaction.delete(deleteLockRef);
+              }
+
+      const updatePayload: any = {
+        status: "cancelled_by_professional",
+        declinedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastChangeBy: 'professional',
+        changeMessage: 'Recusado pelo profissional'
+      };
+      
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
+
+      transaction.update(apptRef, safeUpdate);
+      
+      const updatedData = { ...data, ...safeUpdate };
+      await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
+
+      return { success: true, appointmentId };
+    });
+
+    logger.info("BOOKING", "Decline success");
+    return res.json(result);
+  } catch (err: any) {
+    const status = err.status || 500;
+    const message = err.message || "Erro interno do servidor";
+    logger.error("BOOKING", "Decline endpoint error", { error: err });
+    return res.status(status).json({ error: message });
+  }
+});
+
+// --- NEW: CANCEL CONFIRMED APPOINTMENT BY PROFESSIONAL ENDPOINT ---
+router.post("/appointments/:appointmentId/cancel-by-professional", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const { appointmentId } = req.params;
+  const uid = req.uid;
+
+  logger.info("BOOKING", "Cancel request received");
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const apptRef = db.collection('appointments').doc(appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
+      const data: any = apptDoc.data();
+
+      if (data.professionalId !== uid) {
+        throw { status: 403, message: "Você não tem permissão." };
+      }
+
+      if (data.status !== 'confirmed' && data.status !== 'accepted') {
+        throw { status: 400, message: `Apenas confirmados podem ser cancelados. Status: ${data.status}` };
+      }
+
+      // IMPORTANTE: Firestore transactions exigem todos os reads antes dos writes.
+      // 1. READS
+      let shouldDeleteLock = false;
+      let deleteLockRef: admin.firestore.DocumentReference | null = null;
+      
+      const lockId = getBookingLockId(data);
+      if (lockId) {
+        deleteLockRef = db.collection('booking_locks').doc(lockId);
+        const lockSnap = await transaction.get(deleteLockRef);
+        if (lockSnap.exists) {
+           if (lockSnap.data()?.appointmentId === appointmentId) {
+             shouldDeleteLock = true;
+           } else {
+                        }
+        } else {
+                   }
+      } else {
+              }
+
+      // Read Client Summary
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
+
+      // 2. WRITES
+      if (shouldDeleteLock && deleteLockRef) {
+        transaction.delete(deleteLockRef);
+              }
+
+      const updatePayload: any = {
+        status: "cancelled_by_professional",
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastChangeBy: 'professional',
+        changeMessage: 'Cancelado pelo profissional'
+      };
+      
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
+
+      transaction.update(apptRef, safeUpdate);
+      
+      const updatedData = { ...data, ...safeUpdate };
+      await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
+
+      return { success: true, appointmentId };
+    });
+
+    logger.info("BOOKING", "Cancel success");
+    return res.json(result);
+  } catch (err: any) {
+    const status = err.status || 500;
+    const message = err.message || "Erro interno do servidor";
+    logger.error("BOOKING", "Cancel endpoint error", { error: err });
+    return res.status(status).json({ error: message });
   }
 });
 
@@ -1052,14 +1517,102 @@ router.post("/booking/:id/confirm-presence", async (req, res) => {
     
     if (!appDoc.exists) return res.status(404).json({ error: "Reserva não encontrada" });
     
-    await appRef.update({
+    const updateData = sanitizeAppointment({
       clientConfirmed24h: true,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    });
+    }, true);
+    
+    await appRef.update(updateData);
     
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+
+// --- NEW: CANCEL BY CLIENT VIA MANAGE SLUG ---
+router.post("/public/manage/:manageSlug/cancel", async (req: express.Request, res: express.Response) => {
+  const db = getDb();
+  const { manageSlug } = req.params;
+  const { reason } = req.body;
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Validate slug
+      const linkRef = db.collection('reservation_links').doc(manageSlug);
+      const linkDoc = await transaction.get(linkRef);
+      
+      if (!linkDoc.exists) {
+        throw { status: 404, message: "Link de gerenciamento inválido." };
+      }
+      
+      const appointmentId = linkDoc.data()?.appointmentId;
+      if (!appointmentId) throw { status: 404, message: "Reserva não encontrada no link." };
+
+      const apptRef = db.collection('appointments').doc(appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
+      const data: any = apptDoc.data();
+
+      if (['cancelled', 'cancelled_by_client', 'cancelled_by_professional'].includes(data.status)) {
+        throw { status: 400, message: "Reserva já está cancelada." };
+      }
+
+      // 1. READS for Lock
+      let shouldDeleteLock = false;
+      let deleteLockRef: admin.firestore.DocumentReference | null = null;
+      
+      const lockId = getBookingLockId(data);
+      if (lockId) {
+        deleteLockRef = db.collection('booking_locks').doc(lockId);
+        const lockSnap = await transaction.get(deleteLockRef);
+        if (lockSnap.exists) {
+           if (lockSnap.data()?.appointmentId === appointmentId) {
+             shouldDeleteLock = true;
+           } else {
+                        }
+        }
+      }
+
+      // Read Client Summary
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
+
+      // 2. WRITES
+      if (shouldDeleteLock && deleteLockRef) {
+        transaction.delete(deleteLockRef);
+              }
+
+      const updatePayload: any = {
+        status: "cancelled_by_client",
+        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        cancellationReason: reason || 'Cancelado pelo cliente',
+        lastChangeBy: 'client',
+        changeMessage: 'Cliente cancelou a reserva'
+      };
+      
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
+
+      transaction.update(apptRef, safeUpdate);
+      
+      const updatedData = { ...data, ...safeUpdate };
+      await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
+
+      return { success: true, appointmentId };
+    });
+
+    logger.info("BOOKING", "Cancel by client success");
+    return res.json(result);
+  } catch (err: any) {
+    const status = err.status || 500;
+    const message = err.message || "Erro interno do servidor";
+    logger.error("BOOKING", "Cancel by client error", { error: err });
+    return res.status(status).json({ error: message });
   }
 });
 

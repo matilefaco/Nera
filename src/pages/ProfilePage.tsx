@@ -10,7 +10,7 @@ import {
   RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import imageCompression from 'browser-image-compression';
 import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp } from '../lib/utils';
 import { THEMES, getTheme } from '../lib/themes';
@@ -127,7 +127,7 @@ export default function ProfilePage() {
 
       // Load portfolio from profile array (Single Source of Truth)
       if (profile.portfolio) {
-        setPortfolio(profile.portfolio);
+        setPortfolio(profile.portfolio as any);
       } else {
         // Fallback: Fetch portfolio from sub-collection if array is empty
         const fetchPortfolio = async () => {
@@ -162,10 +162,10 @@ export default function ProfilePage() {
     const handleMessage = (event: MessageEvent) => {
       // Validate origin if needed
       if (event.data?.type === 'CALENDAR_AUTH_SUCCESS') {
-        toast.success('Google Calendar conectado com sucesso!');
+        notify.success('Google Calendar conectado com sucesso!');
         fetchCalendarStatus();
       } else if (event.data?.type === 'CALENDAR_AUTH_ERROR') {
-        toast.error(`Erro ao conectar: ${event.data.error}`);
+        notify.error(`Erro ao conectar: ${event.data.error}`);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -194,7 +194,7 @@ export default function ProfilePage() {
         window.open(data.url, 'google_auth', 'width=600,height=700');
       }
     } catch (err) {
-      toast.error('Erro ao iniciar conexão com Google Calendar.');
+      notify.error('Erro ao iniciar conexão com Google Calendar.');
     } finally {
       setCalendarLoading(false);
     }
@@ -203,31 +203,39 @@ export default function ProfilePage() {
   const handleToggleCalendar = async (enabled: boolean) => {
     if (!user) return;
     try {
+      const token = await user.getIdToken();
       await fetch('/api/calendar/toggle', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ professionalId: user.uid, enabled }),
       });
       setGoogleCalendarEnabled(enabled);
-      toast.success(enabled ? 'Sincronização ativada.' : 'Sincronização desativada.');
+      notify.success(enabled ? 'Sincronização ativada.' : 'Sincronização desativada.');
     } catch (err) {
-      toast.error('Erro ao alterar status da sincronização.');
+      notify.error('Erro ao alterar status da sincronização.');
     }
   };
 
   const handleDisconnectCalendar = async () => {
     if (!user || !confirm('Tem certeza que deseja remover a integração com Google Calendar?')) return;
     try {
+      const token = await user.getIdToken();
       await fetch('/api/calendar/disconnect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ professionalId: user.uid }),
       });
       setGoogleCalendarConnected(false);
       setGoogleCalendarEnabled(false);
-      toast.success('Google Calendar desconectado.');
+      notify.success('Google Calendar desconectado.');
     } catch (err) {
-      toast.error('Erro ao desconectar.');
+      notify.error('Erro ao desconectar.');
     }
   };
 
@@ -247,7 +255,7 @@ export default function ProfilePage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      toast.error('Sessão encerrada. Por favor, faça login novamente.');
+      notify.error('Sessão encerrada. Por favor, faça login novamente.');
       return;
     }
 
@@ -268,7 +276,7 @@ export default function ProfilePage() {
 
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
-      toast.error('Por favor, preencha os campos destacados.');
+      notify.error('Por favor, preencha os campos destacados.');
       return;
     }
 
@@ -339,9 +347,18 @@ export default function ProfilePage() {
 
       try {
         console.log('[ProfileSave] Calling transactional save API...');
+        if (!auth.currentUser) {
+          notify.error("Sua sessão expirou. Entre novamente para salvar.");
+          setLoading(false);
+          return;
+        }
+        const token = await auth.currentUser.getIdToken(true);
         const response = await fetch('/api/profile/save', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({
             uid: user.uid,
             profileData: finalPayload,
@@ -355,14 +372,14 @@ export default function ProfilePage() {
         }
 
         console.log('[ProfileSave] Success');
-        toast.success('Seu perfil foi atualizado com sucesso.');
+        notify.success('Seu perfil foi atualizado com sucesso.');
       } catch (err: any) {
         console.error('[ProfileSave] Failed:', err);
-        toast.error(err.message || 'Não foi possível salvar seu perfil agora.');
+        notify.error(err, 'Não foi possível salvar seu perfil agora.');
       }
     } catch (error: any) {
       console.error('[ProfileSave] CRITICAL ERROR:', error);
-      toast.error('Não foi possível concluir agora. Tente novamente.');
+      notify.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);
       console.log('[ProfileSave] Done');
@@ -372,7 +389,7 @@ export default function ProfilePage() {
   const addArea = () => {
     if (!newAreaName) return;
     if (pricingStrategy === 'extra' && !newAreaFee) {
-      toast.error('Por favor, informe o valor adicional.');
+      notify.error('Por favor, informe o valor adicional.');
       return;
     }
     setServiceAreas([...serviceAreas, { name: newAreaName, fee: Number(newAreaFee || 0) }]);
@@ -407,10 +424,10 @@ export default function ProfilePage() {
         // PERSISTENCE: Save immediately
         await saveProfilePartial(user.uid, { avatar: url });
         
-        toast.success('Foto atualizada com sucesso.');
+        notify.success('Foto atualizada com sucesso.');
       } catch (err: any) {
         console.error('[Avatar] upload flow failed:', err);
-        toast.error('Não foi possível salvar a imagem agora.');
+        notify.error('Não foi possível salvar a imagem agora.');
         // Revert preview on error
         setAvatarPreview(avatar);
       } finally {
@@ -464,10 +481,10 @@ export default function ProfilePage() {
           item.id === tempId ? { id: docId, url: url, category: autoCategory || specialty || 'Geral' } : item
         ));
 
-        toast.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
+        notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
       } catch (err: any) {
         console.error('[Portfolio] upload failed:', err);
-        toast.error('Não foi possível carregar a imagem.');
+        notify.error('Não foi possível carregar a imagem.');
         // Remove temp item on error
         setPortfolio(prev => prev.filter(item => item.id !== tempId));
       } finally {
@@ -489,14 +506,14 @@ export default function ProfilePage() {
     setDeletingId(id);
     try {
       console.log('[Portfolio] removing from Firestore');
-      await deletePortfolioItem(user.uid, itemToRemove);
+      await deletePortfolioItem(user.uid, itemToRemove as any);
       console.log('[Portfolio] removed successfully');
       
       setPortfolio(prev => prev.filter(item => item.id !== id));
-      toast.success('Galeria atualizada.');
+      notify.success('Galeria atualizada.');
     } catch (err) {
       console.error('[Portfolio] Error removing:', err);
-      toast.error('Não foi possível remover a imagem.');
+      notify.error('Não foi possível remover a imagem.');
     } finally {
       setDeletingId(null);
     }
@@ -876,8 +893,8 @@ export default function ProfilePage() {
                 setServiceMode={setServiceMode}
                 studioAddress={studioAddress}
                 setStudioAddress={setStudioAddress}
-                serviceAreaType={serviceAreaType}
-                setServiceAreaType={setServiceAreaType}
+                serviceAreaType={serviceAreaType as any}
+                setServiceAreaType={setServiceAreaType as any}
                 serviceAreas={serviceAreas}
                 setServiceAreas={setServiceAreas}
                 pricingStrategy={pricingStrategy}

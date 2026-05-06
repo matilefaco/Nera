@@ -1,6 +1,8 @@
 import express from "express";
+import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
+import { logger, maskEmail, maskPhone, maskToken, maskUid } from "../utils/logger.js";
 import { 
   sendProfessionalNewBookingEmail,
   sendBookingPendingEmail,
@@ -32,8 +34,7 @@ export async function sendPushToUser(professionalId: string, payload: any) {
     const subscriptionsSnap = await db.collection('users').doc(professionalId).collection('push_subscriptions').get();
     
     if (subscriptionsSnap.empty) {
-      console.log(`[PUSH] No subscriptions found for professional ${professionalId}`);
-      return;
+            return;
     }
 
     const notificationPayload = JSON.stringify(payload);
@@ -42,16 +43,15 @@ export async function sendPushToUser(professionalId: string, payload: any) {
       const subscription = doc.data().subscription;
       return webpush.sendNotification(subscription, notificationPayload).catch(err => {
         if (err.statusCode === 404 || err.statusCode === 410) {
-          console.log(`[PUSH] Subscription expired or removed for ${doc.id}`);
-          return doc.ref.delete();
+                    return doc.ref.delete();
         }
-        console.error(`[PUSH] Error sending to ${doc.id}:`, err);
+        logger.error("PUSH", "Error sending push to doc", { error: err });
       });
     });
 
     await Promise.all(promises);
   } catch (error) {
-    console.error(`[PUSH] Error in sendPushToUser:`, error);
+    logger.error("PUSH", "Error in sendPushToUser", { error });
   }
 }
 
@@ -64,8 +64,7 @@ async function createLastMinuteAlert(payload: any) {
   const apptId = appointmentId || payload.id;
 
   if (!professionalId || !date || !time || !apptId) {
-    console.log('[ALERT] Missing data for last-minute check:', { professionalId, date, time, apptId });
-    return;
+        return;
   }
 
   try {
@@ -76,8 +75,7 @@ async function createLastMinuteAlert(payload: any) {
     const diffMs = apptDate.getTime() - now.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
 
-    console.log(`[ALERT] Cancellation check: ${diffHours.toFixed(2)}h until appointment ${apptId}`);
-
+    
     // If cancellation is within 2 hours of the appointment
     if (diffHours > 0 && diffHours <= 2) {
       const alertId = `last_minute_${apptId}`;
@@ -85,8 +83,7 @@ async function createLastMinuteAlert(payload: any) {
       
       const alertSnap = await alertRef.get();
       if (alertSnap.exists) {
-        console.log(`[ALERT] Alert already exists for ${apptId}`);
-        return;
+                return;
       }
 
       await alertRef.set({
@@ -102,8 +99,7 @@ async function createLastMinuteAlert(payload: any) {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      console.log(`[ALERT] SUCCESS: Last-minute cancellation alert created for ${apptId}`);
-      
+            
       // Also trigger a push
       await sendPushToUser(professionalId, {
         title: "Cancelamento de última hora!",
@@ -113,7 +109,7 @@ async function createLastMinuteAlert(payload: any) {
       });
     }
   } catch (err) {
-    console.error('[ALERT] Error creating last-minute alert:', err);
+    logger.error("ALERT", "Error creating last-minute alert", { error: err });
   }
 }
 
@@ -127,6 +123,12 @@ import {
 } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
+
+
+// Tokens públicos de acesso precisam ser criptograficamente seguros. Não usar Math.random.
+function generateSecureToken(bytes: number = 16): string {
+  return randomBytes(bytes).toString("hex");
+}
 
 const router = express.Router();
 
@@ -152,8 +154,7 @@ router.get("/debug-email", debugOnly, async (req, res) => {
 });
 
 router.get("/test-email", debugOnly, async (req, res) => {
-  console.log('[EMAIL] starting send (Test Endpoint)');
-  const target = (req.query.email as string) || "matilefaco@hotmail.com";
+    const target = (req.query.email as string) || "matilefaco@hotmail.com";
   try {
     if (!process.env.RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY is missing');
@@ -174,13 +175,12 @@ router.get("/test-email", debugOnly, async (req, res) => {
     });
     res.json({ status: "Email test sent successfully", result });
   } catch (err: any) {
-    console.error('[EMAIL] failed error (Test Endpoint):', err);
-    res.status(500).json({ error: err.message, stack: err.stack });
+        res.status(500).json({ error: err.message, stack: err.stack });
   }
 });
 
 // Mock for sendRawEmail which was deprecated in original server.ts
-function sendRawEmailDraft(...args: any[]) { console.warn("sendRawEmail is deprecated"); return { success: false }; }
+function sendRawEmailDraft(...args: any[]) { logger.warn("EMAIL", "sendRawEmail is deprecated"); return { success: false }; }
 
 router.get("/test-email-real", debugOnly, async (req, res) => {
   const target = "matilefaco@hotmail.com";
@@ -292,15 +292,30 @@ router.get("/test-whatsapp", debugOnly, async (req, res) => {
 router.post("/zapi/webhook", async (req, res) => {
   const db = getDb();
   const payload = req.body;
-  console.log("[Z-API Webhook] Received payload:", JSON.stringify(payload));
+  const messageId = payload.messageId || payload.id;
+  const isMessage = payload.type === 'on-message-received' || (payload.phone && payload.text);
 
-  if (payload.type === 'on-message-received' || (payload.phone && payload.text)) {
+  logger.info("WHATSAPP", "Z-API Webhook received", {
+   requestId: req.requestId,
+   meta: {
+     type: payload.type,
+     hasPhone: !!payload.phone,
+     hasMessageId: !!messageId,
+     isMessage
+   }
+  });
+
+  if (isMessage) {
     const phone = payload.phone;
     const message = payload.text?.message || payload.text || "";
     
     if (phone && message) {
       handleInboundMessage(db, phone, message, payload).catch(err => {
-        console.error("[Z-API Webhook] Error processing message:", err);
+        logger.error("WHATSAPP", "Error processing message", {
+          requestId: req.requestId,
+          error: err,
+          meta: { phone: maskPhone(phone), messageId }
+        });
       });
     }
   }
@@ -325,11 +340,9 @@ router.post("/push/subscribe", async (req, res) => {
   const { subscription, userId, userAgent } = req.body;
   const authHeader = req.headers.authorization;
 
-  console.log("[PUSH SUBSCRIBE] START");
-  console.log("[PUSH SUBSCRIBE] uid body:", userId);
-
+    
   if (!subscription || !userId) {
-    console.error("[PUSH SUBSCRIBE] Missing subscription or userId");
+    logger.warn("PUSH", "Missing subscription or userId");
     return res.status(400).json({ error: "Missing subscription or userId" });
   }
 
@@ -340,19 +353,18 @@ router.post("/push/subscribe", async (req, res) => {
     try {
       const decodedToken = await admin.auth().verifyIdToken(token);
       verifiedUid = decodedToken.uid;
-      console.log("[PUSH SUBSCRIBE] Token verified for UID:", verifiedUid);
-    } catch (err) {
-      console.error("[PUSH SUBSCRIBE] Token verification failed:", err);
+          } catch (err) {
+      logger.error("PUSH", "Token verification failed", { error: err });
       return res.status(401).json({ error: "Unauthorized: Invalid token" });
     }
   } else {
-    console.error("[PUSH SUBSCRIBE] Missing Authorization header");
+    logger.warn("PUSH", "Missing Authorization header");
     return res.status(401).json({ error: "Unauthorized: Missing token" });
   }
 
   // Ensure body userId matches token UID
   if (userId !== verifiedUid) {
-    console.error(`[PUSH SUBSCRIBE] UID mismatch. Body: ${userId}, Token: ${verifiedUid}`);
+    logger.warn("PUSH", "UID mismatch in push subscribe");
     return res.status(403).json({ error: "Forbidden: UID mismatch" });
   }
 
@@ -360,15 +372,13 @@ router.post("/push/subscribe", async (req, res) => {
   const keys = subscription.keys;
 
   if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
-    console.error("[PUSH SUBSCRIBE] Invalid subscription structure:", JSON.stringify(subscription));
+    logger.warn("PUSH", "Invalid subscription structure");
     return res.status(400).json({ error: "Invalid subscription structure: missing endpoint or keys (p256dh/auth)" });
   }
 
   try {
     const subscriptionId = Buffer.from(endpoint).toString('base64').substring(0, 50).replace(/[^a-zA-Z0-9]/g, '');
-    console.log("[PUSH SUBSCRIBE] Derived SubscriptionId:", subscriptionId);
-    console.log("[PUSH SUBSCRIBE] saving at:", `users/${userId}/push_subscriptions/${subscriptionId}`);
-
+        
     const docRef = db.collection('users').doc(userId).collection('push_subscriptions').doc(subscriptionId);
     
     const dataToSave = {
@@ -395,26 +405,25 @@ router.post("/push/subscribe", async (req, res) => {
     // VERIFICATION: Check if saved
     const savedDoc = await docRef.get();
     if (!savedDoc.exists) {
-      console.error("[PUSH SUBSCRIBE] Verification failed: Document was not saved in users collection");
+      logger.error("PUSH", "Verification failed: Document was not saved");
       throw new Error("Subscription não foi salva no Firestore (users collection)");
     }
 
     // DEBUG COLLECTION: Save to a root level collection for easier debugging
-    console.log("[PUSH SUBSCRIBE] saving to debug collection at:", `push_subscriptions_debug/${subscriptionId}`);
-    await db.collection('push_subscriptions_debug').doc(subscriptionId).set({
+        await db.collection('push_subscriptions_debug').doc(subscriptionId).set({
       ...dataToSave,
       userId,
       verified: true
     }, { merge: true });
 
-    console.log("[PUSH SUBSCRIBE] SAVED OK for user", userId);
+    logger.info("PUSH", "Push subscription saved successfully");
     res.status(201).json({ 
       success: true, 
       subscriptionId,
       path: `users/${userId}/push_subscriptions/${subscriptionId}`
     });
   } catch (error: any) {
-    console.error("[PUSH SUBSCRIBE] CRITICAL ERROR:", error);
+    logger.error("PUSH", "Critical error during push subscribe", { error });
     res.status(500).json({ error: error.message });
   }
 });
@@ -424,9 +433,7 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
   const { type, payload } = req.body;
   const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   
-  console.log(`[BOOKING FLOW] Processing notification ${type}...`);
-  console.log(`[BOOKING FLOW] Debug Payload for ${type}:`, JSON.stringify(payload, null, 2));
-
+    
   try {
     if (type === 'BOOKING_PENDING_CLIENT') {
       const { clientEmail, clientName, professionalName, professionalWhatsapp, serviceName, date, time, price, reservationCode, manageUrl, appointmentId, paymentMethods } = payload;
@@ -748,7 +755,7 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
     res.json({ success: true, message: "Type processed or ignored." });
 
   } catch (error: any) {
-    console.error(`[Notification Service] ERROR:`, error.message);
+    logger.error("NOTIFICATION", "Notification Service Error", { error });
     res.status(500).json({ 
       success: false, 
       error: error.message 
@@ -768,7 +775,7 @@ router.get('/cron/reminders24h', async (req, res) => {
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
     
-    console.log(`[Cron] Starting 24h reminders for appointments on ${tomorrowStr}...`);
+    logger.info("CRON", "Starting 24h reminders");
 
     const snap = await db.collection('appointments')
       .where('date', '==', tomorrowStr)
@@ -860,7 +867,7 @@ router.get('/cron/reminders24h', async (req, res) => {
               emailSent++;
             }
           } catch (emailErr) {
-            console.error(`[Cron] Email delivery failed for ${apptId}:`, emailErr);
+            logger.error("CRON", "Email delivery failed", { error: emailErr });
           }
         }
 
@@ -974,7 +981,7 @@ router.get('/cron/review-requests', async (req, res) => {
       const clientPhone = appt.clientWhatsapp;
 
       if (clientPhone) {
-        const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const token = generateSecureToken(24);
         const reviewUrl = `${baseUrl}/review/${token}`;
         
         await db.collection('review_requests').add({

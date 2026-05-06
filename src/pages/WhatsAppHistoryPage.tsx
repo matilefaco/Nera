@@ -40,12 +40,16 @@ const WhatsAppHistoryPage: React.FC = () => {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const logsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as WhatsAppLog[];
-      setLogs(logsData);
-      setLoading(false);
+      try {
+        const logsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as WhatsAppLog[];
+setLogs(logsData);
+setLoading(false);
+      } catch (err) {
+        console.error("Error in onSnapshot callback:", err);
+      }
     }, (error) => {
       console.error("Error fetching logs:", error);
       setLoading(false);

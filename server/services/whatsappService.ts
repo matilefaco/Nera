@@ -1,4 +1,5 @@
 import { getDb } from "../firebaseAdmin.js";
+import { logger, maskPhone, maskUid } from "../utils/logger.js";
 import admin from "firebase-admin";
 
 interface WhatsAppMetadata {
@@ -182,7 +183,7 @@ export async function sendWhatsApp(
   const baseUrl = process.env.ZAPI_BASE_URL || 'https://api.z-api.io';
 
   if (!instanceId || !token) {
-    console.error('[WhatsAppService] Missing Z-API credentials');
+    logger.error("WHATSAPP", 'Missing Z-API credentials');
     return { success: false, error: 'Missing Z-API credentials' };
   }
 
@@ -197,13 +198,21 @@ export async function sendWhatsApp(
   try {
     const recentLogs = await db.collection('whatsapp_logs')
       .where('idempotencyKey', '==', idempotencyKey)
-      .where('createdAt', '>', new Date(Date.now() - 5 * 60 * 1000))
-      .limit(1)
+      .limit(5)
       .get();
 
-    if (!recentLogs.empty) {
-      console.log(`[WhatsAppService] Duplicate message detected for ${normalizedPhone}, skipping.`);
-      return { success: true, duplicate: true, logId: recentLogs.docs[0].id };
+    const recentDoc = recentLogs.docs.find(doc => {
+      const data = doc.data();
+      const createdAt = data.createdAt ? data.createdAt.toDate() : new Date(0);
+      return createdAt > new Date(Date.now() - 5 * 60 * 1000);
+    });
+
+    if (recentDoc) {
+      logger.info("WHATSAPP", `Duplicate message detected, skipping.`, {
+        userId: metadata.userId,
+        meta: { phone: maskPhone(normalizedPhone) }
+      });
+      return { success: true, duplicate: true, logId: recentDoc.id };
     }
 
     const logId = await logWhatsAppMessage(db, {
@@ -257,7 +266,7 @@ export async function sendWhatsApp(
         }
       } catch (err: any) {
         lastError = err;
-        console.warn(`[WhatsAppService] Attempt ${attempt + 1} failed for ${normalizedPhone}:`, err.message);
+        logger.warn("WHATSAPP", `Attempt ${attempt + 1} failed for ${maskPhone(normalizedPhone)}:`, { error: err.message, userId: metadata.userId });
         if (attempt < MAX_RETRIES) {
           await new Promise(r => setTimeout(r, 2000));
         }
@@ -275,7 +284,7 @@ export async function sendWhatsApp(
     return { success: false, error: lastError?.message };
 
   } catch (err: any) {
-    console.error('[WhatsAppService] Fatal error:', err);
+    logger.error("WHATSAPP", 'Fatal error:', { error: err, userId: metadata.userId, meta: { phone: maskPhone(normalizedPhone) } });
     return { success: false, error: err.message };
   }
 }
@@ -324,7 +333,12 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
 
   await logRef.set(logData);
 
-  console.log(`[WhatsApp-Inbound] Incoming: ${phone}. Normalized: ${normalizedPhone}. Variations: ${phoneVariations.join(', ')}`);
+  logger.info("WHATSAPP", `Incoming message`, {
+    meta: {
+       phone: maskPhone(normalizedPhone),
+       variationsCount: phoneVariations.length
+    }
+  });
 
   try {
     // Search for appointments in multiple formats
@@ -352,7 +366,7 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
     const targetAppt = futureAppts[0];
     
     if (!targetAppt) {
-      console.warn(`[WhatsApp-Inbound] No active appointment for variants of ${normalizedPhone}`);
+      logger.warn("WHATSAPP", `No active appointment for variants of ${maskPhone(normalizedPhone)}`);
       await logRef.update({ 
         status: 'ignored', 
         error: 'No active appointment found',
@@ -447,7 +461,7 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
     return { success: true, intent, appointmentId: targetAppt.id };
 
   } catch (err: any) {
-    console.error('[WhatsAppService] Error handling inbound:', err);
+    logger.error("WHATSAPP", 'Error handling inbound:', { error: err, meta: { phone: maskPhone(normalizedPhone) } });
     await logRef.update({ status: 'failed', error: err.message });
     return { success: false, error: err.message };
   }

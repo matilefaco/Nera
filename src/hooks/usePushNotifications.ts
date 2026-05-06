@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import { notify } from '../lib/notify';
 import { auth } from '../firebase';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
@@ -155,7 +155,7 @@ export function usePushNotifications() {
       }
     } catch (error: any) {
       console.error('[PUSH ERROR AT STEP]', error);
-      toast.error(`Erro ao ativar notificações: ${error.message}`);
+      notify.error(`Erro ao ativar notificações: ${error.message}`);
       throw error;
     }
   }
