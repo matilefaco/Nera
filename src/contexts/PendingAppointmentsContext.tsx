@@ -22,12 +22,14 @@ export const usePendingAppointments = () => useContext(PendingAppointmentsContex
 
 export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!user?.uid) {
+      setPendingAppointments([]);
       setPendingCount(0);
       setLoading(false);
       return;
@@ -46,7 +48,9 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
       qPending,
       (snapshot) => {
         try {
-          setPendingCount(snapshot.size);
+          const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+          setPendingAppointments(docs);
+          setPendingCount(docs.length);
           setLoading(false);
           setError(null);
         } catch (err) {
@@ -57,6 +61,8 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
       },
       (snapshotError) => {
         console.error('[PendingAppointmentsProvider] Firestore onSnapshot error:', snapshotError);
+        setPendingAppointments([]);
+        setPendingCount(0);
         setError(snapshotError);
         setLoading(false);
       }
@@ -66,7 +72,7 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
   }, [user?.uid]);
 
   const value = {
-    pendingAppointments: [],
+    pendingAppointments,
     pendingCount,
     loading,
     error,
