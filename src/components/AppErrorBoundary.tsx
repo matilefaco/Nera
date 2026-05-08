@@ -35,34 +35,40 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   private handleWindowError = (event: ErrorEvent) => {
     runtimeLogger.log('error', { type: 'window_error', message: event.message });
-    if (this.isFirestoreError(event.error || event.message)) {
+
+    if (this.isRecoverableFirestoreAsyncError(event.error || event.message)) {
       runtimeLogger.dump();
-      event.preventDefault(); // Prevent default browser console error
-      this.setState({ hasError: true, error: event.error || new Error(event.message) });
+      event.preventDefault();
+      return;
     }
+
+    this.setState({ hasError: true, error: event.error || new Error(event.message) });
   };
 
   private handlePromiseRejection = (event: PromiseRejectionEvent) => {
     runtimeLogger.log('error', { type: 'promise_rejection', reason: event.reason });
-    if (this.isFirestoreError(event.reason)) {
+
+    if (this.isRecoverableFirestoreAsyncError(event.reason)) {
       runtimeLogger.dump();
       event.preventDefault();
-      this.setState({ hasError: true, error: event.reason instanceof Error ? event.reason : new Error(String(event.reason)) });
+      return;
     }
+
+    this.setState({ hasError: true, error: event.reason instanceof Error ? event.reason : new Error(String(event.reason)) });
   };
 
-  private isFirestoreError = (error: any): boolean => {
-    const msg = error?.message || String(error);
-    return msg.includes('FIRESTORE') || 
-           msg.includes('INTERNAL ASSERTION FAILED') ||
-           msg.includes('Unexpected state');
+  private isRecoverableFirestoreAsyncError = (error: any): boolean => {
+    const msg = String(error?.message || error || '').toLowerCase();
+    return msg.includes('firestore') ||
+           msg.includes('internal assertion failed') ||
+           msg.includes('unexpected state');
   };
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     runtimeLogger.log('error', { type: 'react_boundary', message: error.message, stack: error.stack });
     console.error('AppErrorBoundary caught an error:', error, errorInfo);
-    if (this.isFirestoreError(error)) {
-        runtimeLogger.dump();
+    if (this.isRecoverableFirestoreAsyncError(error)) {
+      runtimeLogger.dump();
     }
   }
 
@@ -77,10 +83,6 @@ export class AppErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
       
-      const isFirestoreError = this.state.error?.message?.includes('FIRESTORE') || 
-                               this.state.error?.message?.includes('INTERNAL ASSERTION FAILED') ||
-                               this.state.error?.message?.includes('Unexpected state');
-
       return (
         <div className="min-h-screen flex items-center justify-center bg-brand-sand/30 p-6 font-sans">
           <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-brand-sand/50 text-center relative overflow-hidden">
