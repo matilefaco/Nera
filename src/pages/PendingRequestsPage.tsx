@@ -24,6 +24,7 @@ import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
+  const uid = user?.uid ?? null;
   const navigate = useNavigate();
   
   const { pendingAppointments: truePending, loading: pendingLoading } = usePendingAppointments();
@@ -91,14 +92,14 @@ export default function PendingRequestsPage() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
     
     // Check for expired requests on load
-    checkAndExpireAppointments(user.uid).catch((error) => {
+    checkAndExpireAppointments(uid).catch((error) => {
       console.error('[PendingRequestsPage] Failed to expire appointments:', error);
       notify.error('Não foi possível atualizar pedidos expirados agora.');
     });
-  }, [user]);
+  }, [uid]);
 
   useEffect(() => {
     setLoading(pendingLoading);
