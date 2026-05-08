@@ -91,6 +91,7 @@ type DashboardTab = "hoje" | "geral" | "insights" | "divulgacao";
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
+  const uid = user?.uid ?? null;
   const { features, plan } = usePlanFeatures();
   
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
@@ -195,17 +196,14 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!user) return;
-
-    let isActive = true;
-
+    if (!uid) return;
     let isCancelled = false;
 
     const run = async () => {
       try {
         const qCount = query(
           collection(db, 'client_summaries'),
-          where('professionalId', '==', user.uid)
+          where('professionalId', '==', uid)
         );
         const snap = await getCountFromServer(qCount);
         if (!isCancelled) setTotalClientsCountFromSummaries(snap.data().count);
@@ -219,13 +217,13 @@ export default function Dashboard() {
     return () => {
       isCancelled = true;
     };
-  }, [user]);
+  }, [uid]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
     const qAlerts = query(
       collection(db, 'alerts'),
-      where('professionalId', '==', user.uid),
+      where('professionalId', '==', uid),
       where('read', '==', false),
       orderBy('createdAt', 'desc')
     );
@@ -242,7 +240,7 @@ setAlerts(docs);
     });
 
     return () => unsubAlerts();
-  }, [user]);
+  }, [uid]);
 
   const handleMarkAlertRead = async (alertId: string) => {
     try {
@@ -255,7 +253,7 @@ setAlerts(docs);
   // Triggers handled by hook
 
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
 
     let isCancelled = false;
 
@@ -263,7 +261,7 @@ setAlerts(docs);
       try {
         const qAnalytics = query(
           collection(db, 'analytics_events'),
-          where('professionalId', '==', user.uid),
+          where('professionalId', '==', uid),
           orderBy('timestamp', 'desc'),
           limit(100)
         );
@@ -281,7 +279,7 @@ setAlerts(docs);
     return () => {
       isCancelled = true;
     };
-  }, [user]);
+  }, [uid]);
 
 
 
@@ -308,7 +306,7 @@ setAlerts(docs);
   const dailyTip = getContextualTip();
 
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
     let isActive = true;
 
     const today = getTodayLocale();
@@ -316,7 +314,7 @@ setAlerts(docs);
     // Query: All appointments for today
     const qToday = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
+      where('professionalId', '==', uid),
       where('date', '==', today),
       orderBy('time', 'asc')
     );
@@ -341,7 +339,7 @@ setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (c
 
     const qUnconfirmed = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
+      where('professionalId', '==', uid),
       where('date', '==', tomorrowStr),
       where('status', '==', 'pending_confirmation')
     );
@@ -368,7 +366,7 @@ setUnconfirmedTomorrow(docs);
     // Query: Historical and upcoming appointments to calculate metrics
     const qAll = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
+      where('professionalId', '==', uid),
       where('date', '>=', startDateStr),
       where('date', '<=', endDateStr),
       orderBy('date', 'desc')
@@ -393,7 +391,7 @@ setUnconfirmedTomorrow(docs);
     // Query: Waitlist
     const qWaitlist = query(
       collection(db, 'waitlist'),
-      where('professionalId', '==', user.uid),
+      where('professionalId', '==', uid),
       where('status', 'in', ['waiting', 'invited']),
       orderBy('createdAt', 'desc')
     );
@@ -436,7 +434,7 @@ setWaitlist(docs);
 
     const qInactive = query(
       collection(db, 'client_summaries'),
-      where('professionalId', '==', user.uid),
+      where('professionalId', '==', uid),
       where('lastAppointmentDate', '<', thirtyDaysAgoStr),
       orderBy('lastAppointmentDate', 'desc'),
       limit(20)
@@ -458,7 +456,7 @@ setWaitlist(docs);
     // Query: All services
     const qServices = query(
       collection(db, 'services'),
-      where('professionalId', '==', user.uid)
+      where('professionalId', '==', uid)
     );
 
     getDocs(qServices).then((snapshot) => {
@@ -508,7 +506,7 @@ setWaitlist(docs);
     // Query: WhatsApp Logs
     const qWl = query(
       collection(db, 'whatsapp_logs'),
-      where('userId', '==', user.uid),
+      where('userId', '==', uid),
       orderBy('createdAt', 'desc'),
       limit(5)
     );
@@ -531,7 +529,7 @@ setWaitlist(docs);
       unsubUnconfirmed();
       unsubWaitlist();
     };
-  }, [user]);
+  }, [uid]);
 
   useEffect(() => {
     if (!profile) return;
