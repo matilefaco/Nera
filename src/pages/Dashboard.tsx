@@ -196,15 +196,27 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const qCount = query(
-      collection(db, 'client_summaries'),
-      where('professionalId', '==', user.uid)
-    );
-    getCountFromServer(qCount).then(snap => {
-      setTotalClientsCountFromSummaries(snap.data().count);
-    }).catch(err => {
-      console.error('Error fetching client summaries count:', err);
-    });
+
+    let isCancelled = false;
+
+    const run = async () => {
+      try {
+        const qCount = query(
+          collection(db, 'client_summaries'),
+          where('professionalId', '==', user.uid)
+        );
+        const snap = await getCountFromServer(qCount);
+        if (!isCancelled) setTotalClientsCountFromSummaries(snap.data().count);
+      } catch (err) {
+        console.error('Error fetching client summaries count:', err);
+      }
+    };
+
+    void run();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [user]);
 
   useEffect(() => {
@@ -243,23 +255,30 @@ setAlerts(docs);
   useEffect(() => {
     if (!user) return;
 
-    const qAnalytics = query(
-      collection(db, 'analytics_events'),
-      where('professionalId', '==', user.uid),
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
+    let isCancelled = false;
 
-    getDocs(qAnalytics).then((snapshot) => {
+    const run = async () => {
       try {
+        const qAnalytics = query(
+          collection(db, 'analytics_events'),
+          where('professionalId', '==', user.uid),
+          orderBy('timestamp', 'desc'),
+          limit(100)
+        );
+
+        const snapshot = await getDocs(qAnalytics);
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
-        setAnalyticsEvents(docs);
-      } catch (err) {
-        console.error("Error processing getDocs callback:", err);
+        if (!isCancelled) setAnalyticsEvents(docs);
+      } catch (error) {
+        console.error('[Dashboard] Fetch error on qAnalytics:', error);
       }
-    }).catch((error) => {
-      console.error('[Dashboard] Fetch error on qAnalytics:', error);
-    });
+    };
+
+    void run();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [user]);
 
 
