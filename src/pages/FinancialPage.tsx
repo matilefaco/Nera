@@ -37,6 +37,7 @@ export default function FinancialPage() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
 
     const fetchFinancialData = async () => {
       setLoading(true);
@@ -60,7 +61,9 @@ export default function FinancialPage() {
         // Order in memory
         docs.sort((a, b) => b.date.localeCompare(a.date));
         
-        setAppointments(docs);
+        if (!cancelled) {
+          setAppointments(docs);
+        }
       } catch (err: any) {
         if (err.message && err.message.includes('index')) {
           console.warn('[FinancialPage] Firestore index required: appointments professionalId ASC, date ASC');
@@ -68,11 +71,16 @@ export default function FinancialPage() {
           console.error('[FinancialPage] Failed to load financial appointments', err);
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchFinancialData();
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const monthlyGroups = useMemo(() => {

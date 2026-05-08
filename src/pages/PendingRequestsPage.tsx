@@ -18,17 +18,17 @@ import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/ut
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
 import { usePushNotifications } from '../hooks/usePushNotifications';
-import { usePendingAppointments } from '../contexts/PendingAppointmentsContext';
 import { Zap } from 'lucide-react';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
   const uid = user?.uid ?? null;
   const navigate = useNavigate();
   
-  const { pendingAppointments: truePending, loading: pendingLoading } = usePendingAppointments();
-  
+  const [truePending, setTruePending] = useState<Appointment[]>([]);
   const [localRequests, setLocalRequests] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -102,8 +102,38 @@ export default function PendingRequestsPage() {
   }, [uid]);
 
   useEffect(() => {
-    setLoading(pendingLoading);
-  }, [pendingLoading]);
+    if (!uid) {
+      setTruePending([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    const qPending = query(
+      collection(db, 'appointments'),
+      where('professionalId', '==', uid),
+      where('status', '==', 'pending'),
+      orderBy('date', 'asc'),
+      orderBy('time', 'asc'),
+      limit(50)
+    );
+
+    const unsubscribe = onSnapshot(
+      qPending,
+      (snapshot) => {
+        const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+        setTruePending(docs);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('[PendingRequestsPage] Firestore onSnapshot error:', error);
+        setTruePending([]);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [uid]);
 
   // Sync localRequests to include items being confirmed/handling WhatsApp
   useEffect(() => {
