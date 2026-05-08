@@ -308,6 +308,17 @@ setAlerts(docs);
   useEffect(() => {
     if (!uid) return;
     let isActive = true;
+    let isAllAppointmentsResolved = false;
+    let isTodayResolved = false;
+
+    const finishInitialLoadingIfReady = () => {
+      if (!isActive) return;
+      if (isAllAppointmentsResolved && isTodayResolved) {
+        setIsInitialLoading(false);
+      }
+    };
+
+    setIsInitialLoading(true);
 
     const today = getTodayLocale();
     
@@ -327,9 +338,18 @@ setConfirmedToday(relevantToday);
 setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0));
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
+      } finally {
+        if (!isTodayResolved) {
+          isTodayResolved = true;
+          finishInitialLoadingIfReady();
+        }
       }
     }, (error) => {
       console.error('[Dashboard] Subscription error on qToday:', error);
+      if (!isTodayResolved) {
+        isTodayResolved = true;
+        finishInitialLoadingIfReady();
+      }
     });
 
     // Query: Unconfirmed for tomorrow
@@ -385,7 +405,8 @@ setUnconfirmedTomorrow(docs);
       console.error("Firestore getDocs error:", error); 
     }).finally(() => {
       if (!isActive) return;
-      setIsInitialLoading(false);
+      isAllAppointmentsResolved = true;
+      finishInitialLoadingIfReady();
     });
 
     // Query: Waitlist
