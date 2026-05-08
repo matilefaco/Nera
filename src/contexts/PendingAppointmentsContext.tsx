@@ -53,6 +53,7 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
         } catch (err) {
           console.error('[PendingAppointmentsProvider] Error parsing snapshot callback:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
+          setLoading(false);
         }
       },
       (error) => {
