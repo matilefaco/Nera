@@ -603,55 +603,11 @@ setIsLoadingSlots(false);
       setAppointmentToken(token);
       setReservationCode(resCode || null);
       setBookingSuccess(true);
+      
+      // Post-booking notifications (BOOKING_PENDING_CLIENT and NEW_BOOKING_REQUEST)
+      // are now handled safely and securely by the backend inside the 
+      // /api/public/create-booking endpoint.
 
-      // --- SEND PENDING NOTIFICATION TO CLIENT ---
-      if (clientEmail.trim()) {
-        fetch('/api/notify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'BOOKING_PENDING_CLIENT',
-            payload: {
-              clientEmail: clientEmail.trim().toLowerCase(),
-              clientName: clientName.trim(),
-              professionalName: profile.name,
-              professionalWhatsapp: profile.whatsapp,
-              serviceName: selectedService.name,
-              date: selectedDate,
-              time: selectedTime,
-              price: formatCurrency(totalPrice),
-              reservationCode: resCode,
-              manageUrl: `${window.location.origin}/r/${token}`,
-              paymentMethods: paymentMethodsList
-            }
-          })
-        })
-        .then(res => res.json())
-        .then(data => console.log('[EMAIL_PENDING] Result:', data))
-        .catch(err => console.error('[EMAIL_PENDING_ERROR] Notification failed:', err));
-      }
-      
-      // Notify professional
-      fetch('/api/notify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'NEW_BOOKING_REQUEST',
-          payload: {
-            professionalId: profile.uid,
-            clientName: clientName.trim(),
-            serviceName: selectedService.name,
-            date: selectedDate,
-            time: selectedTime,
-            totalPrice: totalPrice,
-            appointmentId: bookingId,
-            token: token,
-            locationDetail: isHomeService ? `${addressNeighborhood.trim() || selectedArea?.name}, ${addressCity.trim() || profile?.city}` : 'No Estúdio',
-            paymentMethods: paymentMethodsList
-          }
-        })
-      }).catch(e => console.error(e));
-      
       // If booking from waitlist, mark it as booked
       if (waitlistEntry?.id) {
         await markWaitlistAsBooked(waitlistEntry.id);
@@ -710,7 +666,7 @@ setIsLoadingSlots(false);
               animate={{ y: 0 }} 
               exit={{ y: "100%" }} 
               transition={{ type: "spring", damping: 25, stiffness: 200 }} 
-              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[90vh] overflow-y-auto no-scrollbar pb-32 md:pb-12"
+              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[90vh] overflow-y-auto no-scrollbar pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-12"
             >
               <button onClick={onClose} className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors">
                 <X size={24} />
@@ -831,13 +787,13 @@ setIsLoadingSlots(false);
                     <div className="space-y-4 mb-8">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Seu Nome <span className="text-brand-terracotta">*</span></label>
-                        <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome completo" className={cn("w-full px-5 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs", clientName.trim().length < 2 && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
+                        <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Nome completo" className={cn("w-full px-5 py-4 min-h-[56px] bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs", clientName.trim().length < 2 && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
                         {clientName.trim().length < 2 && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">Digite seu nome completo</p>}
                       </div>
                       <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-3 md:gap-4">
                         <div className="space-y-1.5 min-w-0">
                           <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">WhatsApp <span className="text-brand-terracotta">*</span></label>
-                          <input type="tel" value={formatWhatsappDisplay(clientPhone)} onChange={(e) => setClientPhone(cleanWhatsapp(e.target.value))} placeholder="(85) 99999-9999" className={cn("w-full px-5 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs min-w-0", !clientPhone && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
+                          <input type="tel" value={formatWhatsappDisplay(clientPhone)} onChange={(e) => setClientPhone(cleanWhatsapp(e.target.value))} placeholder="(85) 99999-9999" className={cn("w-full px-5 py-4 min-h-[56px] bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs min-w-0", !clientPhone && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} />
                           {!clientPhone && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">WhatsApp obrigatório</p>}
                         </div>
                         <div className="space-y-1.5 min-w-0">
@@ -849,7 +805,7 @@ setIsLoadingSlots(false);
                             value={clientEmail} 
                             onChange={(e) => setClientEmail(e.target.value)} 
                             placeholder="Ex: seu@email.com" 
-                            className={cn("w-full px-5 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs min-w-0", !clientEmail && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} 
+                            className={cn("w-full px-5 py-4 min-h-[56px] bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs min-w-0", !clientEmail && bookingAttempted ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist")} 
                           />
                           {!clientEmail && bookingAttempted && <p className="text-[9px] text-brand-terracotta font-bold uppercase tracking-wider ml-2 mt-1">E-mail obrigatório</p>}
                         </div>
@@ -868,7 +824,7 @@ setIsLoadingSlots(false);
                               <input 
                                 type="text" placeholder="Nome da rua" 
                                 value={addressStreet} onChange={(e) => setAddressStreet(e.target.value)}
-                                className={cn("w-full px-4 py-3 bg-brand-parchment border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressStreet && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
+                                className={cn("w-full px-4 py-3 min-h-[48px] bg-brand-parchment border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressStreet && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
                               />
                             </div>
                             <div className="col-span-1 space-y-1.5">
@@ -876,7 +832,7 @@ setIsLoadingSlots(false);
                               <input 
                                 type="text" placeholder="123" 
                                 value={addressNumber} onChange={(e) => setAddressNumber(e.target.value)}
-                                className={cn("w-full px-2 py-3 bg-brand-parchment border rounded-xl text-xs text-center outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressNumber && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
+                                className={cn("w-full px-2 py-3 min-h-[48px] bg-brand-parchment border rounded-xl text-xs text-center outline-none focus:ring-1 focus:ring-brand-ink transition-all", !addressNumber && bookingAttempted ? "border-brand-terracotta" : "border-brand-mist")}
                               />
                             </div>
                           </div>
@@ -1093,7 +1049,7 @@ setIsLoadingSlots(false);
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 100, opacity: 0 }} 
-            className="fixed bottom-0 left-0 right-0 z-[250] md:hidden p-6 bg-gradient-to-t from-brand-white via-brand-white to-transparent pt-16 pointer-events-none"
+            className="fixed bottom-0 left-0 right-0 z-[250] md:hidden px-6 pt-16 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-[rgba(255,255,255,1)] via-[rgba(255,255,255,0.95)] to-transparent pointer-events-none"
           >
             <div className="pointer-events-auto">
               <PremiumButton 

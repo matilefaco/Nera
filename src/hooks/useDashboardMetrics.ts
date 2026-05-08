@@ -5,7 +5,8 @@ import { getTodayLocale } from '../lib/utils';
 
 export function useDashboardMetrics(
   appointments: Appointment[],
-  analyticsEvents: AnalyticsEvent[]
+  analyticsEvents: AnalyticsEvent[],
+  totalClientsCountOverride?: number | null
 ) {
   return useMemo(() => {
     // Basic setup
@@ -34,7 +35,7 @@ export function useDashboardMetrics(
 
     for (let i = 0; i < analyticsEvents.length; i++) {
         const e = analyticsEvents[i];
-        if (!e.timestamp) continue;
+        if (!e.timestamp || typeof e.timestamp.toDate !== 'function') continue;
         const eDate = e.timestamp.toDate();
         
         if (eDate > thirtyDaysAgo) {
@@ -78,7 +79,7 @@ export function useDashboardMetrics(
 
     for (let i = 0; i < appointments.length; i++) {
         const app = appointments[i];
-        if (!app.date) continue;
+        if (!app.date || typeof app.date !== 'string' || app.date.indexOf('-') === -1) continue;
         
         const isRevenue = isRevenueStatus(app.status);
         const isDoneOrAccepted = isRevenueStatus(app.status);
@@ -142,7 +143,7 @@ export function useDashboardMetrics(
             }
 
             // Best Time (isDoneOrAccepted)
-            if (app.time) {
+            if (app.time && typeof app.time === 'string') {
                 const hour = app.time.split(':')[0] + ':00';
                 timesMap[hour] = (timesMap[hour] || 0) + 1;
             }
@@ -218,7 +219,7 @@ export function useDashboardMetrics(
 
     return {
         confirmedAppointments,
-        totalClientsCount: clientMap.size,
+        totalClientsCount: typeof totalClientsCountOverride === 'number' ? totalClientsCountOverride : clientMap.size,
         monthlyRevenue,
         prevMonthlyRevenue,
         returningThisWeek,

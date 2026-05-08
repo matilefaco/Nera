@@ -25,6 +25,7 @@ import { ProfessionalIdentity, UserProfile, Service } from '../types';
 import { userProfileSchema, serviceSchema } from '../lib/validation';
 import { z } from 'zod';
 import { useProfileForm } from '../hooks/useProfileForm';
+import { APP_URL, getPublicProfileUrl } from '../lib/env';
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
 
@@ -48,7 +49,7 @@ const CopyLinkButton = ({ slug }: { slug: string }) => {
   const [copied, setCopied] = useState(false);
   
   const handleCopy = () => {
-    navigator.clipboard.writeText(`https://nera.app/p/${slug}`);
+    navigator.clipboard.writeText(getPublicProfileUrl(slug));
     setCopied(true);
     notify.success('Link copiado!');
     setTimeout(() => setCopied(false), 2000);
@@ -1124,14 +1125,14 @@ export default function OnboardingPage() {
               <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
                 <div className="p-8 bg-brand-parchment rounded-[32px] border border-brand-mist">
                   <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-2">Seu link profissional</p>
-                  <p className="text-2xl font-serif italic text-brand-terracotta break-all">nera.app/p/{slug}</p>
+                  <p className="text-2xl font-serif italic text-brand-terracotta break-all">{getPublicProfileUrl(slug).replace(/^https?:\/\//, '')}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <CopyLinkButton slug={slug} />
                   <button 
                     onClick={() => {
-                      const text = `Olá! Agora você pode agendar seus horários comigo diretamente pelo meu link: https://nera.app/p/${slug} ✨`;
+                      const text = `Olá! Agora você pode agendar seus horários comigo diretamente pelo meu link: ${getPublicProfileUrl(slug)} ✨`;
                       window.open(buildWhatsappLink('', text), '_blank');
                     }}
                     className="flex flex-col items-center gap-4 p-8 bg-brand-parchment rounded-[32px] border border-brand-mist hover:bg-brand-linen transition-all group"

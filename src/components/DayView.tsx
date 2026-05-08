@@ -126,7 +126,7 @@ export default function DayView({
           </div>
           <button 
             onClick={() => onSelectSlot("09:00")}
-            className="mt-2 px-6 py-2.5 bg-brand-ink text-brand-white rounded-xl text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all"
+            className="mt-2 px-8 py-4 min-h-[48px] bg-brand-ink text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md focus:ring-4 ring-brand-ink/20 focus:outline-none"
           >
             Adicionar Reserva
           </button>
@@ -160,10 +160,10 @@ export default function DayView({
                 key={time} 
                 className={cn(
                   "group flex items-start gap-4 transition-all pr-4",
-                  hasActivity ? "h-24" : "h-[4.5rem]"
+                  hasActivity ? "h-[6rem]" : "h-20"
                 )}
               >
-                <div className="w-10 text-right -ml-14 bg-brand-white pr-4 pt-1 z-10">
+                <div className="w-12 text-right -ml-16 bg-brand-white pr-4 pt-1 z-10">
                   <span className={cn(
                     "text-[8px] font-bold uppercase tracking-widest",
                     hasActivity ? "text-brand-ink" : "text-brand-stone opacity-30"

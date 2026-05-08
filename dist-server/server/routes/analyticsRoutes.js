@@ -3,6 +3,7 @@ import { getDb } from "../firebaseAdmin.js";
 import { callNvidiaAI, aiRateLimit, RATE_LIMIT_WINDOW, MAX_REQUESTS, getServiceDescriptionWithFallback } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { generateMonthlyReportPDF } from "../reports/monthlyReport.js";
+import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
 const router = express.Router();
 const debugOnly = (req, res, next) => {
     if (process.env.NODE_ENV === "production") {
@@ -10,8 +11,9 @@ const debugOnly = (req, res, next) => {
     }
     return next();
 };
-router.post("/generate-content", checkPlanFeature('advancedDashboard'), async (req, res) => {
+router.post("/generate-content", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req, res) => {
     const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
+    console.log(`[AI AUTH] Generating content for user: ${req.uid}`);
     // Simple rate limit check
     const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous');
     const now = Date.now();
@@ -66,8 +68,9 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato:
         res.status(500).json({ error: "Não foi possível gerar o conteúdo." });
     }
 });
-router.post("/analyze-portfolio-image", checkPlanFeature('advancedDashboard'), async (req, res) => {
+router.post("/analyze-portfolio-image", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req, res) => {
     const { imageUrl, specialty } = req.body;
+    console.log(`[AI AUTH] Analyzing portfolio image for user: ${req.uid}`);
     if (!process.env.NVIDIA_API_KEY) {
         console.error("[PortfolioAI] NVIDIA_API_KEY is missing");
         return res.json({ category: "Portfólio" });
@@ -124,14 +127,15 @@ router.get("/test-ai-service-description", debugOnly, async (req, res) => {
     const result = await getServiceDescriptionWithFallback(serviceName, "Beleza", 30, 100, "elegante");
     res.json(result);
 });
-router.post("/ai/service-description", checkPlanFeature('advancedDashboard'), async (req, res) => {
+router.post("/ai/service-description", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req, res) => {
     const { serviceName, professionalSpecialty, duration, price, tone } = req.body;
-    console.log(`[AI SERVICE] service-description requested for: ${serviceName}`);
+    console.log(`[AI AUTH] service-description requested for: ${serviceName} by user: ${req.uid}`);
     const result = await getServiceDescriptionWithFallback(serviceName, professionalSpecialty || "Beleza", duration, price, tone);
     res.json(result);
 });
-router.post("/ai/categorize-service", async (req, res) => {
+router.post("/ai/categorize-service", requireFirebaseAuth, async (req, res) => {
     const { serviceName } = req.body;
+    console.log(`[AI AUTH] Categorize service requested for: ${serviceName} by user: ${req.uid}`);
     if (!process.env.NVIDIA_API_KEY) {
         console.warn("[AI SERVICE] NVIDIA failed (missing key), using local fallback");
         return res.json({ category: "Outros" });
@@ -150,8 +154,9 @@ router.post("/ai/categorize-service", async (req, res) => {
         res.json({ category: "Outros" });
     }
 });
-router.post("/ai/categorize-portfolio-item", async (req, res) => {
+router.post("/ai/categorize-portfolio-item", requireFirebaseAuth, async (req, res) => {
     const { title, description } = req.body;
+    console.log(`[AI AUTH] Categorize portfolio item requested for title: ${title} by user: ${req.uid}`);
     if (!process.env.NVIDIA_API_KEY) {
         console.warn("[AI SERVICE] NVIDIA failed (missing key), using local fallback");
         return res.json({ category: "Geral" });
@@ -170,11 +175,17 @@ router.post("/ai/categorize-portfolio-item", async (req, res) => {
         res.json({ category: "Geral" });
     }
 });
-router.get("/reports/monthly", checkPlanFeature('reports'), async (req, res) => {
+router.get("/reports/monthly", requireFirebaseAuth, checkPlanFeature('reports'), async (req, res) => {
     const db = getDb();
-    const { month, professionalId } = req.query;
-    if (!month || !professionalId) {
-        return res.status(400).json({ error: "Month (YYYY-MM) and professionalId are required" });
+    const { month } = req.query;
+    const professionalId = String(req.query.professionalId || req.uid);
+    console.log(`[REPORT AUTH] Monthly report requested for user: ${req.uid}, target professionalId: ${professionalId}`);
+    if (professionalId !== req.uid) {
+        console.warn(`[REPORT AUTH] User ${req.uid} attempted to access report of ${professionalId}. Access denied.`);
+        return res.status(403).json({ error: "Acesso negado. Você só pode gerar relatórios da sua própria conta." });
+    }
+    if (!month) {
+        return res.status(400).json({ error: "Month (YYYY-MM) is required" });
     }
     try {
         const proDoc = await db.collection('users').doc(String(professionalId)).get();

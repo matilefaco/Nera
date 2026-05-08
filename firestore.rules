@@ -118,8 +118,7 @@ service cloud.firestore {
       allow list: if (isSignedIn() && isDocOwner(resource.data)) || isAdmin();
       
       // 2. Secured Create/Update: Only owner/admin. (Backend via Admin SDK bypasses this for public bookings)
-      // Fallback: ALLOW public create to support preview/dev mode where backend might be unstable.
-      allow create: if isValidAppointment(incoming()); 
+      allow create: if false; // Public bookings are created only through the backend Admin SDK. Direct client creates are blocked to preserve locks, plan limits, pricing validation and anti-spam protections.
       allow update: if (isDocOwner(existing()) || isAdmin()) && isValidAppointment(incoming());
     }
 

@@ -7,11 +7,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(value: number) {
+export function formatCurrency(value: number | undefined | null) {
+  const val = Number(value);
+  if (isNaN(val)) return 'R$ 0,00';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  }).format(value);
+  }).format(val);
 }
 
 export function generateSlug(text: string) {

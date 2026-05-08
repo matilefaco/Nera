@@ -381,7 +381,7 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
 
     await logRef.update({ appointmentId: targetAppt.id });
 
-    const baseUrl = process.env.BASE_URL || 'https://nera.app';
+    const baseUrl = process.env.BASE_URL || 'https://usenera.com';
     const profileLink = `${baseUrl}/p/${targetAppt.professionalSlug || 'app'}`;
 
     switch (intent) {

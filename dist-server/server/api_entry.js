@@ -25,7 +25,7 @@ export const api = onRequest({
     memory: "512MiB",
     timeoutSeconds: 60,
     minInstances: 0,
-    cors: true,
+    cors: false,
 }, async (req, res) => {
     const isProdEnv = process.env.GCLOUD_PROJECT && process.env.FUNCTIONS_EMULATOR !== "true";
     const isHostProd = req.hostname && req.hostname.includes("usenera.com");

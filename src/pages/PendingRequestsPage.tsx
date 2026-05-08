@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../AuthContext';
-import { db, handleBookingError, checkAndExpireAppointments } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { handleBookingError, checkAndExpireAppointments } from '../firebase';
 import { 
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
@@ -16,18 +15,20 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { notify } from '../lib/notify';
 import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/utils';
-import { getClientScore } from '../lib/clientUtils';
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { Zap } from 'lucide-react';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
+import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
+import { db } from '../firebase';
 
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
+  const uid = user?.uid ?? null;
   const navigate = useNavigate();
+  
   const [truePending, setTruePending] = useState<Appointment[]>([]);
-  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
   const [localRequests, setLocalRequests] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -91,55 +92,48 @@ export default function PendingRequestsPage() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    if (!uid) return;
     
     // Check for expired requests on load
-    checkAndExpireAppointments(user.uid);
+    checkAndExpireAppointments(uid).catch((error) => {
+      console.error('[PendingRequestsPage] Failed to expire appointments:', error);
+      notify.error('Não foi possível atualizar pedidos expirados agora.');
+    });
+  }, [uid]);
 
+  useEffect(() => {
+    if (!uid) {
+      setTruePending([]);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     const qPending = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
+      where('professionalId', '==', uid),
       where('status', '==', 'pending'),
       orderBy('date', 'asc'),
-      orderBy('time', 'asc')
+      orderBy('time', 'asc'),
+      limit(50)
     );
 
-    const unsubscribe = onSnapshot(qPending, (snapshot) => {
-      try {
-        const incomingDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-setTruePending(incomingDocs);
-setLoading(false);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+    const unsubscribe = onSnapshot(
+      qPending,
+      (snapshot) => {
+        const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+        setTruePending(docs);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('[PendingRequestsPage] Firestore onSnapshot error:', error);
+        setTruePending([]);
+        setLoading(false);
       }
-    }, (error) => {
-      console.error('[PendingRequests] Subscription error:', error);
-      setLoading(false);
-    });
-
-    const qAll = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      orderBy('date', 'desc'),
-      limit(500)
     );
 
-    const unsubAll = onSnapshot(qAll, (snapshot) => {
-      try {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-setAllAppointments(docs);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => {
-      console.error('[PendingRequests] Subscription error (qAll):', error);
-    });
-
-    return () => {
-      unsubscribe();
-      unsubAll();
-    };
-  }, [user]);
+    return () => unsubscribe();
+  }, [uid]);
 
   // Sync localRequests to include items being confirmed/handling WhatsApp
   useEffect(() => {
@@ -191,6 +185,38 @@ setAllAppointments(docs);
       }
     }
   }, [loading, localRequests]);
+
+
+  const formatDateDisplay = (value: unknown): string => {
+    if (typeof value !== 'string') return 'Data não informada';
+    const trimmed = value.trim();
+    if (!trimmed) return 'Data não informada';
+
+    const parts = trimmed.split('-');
+    if (parts.length === 3 && parts.every(Boolean)) {
+      return parts.reverse().join('/');
+    }
+
+    const parsed = new Date(trimmed);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString('pt-BR');
+    }
+
+    return 'Data não informada';
+  };
+
+  const formatTimeDisplay = (value: unknown): string => {
+    if (typeof value !== 'string') return 'Horário não informado';
+    const trimmed = value.trim();
+    return trimmed || 'Horário não informado';
+  };
+
+  const getSafeWhatsappLink = (raw: unknown, message?: string): string | null => {
+    if (typeof raw !== 'string') return null;
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 10) return null;
+    return buildWhatsappLink(raw, message);
+  };
 
   const handleRespond = async (id: string, decision: typeof APPOINTMENT_STATUS.CONFIRMED | typeof APPOINTMENT_STATUS.CANCELLED_BY_PROFESSIONAL, appointment?: any) => {
     if (processingId === id) return;
@@ -408,21 +434,6 @@ setAllAppointments(docs);
                       <div>
                         <div className="flex flex-wrap items-center gap-3 mb-1">
                           <h3 className="text-2xl md:text-3xl font-serif text-brand-ink">{request.clientName}</h3>
-                          {(() => {
-                            const score = getClientScore(allAppointments, request.clientWhatsapp);
-                            if (!score) return null;
-                            const config = {
-                              reliable: { label: 'Cliente Fiel', className: 'bg-green-50 text-green-700 border-green-200' },
-                              attention: { label: 'Atenção', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-                              risk: { label: 'Histórico de Faltas', className: 'bg-red-50 text-red-600 border-red-200' }
-                            };
-                            const c = config[score];
-                            return (
-                              <span className={`text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${c.className}`}>
-                                {c.label}
-                              </span>
-                            );
-                          })()}
                         </div>
                         <span className="text-[10px] text-brand-terracotta uppercase tracking-[0.2em] font-bold">
                           {request.serviceName}
@@ -439,14 +450,14 @@ setAllAppointments(docs);
                         <Calendar size={14} className="text-brand-terracotta/60 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left truncate">Data</span>
-                          <span className="text-[13px] font-bold text-brand-ink truncate">{request.date.split('-').reverse().join('/')}</span>
+                          <span className="text-[13px] font-bold text-brand-ink truncate">{formatDateDisplay(request.date)}</span>
                         </div>
                       </div>
                       <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/30 flex items-center gap-3 min-w-0">
                         <Clock size={14} className="text-brand-terracotta/60 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left truncate">Horário</span>
-                          <span className="text-[13px] font-bold text-brand-ink truncate">{request.time}</span>
+                          <span className="text-[13px] font-bold text-brand-ink truncate">{formatTimeDisplay(request.time)}</span>
                         </div>
                       </div>
                     </div>
@@ -492,14 +503,32 @@ setAllAppointments(docs);
                             </>
                           )}
                         </button>
-                        <a 
-                          href={buildWhatsappLink(request.clientWhatsapp)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 aspect-square bg-brand-white border border-brand-mist rounded-[24px] flex items-center justify-center text-brand-stone hover:text-green-600 hover:border-green-200 transition-all active:scale-90"
-                        >
-                          <MessageCircle size={20} />
-                        </a>
+                        {(() => {
+                          const whatsappLink = getSafeWhatsappLink(request.clientWhatsapp);
+                          if (!whatsappLink) {
+                            return (
+                              <button
+                                type="button"
+                                disabled
+                                className="flex-1 aspect-square bg-brand-white border border-brand-mist rounded-[24px] flex items-center justify-center text-brand-stone/40 cursor-not-allowed"
+                                title="WhatsApp não informado"
+                              >
+                                <MessageCircle size={20} />
+                              </button>
+                            );
+                          }
+
+                          return (
+                            <a 
+                              href={whatsappLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex-1 aspect-square bg-brand-white border border-brand-mist rounded-[24px] flex items-center justify-center text-brand-stone hover:text-green-600 hover:border-green-200 transition-all active:scale-90"
+                            >
+                              <MessageCircle size={20} />
+                            </a>
+                          );
+                        })()}
                       </div>
                       
                       <div className="flex gap-3">
@@ -552,21 +581,31 @@ setAllAppointments(docs);
                               </div>
                               <h4 className="text-sm font-bold uppercase tracking-widest mb-3">Avisar cliente?</h4>
                               <p className="text-[11px] opacity-60 mb-8 leading-relaxed max-w-[200px] italic">
-                                "Oi {request.clientName}, seu horário para {request.serviceName} dia {request.date.split('-').reverse().join('/')} às {request.time} foi confirmado 💛"
+                                "Oi {request.clientName}, seu horário para {request.serviceName} dia {formatDateDisplay(request.date)} às {formatTimeDisplay(request.time)} foi confirmado 💛"
                               </p>
                               <div className="flex flex-col w-full gap-4">
-                                <a 
-                                  href={buildWhatsappLink(request.clientWhatsapp, `Oi ${request.clientName}, seu horário para ${request.serviceName} dia ${request.date.split('-').reverse().join('/')} às ${request.time} foi confirmado 💛`)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  onClick={() => {
-                                    setConfirmedId(null);
-                                    setWhatsappCtaId(null);
-                                  }}
-                                  className="w-full py-5 bg-green-500 text-white rounded-[24px] text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-green-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                >
-                                  Enviar agora
-                                </a>
+                                {(() => {
+                                  const confirmationText = `Oi ${request.clientName || 'cliente'}, seu horário para ${request.serviceName || 'o serviço'} dia ${formatDateDisplay(request.date)} às ${formatTimeDisplay(request.time)} foi confirmado 💛`;
+                                  const whatsappLink = getSafeWhatsappLink(request.clientWhatsapp, confirmationText);
+                                  if (!whatsappLink) {
+                                    return null;
+                                  }
+
+                                  return (
+                                    <a 
+                                      href={whatsappLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => {
+                                        setConfirmedId(null);
+                                        setWhatsappCtaId(null);
+                                      }}
+                                      className="w-full py-5 bg-green-500 text-white rounded-[24px] text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-green-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                    >
+                                      Enviar agora
+                                    </a>
+                                  );
+                                })()}
                                 <button 
                                   onClick={() => {
                                     setConfirmedId(null);
@@ -635,11 +674,11 @@ setAllAppointments(docs);
                     <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-6">
                       <div className="space-y-2 min-w-0">
                         <p className="text-[9px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Data Escolhida</p>
-                        <p className="text-brand-ink font-serif text-xl truncate">{selectedRequest.date.split('-').reverse().join('/')}</p>
+                        <p className="text-brand-ink font-serif text-xl truncate">{formatDateDisplay(selectedRequest.date)}</p>
                       </div>
                       <div className="space-y-2 min-w-0">
                         <p className="text-[9px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Horário Alvo</p>
-                        <p className="text-brand-ink font-serif text-xl truncate">{selectedRequest.time}</p>
+                        <p className="text-brand-ink font-serif text-xl truncate">{formatTimeDisplay(selectedRequest.time)}</p>
                       </div>
                     </div>
 

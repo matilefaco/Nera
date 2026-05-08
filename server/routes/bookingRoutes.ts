@@ -8,6 +8,7 @@ import { sendBookingConfirmedEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
+import { sendBookingPendingClientNotification, sendNewBookingRequestNotification } from "../services/notificationService.js";
 
 const router = express.Router();
 
@@ -63,6 +64,16 @@ const removeEmptyFields = (obj: any): any => {
     }
   });
   return newObj;
+};
+
+const timeToMinutes = (time: string): number => {
+  if (!time) return 0;
+  const [h, m] = time.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+const intervalsOverlap = (startA: number, endA: number, startB: number, endB: number): boolean => {
+  return Math.max(startA, startB) < Math.min(endA, endB);
 };
 
 function getBookingLockId(appointment: any): string | null {
@@ -182,10 +193,8 @@ async function updateClientSummaryInternal(transaction: admin.firestore.Transact
 router.get("/public/booking-health", (req, res) => {
   res.json({ 
     ok: true, 
-    route: "booking", 
     time: new Date().toISOString(),
-    headers: req.headers,
-    processId: process.pid
+    route: "booking"
   });
 });
 
@@ -213,6 +222,49 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
   }
 
   try {
+    // Plan Limit Check for Free Plan
+    const professionalId = appointmentData.professionalId;
+    const proDoc = await db.collection('users').doc(professionalId).get();
+    if (!proDoc.exists) {
+      logger.error("BOOKING", `Professional not found for limit check: ${professionalId}`);
+      return res.status(404).json({ error: `Profissional não encontrado (${professionalId}).` });
+    }
+    
+    const proUser = proDoc.data();
+    const plan = proUser?.plan || 'free';
+
+    if (plan === 'free') {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const startOfMonth = `${currentYear}-${currentMonth}-01`;
+      const endOfMonth = `${currentYear}-${currentMonth}-31`; 
+
+      const snapshot = await db.collection('appointments')
+        .where('professionalId', '==', professionalId)
+        .where('date', '>=', startOfMonth)
+        .where('date', '<=', endOfMonth)
+        .get();
+        
+      const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
+      
+      let bookingCountOfMonth = 0;
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (countingStatuses.includes(data.status)) {
+          bookingCountOfMonth++;
+        }
+      });
+      
+      if (bookingCountOfMonth >= 15) {
+        logger.warn("BOOKING", `Booking limit reached for free plan`, { professionalId: maskUid(professionalId), meta: { currentCount: bookingCountOfMonth } });
+        return res.status(403).json({
+          error: "Esta profissional atingiu o limite de agendamentos do mês. Entre em contato com ela para agendar.",
+          code: "BOOKING_LIMIT_REACHED"
+        });
+      }
+    }
+
     const cleanedData = removeEmptyFields(appointmentData);
     const apptRef = db.collection('appointments').doc();
     const reservationCode = generateReservationCode(appointmentData.date);
@@ -289,6 +341,40 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         }
       }
 
+      // Check for duration overlap with other appointments
+      const existingApptsSnap = await transaction.get(
+        db.collection('appointments')
+          .where('professionalId', '==', finalData.professionalId)
+          .where('date', '==', finalData.date)
+      );
+
+      const overlapBlockingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
+      const newStart = timeToMinutes(finalData.time);
+      const newEnd = newStart + finalData.duration;
+
+      for (const doc of existingApptsSnap.docs) {
+        const existing = doc.data();
+        if (overlapBlockingStatuses.includes(existing.status)) {
+          const existingStart = timeToMinutes(existing.time);
+          const existingDuration = Number(existing.duration || existing.serviceDuration || 60);
+          const existingEnd = existingStart + existingDuration;
+
+          if (intervalsOverlap(newStart, newEnd, existingStart, existingEnd)) {
+            logger.warn("BOOKING", "Durational overlap detected in create-booking", {
+              professionalId: maskUid(finalData.professionalId),
+              meta: {
+                date: finalData.date,
+                time: finalData.time,
+                newDuration: finalData.duration,
+                existingTime: existing.time,
+                existingDuration
+              }
+            });
+            throw new Error('SLOT_LOCKED:Este horário acabou de ficar indisponível. Escolha outro horário.');
+          }
+        }
+      }
+
       // Read Client Summary
       const clientKey = getClientKey(appointmentData.clientWhatsapp, appointmentData.clientEmail, appointmentData.clientName);
       const summaryId = `${appointmentData.professionalId}_${clientKey}`;
@@ -342,6 +428,63 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
     });
 
     logger.info("BOOKING", `SUCCESS: Committed Appt ${apptRef.id}`);
+
+    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    
+    // Background task: Send notifications safely without failing the booking
+    (async () => {
+      try {
+        const proDoc = await db.collection('users').doc(appointmentData.professionalId).get();
+        const proData = proDoc.exists ? proDoc.data() : null;
+        
+        let paymentMethodsArr: string[] = Array.isArray(appointmentData.paymentMethods) 
+                                ? appointmentData.paymentMethods 
+                                : (appointmentData.paymentMethods ? [String(appointmentData.paymentMethods)] : []);
+                                
+        // Need to determine location conditionally if service was home service
+        const isHomeService = finalData.locationType === 'home' || finalData.locationType === 'domicilio';
+        let locationDetail = 'No Estúdio';
+        if (isHomeService) {
+           locationDetail = `${finalData.neighborhood || 'Bairro omitido'}, ${proData?.city || 'Cidade omitida'}`;
+        }
+
+        await sendBookingPendingClientNotification({
+          clientEmail: appointmentData.clientEmail,
+          clientName: appointmentData.clientName,
+          professionalName: proData?.name || 'Profissional',
+          professionalWhatsapp: proData?.whatsapp || '',
+          serviceName: finalData.serviceName,
+          date: finalData.date,
+          time: finalData.time,
+          price: `R$ ${(finalData.price || 0).toFixed(2).replace('.', ',')}`,
+          reservationCode,
+          manageUrl: `${baseUrl}/r/${manageSlug}`,
+          appointmentId: apptRef.id,
+          paymentMethods: paymentMethodsArr,
+        }, baseUrl);
+
+        await sendNewBookingRequestNotification({
+          professionalId: appointmentData.professionalId,
+          clientName: appointmentData.clientName,
+          serviceName: finalData.serviceName,
+          date: finalData.date,
+          time: finalData.time,
+          totalPrice: finalData.price,
+          price: finalData.price,
+          appointmentId: apptRef.id,
+          token: manageSlug,
+          paymentMethods: paymentMethodsArr,
+          locationDetail: locationDetail,
+          clientWhatsapp: appointmentData.clientWhatsapp || appointmentData.clientPhone || '',
+          clientEmail: appointmentData.clientEmail,
+        }, baseUrl);
+      } catch (err: any) {
+        logger.error("NOTIFICATION", "Failed to send post-booking notifications", {
+          appointmentId: apptRef.id,
+          error: err.message
+        });
+      }
+    })();
 
     res.json({
       success: true,
@@ -933,13 +1076,42 @@ router.post("/appointments/:appointmentId/confirm", requireFirebaseAuth, async (
       const summaryRef = db.collection('client_summaries').doc(summaryId);
       const summarySnap = await transaction.get(summaryRef);
 
-      const blockingStatuses = ['confirmed', 'accepted', 'completed'];
+      // Check for duration overlap with other appointments
+      const apptsQuery = db.collection('appointments')
+        .where('professionalId', '==', data.professionalId)
+        .where('date', '==', dateAttr);
+      const existingApptsSnap = await transaction.get(apptsQuery);
+
+      const blockingStatuses = ['confirmed', 'accepted', 'completed', 'concluido'];
 
       if (lockSnap.exists) {
         const lockData = lockSnap.data();
         if (lockData && lockData.appointmentId !== appointmentId && blockingStatuses.includes(lockData.status)) {
           logger.warn("BOOKING", "Confirm failed, slot occupied");
           throw { status: 409, message: "Este horário acabou de ser ocupado por outra cliente." };
+        }
+      }
+
+      const newStart = timeToMinutes(timeAttr);
+      const newDuration = Number(data.duration || data.serviceDuration || 60);
+      const newEnd = newStart + newDuration;
+
+      for (const doc of existingApptsSnap.docs) {
+        if (doc.id === appointmentId) continue; // Skip itself
+        
+        const existing = doc.data();
+        if (blockingStatuses.includes(existing.status)) {
+          const existingStart = timeToMinutes(existing.time);
+          const existingDuration = Number(existing.duration || existing.serviceDuration || 60);
+          const existingEnd = existingStart + existingDuration;
+          
+          if (intervalsOverlap(newStart, newEnd, existingStart, existingEnd)) {
+            logger.warn("BOOKING", "Confirm failed, durational overlap detected", { 
+              appointmentId,
+              meta: { existingAppointmentId: doc.id }
+            });
+            throw { status: 409, message: "Este horário já possui um agendamento conflitante de outra cliente." };
+          }
         }
       }
 

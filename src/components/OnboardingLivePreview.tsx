@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Globe, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { getPublicProfileUrl } from '../lib/env';
 
 interface OnboardingLivePreviewProps {
   name: string;
@@ -68,7 +69,7 @@ export const OnboardingLivePreview = ({
         <div className="mt-6 pt-5 border-t border-brand-mist/50 flex items-center justify-between">
           <div className="flex items-center gap-2 text-brand-stone/40">
             <Globe size={12} />
-            <span className="text-[10px] font-medium tracking-wide">nera.app/p/{slug || 'link'}</span>
+            <span className="text-[10px] font-medium tracking-wide">{getPublicProfileUrl(slug || 'link').replace(/^https?:\/\//, '')}</span>
           </div>
           
           <div className="flex gap-1">

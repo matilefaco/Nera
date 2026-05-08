@@ -23,12 +23,14 @@ export const usePendingAppointments = () => useContext(PendingAppointmentsContex
 export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!user?.uid) {
       setPendingAppointments([]);
+      setPendingCount(0);
       setLoading(false);
       return;
     }
@@ -48,16 +50,20 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
         try {
           const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
           setPendingAppointments(docs);
+          setPendingCount(docs.length);
           setLoading(false);
           setError(null);
         } catch (err) {
           console.error('[PendingAppointmentsProvider] Error parsing snapshot callback:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
+          setLoading(false);
         }
       },
-      (error) => {
-        console.error('[PendingAppointmentsProvider] Firestore onSnapshot error:', error);
-        setError(error);
+      (snapshotError) => {
+        console.error('[PendingAppointmentsProvider] Firestore onSnapshot error:', snapshotError);
+        setPendingAppointments([]);
+        setPendingCount(0);
+        setError(snapshotError);
         setLoading(false);
       }
     );
@@ -67,7 +73,7 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
 
   const value = {
     pendingAppointments,
-    pendingCount: pendingAppointments.length,
+    pendingCount,
     loading,
     error,
   };

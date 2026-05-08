@@ -2,6 +2,7 @@ import express from "express";
 import { google } from "googleapis";
 import { getDb } from "../firebaseAdmin.js";
 import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
+import { logger, maskUid } from "../utils/logger.js";
 const router = express.Router();
 const SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
 function getOAuthClient(redirectUri) {
@@ -67,7 +68,7 @@ router.get("/callback", async (req, res) => {
     `);
     }
     catch (err) {
-        console.error("[CALENDAR CALLBACK ERROR]", err.message);
+        logger.error("CALENDAR", "Failed to process OAuth callback", { requestId: req.requestId, professionalId: maskUid(professionalId), error: err });
         res.send(`
       <html>
         <body>
@@ -150,7 +151,7 @@ export async function createGoogleCalendarEvent(appointment, professionalId) {
         const userDoc = await db.collection("users").doc(professionalId).get();
         const integration = userDoc.data()?.integrations?.google_calendar;
         if (!integration || !integration.tokens || !integration.enabled) {
-            console.log(`[CALENDAR] Skipping event creation for user ${professionalId} (Integration disabled)`);
+            logger.info("CALENDAR", "Skipping event creation (Integration disabled or missing tokens)", { professionalId: maskUid(professionalId) });
             return;
         }
         const oauth2Client = getOAuthClient(""); // redirectUri doesn't matter for operations
@@ -199,7 +200,7 @@ Mensagem: ${appointment.clientMessage || "Nenhuma"}
             calendarId: "primary",
             requestBody: event,
         });
-        console.log(`[CALENDAR] Event created: ${response.data.htmlLink}`);
+        logger.info("CALENDAR", "Event created successfully", { professionalId: maskUid(professionalId) });
         // Save event ID to appointment
         await db.collection("appointments").doc(appointment.id).update({
             googleCalendarEventId: response.data.id
@@ -207,7 +208,7 @@ Mensagem: ${appointment.clientMessage || "Nenhuma"}
         return response.data;
     }
     catch (err) {
-        console.error("[GOOGLE CALENDAR EVENT FAILED]", err.message);
+        logger.error("CALENDAR", "Google Calendar event creation failed", { professionalId: maskUid(professionalId), error: err });
     }
 }
 export default router;
