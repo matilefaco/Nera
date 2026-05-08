@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, handleBookingError, createManualAppointment, updateAppointmentStatus, sanitizeAppointment } from '../firebase';
@@ -85,6 +85,21 @@ export default function AgendaPage() {
 
   const [blockStartTime, setBlockStartTime] = useState('09:00');
   const [blockEndTime, setBlockEndTime] = useState('18:00');
+  const isMountedRef = useRef(false);
+  const listenerSeqRef = useRef(0);
+
+  const logListener = (event: string, details: Record<string, unknown>) => {
+    console.log(`[AgendaPage][listener] ${event}`, details);
+  };
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    console.log('[AgendaPage] mounted', { route: '/agenda', uid: userUid });
+    return () => {
+      isMountedRef.current = false;
+      console.log('[AgendaPage] unmounted', { route: '/agenda', uid: userUid });
+    };
+  }, [userUid]);
 
   // Sync date from URL if it changes
   useEffect(() => {
@@ -222,6 +237,8 @@ export default function AgendaPage() {
 
   useEffect(() => {
     if (!userUid) return;
+    const listenerId = ++listenerSeqRef.current;
+    logListener('create:appointmentsByDay', { listenerId, uid: userUid, date: selectedDateKey });
 
     const q = query(
       collection(db, 'appointments'),
@@ -232,6 +249,11 @@ export default function AgendaPage() {
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!isMountedRef.current) {
+        logListener('ignore-callback:appointmentsByDay:unmounted', { listenerId, uid: userUid, date: selectedDateKey });
+        return;
+      }
+      logListener('callback:appointmentsByDay', { listenerId, uid: userUid, date: selectedDateKey, size: snapshot.size });
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
 setAppointments(docs);
@@ -254,34 +276,16 @@ setIsInitialLoading(false);
       setIsInitialLoading(false);
     });
 
-    const blockedRef = collection(db, 'blocked_schedules');
-    const dayOfWeek = parseLocalDate(selectedDateKey).getDay();
-
-    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', userUid)), (snap) => {
-      try {
-        const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-const dayBlocked = allBlocked.filter(b => {
-            const isToday = b.date === selectedDateKey;
-            const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-            return isToday || isRecurringToday;
-          });
-setBlockedSchedules(dayBlocked);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => {
-      console.error('[AgendaPage] Subscription error (blockedSchedules day):', error);
-    });
-
     return () => {
+      logListener('cleanup:appointmentsByDay', { listenerId, uid: userUid, date: selectedDateKey });
       unsubscribe();
-      unsubBlocked();
     };
   }, [userUid, selectedDateKey]);
 
   // Fetch all appointments for week/month view with a safe window
   useEffect(() => {
     if (!userUid) return;
+    const listenerId = ++listenerSeqRef.current;
     
     // We base the window on 'selectedDate' (which is YYYY-MM-DD)
     const baseDate = new Date(selectedDateKey + 'T12:00:00');
@@ -304,6 +308,11 @@ setBlockedSchedules(dayBlocked);
     );
 
     const unsubAll = onSnapshot(q, (snapshot) => {
+      if (!isMountedRef.current) {
+        logListener('ignore-callback:allAppointmentsWindow:unmounted', { listenerId, uid: userUid, date: selectedDateKey });
+        return;
+      }
+      logListener('callback:allAppointmentsWindow', { listenerId, uid: userUid, date: selectedDateKey, size: snapshot.size });
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         // Sort in memory to avoid complex index requirements while keeping standard behavior
@@ -330,7 +339,19 @@ setBlockedSchedules(dayBlocked);
     });
 
     const blockedRef = collection(db, 'blocked_schedules');
+    logListener('create:allAppointmentsWindow', {
+      listenerId,
+      uid: userUid,
+      date: selectedDateKey,
+      rangeStart: visibleStartStr,
+      rangeEnd: visibleEndStr
+    });
     const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', userUid)), (snap) => {
+      if (!isMountedRef.current) {
+        logListener('ignore-callback:allBlockedSchedules:unmounted', { listenerId, uid: userUid, date: selectedDateKey });
+        return;
+      }
+      logListener('callback:allBlockedSchedules', { listenerId, uid: userUid, date: selectedDateKey, size: snap.size });
       try {
         setAllBlockedSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
@@ -341,10 +362,24 @@ setBlockedSchedules(dayBlocked);
     });
 
     return () => {
+      logListener('cleanup:allAppointmentsWindow', { listenerId, uid: userUid, date: selectedDateKey });
       unsubAll();
       unsubBlocked();
     };
   }, [userUid, selectedDateKey]);
+
+  const blockedSchedulesForSelectedDate = useMemo(() => {
+    const dayOfWeek = parseLocalDate(selectedDateKey).getDay();
+    return allBlockedSchedules.filter((b: any) => {
+      const isToday = b.date === selectedDateKey;
+      const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+      return isToday || isRecurringToday;
+    });
+  }, [allBlockedSchedules, selectedDateKey]);
+
+  useEffect(() => {
+    setBlockedSchedules(blockedSchedulesForSelectedDate);
+  }, [blockedSchedulesForSelectedDate]);
 
   // Save view preference
   useEffect(() => {
