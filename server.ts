@@ -20,14 +20,19 @@ const allowedOrigins = [
 function isAllowedOrigin(origin?: string): boolean {
   if (!origin) return true; // server-to-server, Stripe, curl, bots, SSR
 
-  if (allowedOrigins.includes(origin)) return true;
+  const envOrigins = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(o => o.trim())
+    .filter(Boolean);
+
+  if (process.env.APP_URL) envOrigins.push(process.env.APP_URL);
+  if (process.env.VITE_APP_URL) envOrigins.push(process.env.VITE_APP_URL);
+
+  if (allowedOrigins.includes(origin) || envOrigins.includes(origin)) return true;
 
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
-
-  // permitir previews Google/AI Studio/Cloud Run com cautela
-  if (origin.endsWith(".run.app")) return true;
-  if (origin.includes("cloudworkstations.dev")) return true;
-  if (origin.includes("idx.dev")) return true;
+  
+  if (process.env.CLOUD_RUN_PUBLIC_URL && origin === process.env.CLOUD_RUN_PUBLIC_URL) return true;
 
   return false;
 }
@@ -52,8 +57,8 @@ export async function createServerApp() {
       if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
-      logger.warn("SERVER", "Blocked origin via CORS", { meta: { origin } });
-      return callback(new Error("Not allowed by CORS"));
+      logger.warn("CORS", "Blocked origin via CORS", { meta: { origin } });
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

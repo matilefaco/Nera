@@ -1,5 +1,8 @@
 import express from "express";
 import { getDb } from "../firebaseAdmin.js";
+import { logger } from "../utils/logger.js";
+
+const isProduction = process.env.NODE_ENV === "production";
 
 const router = express.Router();
 
@@ -49,7 +52,7 @@ router.get("/check", async (req, res) => {
       console.error("[SLUG CHECK ERROR] Firestore db is NOT initialized.");
       return res.status(500).json({ 
         error: "Serviço de banco de dados não disponível.",
-        debug: "db_not_initialized"
+        ...(isProduction ? {} : { debug: "db_not_initialized" })
       });
     }
 
@@ -94,20 +97,18 @@ router.get("/check", async (req, res) => {
         message: "Link disponível!" 
       });
     } catch (innerErr: any) {
-      console.error("[SLUG CHECK INNER ERROR]", innerErr);
+      logger.error("SERVER", "Slug check failed inside db operations", { error: innerErr.message, requestId: (req as any).requestId });
       return res.status(500).json({
         error: "Erro ao acessar o banco de dados.",
-        debug: innerErr.message || "fire_error",
-        stack: innerErr.stack
+        ...(isProduction ? {} : { debug: innerErr.message || "fire_error", stack: innerErr.stack })
       });
     }
 
   } catch (err: any) {
-    console.error("[SLUG CHECK OUTER ERROR FULL]", err);
+    logger.error("SERVER", "Slug check outer error", { error: err.message, requestId: (req as any).requestId });
     return res.status(500).json({ 
       error: "Erro ao verificar disponibilidade do link.",
-      debug: err?.message || String(err),
-      code: err?.code || null
+      ...(isProduction ? {} : { debug: err?.message || String(err), code: err?.code || null })
     });
   }
 });

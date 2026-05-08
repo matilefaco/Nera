@@ -32,9 +32,13 @@ export default function RegisterPage() {
     console.log('[SIGNUP FLOW DEBUG] user.email exists:', !!user.email);
 
     try {
+      const token = await user.getIdToken();
       const response = await fetch('/api/plans/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           plan: selectedPlan,
           professionalId: user.uid,

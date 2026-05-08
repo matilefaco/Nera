@@ -1,4 +1,5 @@
 import { getDb } from "../firebaseAdmin.js";
+import { logger, maskPhone } from "../utils/logger.js";
 import admin from "firebase-admin";
 /**
  * Normalizes any phone number into a standard format: 55XXXXXXXXXXX (12 or 13 digits)
@@ -124,7 +125,7 @@ export async function sendWhatsApp(_db, phone, message, metadata) {
     const clientToken = process.env.ZAPI_CLIENT_TOKEN;
     const baseUrl = process.env.ZAPI_BASE_URL || 'https://api.z-api.io';
     if (!instanceId || !token) {
-        console.error('[WhatsAppService] Missing Z-API credentials');
+        logger.error("WHATSAPP", 'Missing Z-API credentials');
         return { success: false, error: 'Missing Z-API credentials' };
     }
     const normalizedPhone = normalizePhone(phone);
@@ -136,12 +137,19 @@ export async function sendWhatsApp(_db, phone, message, metadata) {
     try {
         const recentLogs = await db.collection('whatsapp_logs')
             .where('idempotencyKey', '==', idempotencyKey)
-            .where('createdAt', '>', new Date(Date.now() - 5 * 60 * 1000))
-            .limit(1)
+            .limit(5)
             .get();
-        if (!recentLogs.empty) {
-            console.log(`[WhatsAppService] Duplicate message detected for ${normalizedPhone}, skipping.`);
-            return { success: true, duplicate: true, logId: recentLogs.docs[0].id };
+        const recentDoc = recentLogs.docs.find(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt ? data.createdAt.toDate() : new Date(0);
+            return createdAt > new Date(Date.now() - 5 * 60 * 1000);
+        });
+        if (recentDoc) {
+            logger.info("WHATSAPP", `Duplicate message detected, skipping.`, {
+                userId: metadata.userId,
+                meta: { phone: maskPhone(normalizedPhone) }
+            });
+            return { success: true, duplicate: true, logId: recentDoc.id };
         }
         const logId = await logWhatsAppMessage(db, {
             userId: metadata.userId,
@@ -191,7 +199,7 @@ export async function sendWhatsApp(_db, phone, message, metadata) {
             }
             catch (err) {
                 lastError = err;
-                console.warn(`[WhatsAppService] Attempt ${attempt + 1} failed for ${normalizedPhone}:`, err.message);
+                logger.warn("WHATSAPP", `Attempt ${attempt + 1} failed for ${maskPhone(normalizedPhone)}:`, { error: err.message, userId: metadata.userId });
                 if (attempt < MAX_RETRIES) {
                     await new Promise(r => setTimeout(r, 2000));
                 }
@@ -208,7 +216,7 @@ export async function sendWhatsApp(_db, phone, message, metadata) {
         return { success: false, error: lastError?.message };
     }
     catch (err) {
-        console.error('[WhatsAppService] Fatal error:', err);
+        logger.error("WHATSAPP", 'Fatal error:', { error: err, userId: metadata.userId, meta: { phone: maskPhone(normalizedPhone) } });
         return { success: false, error: err.message };
     }
 }
@@ -253,7 +261,12 @@ export async function handleInboundMessage(_db, phone, message, rawPayload) {
         createdAt: admin.firestore.FieldValue.serverTimestamp()
     };
     await logRef.set(logData);
-    console.log(`[WhatsApp-Inbound] Incoming: ${phone}. Normalized: ${normalizedPhone}. Variations: ${phoneVariations.join(', ')}`);
+    logger.info("WHATSAPP", `Incoming message`, {
+        meta: {
+            phone: maskPhone(normalizedPhone),
+            variationsCount: phoneVariations.length
+        }
+    });
     try {
         // Search for appointments in multiple formats
         const apptsSnap = await db.collection('appointments')
@@ -276,7 +289,7 @@ export async function handleInboundMessage(_db, phone, message, rawPayload) {
         });
         const targetAppt = futureAppts[0];
         if (!targetAppt) {
-            console.warn(`[WhatsApp-Inbound] No active appointment for variants of ${normalizedPhone}`);
+            logger.warn("WHATSAPP", `No active appointment for variants of ${maskPhone(normalizedPhone)}`);
             await logRef.update({
                 status: 'ignored',
                 error: 'No active appointment found',
@@ -289,7 +302,7 @@ export async function handleInboundMessage(_db, phone, message, rawPayload) {
             return { success: false, reason: 'no_appointment' };
         }
         await logRef.update({ appointmentId: targetAppt.id });
-        const baseUrl = process.env.BASE_URL || 'https://nera.app';
+        const baseUrl = process.env.BASE_URL || 'https://usenera.com';
         const profileLink = `${baseUrl}/p/${targetAppt.professionalSlug || 'app'}`;
         switch (intent) {
             case 'confirm':
@@ -364,7 +377,7 @@ export async function handleInboundMessage(_db, phone, message, rawPayload) {
         return { success: true, intent, appointmentId: targetAppt.id };
     }
     catch (err) {
-        console.error('[WhatsAppService] Error handling inbound:', err);
+        logger.error("WHATSAPP", 'Error handling inbound:', { error: err, meta: { phone: maskPhone(normalizedPhone) } });
         await logRef.update({ status: 'failed', error: err.message });
         return { success: false, error: err.message };
     }

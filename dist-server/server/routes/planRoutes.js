@@ -3,6 +3,8 @@ import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { sendReferralRewardEmail, sendTrialWillEndEmail } from "../emails/sendEmail.js";
 import Stripe from "stripe";
+import { logger, maskToken, maskUid } from "../utils/logger.js";
+import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
 const router = express.Router();
 const isDev = process.env.NODE_ENV !== "production";
 let stripeModule = null;
@@ -21,25 +23,34 @@ function getStripe() {
 /**
  * CREATE CHECKOUT SESSION
  */
-router.post("/create-checkout", async (req, res) => {
+router.post("/create-checkout", requireFirebaseAuth, async (req, res) => {
     const db = getDb();
-    const { plan, professionalId, email } = req.body;
-    if (!plan || !professionalId || !email) {
-        return res.status(400).json({ error: "Missing required fields: plan, professionalId, email" });
+    const { plan } = req.body;
+    const uid = req.uid; // guaranteed by requireFirebaseAuth
+    if (!plan) {
+        return res.status(400).json({ error: "Missing required field: plan" });
     }
     try {
+        const userDoc = await db.collection("users").doc(uid).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        const userData = userDoc.data();
+        const email = userData?.email;
+        if (!email) {
+            return res.status(400).json({ error: "User email not found" });
+        }
         const stripe = getStripe();
         if (isDev) {
-            console.log("[DEV CHECKOUT] Initiating checkout session for plan:", plan);
+            logger.info("STRIPE", "Initiating checkout session", { professionalId: maskUid(uid), meta: { plan } });
         }
         const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
         if (!priceId) {
-            console.error("[CHECKOUT ERROR] Price ID not configured. Check environment variables.");
+            logger.error("STRIPE", "Price ID not configured. Check environment variables.");
             return res.status(400).json({ error: `O plano ${plan} não está configurado corretamente (Price ID ausente). Por favor, contate o suporte.` });
         }
         // Check for credits before creating session params
-        const userDoc = await db.collection("users").doc(professionalId).get();
-        const credits = userDoc.data()?.credits || 0;
+        const credits = userData?.credits || 0;
         const sessionParams = {
             payment_method_types: ["card"],
             line_items: [
@@ -50,7 +61,7 @@ router.post("/create-checkout", async (req, res) => {
             ],
             mode: "subscription",
             customer_email: email,
-            client_reference_id: professionalId,
+            client_reference_id: uid,
             subscription_data: {
                 trial_period_days: 15,
                 trial_settings: {
@@ -63,7 +74,7 @@ router.post("/create-checkout", async (req, res) => {
             success_url: `${process.env.APP_URL}/checkout/success`,
             cancel_url: `${process.env.APP_URL}/checkout/canceled`,
             metadata: {
-                professionalId,
+                professionalId: uid,
                 plan,
                 creditsUsed: credits >= 10 ? 'true' : 'false'
             },
@@ -81,7 +92,7 @@ router.post("/create-checkout", async (req, res) => {
         res.json({ checkoutUrl: session.url });
     }
     catch (err) {
-        console.error("[STRIPE CHECKOUT ERROR]", err.message);
+        logger.error("STRIPE", "Failed to create checkout session", { requestId: req.requestId, error: err });
         res.status(500).json({
             error: "Failed to create checkout session",
             details: err.message
@@ -98,30 +109,30 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
     let event;
     if (!webhookSecret || !sig) {
-        console.error('[STRIPE WEBHOOK ERROR] Missing webhookSecret or signature');
+        logger.error("STRIPE", "Missing webhookSecret or signature", { requestId: req.requestId });
         return res.status(400).send('Webhook Error: Missing verification details');
     }
     try {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     }
     catch (err) {
-        console.error(`[STRIPE WEBHOOK ERROR] Verification failed: ${err.message}`);
+        logger.error("STRIPE", "Verification failed", { requestId: req.requestId, error: err });
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-    console.log(`[STRIPE WEBHOOK] Received event: ${event.type}`);
+    logger.info("STRIPE", "Received webhook event", { requestId: req.requestId, meta: { eventType: event.type } });
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         const userId = session.client_reference_id;
         const plan = session.metadata?.plan || 'pro';
         if (isDev) {
-            console.log(`[DEV WEBHOOK] Processing checkout.session.completed for userId=${userId}, plan=${plan}`);
+            logger.info("STRIPE", "Processing checkout.session.completed", { professionalId: maskUid(userId), meta: { plan } });
         }
         if (!userId) {
-            console.warn('[STRIPE WEBHOOK ERROR] Missing client_reference_id in session');
+            logger.warn("STRIPE", "Missing client_reference_id in session", { requestId: req.requestId });
             return res.status(400).json({ error: 'Missing client_reference_id' });
         }
         if (!session.subscription) {
-            console.error("[STRIPE WEBHOOK ERROR] Missing subscription in checkout session id:", session.id);
+            logger.error("STRIPE", "Missing subscription in checkout session", { requestId: req.requestId, meta: { sessionId: maskToken(session.id) } });
             return res.status(400).json({ error: "Missing subscription" });
         }
         try {
@@ -131,11 +142,11 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
             const userRef = db.collection('users').doc(userId);
             const userDoc = await userRef.get();
             if (!userDoc.exists) {
-                console.warn(`[STRIPE WEBHOOK ERROR] User context not found during checkout completion`);
+                logger.warn("STRIPE", "User context not found during checkout completion", { professionalId: maskUid(userId) });
                 return res.status(404).json({ error: 'User not found' });
             }
             if (isDev) {
-                console.log(`[DEV WEBHOOK] Updating plan for user ${userId} to ${plan}...`);
+                logger.info("STRIPE", "Updating plan for user", { professionalId: maskUid(userId), meta: { plan } });
             }
             const userData = userDoc.data();
             const referredBy = userData?.referredBy;
@@ -174,10 +185,10 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
                 updateData.credits = 0;
             }
             await userRef.update(updateData);
-            console.log(`[STRIPE WEBHOOK SUCCESS] User successfully upgraded to ${plan}`);
+            logger.info("STRIPE", "User successfully upgraded", { professionalId: maskUid(userId), meta: { plan } });
         }
         catch (err) {
-            console.error('[STRIPE WEBHOOK ERROR] Error processing checkout.session.completed:', err.message);
+            logger.error("STRIPE", "Error processing checkout.session.completed", { requestId: req.requestId, professionalId: maskUid(userId), error: err });
             return res.status(500).json({ error: 'Internal processing error' });
         }
     }
@@ -185,7 +196,7 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
         const subscription = event.data.object;
         const customerId = subscription.customer;
         if (isDev) {
-            console.log(`[DEV WEBHOOK] Trial strictly ending soon for customer ${customerId}`);
+            logger.info("STRIPE", "Trial strictly ending soon", { meta: { customerId: maskToken(customerId) } });
         }
         try {
             const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
@@ -208,21 +219,21 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
                         name: userData.name || 'Parceira Nera',
                         trialEndAt: new Date(subscription.trial_end * 1000).toISOString()
                     });
-                    console.log(`[STRIPE WEBHOOK SUCCESS] Trial warning email sent`);
+                    logger.info("STRIPE", "Trial warning email sent", { professionalId: maskUid(userId) });
                 }
             }
         }
         catch (err) {
-            console.error('[STRIPE WEBHOOK ERROR] Error handling trial_will_end:', err.message);
+            logger.error("STRIPE", "Error handling trial_will_end", { requestId: req.requestId, error: err });
         }
     }
     if (event.type === 'invoice.paid') {
         const invoice = event.data.object;
         const customerId = invoice.customer;
         const subscriptionId = invoice.subscription;
-        console.log(`[STRIPE WEBHOOK] Received invoice.paid for customer ${customerId}`);
+        logger.info("STRIPE", "Received invoice.paid", { requestId: req.requestId, meta: { customerId: maskToken(customerId) } });
         if (!subscriptionId || !customerId) {
-            console.error('[STRIPE WEBHOOK ERROR] Missing critical data in invoice.paid event');
+            logger.error("STRIPE", "Missing critical data in invoice.paid event", { requestId: req.requestId });
             return res.status(400).json({ error: 'Missing critical data' });
         }
         try {
@@ -234,14 +245,14 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
                     planExpiresAt: newExpiry.toISOString(),
                     updatedAt: new Date().toISOString()
                 });
-                console.log(`[STRIPE WEBHOOK SUCCESS] Plan successfully renewed`);
+                logger.info("STRIPE", "Plan successfully renewed", { professionalId: maskUid(usersSnap.docs[0].id) });
             }
             else {
-                console.warn(`[STRIPE WEBHOOK] Customer for renewal not found in system`);
+                logger.warn("STRIPE", "Customer for renewal not found in system", { meta: { customerId: maskToken(customerId) } });
             }
         }
         catch (err) {
-            console.error('[STRIPE WEBHOOK ERROR] Critical error processing invoice.paid:', err.message);
+            logger.error("STRIPE", "Critical error processing invoice.paid", { requestId: req.requestId, error: err });
             return res.status(500).json({ error: 'Internal error updating renewal' });
         }
     }
@@ -260,14 +271,14 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
                     stripeSubscriptionId: null,
                     updatedAt: new Date().toISOString()
                 });
-                console.log(`[STRIPE WEBHOOK SUCCESS] Subscription ended, plan reset to free`);
+                logger.info("STRIPE", "Subscription ended, plan reset to free", { professionalId: maskUid(userDoc.id) });
             }
             else {
-                console.warn(`[STRIPE WEBHOOK] Customer for deletion not found in system`);
+                logger.warn("STRIPE", "Customer for deletion not found in system", { meta: { customerId: maskToken(customerId) } });
             }
         }
         catch (err) {
-            console.error('[STRIPE WEBHOOK ERROR] Error deleting subscription:', err.message);
+            logger.error("STRIPE", "Error deleting subscription", { requestId: req.requestId, error: err });
             return res.status(500).json({ error: 'Internal error processing deletion' });
         }
     }

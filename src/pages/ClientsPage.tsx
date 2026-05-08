@@ -151,7 +151,7 @@ export default function ClientsPage() {
             
             apptSnap.docs.forEach(doc => {
               const appt = doc.data() as Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string };
-              if (!appt.clientName) return;
+              if (!appt.clientName || !appt.date) return;
               
               const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
               const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
@@ -193,15 +193,15 @@ export default function ClientsPage() {
               if (isCancelled) existing.cancelledAppointments += 1;
               
               if (!existing.services) existing.services = [];
-              if (!existing.services.includes(appt.serviceName) && appt.serviceName) {
+              if (!existing.services.includes(appt.serviceName || '') && appt.serviceName) {
                 existing.services.push(appt.serviceName);
               }
               
-              if (new Date(appt.date) > new Date(existing.lastAppointmentDate)) {
+              if (appt.date > existing.lastAppointmentDate) {
                 existing.lastAppointmentDate = appt.date;
                 existing.lastServiceName = appt.serviceName || '';
               }
-              if (new Date(appt.date) < new Date(existing.firstAppointmentDate)) {
+              if (appt.date < existing.firstAppointmentDate) {
                 existing.firstAppointmentDate = appt.date;
               }
               
@@ -240,77 +240,107 @@ export default function ClientsPage() {
     if (!user) return;
     setIsMigrating(true);
     notify.info('Iniciando atualização inteligente da base de clientes...', {
-      description: 'Isso pode levar alguns instantes.'
+      description: 'Isso pode processar dados em lotes. Por favor, aguarde.'
     });
 
     try {
-      // Fetch all appointments for this professional
-      const q = query(collection(db, 'appointments'), where('professionalId', '==', user.uid));
-      const snap = await getDocs(q);
-      const appointments = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
-
       let count = 0;
+      let hasMore = true;
+      let lastVisibleDoc = null;
+      const MAX_MIGRATION_DOCS = 3000;
+      const PAGE_SIZE = 300;
       
       const batchMap = new Map<string, any>();
       
-      for (const appt of appointments as Array<Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string }>) {
-        if (!appt.clientName) continue;
+      while (hasMore) {
+        let q = query(
+          collection(db, 'appointments'), 
+          where('professionalId', '==', user.uid),
+          orderBy('date', 'desc'),
+          limit(PAGE_SIZE)
+        );
         
-        const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
-        const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
-        const summaryId = `${user.uid}_${key}`;
-        
-        const existing = batchMap.get(summaryId) || {
-          professionalId: user.uid,
-          clientKey: key,
-          clientName: appt.clientName || 'Cliente',
-          clientPhone: phone,
-          clientEmail: appt.clientEmail || appt.customerEmail || '',
-          totalAppointments: 0,
-          confirmedAppointments: 0,
-          cancelledAppointments: 0,
-          noShowCount: 0,
-          totalSpent: 0,
-          firstAppointmentDate: appt.date,
-          lastAppointmentDate: appt.date,
-          lastServiceId: appt.serviceId || '',
-          lastServiceName: appt.serviceName || '',
-          segment: 'new',
-          notes: '',
-          services: []
-        };
-        
-        const isConfirmed = isRevenueStatus(appt.status);
-        const isCancelled = isCancelledStatus(appt.status);
-        const isNoShow = appt.status === APPOINTMENT_STATUS.NO_SHOW;
-        
-        if (isConfirmed || isCancelled || isNoShow) {
-          existing.totalAppointments += 1;
+        if (lastVisibleDoc) {
+          q = query(q, startAfter(lastVisibleDoc));
         }
 
-        if (isConfirmed) {
-          existing.confirmedAppointments += 1;
-          existing.totalSpent += (Number(appt.price) || 0);
-        }
-        if (isNoShow) existing.noShowCount += 1;
-        if (isCancelled) existing.cancelledAppointments += 1;
+        const snap = await getDocs(q);
         
-        if (!existing.services) existing.services = [];
-        if (!existing.services.includes(appt.serviceName) && appt.serviceName) {
-          existing.services.push(appt.serviceName);
+        if (snap.empty) {
+          hasMore = false;
+          break;
         }
+
+        lastVisibleDoc = snap.docs[snap.docs.length - 1];
+        const appointments = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
         
-        if (new Date(appt.date) > new Date(existing.lastAppointmentDate)) {
-          existing.lastAppointmentDate = appt.date;
-          existing.lastServiceId = appt.serviceId || '';
-          existing.lastServiceName = appt.serviceName || '';
+        for (const appt of appointments as Array<Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string }>) {
+          if (!appt.clientName || !appt.date) continue;
+          
+          const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
+          const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
+          const summaryId = `${user.uid}_${key}`;
+          
+          const existing = batchMap.get(summaryId) || {
+            professionalId: user.uid,
+            clientKey: key,
+            clientName: appt.clientName || 'Cliente',
+            clientPhone: phone,
+            clientEmail: appt.clientEmail || appt.customerEmail || '',
+            totalAppointments: 0,
+            confirmedAppointments: 0,
+            cancelledAppointments: 0,
+            noShowCount: 0,
+            totalSpent: 0,
+            firstAppointmentDate: appt.date,
+            lastAppointmentDate: appt.date,
+            lastServiceId: appt.serviceId || '',
+            lastServiceName: appt.serviceName || '',
+            segment: 'new',
+            notes: '',
+            services: []
+          };
+          
+          const isConfirmed = isRevenueStatus(appt.status);
+          const isCancelled = isCancelledStatus(appt.status);
+          const isNoShow = appt.status === APPOINTMENT_STATUS.NO_SHOW;
+          
+          if (isConfirmed || isCancelled || isNoShow) {
+            existing.totalAppointments += 1;
+          }
+
+          if (isConfirmed) {
+            existing.confirmedAppointments += 1;
+            existing.totalSpent += (Number(appt.price) || 0);
+          }
+          if (isNoShow) existing.noShowCount += 1;
+          if (isCancelled) existing.cancelledAppointments += 1;
+          
+          if (!existing.services) existing.services = [];
+          if (!existing.services.includes(appt.serviceName || '') && appt.serviceName) {
+            existing.services.push(appt.serviceName);
+          }
+          
+          if (appt.date > existing.lastAppointmentDate) {
+            existing.lastAppointmentDate = appt.date;
+            existing.lastServiceId = appt.serviceId || '';
+            existing.lastServiceName = appt.serviceName || '';
+          }
+          if (appt.date < existing.firstAppointmentDate) {
+            existing.firstAppointmentDate = appt.date;
+          }
+          
+          batchMap.set(summaryId, existing);
+          count++;
         }
-        if (new Date(appt.date) < new Date(existing.firstAppointmentDate)) {
-          existing.firstAppointmentDate = appt.date;
+
+        if (count >= MAX_MIGRATION_DOCS) {
+          notify.warning('Muitos registros encontrados', {
+            description: 'Sincronizamos os mais recentes. Para uma migração total de histórico gigante, use uma rotina administrativa fora do app.'
+          });
+          hasMore = false;
+          break;
         }
-        
-        batchMap.set(summaryId, existing);
-        count++;
       }
       
       // Write to Firestore in batches
@@ -322,7 +352,7 @@ export default function ClientsPage() {
         }
         resultArray[chunkIndex].push(item);
         return resultArray;
-}, [] as [string, any][][]);
+      }, [] as [string, any][][]);
       
       for (const chunk of chunks) {
         const batch = writeBatch(db);
@@ -334,7 +364,7 @@ export default function ClientsPage() {
       }
 
       notify.success('Base de clientes sincronizada!', {
-        description: `${batchMap.size} clientes únicos processados a partir de ${count} reservas.`
+        description: `${batchMap.size} clientes únicos processados a partir de ${count} reservas resgatadas.`
       });
       
       // Refresh the page data

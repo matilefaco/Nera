@@ -4,7 +4,7 @@ import { useAuth } from '../AuthContext';
 import { db, auth, handleBookingError, inviteFromWaitlist, updateAppointmentStatus } from '../firebase';
 import { 
   collection, query, where, onSnapshot, orderBy, doc, updateDoc, 
-  addDoc, deleteDoc, serverTimestamp, limit 
+  addDoc, deleteDoc, serverTimestamp, limit, getDocs, getCountFromServer
 } from 'firebase/firestore';
 import { 
   Calendar, Clock, Users, LogOut, 
@@ -44,6 +44,45 @@ import { useDashboardMetrics } from '../hooks/useDashboardMetrics';
 
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
+import { getPublicProfileUrl } from '../lib/env';
+
+// --- SAFE HELPERS ---
+function safeString(value: unknown, fallback = ''): string {
+  if (typeof value !== 'string') return fallback;
+  return value;
+}
+
+function safeDateLabel(date?: string | null, fallback = '—'): string {
+  if (!date || typeof date !== 'string' || date.indexOf('-') === -1) return fallback;
+  const parts = date.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return date;
+}
+
+function safeParseLocalDate(date?: string | null): Date | null {
+  if (!date || typeof date !== 'string' || date.indexOf('-') === -1) return null;
+  const parts = date.split('-').map(Number);
+  if (parts.length === 3 && parts.every(p => !isNaN(p))) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return null;
+}
+
+function safeFormatDateKey(date?: string | null, fallback = 'Recorrente'): string {
+  const parsed = safeParseLocalDate(date);
+  if (!parsed) return fallback;
+  return formatDateKey(parsed);
+}
+
+function safeLocaleCompare(a?: string | null, b?: string | null): number {
+  if (!a && !b) return 0;
+  if (!a) return -1;
+  if (!b) return 1;
+  return String(a).localeCompare(String(b));
+}
+// --------------------
 
 const isDev = import.meta.env.DEV;
 const devLog = (...args: any[]) => isDev && console.log(...args);
@@ -107,7 +146,7 @@ export default function Dashboard() {
     });
     
     // Remove if optimistically cancelled
-    return confirmed.filter(req => optimisticUpdates[req.id] !== 'cancelled_by_professional').sort((a,b) => a.time.localeCompare(b.time));
+    return confirmed.filter(req => optimisticUpdates[req.id] !== 'cancelled_by_professional').sort((a,b) => safeLocaleCompare(a.time, b.time));
   }, [confirmedToday, pendingRequests, optimisticUpdates]);
 
   const displayedDailyRevenue = useMemo(() => {
@@ -137,6 +176,7 @@ export default function Dashboard() {
   const [blockedSchedules, setBlockedSchedules] = useState<BlockedSchedule[]>([]);
   const [referralLink, setReferralLink] = useState('');
   const [analyticsEvents, setAnalyticsEvents] = useState<AnalyticsEvent[]>([]);
+  const [totalClientsCountFromSummaries, setTotalClientsCountFromSummaries] = useState<number | null>(null);
   const {
     confirmedAppointments,
     totalClientsCount,
@@ -147,12 +187,25 @@ export default function Dashboard() {
     servicesByMonth,
     daysSinceLastAppointment,
     growthMetrics
-  } = useDashboardMetrics(appointments, analyticsEvents);
+  } = useDashboardMetrics(appointments, analyticsEvents, totalClientsCountFromSummaries);
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const qCount = query(
+      collection(db, 'client_summaries'),
+      where('professionalId', '==', user.uid)
+    );
+    getCountFromServer(qCount).then(snap => {
+      setTotalClientsCountFromSummaries(snap.data().count);
+    }).catch(err => {
+      console.error('Error fetching client summaries count:', err);
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -194,21 +247,19 @@ setAlerts(docs);
       collection(db, 'analytics_events'),
       where('professionalId', '==', user.uid),
       orderBy('timestamp', 'desc'),
-      limit(1000)
+      limit(100)
     );
 
-    const unsubAnalytics = onSnapshot(qAnalytics, (snapshot) => {
+    getDocs(qAnalytics).then((snapshot) => {
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
-setAnalyticsEvents(docs);
+        setAnalyticsEvents(docs);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        console.error("Error processing getDocs callback:", err);
       }
-    }, (error) => {
-      console.error('[Dashboard] Subscription error on qAnalytics:', error);
+    }).catch((error) => {
+      console.error('[Dashboard] Fetch error on qAnalytics:', error);
     });
-
-    return () => unsubAnalytics();
   }, [user]);
 
 
@@ -284,24 +335,36 @@ setUnconfirmedTomorrow(docs);
       console.error('[Dashboard] Subscription error on qUnconfirmed:', error);
     });
 
-    // Query: All appointments to calculate metrics
+    const todayNum = new Date();
+    const firstDayLastMonth = new Date(todayNum.getFullYear(), todayNum.getMonth() - 1, 1);
+    const startDateStr = firstDayLastMonth.toISOString().split('T')[0];
+
+    const thirtyDaysFromNow = new Date(todayNum);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const endDateStr = thirtyDaysFromNow.toISOString().split('T')[0];
+
+    // Query: Historical and upcoming appointments to calculate metrics
     const qAll = query(
       collection(db, 'appointments'),
       where('professionalId', '==', user.uid),
-      orderBy('date', 'desc'),
-      limit(500)
+      where('date', '>=', startDateStr),
+      where('date', '<=', endDateStr),
+      orderBy('date', 'desc')
     );
 
-    const unsubAll = onSnapshot(qAll, (snapshot) => {
+    getDocs(qAll).then((snapshot) => {
       try {
         const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-setAppointments(appointmentsData);
-// Metrics calculation moved to hook
-setIsInitialLoading(false);
+        setAppointments(appointmentsData);
+        // Metrics calculation moved to hook
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        console.error("Error processing getDocs callback:", err);
       }
-    }, (error) => { console.error("Firestore onSnapshot error:", error); });
+    }).catch((error) => { 
+      console.error("Firestore getDocs error:", error); 
+    }).finally(() => {
+      setIsInitialLoading(false);
+    });
 
     // Sync Profile Settings
     if (profile) {
@@ -334,22 +397,22 @@ setWaitlist(docs);
 
     // Query: Blocked Schedules
     const blockedRef = collection(db, 'blocked_schedules');
-    const dayOfWeek = parseLocalDate(today).getDay();
-    const qBlocked = query(blockedRef, where('professionalId', '==', user.uid));
+    const dayOfWeek = safeParseLocalDate(today)?.getDay() || 0;
+    const qBlocked = query(blockedRef, where('professionalId', '==', user.uid), limit(100));
     
-    const unsubBlocked = onSnapshot(qBlocked, (snap) => {
+    getDocs(qBlocked).then((snap) => {
       try {
         const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         const todayBlocked = allBlocked.filter(b => {
             const isToday = b.date === today;
-            const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+            const isRecurringToday = b.isRecurring && Array.isArray(b.recurringDays) && b.recurringDays.includes(dayOfWeek);
             return isToday || isRecurringToday;
         });
         setBlockedSchedules(todayBlocked);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        console.error("Error processing getDocs callback:", err);
       }
-    }, (error) => { console.error('[Dashboard] Subscription error on qBlocked:', error); });
+    }).catch((error) => { console.error('[Dashboard] Fetch error on qBlocked:', error); });
 
     // Query: Inactive clients from summaries
     const thirtyDaysAgo = new Date();
@@ -364,16 +427,16 @@ setWaitlist(docs);
       limit(20)
     );
 
-    const unsubInactive = onSnapshot(qInactive, (snapshot) => {
+    getDocs(qInactive).then((snapshot) => {
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-setInactiveClientsCount(docs.length);
-setInactiveClients(docs);
+        setInactiveClientsCount(docs.length);
+        setInactiveClients(docs);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        console.error("Error processing getDocs callback:", err);
       }
-    }, (error) => {
-      console.error('[Dashboard] Subscription error on qInactive:', error);
+    }).catch((error) => {
+      console.error('[Dashboard] Fetch error on qInactive:', error);
     });
 
     // Query: All services
@@ -382,10 +445,10 @@ setInactiveClients(docs);
       where('professionalId', '==', user.uid)
     );
 
-    const unsubServices = onSnapshot(qServices, (snapshot) => {
+    getDocs(qServices).then((snapshot) => {
       try {
         const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
-const filtered = rawServices.filter((s: any) => 
+        const filtered = rawServices.filter((s: any) => 
             s.active !== false &&
             s.name?.trim() &&
             Number(s.price) > 0
@@ -396,16 +459,14 @@ const filtered = rawServices.filter((s: any) =>
               ...s,
               duration: parsedDuration
             };
-          }, (error) => {
-          console.error('[Dashboard] Subscription error on qServices:', error);
-        });
-const grouped = new Map<string, any[]>();
-filtered.forEach(s => {
+          });
+        const grouped = new Map<string, any[]>();
+        filtered.forEach(s => {
             const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
             if (!grouped.has(key)) grouped.set(key, []);
             grouped.get(key)!.push(s);
           });
-const uniqueServices = Array.from(grouped.values()).map(list => {
+        const uniqueServices = Array.from(grouped.values()).map(list => {
             if (list.length === 1) return list[0];
             
             // Critérios de desempate se houver duplicados:
@@ -421,11 +482,11 @@ const uniqueServices = Array.from(grouped.values()).map(list => {
               return bTime - aTime;
             })[0];
           });
-setServices(uniqueServices);
+        setServices(uniqueServices);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        console.error("Error processing getDocs callback:", err);
       }
-    }, (error) => { console.error("Firestore onSnapshot error:", error); });
+    }).catch((error) => { console.error("Firestore getDocs error:", error); });
 
     // Query: WhatsApp Logs
     const qWl = query(
@@ -435,26 +496,21 @@ setServices(uniqueServices);
       limit(5)
     );
 
-    const unsubWl = onSnapshot(qWl, (snapshot) => {
+    getDocs(qWl).then((snapshot) => {
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
-setWhatsappLogs(docs);
+        setWhatsappLogs(docs);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        console.error("Error processing getDocs callback:", err);
       }
-    }, (error) => {
-      console.error('[Dashboard] Subscription error on qWl:', error);
+    }).catch((error) => {
+      console.error('[Dashboard] Fetch error on qWl:', error);
     });
 
     return () => {
       unsubToday();
       unsubUnconfirmed();
-      unsubAll();
       unsubWaitlist();
-      unsubBlocked();
-      unsubInactive();
-      unsubServices();
-      unsubWl();
     };
   }, [user, profile]);
 
@@ -583,7 +639,8 @@ setWhatsappLogs(docs);
     }
   };
 
-  const isPastTime = (time: string): boolean => {
+  const isPastTime = (time: string | undefined): boolean => {
+    if (!time || typeof time !== 'string' || !time.includes(':')) return false;
     const [h, m] = time.split(":").map(Number);
     const apptDate = new Date();
     apptDate.setHours(h, m, 0);
@@ -597,6 +654,10 @@ setWhatsappLogs(docs);
     const now = new Date();
     return displayedConfirmedToday.find(appt => {
       if (!isConfirmedLikeStatus(appt.status)) return false;
+      if (!appt.time || typeof appt.time !== 'string' || !appt.time.includes(':')) {
+        if (import.meta.env.DEV) console.warn('Appointment without valid time found:', appt.id);
+        return false;
+      }
       const [h, m] = appt.time.split(':').map(Number);
       const apptDate = new Date();
       apptDate.setHours(h, m, 0);
@@ -805,7 +866,7 @@ setWhatsappLogs(docs);
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-serif text-brand-ink">
-              Olá, {profile?.name?.split(' ')[0]} ✨
+              Olá, {safeString(profile?.name).split(' ')[0]} ✨
             </h1>
             <div className="flex flex-col mt-1">
               <div className="flex items-center gap-2">
@@ -829,7 +890,9 @@ setWhatsappLogs(docs);
               </div>
               <p className="text-[11px] text-brand-stone font-medium mt-1">
                 Você recebeu {appointments.filter(a => {
-                  const d = new Date(a.date + 'T12:00:00');
+                  if (!a.date) return false;
+                  const d = safeParseLocalDate(a.date);
+                  if (!d) return false;
                   const now = new Date();
                   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
                 }).length} agendamentos este mês ✨
@@ -1162,12 +1225,13 @@ setWhatsappLogs(docs);
                           ))}
                         </div>
                       ) : (
-                        <div className="py-10 text-center flex flex-col items-center">
-                          <div className="w-12 h-12 bg-brand-parchment rounded-full flex items-center justify-center text-brand-mist mb-4">
-                            <Info size={24} />
+                        <div className="py-12 border-t border-brand-linen text-center flex flex-col items-center">
+                          <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta mb-3 opacity-80">
+                            <Star size={18} />
                           </div>
-                          <p className="text-[11px] text-brand-stone italic max-w-[200px] mx-auto leading-relaxed">
-                            Quando houver reservas neste mês, seus serviços mais procurados aparecerão aqui.
+                          <p className="text-sm font-serif text-brand-ink">O pódio deste mês está livre.</p>
+                          <p className="text-[10px] text-brand-stone font-light max-w-[240px] mx-auto mt-2 leading-relaxed">
+                            Assim que os primeiros clientes agendarem, você verá aqui o ranking inteligente dos serviços que mais geram receita.
                           </p>
                         </div>
                       )}
@@ -1298,46 +1362,80 @@ setWhatsappLogs(docs);
               </motion.div>
             )}
 
-            {/* Resumo Financeiro Hoje */}
-            <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
-              {displayedConfirmedToday.length === 0 && (
-                <div className="mb-6 pb-6 border-b border-brand-linen">
-                  <p className="text-sm font-serif text-brand-ink italic">Dia tranquilo até agora — vamos preencher?</p>
-                  {daysSinceLastAppointment !== null && (
-                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mt-2">
-                      Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
-                    </p>
-                  )}
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-8 divide-x divide-brand-linen">
-                <div>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Faturamento Hoje</p>
-                  <p className="text-3xl font-serif text-brand-ink">{formatCurrency(displayedDailyRevenue)}</p>
-                </div>
-                <div className="pl-8">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Agendamentos</p>
-                  <p className="text-3xl font-serif text-brand-ink">{displayedConfirmedToday.length}</p>
-                </div>
-              </div>
-              
-              <div className="mt-6 pt-6 border-t border-brand-linen flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-brand-linen text-brand-terracotta rounded-xl flex items-center justify-center shrink-0">
-                    <DollarSign size={20} />
+            {/* Resumo Financeiro Hoje / Day 1 Activation */}
+            {appointments.length === 0 && pendingCount === 0 && (!totalClientsCountFromSummaries || totalClientsCountFromSummaries === 0) ? (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-brand-white p-8 md:p-12 rounded-[40px] border border-brand-mist shadow-xl relative overflow-hidden group mb-2"
+              >
+                <div className="absolute top-0 right-0 w-64 h-64 bg-brand-linen rounded-full blur-3xl opacity-60 -mr-20 -mt-20 pointer-events-none transition-opacity group-hover:opacity-80" />
+                <div className="relative z-10 max-w-lg">
+                  <div className="w-16 h-16 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                    <Sparkles size={32} />
                   </div>
+                  <h4 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Seu espaço está pronto.</h4>
+                  <p className="text-sm text-brand-stone italic mb-8 leading-relaxed">
+                    Tudo configurado! O próximo passo é deixar suas clientes encontrarem você. Compartilhe seu link exclusivo e comece a receber pedidos diretamente na sua Nera.
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button 
+                      onClick={() => setIsShareModalOpen(true)} 
+                      className="w-full sm:w-auto px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-lg flex items-center justify-center gap-2 group-hover:bg-brand-espresso"
+                    >
+                      <Share2 size={16} /> Divulgar agenda
+                    </button>
+                    <Link 
+                      to="/profile" 
+                      className="w-full sm:w-auto px-8 py-4 bg-brand-parchment border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-2"
+                    >
+                      Ver meu perfil
+                    </Link>
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
+                {displayedConfirmedToday.length === 0 && (
+                  <div className="mb-6 pb-6 border-b border-brand-linen">
+                    <p className="text-sm font-serif text-brand-ink italic">Dia tranquilo até agora — vamos preencher?</p>
+                    {daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mt-2">
+                        Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-8 divide-x divide-brand-linen">
                   <div>
-                    <h4 className="text-sm font-serif text-brand-ink">Painel Financeiro</h4>
-                    <p className="text-[10px] text-brand-stone font-light italic">Histórico e exportação CSV</p>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Faturamento Hoje</p>
+                    <p className="text-3xl font-serif text-brand-ink">{formatCurrency(displayedDailyRevenue)}</p>
+                  </div>
+                  <div className="pl-8">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Agendamentos</p>
+                    <p className="text-3xl font-serif text-brand-ink">{displayedConfirmedToday.length}</p>
                   </div>
                 </div>
-                <Link to="/financeiro">
-                  <button className="px-5 py-2 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:scale-105 transition-all">
-                    Acessar
-                  </button>
-                </Link>
+                
+                <div className="mt-6 pt-6 border-t border-brand-linen flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-brand-linen text-brand-terracotta rounded-xl flex items-center justify-center shrink-0">
+                      <DollarSign size={20} />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-serif text-brand-ink">Painel Financeiro</h4>
+                      <p className="text-[10px] text-brand-stone font-light italic">Histórico e exportação CSV</p>
+                    </div>
+                  </div>
+                  <Link to="/financeiro">
+                    <button className="px-5 py-2 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:scale-105 transition-all">
+                      Acessar
+                    </button>
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Timeline de Hoje */}
             <section className="space-y-6">
@@ -1571,7 +1669,7 @@ setWhatsappLogs(docs);
                     {blockedSchedules && blockedSchedules.length > 0 && (
                       <div className="bg-brand-parchment/30 p-4 rounded-2xl border border-brand-mist/50">
                         <p className="text-[10px] text-brand-ink leading-tight font-medium">
-                          Indisponível {blockedSchedules[0].date === getTodayLocale() ? 'hoje' : formatDateKey(parseLocalDate(blockedSchedules[0].date))} às {blockedSchedules[0].startTime}
+                          Indisponível {blockedSchedules[0].date === getTodayLocale() ? 'hoje' : safeFormatDateKey(blockedSchedules[0].date, 'Recorrente')} às {blockedSchedules[0].startTime}
                         </p>
                       </div>
                     )}
@@ -1594,12 +1692,12 @@ setWhatsappLogs(docs);
                             <div key={idx} className="bg-brand-parchment/10 p-4 rounded-2xl border border-brand-mist flex items-center justify-between gap-4">
                               <div className="flex-1">
                                 <p className="text-[11px] font-bold text-brand-ink">{client.clientName || client.name}</p>
-                                <p className="text-[9px] text-brand-stone italic">Não volta desde {client.lastDate?.split('-').reverse().join('/')}</p>
+                                <p className="text-[9px] text-brand-stone italic">Não volta desde {safeDateLabel(client.lastDate)}</p>
                               </div>
                               {idx === 0 && (client.clientWhatsapp || client.whatsapp) && (
                                 <button 
                                   onClick={() => {
-                                    const firstName = (client.clientName || client.name).split(' ')[0];
+                                    const firstName = safeString(client.clientName || client.name, 'Cliente').split(' ')[0];
                                     const msg = `Oi ${firstName} ✨ Saudades! Notamos que faz um tempinho que você não vem nos visitar. Que tal garantir um horário agora?`;
                                     window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || '', msg), '_blank');
                                   }}
@@ -1624,7 +1722,7 @@ setWhatsappLogs(docs);
                             <button 
                               onClick={() => {
                                 const client = inactiveClients[0];
-                                const firstName = (client.clientName || client.name).split(' ')[0];
+                                const firstName = safeString(client.clientName || client.name, 'Cliente').split(' ')[0];
                                 const msg = `Oi ${firstName} ✨ Saudades! Notamos que faz um tempinho que você não vem nos visitar. Que tal garantir um horário agora?`;
                                 window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || '', msg), '_blank');
                               }}
@@ -1644,8 +1742,14 @@ setWhatsappLogs(docs);
                   </div>
 
                   {!(waitlist && waitlist.length > 0) && !(blockedSchedules && blockedSchedules.length > 0) && inactiveClientsCount === 0 && (
-                    <div className="pt-4 text-center">
-                      <p className="text-sm font-serif text-brand-stone italic">Tudo em dia por aqui.</p>
+                    <div className="pt-6 border-t border-brand-linen text-center space-y-3">
+                      <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta mx-auto mb-2 opacity-80">
+                        <Check size={18} />
+                      </div>
+                      <p className="text-sm font-serif text-brand-ink">A operação rodando suavemente.</p>
+                      <p className="text-[10px] text-brand-stone font-light px-4 leading-relaxed max-w-[250px] mx-auto">
+                        Sem clientes para resgatar ou pendências. Quando a operação precisar da sua atenção, os alertas estratégicos aparecerão aqui.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1741,9 +1845,14 @@ setWhatsappLogs(docs);
                           </div>
                         ))
                       ) : (
-                        <div className="text-center py-6">
-                          <p className="text-[10px] text-brand-stone italic">Nenhuma mensagem automática enviada ainda.</p>
-                          <p className="text-[9px] text-gray-400 mt-1">Lembretes e confirmações aparecerão aqui.</p>
+                        <div className="py-8 text-center flex flex-col items-center border-t border-brand-linen">
+                          <div className="w-8 h-8 bg-brand-linen rounded-full flex items-center justify-center text-brand-stone mb-2 opacity-60">
+                            <MessageCircle size={14} />
+                          </div>
+                          <p className="text-xs font-serif text-brand-ink">Nenhuma mensagem disparada</p>
+                          <p className="text-[10px] text-brand-stone font-light max-w-[200px] mx-auto mt-1 leading-relaxed">
+                            Lembretes, confirmações e retornos automáticos aparecerão aqui quando a sua agenda começar a fluir.
+                          </p>
                         </div>
                       )}
                     </div>
@@ -1816,7 +1925,7 @@ setWhatsappLogs(docs);
                           <p className="text-xs text-amber-700 italic">{app.time} — {app.serviceName}</p>
                         </div>
                         <a 
-                          href={buildWhatsappLink(app.clientWhatsapp || '', `Olá ${app.clientName.split(' ')[0]} ✨ Vi que ainda não confirmou sua presença para amanhã às ${app.time}. Confirmado?`)}
+                          href={buildWhatsappLink(app.clientWhatsapp || '', `Olá ${safeString(app.clientName, 'Cliente').split(' ')[0]} ✨ Vi que ainda não confirmou sua presença para amanhã às ${app.time}. Confirmado?`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700"
@@ -1881,7 +1990,7 @@ setWhatsappLogs(docs);
                       
                       <div className="flex items-center gap-2">
                         <a 
-                          href={buildWhatsappLink(appt.clientWhatsapp || '', `Oi ${appt.clientName.split(' ')[0]} ✨ tudo bem?`)}
+                          href={buildWhatsappLink(appt.clientWhatsapp || '', `Oi ${safeString(appt.clientName, 'Cliente').split(' ')[0]} ✨ tudo bem?`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-3 text-brand-stone hover:text-[#25D366] hover:bg-green-50 rounded-2xl transition-all"
@@ -2014,7 +2123,7 @@ setWhatsappLogs(docs);
                         <p className="text-xs text-amber-700 font-medium italic">{app.time} - {app.serviceName}</p>
                       </div>
                       <a 
-                        href={buildWhatsappLink(app.clientWhatsapp || '', `Olá ${app.clientName.split(' ')[0]} ✨ Vi que ainda não confirmou sua presença para amanhã às ${app.time}. Podemos contar com você?`)}
+                        href={buildWhatsappLink(app.clientWhatsapp || '', `Olá ${safeString(app.clientName, 'Cliente').split(' ')[0]} ✨ Vi que ainda não confirmou sua presença para amanhã às ${app.time}. Podemos contar com você?`)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="p-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors shadow-sm"
@@ -2070,7 +2179,7 @@ setWhatsappLogs(docs);
                         {block.reason || 'Bloqueado'}
                       </p>
                       <p className="text-[10px] text-brand-stone font-medium italic">
-                        {block.date === getTodayLocale() ? 'Hoje' : formatDateKey(parseLocalDate(block.date))} às {block.startTime}
+                        {block.date === getTodayLocale() ? 'Hoje' : safeFormatDateKey(block.date, 'Recorrente')} às {block.startTime}
                       </p>
                     </div>
                     <button 
@@ -2107,7 +2216,7 @@ setWhatsappLogs(docs);
                   <div className="flex items-center gap-4">
                     <div className="text-center min-w-[45px]">
                       <p className="text-sm font-serif font-bold text-brand-ink leading-tight">{appt.time}</p>
-                      <p className="text-[8px] text-brand-stone uppercase font-bold">{appt.date.split('-').slice(1).reverse().join('/')}</p>
+                      <p className="text-[8px] text-brand-stone uppercase font-bold">{safeDateLabel(appt.date).split('/').slice(0, 2).join('/')}</p>
                     </div>
                     <div className="h-8 w-px bg-brand-linen" />
                     <div>
@@ -2249,7 +2358,7 @@ setWhatsappLogs(docs);
               <div className="space-y-4">
                 <button 
                   onClick={() => {
-                    const url = `https://nera.app/p/${profile?.slug}`;
+                    const url = getPublicProfileUrl(profile?.slug);
                     const text = `Acabei de abrir novos horários ✨ Reserve online comigo: ${url}`;
                     window.open(buildWhatsappLink('', text), '_blank');
                     setIsShareModalOpen(false);
@@ -2270,7 +2379,7 @@ setWhatsappLogs(docs);
 
                 <button 
                   onClick={() => {
-                    const url = `https://nera.app/p/${profile?.slug}`;
+                    const url = getPublicProfileUrl(profile?.slug);
                     navigator.clipboard.writeText(url);
                     notify.success('Link copiado. Abra o Instagram e cole nos seus Stories!');
                     setIsShareModalOpen(false);
@@ -2291,7 +2400,7 @@ setWhatsappLogs(docs);
 
                 <button 
                   onClick={() => {
-                    const url = `https://nera.app/p/${profile?.slug}`;
+                    const url = getPublicProfileUrl(profile?.slug);
                     navigator.clipboard.writeText(url);
                     notify.success('Link copiado para a área de transferência.');
                     setIsShareModalOpen(false);
@@ -2314,7 +2423,7 @@ setWhatsappLogs(docs);
               <div className="mt-8 p-5 bg-brand-linen/30 rounded-[24px] border border-brand-mist/50">
                 <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.2em] mb-2">Sugestão de texto:</p>
                 <p className="text-xs text-brand-ink font-light italic">
-                  "Acabei de abrir novos horários ✨ Reserve online comigo: nera.app/p/{profile?.slug}"
+                  "Acabei de abrir novos horários ✨ Reserve online comigo: {getPublicProfileUrl(profile?.slug)}"
                 </p>
               </div>
             </motion.div>
@@ -2371,7 +2480,7 @@ setWhatsappLogs(docs);
                   <div className="grid grid-cols-2 gap-6 pt-6 border-t border-brand-mist">
                     <div className="space-y-1">
                       <p className="text-[10px] text-brand-stone uppercase tracking-widest">Data</p>
-                      <p className="text-brand-ink font-light">{selectedRequest.date.split('-').reverse().join('/')}</p>
+                      <p className="text-brand-ink font-light">{safeDateLabel(selectedRequest.date)}</p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-brand-stone uppercase tracking-widest">Horário</p>
@@ -2633,7 +2742,7 @@ setWhatsappLogs(docs);
                           )}
                         </div>
                         <div className="flex items-center gap-3 text-brand-stone text-[10px] uppercase tracking-widest font-medium">
-                          <span>{entry.requestedDate.split('-').reverse().join('/')}</span>
+                          <span>{safeDateLabel(entry.requestedDate)}</span>
                           <span>•</span>
                           <span>{entry.period === 'any' ? 'Qualquer horário' : entry.period}</span>
                         </div>
@@ -2750,7 +2859,7 @@ setWhatsappLogs(docs);
           >
             <CheckCircle2 size={24} />
             <div className="absolute right-full mr-3 bg-brand-ink text-white text-[10px] font-bold uppercase tracking-widest py-2 px-4 rounded-xl whitespace-nowrap opacity-0 transition-opacity pointer-events-none">
-              Finalizar {ongoingAppt.clientName.split(' ')[0]}
+              Finalizar {safeString(ongoingAppt.clientName, 'Cliente').split(' ')[0]}
             </div>
           </motion.button>
         </div>

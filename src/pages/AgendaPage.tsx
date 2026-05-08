@@ -723,19 +723,19 @@ setBlockedSchedules(dayBlocked);
             <div className="flex bg-brand-linen/50 p-1.5 rounded-2xl text-[9px] font-bold uppercase tracking-widest border border-brand-mist/20">
               <button 
                 onClick={() => setView('day')}
-                className={cn("px-4 py-2 rounded-xl transition-all", view === 'day' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
+                className={cn("flex-1 px-4 py-3 min-h-[44px] rounded-xl transition-all flex items-center justify-center", view === 'day' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
               >
                 Dia
               </button>
               <button 
                 onClick={() => setView('week')}
-                className={cn("px-4 py-2 rounded-xl transition-all", view === 'week' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
+                className={cn("flex-1 px-4 py-3 min-h-[44px] rounded-xl transition-all flex items-center justify-center", view === 'week' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
               >
                 Semana
               </button>
               <button 
                 onClick={() => setView('month')}
-                className={cn("px-4 py-2 rounded-xl transition-all", view === 'month' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
+                className={cn("flex-1 px-4 py-3 min-h-[44px] rounded-xl transition-all flex items-center justify-center", view === 'month' ? "bg-brand-ink text-white shadow-md" : "text-brand-stone hover:text-brand-ink")}
               >
                 Mês
               </button>
@@ -745,30 +745,30 @@ setBlockedSchedules(dayBlocked);
           <div className="flex items-center gap-2">
             <button
               onClick={() => user && exportAppointmentsCsv(user.uid)}
-              className="hidden md:flex px-4 py-2.5 bg-brand-white border border-brand-mist/50 rounded-xl text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm items-center justify-center mr-2"
+              className="hidden md:flex px-4 py-3 min-h-[44px] bg-brand-white border border-brand-mist/50 rounded-xl text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm items-center justify-center mr-2"
               title="Exportar meus agendamentos (últimos 12 meses)"
             >
               Exportar CSV
             </button>
             <button 
               onClick={() => handleNavigate('prev')} 
-              className="w-10 h-10 bg-brand-white border border-brand-mist/50 flex items-center justify-center rounded-2xl text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm"
+              className="w-12 h-12 md:w-10 md:h-10 bg-brand-white border border-brand-mist/50 flex items-center justify-center rounded-2xl text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm shrink-0"
             >
-              <ChevronLeft size={18} />
+              <ChevronLeft size={20} />
             </button>
             {!isSelectedDateToday && (
               <button 
                 onClick={setDateToToday}
-                className="px-5 py-2.5 bg-brand-linen/80 text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all border border-brand-terracotta/10"
+                className="px-6 py-3 min-h-[44px] bg-brand-linen/80 text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all border border-brand-terracotta/10 flex items-center justify-center"
               >
                 Hoje
               </button>
             )}
             <button 
               onClick={() => handleNavigate('next')} 
-              className="w-10 h-10 bg-brand-white border border-brand-mist/50 flex items-center justify-center rounded-2xl text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm"
+              className="w-12 h-12 md:w-10 md:h-10 bg-brand-white border border-brand-mist/50 flex items-center justify-center rounded-2xl text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm shrink-0"
             >
-              <ChevronRight size={18} />
+              <ChevronRight size={20} />
             </button>
           </div>
         </header>
@@ -944,20 +944,20 @@ setBlockedSchedules(dayBlocked);
               exit={{ opacity: 0, y: 10, scale: 0.9 }}
               className="absolute bottom-16 right-0 w-56 bg-brand-white border border-brand-mist p-3 rounded-[28px] shadow-2xl space-y-1"
             >
-              <button onClick={() => { setIsBlockModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <Lock size={16} className="text-brand-stone group-hover:text-brand-ink" />
+              <button onClick={() => { setIsBlockModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
+                <Lock size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
                 <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Bloquear horário</span>
               </button>
-              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <Sparkles size={16} className="text-brand-stone group-hover:text-brand-ink" />
+              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
+                <Sparkles size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
                 <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Novo encaixe</span>
               </button>
-              <button onClick={() => { setIsWaitlistOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <Users size={16} className="text-brand-stone group-hover:text-brand-ink" />
+              <button onClick={() => { setIsWaitlistOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
+                <Users size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
                 <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Lista de Espera</span>
               </button>
-              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <CalendarCheck2 size={16} className="text-brand-stone group-hover:text-brand-ink" />
+              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
+                <CalendarCheck2 size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
                 <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Reserva manual</span>
               </button>
             </motion.div>
@@ -1284,13 +1284,14 @@ setBlockedSchedules(dayBlocked);
             />
             <motion.div 
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="relative w-full max-w-md bg-brand-white rounded-t-[40px] md:rounded-[40px] p-8 md:p-10 shadow-2xl overflow-y-auto max-h-[90vh]"
+              className="relative w-full max-w-md bg-brand-white rounded-t-[40px] md:rounded-[40px] px-6 py-8 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] overflow-y-auto max-h-[90vh] pb-[calc(2rem+env(safe-area-inset-bottom))]"
             >
               <button 
                 onClick={() => setIsDetailsOpen(false)}
-                className="absolute top-8 right-8 text-brand-stone hover:text-brand-ink"
+                className="absolute top-6 right-6 p-3 bg-brand-linen rounded-full text-brand-stone hover:text-brand-ink transition-colors"
+                title="Fechar"
               >
-                <X size={24} />
+                <X size={20} />
               </button>
 
               <div className="mb-8">

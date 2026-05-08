@@ -3,8 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../AuthContext';
-import { db, handleBookingError, checkAndExpireAppointments } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { handleBookingError, checkAndExpireAppointments } from '../firebase';
 import { 
   Calendar, Clock, Users, LogOut, 
   Settings, List, MessageCircle, CheckCircle2, 
@@ -16,18 +15,19 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { notify } from '../lib/notify';
 import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/utils';
-import { getClientScore } from '../lib/clientUtils';
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { usePendingAppointments } from '../contexts/PendingAppointmentsContext';
 import { Zap } from 'lucide-react';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
-  const [truePending, setTruePending] = useState<Appointment[]>([]);
-  const [allAppointments, setAllAppointments] = useState<Appointment[]>([]);
+  
+  const { pendingAppointments: truePending, loading: pendingLoading } = usePendingAppointments();
+  
   const [localRequests, setLocalRequests] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -95,51 +95,11 @@ export default function PendingRequestsPage() {
     
     // Check for expired requests on load
     checkAndExpireAppointments(user.uid);
-
-    const qPending = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      where('status', '==', 'pending'),
-      orderBy('date', 'asc'),
-      orderBy('time', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(qPending, (snapshot) => {
-      try {
-        const incomingDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-setTruePending(incomingDocs);
-setLoading(false);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => {
-      console.error('[PendingRequests] Subscription error:', error);
-      setLoading(false);
-    });
-
-    const qAll = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      orderBy('date', 'desc'),
-      limit(500)
-    );
-
-    const unsubAll = onSnapshot(qAll, (snapshot) => {
-      try {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-setAllAppointments(docs);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => {
-      console.error('[PendingRequests] Subscription error (qAll):', error);
-    });
-
-    return () => {
-      unsubscribe();
-      unsubAll();
-    };
   }, [user]);
+
+  useEffect(() => {
+    setLoading(pendingLoading);
+  }, [pendingLoading]);
 
   // Sync localRequests to include items being confirmed/handling WhatsApp
   useEffect(() => {
@@ -408,21 +368,6 @@ setAllAppointments(docs);
                       <div>
                         <div className="flex flex-wrap items-center gap-3 mb-1">
                           <h3 className="text-2xl md:text-3xl font-serif text-brand-ink">{request.clientName}</h3>
-                          {(() => {
-                            const score = getClientScore(allAppointments, request.clientWhatsapp);
-                            if (!score) return null;
-                            const config = {
-                              reliable: { label: 'Cliente Fiel', className: 'bg-green-50 text-green-700 border-green-200' },
-                              attention: { label: 'Atenção', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-                              risk: { label: 'Histórico de Faltas', className: 'bg-red-50 text-red-600 border-red-200' }
-                            };
-                            const c = config[score];
-                            return (
-                              <span className={`text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${c.className}`}>
-                                {c.label}
-                              </span>
-                            );
-                          })()}
                         </div>
                         <span className="text-[10px] text-brand-terracotta uppercase tracking-[0.2em] font-bold">
                           {request.serviceName}

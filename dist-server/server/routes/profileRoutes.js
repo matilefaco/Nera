@@ -4,6 +4,7 @@ import admin from "firebase-admin";
 import { isValidWhatsapp } from "../utils.js";
 import { PLAN_CONFIGS } from "../../src/constants/plans.js";
 import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
+import { logger, maskUid } from "../utils/logger.js";
 const router = express.Router();
 const debugOnly = (req, res, next) => {
     if (process.env.NODE_ENV === "production") {
@@ -32,21 +33,29 @@ const removeUndefinedDeep = (value) => {
 router.post("/save", requireFirebaseAuth, async (req, res) => {
     const { profileData, services } = req.body;
     const uid = req.uid;
-    console.log("[PROFILE_PUBLISH_PAYLOAD] Received for UID:", uid);
+    logger.info("PROFILE", "Profile save requested", {
+        requestId: req.requestId,
+        professionalId: maskUid(uid),
+        meta: {
+            hasName: Boolean(profileData?.name),
+            hasWhatsapp: Boolean(profileData?.whatsapp),
+            hasSlug: Boolean(profileData?.slug),
+            servicesCount: services?.length || 0
+        }
+    });
     const sanitizedProfile = removeUndefinedDeep(profileData || {});
     const slug = sanitizedProfile?.slug?.toLowerCase()?.trim();
     if (!uid || !slug) {
         return res.status(400).json({ error: "UID e Slug são obrigatórios." });
     }
     try {
-        console.log("[PROFILE SAVE] Starting transaction for UID:", uid, "Slug:", slug);
+        logger.info("PROFILE", "Starting transaction", { professionalId: maskUid(uid), meta: { slug } });
         const db = getDb();
         if (!db)
             throw new Error("Database not connected");
         const result = await db.runTransaction(async (transaction) => {
             const slugRef = db.collection("slugs").doc(slug);
             const userRef = db.collection("users").doc(uid);
-            console.log("[PROFILE SAVE TX] Fetching docs for UID:", uid, "Slug:", slug);
             const [slugDoc, userSnap] = await Promise.all([
                 transaction.get(slugRef),
                 transaction.get(userRef)
@@ -55,7 +64,7 @@ router.post("/save", requireFirebaseAuth, async (req, res) => {
             if (slugDoc.exists) {
                 const ownerId = slugDoc.data()?.uid;
                 if (ownerId && ownerId !== uid) {
-                    console.warn("[PROFILE SAVE TX] Slug conflict:", slug, "owned by", ownerId);
+                    logger.warn("PROFILE", "Slug conflict detected", { professionalId: maskUid(uid), meta: { slug, ownerId: maskUid(ownerId) } });
                     throw new Error("Este link já está sendo usado por outra profissional.");
                 }
             }
@@ -63,12 +72,11 @@ router.post("/save", requireFirebaseAuth, async (req, res) => {
             const userData = userSnap.exists ? userSnap.data() : null;
             const currentSlug = userData?.slug;
             if (currentSlug && currentSlug.toLowerCase() !== slug) {
-                console.log("[PROFILE SAVE TX] Releasing old slug:", currentSlug);
+                logger.info("PROFILE", "Releasing old slug", { professionalId: maskUid(uid), meta: { currentSlug } });
                 const oldSlugRef = db.collection("slugs").doc(currentSlug.toLowerCase());
                 transaction.delete(oldSlugRef);
             }
             // 3. Securely Lock/Claim the new slug
-            console.log("[PROFILE SAVE TX] Locking slug:", slug);
             transaction.set(slugRef, {
                 uid,
                 slug,
@@ -77,21 +85,20 @@ router.post("/save", requireFirebaseAuth, async (req, res) => {
                 source: "profile_save"
             }, { merge: true });
             // 4. Update the user profile
-            console.log("[PROFILE SAVE TX] Updating user profile doc");
             // --- THEME VALIDATION (Security) ---
             const userPlan = (userData?.plan || 'free').toLowerCase();
             const themeVariant = sanitizedProfile?.profileTheme?.variant;
             // WhatsApp validation on backend
             const whatsapp = sanitizedProfile?.whatsapp;
             if (whatsapp && !isValidWhatsapp(whatsapp)) {
-                console.warn(`[SECURITY] User ${uid} tried to save invalid WhatsApp: ${whatsapp}`);
+                logger.warn("PROFILE", "User tried to save invalid WhatsApp", { professionalId: maskUid(uid) });
                 throw new Error("O número de WhatsApp informado é inválido. Use um formato brasileiro (DDD + número).");
             }
             const config = PLAN_CONFIGS[userPlan] || PLAN_CONFIGS.free;
             const allowed = config.themes;
             let validatedTheme = sanitizedProfile?.profileTheme;
             if (themeVariant && !allowed.includes(themeVariant)) {
-                console.warn(`[THEME SECURITY] User ${uid} (${userPlan}) tried to use ${themeVariant}. Resetting to terracotta.`);
+                logger.warn("PROFILE", "User tried to use an unauthorized theme variant. Resetting.", { professionalId: maskUid(uid), meta: { userPlan, requestedTheme: themeVariant } });
                 validatedTheme = { variant: 'terracotta' };
             }
             const finalProfileData = removeUndefinedDeep({
@@ -103,7 +110,6 @@ router.post("/save", requireFirebaseAuth, async (req, res) => {
             transaction.set(userRef, finalProfileData, { merge: true });
             // 5. Handle Services if provided
             if (Array.isArray(services) && services.length > 0) {
-                console.log("[PROFILE SAVE TX] Adding", services.length, "services");
                 for (const service of services) {
                     const sanitizedService = removeUndefinedDeep(service);
                     const serviceRef = db.collection("services").doc();
@@ -115,14 +121,13 @@ router.post("/save", requireFirebaseAuth, async (req, res) => {
                     });
                 }
             }
-            console.log("[PROFILE SAVE TX] Transaction logic completed successfully");
             return { success: true, slug };
         });
-        console.log("[PROFILE SAVE] Transaction committed successfully for UID:", uid);
+        logger.info("PROFILE", "Transaction committed successfully", { professionalId: maskUid(uid) });
         res.json(result);
     }
     catch (err) {
-        console.error("[PROFILE_PUBLISH_ERROR]", err.message);
+        logger.error("PROFILE", "Profile publish error", { requestId: req.requestId, professionalId: maskUid(uid), error: err });
         const status = err.message.includes("já está sendo usado") ? 409 : 500;
         res.status(status).json({ error: err.message });
     }

@@ -36,7 +36,7 @@ function getResendClient() {
 
 const FROM_EMAIL = process.env.EMAIL_FROM || "Nera <agenda@usenera.com>";
 const FALLBACK_FROM_EMAIL = "Nera <noreply@usenera.com>";
-const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://nera.app";
+const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://usenera.com";
 
 /**
  * Standard Logging Helper

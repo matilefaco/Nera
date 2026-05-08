@@ -10,7 +10,25 @@ interface ReviewsSectionProps {
 }
 
 export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
-  if (reviews.length === 0) return null;
+  if (reviews.length === 0) {
+    return (
+      <section className="py-32 px-6 max-w-7xl mx-auto w-full">
+        <div className="flex flex-col md:flex-row md:items-center gap-16 mb-24">
+          <div className="flex-1 text-center md:text-left">
+            <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-[var(--theme-accent,var(--color-brand-terracotta))] mb-4 block">Experiências Reais</span>
+            <h2 className="text-4xl md:text-5xl font-serif text-brand-ink mb-6">
+              O que elas dizem sobre<br />
+              o <em className="font-serif italic text-brand-stone">atendimento</em>
+            </h2>
+            <div className="flex flex-col items-center md:items-start space-y-2 mt-8">
+              <p className="text-brand-ink font-serif italic text-xl">Ainda não há avaliações por aqui.</p>
+              <p className="text-brand-stone text-sm max-w-md">Depois do atendimento, as clientes poderão deixar sua experiência registrada.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-32 px-6 max-w-7xl mx-auto w-full">

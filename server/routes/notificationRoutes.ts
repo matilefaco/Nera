@@ -123,6 +123,7 @@ import {
 } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
+import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
 
 
 // Tokens públicos de acesso precisam ser criptograficamente seguros. Não usar Math.random.
@@ -248,7 +249,7 @@ router.get("/test-whatsapp", debugOnly, async (req, res) => {
     time: "14:00",
     professionalName: "Helena Prado",
     professionalSlug: "helena-prado",
-    reviewUrl: "https://nera.app/review/test"
+    reviewUrl: "https://usenera.com/review/test"
   };
 
   if (!msg) {
@@ -261,7 +262,7 @@ router.get("/test-whatsapp", debugOnly, async (req, res) => {
         msg = `✨ *Seu horário foi confirmado!*\n\n*Profissional:* ${mockData.professionalName}\n*Serviço:* ${mockData.serviceName}\n*Data:* ${formattedDate}\n*Hora:* ${mockData.time}\n\nResponda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença\n\nNos vemos em breve 💛`;
         break;
       case 'CANCELLED':
-        msg = `Seu agendamento foi cancelado.\nSe desejar, reagende facilmente:\nhttps://nera.app/p/${mockData.professionalSlug}`;
+        msg = `Seu agendamento foi cancelado.\nSe desejar, reagende facilmente:\nhttps://usenera.com/p/${mockData.professionalSlug}`;
         break;
       case 'REMINDER_24H':
         msg = `✨ *Lembrete do seu atendimento amanhã:*\n\n${mockData.serviceName}\n${formattedDate}\n${mockData.time}\n\nResponda:\n1 — Reagendar\n2 — Cancelar\n*Sim* — Confirmar presença`;
@@ -433,6 +434,11 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
   const { type, payload } = req.body;
   const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   
+  if (type === 'BOOKING_PENDING_CLIENT' || type === 'NEW_BOOKING_REQUEST') {
+    logger.warn("NOTIFICATION", `Deprecated POST /notify used for type ${type}. Please migrate this call to the backend.`, { 
+      appointmentId: payload?.appointmentId 
+    });
+  }
     
   try {
     if (type === 'BOOKING_PENDING_CLIENT') {
@@ -763,12 +769,8 @@ router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, re
   }
 });
 
-router.get('/cron/reminders24h', async (req, res) => {
+router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
   const db = getDb();
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
   
   try {
     const tomorrow = new Date();
@@ -899,12 +901,8 @@ router.get('/cron/reminders24h', async (req, res) => {
   }
 });
 
-router.get('/cron/reminders2h', async (req, res) => {
+router.get('/cron/reminders2h', requireCronSecret, async (req, res) => {
   const db = getDb();
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   try {
     const today = new Date().toISOString().split('T')[0];
@@ -954,12 +952,8 @@ router.get('/cron/reminders2h', async (req, res) => {
   }
 });
 
-router.get('/cron/review-requests', async (req, res) => {
+router.get('/cron/review-requests', requireCronSecret, async (req, res) => {
   const db = getDb();
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   try {
     const yesterday = new Date();
@@ -1045,12 +1039,8 @@ router.get('/cron/review-requests', async (req, res) => {
   }
 });
 
-router.get('/cron/anti-no-show', async (req, res) => {
+router.get('/cron/anti-no-show', requireCronSecret, async (req, res) => {
   const db = getDb();
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   try {
     const tomorrow = new Date();
@@ -1064,7 +1054,7 @@ router.get('/cron/anti-no-show', async (req, res) => {
       .get();
     
     let sentCount = 0;
-    const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://nera.app';
+    const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://usenera.com';
 
     for (const docSnap of snap.docs) {
       const appt = docSnap.data();
@@ -1110,12 +1100,8 @@ router.get('/cron/anti-no-show', async (req, res) => {
   }
 });
 
-router.get('/cron/retention', async (req, res) => {
+router.get('/cron/retention', requireCronSecret, async (req, res) => {
   const db = getDb();
-  const secret = req.headers['x-cron-secret'];
-  if (secret !== process.env.CRON_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   try {
     const thirtyDaysAgo = new Date();
@@ -1129,7 +1115,7 @@ router.get('/cron/retention', async (req, res) => {
       .get();
     
     let sentCount = 0;
-    const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://nera.app';
+    const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://usenera.com';
 
     for (const docSnap of snap.docs) {
       const appt = docSnap.data();

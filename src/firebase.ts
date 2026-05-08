@@ -202,7 +202,9 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || 'Erro ao criar pedido.');
+    const error = new Error(data.error || 'Erro ao criar pedido.');
+    (error as any).code = data.code;
+    throw error;
   }
   
   const result = await response.json();

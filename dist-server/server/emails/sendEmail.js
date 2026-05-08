@@ -11,13 +11,20 @@ import { buildPasswordResetEmail } from './templates/passwordReset.js';
 import { buildWaitlistInviteEmail } from './templates/waitlistInvite.js';
 import { buildBookingReminder24hEmail } from './templates/bookingReminder24h.js';
 import { buildBookingRescheduledEmail } from './templates/bookingRescheduled.js';
+import { logger, maskEmail, maskToken } from '../utils/logger.js';
 // Lazy initialization of Resend client
 let _resendClient = null;
+function isValidEmail(email) {
+    if (!email || typeof email !== 'string')
+        return false;
+    const trimmed = email.trim();
+    return trimmed.length > 3 && trimmed.includes('@');
+}
 function getResendClient() {
     if (!_resendClient) {
         const apiKey = process.env.RESEND_API_KEY;
         if (!apiKey) {
-            console.warn('[EMAIL_UNIFIED_ERROR] RESEND_API_KEY is missing.');
+            logger.warn("EMAIL", "RESEND_API_KEY is missing in environment");
         }
         _resendClient = new Resend(apiKey);
     }
@@ -25,12 +32,34 @@ function getResendClient() {
 }
 const FROM_EMAIL = process.env.EMAIL_FROM || "Nera <agenda@usenera.com>";
 const FALLBACK_FROM_EMAIL = "Nera <noreply@usenera.com>";
-const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://nera.app";
+const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://usenera.com";
 /**
  * Standard Logging Helper
  */
 function logEmail(stage, event, details) {
-    console.log(`[EMAIL_SEND_${stage}]`, { event, ...details });
+    const meta = { event };
+    if (details.appointmentId)
+        meta.appointmentId = details.appointmentId;
+    if (details.resendId)
+        meta.resendId = maskToken(details.resendId);
+    if (details.error)
+        meta.error = typeof details.error === 'string' ? details.error : details.error?.message;
+    const ctx = {
+        meta,
+        clientEmail: details.to ? maskEmail(details.to) : undefined
+    };
+    if (stage === 'ERROR') {
+        logger.error("EMAIL", `Email dispatch failed`, ctx);
+    }
+    else if (stage === 'SUCCESS') {
+        logger.info("EMAIL", `Email verified delivery`, ctx);
+    }
+    else if (stage === 'SKIP_DUPLICATE') {
+        logger.info("EMAIL", `Email skipped duplicate`, ctx);
+    }
+    else {
+        logger.info("EMAIL", `Email dispatch started`, ctx);
+    }
 }
 // --- EMAIL FUNCTIONS ---
 /**
@@ -39,7 +68,7 @@ function logEmail(stage, event, details) {
 export async function sendBookingPendingEmail(data) {
     const { clientEmail, clientName, professionalName, professionalWhatsapp, serviceName, date, time, price, reservationCode, manageUrl, appointmentId, paymentMethods } = data;
     logEmail('START', 'booking_created_client', { to: clientEmail, appointmentId });
-    if (!clientEmail) {
+    if (!isValidEmail(clientEmail)) {
         logEmail('ERROR', 'booking_created_client', { error: 'Missing client email' });
         return { success: false, error: 'Missing email' };
     }
@@ -78,7 +107,7 @@ export async function sendBookingPendingEmail(data) {
 export async function sendProfessionalNewBookingEmail(data) {
     const { professionalEmail, professionalName, clientName, appointmentId, paymentMethods, clientWhatsapp } = data;
     logEmail('START', 'booking_created_professional', { to: professionalEmail, appointmentId });
-    if (!professionalEmail) {
+    if (!isValidEmail(professionalEmail)) {
         logEmail('ERROR', 'booking_created_professional', { error: 'Missing pro email' });
         return { success: false, error: 'Missing email' };
     }
@@ -117,7 +146,7 @@ export async function sendProfessionalNewBookingEmail(data) {
 export async function sendBookingConfirmedEmail(data) {
     const { clientEmail, professionalName, bookingId } = data;
     logEmail('START', 'booking_confirmed_client', { to: clientEmail, appointmentId: bookingId });
-    if (!clientEmail) {
+    if (!isValidEmail(clientEmail)) {
         logEmail('ERROR', 'booking_confirmed_client', { error: 'Missing client email' });
         return { success: false, error: 'Email missing' };
     }

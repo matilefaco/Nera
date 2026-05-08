@@ -4,6 +4,7 @@ import { getDb } from "../firebaseAdmin.js";
 import { sendReferralRewardEmail, sendTrialWillEndEmail } from "../emails/sendEmail.js";
 import Stripe from "stripe";
 import { logger, maskToken, maskUid } from "../utils/logger.js";
+import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -27,18 +28,30 @@ function getStripe() {
 /**
  * CREATE CHECKOUT SESSION
  */
-router.post("/create-checkout", async (req, res) => {
+router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const db = getDb();
-  const { plan, professionalId, email } = req.body;
+  const { plan } = req.body;
+  const uid = req.uid; // guaranteed by requireFirebaseAuth
 
-  if (!plan || !professionalId || !email) {
-    return res.status(400).json({ error: "Missing required fields: plan, professionalId, email" });
+  if (!plan) {
+    return res.status(400).json({ error: "Missing required field: plan" });
   }
 
   try {
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userData = userDoc.data();
+    const email = userData?.email;
+
+    if (!email) {
+       return res.status(400).json({ error: "User email not found" });
+    }
+
     const stripe = getStripe();
     if (isDev) {
-      logger.info("STRIPE", "Initiating checkout session", { professionalId: maskUid(professionalId), meta: { plan } });
+      logger.info("STRIPE", "Initiating checkout session", { professionalId: maskUid(uid), meta: { plan } });
     }
     
     const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
@@ -49,8 +62,7 @@ router.post("/create-checkout", async (req, res) => {
     }
 
     // Check for credits before creating session params
-    const userDoc = await db.collection("users").doc(professionalId).get();
-    const credits = userDoc.data()?.credits || 0;
+    const credits = userData?.credits || 0;
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ["card"],
@@ -62,7 +74,7 @@ router.post("/create-checkout", async (req, res) => {
       ],
       mode: "subscription",
       customer_email: email,
-      client_reference_id: professionalId,
+      client_reference_id: uid,
       subscription_data: {
         trial_period_days: 15,
         trial_settings: {
@@ -75,7 +87,7 @@ router.post("/create-checkout", async (req, res) => {
       success_url: `${process.env.APP_URL}/checkout/success`,
       cancel_url: `${process.env.APP_URL}/checkout/canceled`,
       metadata: {
-        professionalId,
+        professionalId: uid,
         plan,
         creditsUsed: credits >= 10 ? 'true' : 'false'
       },
