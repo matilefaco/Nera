@@ -197,6 +197,8 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
+    let isActive = true;
+
     let isCancelled = false;
 
     const run = async () => {
@@ -307,6 +309,7 @@ setAlerts(docs);
 
   useEffect(() => {
     if (!user) return;
+    let isActive = true;
 
     const today = getTodayLocale();
     
@@ -373,6 +376,7 @@ setUnconfirmedTomorrow(docs);
 
     getDocs(qAll).then((snapshot) => {
       try {
+        if (!isActive) return;
         const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
         setAppointments(appointmentsData);
         // Metrics calculation moved to hook
@@ -382,18 +386,9 @@ setUnconfirmedTomorrow(docs);
     }).catch((error) => { 
       console.error("Firestore getDocs error:", error); 
     }).finally(() => {
+      if (!isActive) return;
       setIsInitialLoading(false);
     });
-
-    // Sync Profile Settings
-    if (profile) {
-      setWaitlistMode(profile.waitlistMode || 'manual');
-      
-      if (profile.referralCode) {
-        const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-        setReferralLink(`${appUrl}/register?ref=${profile.referralCode}`);
-      }
-    }
 
     // Query: Waitlist
     const qWaitlist = query(
@@ -421,6 +416,7 @@ setWaitlist(docs);
     
     getDocs(qBlocked).then((snap) => {
       try {
+        if (!isActive) return;
         const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         const todayBlocked = allBlocked.filter(b => {
             const isToday = b.date === today;
@@ -448,6 +444,7 @@ setWaitlist(docs);
 
     getDocs(qInactive).then((snapshot) => {
       try {
+        if (!isActive) return;
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setInactiveClientsCount(docs.length);
         setInactiveClients(docs);
@@ -466,6 +463,7 @@ setWaitlist(docs);
 
     getDocs(qServices).then((snapshot) => {
       try {
+        if (!isActive) return;
         const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
         const filtered = rawServices.filter((s: any) => 
             s.active !== false &&
@@ -517,6 +515,7 @@ setWaitlist(docs);
 
     getDocs(qWl).then((snapshot) => {
       try {
+        if (!isActive) return;
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
         setWhatsappLogs(docs);
       } catch (err) {
@@ -527,11 +526,24 @@ setWaitlist(docs);
     });
 
     return () => {
+      isActive = false;
       unsubToday();
       unsubUnconfirmed();
       unsubWaitlist();
     };
-  }, [user, profile]);
+  }, [user]);
+
+  useEffect(() => {
+    if (!profile) return;
+    setWaitlistMode(profile.waitlistMode || 'manual');
+
+    if (profile.referralCode) {
+      const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+      setReferralLink(`${appUrl}/register?ref=${profile.referralCode}`);
+    } else {
+      setReferralLink('');
+    }
+  }, [profile]);
 
   const availability = useMemo(() => {
     if (!profile?.workingHours) return null;
