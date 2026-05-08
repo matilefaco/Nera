@@ -1,6 +1,6 @@
-import { initializeApp } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence, browserPopupRedirectResolver, indexedDBLocalPersistence } from 'firebase/auth';
-import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit, increment } from 'firebase/firestore';
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import { initializeAuth, getAuth, browserLocalPersistence, browserPopupRedirectResolver } from 'firebase/auth';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit, increment } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
 import { removeUndefinedDeep, parseFirestoreDate } from './lib/utils';
@@ -16,15 +16,24 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:768951224787:web:9165a57c367a649f1e8726",
 };
 
-export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  ignoreUndefinedProperties: true,
+});
 export const storage = getStorage(app);
 
-// Initialize Auth with browserLocalPersistence for maximum compatibility in iframes (Safari/iPhone)
-export const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence,
-  popupRedirectResolver: browserPopupRedirectResolver,
-});
+// Initialize Auth only once; fallback to existing instance when already initialized.
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: browserLocalPersistence,
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch {
+    return getAuth(app);
+  }
+})();
 
 export async function notify(type: string, payload: any) {
   try {
