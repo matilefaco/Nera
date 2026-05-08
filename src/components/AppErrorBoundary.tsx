@@ -34,7 +34,15 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   private handleWindowError = (event: ErrorEvent) => {
-    runtimeLogger.log('error', { type: 'window_error', message: event.message });
+    runtimeLogger.log('error', {
+      type: 'window_error',
+      message: event.message,
+      stack: event.error?.stack,
+      filename: event.filename,
+      lineno: event.lineno,
+      colno: event.colno,
+      route: window.location.pathname
+    });
 
     const rawError = event.error || event.message;
 
@@ -46,15 +54,22 @@ export class AppErrorBoundary extends Component<Props, State> {
 
     // Async/global runtime errors should be diagnosed, but not crash the app shell.
     // Only escalate to full fallback for truly critical boot/chunk-load failures.
-    if (!this.isCriticalGlobalError(rawError)) {
+    if (!this.isCriticalGlobalError(rawError, event.message)) {
       return;
     }
 
+    runtimeLogger.dump();
     this.setState({ hasError: true, error: rawError instanceof Error ? rawError : new Error(String(rawError || event.message)) });
   };
 
   private handlePromiseRejection = (event: PromiseRejectionEvent) => {
-    runtimeLogger.log('error', { type: 'promise_rejection', reason: event.reason });
+    runtimeLogger.log('error', {
+      type: 'promise_rejection',
+      reason: event.reason,
+      message: (event.reason as any)?.message,
+      stack: (event.reason as any)?.stack,
+      route: window.location.pathname
+    });
 
     if (this.isRecoverableFirestoreAsyncError(event.reason)) {
       runtimeLogger.dump();
@@ -68,11 +83,12 @@ export class AppErrorBoundary extends Component<Props, State> {
     }
 
     event.preventDefault();
+    runtimeLogger.dump();
     this.setState({ hasError: true, error: event.reason instanceof Error ? event.reason : new Error(String(event.reason)) });
   };
 
-  private isCriticalGlobalError = (error: unknown): boolean => {
-    const msg = String((error as any)?.message || error || '').toLowerCase();
+  private isCriticalGlobalError = (error: unknown, fallbackMessage?: string): boolean => {
+    const msg = String((error as any)?.message || fallbackMessage || error || '').toLowerCase();
 
     return msg.includes('loading chunk') ||
       msg.includes('chunkloaderror') ||
@@ -90,7 +106,14 @@ export class AppErrorBoundary extends Component<Props, State> {
   };
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    runtimeLogger.log('error', { type: 'react_boundary', message: error.message, stack: error.stack });
+    runtimeLogger.log('error', {
+      type: 'react_boundary',
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      route: window.location.pathname
+    });
+    runtimeLogger.dump();
     console.error('AppErrorBoundary caught an error:', error, errorInfo);
     if (this.isRecoverableFirestoreAsyncError(error)) {
       runtimeLogger.dump();
