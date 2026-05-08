@@ -77,7 +77,6 @@ export default function AgendaPage() {
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
   const [quickBlockTime, setQuickBlockTime] = useState('');
   
-  const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [showNavTip, setShowNavTip] = useState(() => {
     return localStorage.getItem('nera_agenda_nav_tip_dismissed') !== 'true';
@@ -377,9 +376,6 @@ setIsInitialLoading(false);
     });
   }, [allBlockedSchedules, selectedDateKey]);
 
-  useEffect(() => {
-    setBlockedSchedules(blockedSchedulesForSelectedDate);
-  }, [blockedSchedulesForSelectedDate]);
 
   // Save view preference
   useEffect(() => {
@@ -405,9 +401,9 @@ setIsInitialLoading(false);
       serviceDuration: 60,
       workingHours: profile.workingHours,
       appointments,
-      blockedSchedules
+      blockedSchedulesForSelectedDate
     });
-  }, [selectedDate, appointments, blockedSchedules, profile]);
+  }, [selectedDate, appointments, blockedSchedulesForSelectedDate, profile]);
 
   useEffect(() => {
     if (availability) {
@@ -678,7 +674,7 @@ setIsInitialLoading(false);
     });
 
     // Add blocked schedules
-    blockedSchedules.forEach(block => {
+    blockedSchedulesForSelectedDate.forEach(block => {
       items.push({
         type: 'block',
         time: block.startTime,
@@ -693,7 +689,7 @@ setIsInitialLoading(false);
       // Filter out slots that already have an appointment or a block starting exactly at this time
       // Regra crítica: se houver QUALQUER appointment bloqueante, remove o slot livre.
       const hasStrictMeeting = displayedAppointments.some(a => a.time === slot && isActiveSlotStatus(a.status));
-      const hasStrictBlock = blockedSchedules.some(b => b.startTime === slot);
+      const hasStrictBlock = blockedSchedulesForSelectedDate.some(b => b.startTime === slot);
       
       if (!hasStrictMeeting && !hasStrictBlock) {
         items.push({
@@ -704,7 +700,7 @@ setIsInitialLoading(false);
     });
 
     return items.sort((a, b) => a.time.localeCompare(b.time));
-  }, [displayedAppointments, blockedSchedules, openSlots]);
+  }, [displayedAppointments, blockedSchedulesForSelectedDate, openSlots]);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -898,7 +894,7 @@ setIsInitialLoading(false);
           {view === 'day' && (
             <DayView 
               appointments={appointments}
-              blockedSchedules={blockedSchedules}
+              blockedSchedules={blockedSchedulesForSelectedDate}
               date={selectedDate}
               onSelectAppointment={(appt) => { setSelectedAppointment(appt); setIsDetailsOpen(true); }}
               onSelectSlot={(time) => {
