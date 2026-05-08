@@ -36,13 +36,21 @@ export class AppErrorBoundary extends Component<Props, State> {
   private handleWindowError = (event: ErrorEvent) => {
     runtimeLogger.log('error', { type: 'window_error', message: event.message });
 
-    if (this.isRecoverableFirestoreAsyncError(event.error || event.message)) {
+    const rawError = event.error || event.message;
+
+    if (this.isRecoverableFirestoreAsyncError(rawError)) {
       runtimeLogger.dump();
       event.preventDefault();
       return;
     }
 
-    this.setState({ hasError: true, error: event.error || new Error(event.message) });
+    // Async/global runtime errors should be diagnosed, but not crash the app shell.
+    // Only escalate to full fallback for truly critical boot/chunk-load failures.
+    if (!this.isCriticalGlobalError(rawError)) {
+      return;
+    }
+
+    this.setState({ hasError: true, error: rawError instanceof Error ? rawError : new Error(String(rawError || event.message)) });
   };
 
   private handlePromiseRejection = (event: PromiseRejectionEvent) => {
@@ -54,7 +62,24 @@ export class AppErrorBoundary extends Component<Props, State> {
       return;
     }
 
+    // Promise rejections during page-level async work should stay local.
+    if (!this.isCriticalGlobalError(event.reason)) {
+      return;
+    }
+
+    event.preventDefault();
     this.setState({ hasError: true, error: event.reason instanceof Error ? event.reason : new Error(String(event.reason)) });
+  };
+
+  private isCriticalGlobalError = (error: unknown): boolean => {
+    const msg = String((error as any)?.message || error || '').toLowerCase();
+
+    return msg.includes('loading chunk') ||
+      msg.includes('chunkloaderror') ||
+      msg.includes('failed to fetch dynamically imported module') ||
+      msg.includes('importing a module script failed') ||
+      msg.includes('root element not found') ||
+      msg.includes('boot_failure');
   };
 
   private isRecoverableFirestoreAsyncError = (error: any): boolean => {

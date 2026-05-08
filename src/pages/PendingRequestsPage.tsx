@@ -94,7 +94,10 @@ export default function PendingRequestsPage() {
     if (!user) return;
     
     // Check for expired requests on load
-    checkAndExpireAppointments(user.uid);
+    checkAndExpireAppointments(user.uid).catch((error) => {
+      console.error('[PendingRequestsPage] Failed to expire appointments:', error);
+      notify.error('Não foi possível atualizar pedidos expirados agora.');
+    });
   }, [user]);
 
   useEffect(() => {
