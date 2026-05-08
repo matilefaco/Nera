@@ -9,18 +9,22 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error: Error | null;
+  error: unknown;
+  errorSource: 'react_boundary' | 'window_error' | 'promise_rejection' | null;
+  componentStack: string | null;
 }
 
 export class AppErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null
+    error: null,
+    errorSource: null,
+    componentStack: null
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: unknown): State {
     // Update state so the next render will show the fallback UI.
-    return { hasError: true, error };
+    return { hasError: true, error, errorSource: 'react_boundary', componentStack: null };
   }
 
   public componentDidMount() {
@@ -59,7 +63,7 @@ export class AppErrorBoundary extends Component<Props, State> {
     }
 
     runtimeLogger.dump();
-    this.setState({ hasError: true, error: rawError instanceof Error ? rawError : new Error(String(rawError || event.message)) });
+    this.setState({ hasError: true, error: rawError ?? event.message, errorSource: 'window_error', componentStack: null });
   };
 
   private handlePromiseRejection = (event: PromiseRejectionEvent) => {
@@ -84,7 +88,7 @@ export class AppErrorBoundary extends Component<Props, State> {
 
     event.preventDefault();
     runtimeLogger.dump();
-    this.setState({ hasError: true, error: event.reason instanceof Error ? event.reason : new Error(String(event.reason)) });
+    this.setState({ hasError: true, error: event.reason, errorSource: 'promise_rejection', componentStack: null });
   };
 
   private isCriticalGlobalError = (error: unknown, fallbackMessage?: string): boolean => {
@@ -106,6 +110,7 @@ export class AppErrorBoundary extends Component<Props, State> {
   };
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    this.setState({ errorSource: 'react_boundary', componentStack: errorInfo.componentStack || null });
     runtimeLogger.log('error', {
       type: 'react_boundary',
       message: error.message,
@@ -123,6 +128,21 @@ export class AppErrorBoundary extends Component<Props, State> {
   private handleReload = () => {
     // Optional: selectively clear problematic state here before reloading
     window.location.reload();
+  };
+
+  private shouldShowDiagnostics = (): boolean => {
+    const hostname = window.location.hostname || '';
+    if (hostname === 'usenera.com' || hostname.endsWith('.usenera.com')) {
+      return false;
+    }
+    return Boolean(import.meta.env.DEV || hostname.includes('.github.dev') || hostname.includes('.run.app'));
+  };
+
+  private getSafeStack = (): string => {
+    const stack = (this.state.error as { stack?: unknown } | null | undefined)?.stack;
+    return typeof stack === 'string'
+      ? stack.split('\n').slice(0, 4).join('\n')
+      : 'Stack unavailable';
   };
 
   public render() {
@@ -156,6 +176,21 @@ export class AppErrorBoundary extends Component<Props, State> {
               <RefreshCw size={16} />
               Recarregar com segurança
             </button>
+
+            {this.shouldShowDiagnostics() && (
+              <div className="mt-6 rounded-2xl border border-brand-sand/70 bg-brand-sand/30 p-4 text-left">
+                <p className="text-[11px] uppercase tracking-widest text-brand-stone mb-2">Diagnóstico temporário</p>
+                <pre className="text-xs text-brand-ink whitespace-pre-wrap break-words">
+{`source: ${String(this.state.errorSource ?? 'unknown')}
+message: ${String(this.state.error ?? 'Unknown error')}
+route: ${String(window.location.pathname ?? '/')}
+stack:
+${this.getSafeStack()}
+componentStack:
+${String(this.state.componentStack ?? 'N/A')}`}
+                </pre>
+              </div>
+            )}
             
             {/* Soft subtle pattern in background */}
             <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-brand-peach/20 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
