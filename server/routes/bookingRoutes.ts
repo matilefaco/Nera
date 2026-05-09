@@ -202,20 +202,6 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
   const db = getDb();
   const appointmentData = req.body;
   
-  logger.info("BOOKING", "Booking payload received", {
-   requestId: req.requestId,
-   professionalId: maskUid(appointmentData.professionalId),
-   meta: {
-    hasClientName: Boolean(appointmentData.clientName),
-    clientPhone: maskPhone(appointmentData.clientWhatsapp || appointmentData.clientPhone),
-    clientEmail: maskEmail(appointmentData.clientEmail),
-    serviceId: appointmentData.serviceId,
-    date: appointmentData.date,
-    time: appointmentData.time,
-    status: appointmentData.status
-   }
-  });
-  
   if (!appointmentData.professionalId || !appointmentData.date || !appointmentData.time) {
     logger.warn("BOOKING", "Rejected missing fields", { meta: { hasName: Boolean(appointmentData?.clientName) } });
     return res.status(400).json({ error: "Dados de agendamento incompletos (professionalId, date ou time ausentes)" });
@@ -284,8 +270,6 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
-
-    logger.info("BOOKING", "Transaction starting");
 
     await db.runTransaction(async (transaction) => {
       // Professional Check
@@ -933,8 +917,6 @@ router.get("/fix-duplicate-slots", debugOnly, async (req, res) => {
     const db = getDb();
     const { professionalId } = req.query;
     if (!professionalId) return res.status(400).json({ error: "Missing professionalId" });
-
-    logger.info("SYSTEM", "Fix duplicates scan starting", { professionalId: maskUid(professionalId as string) });
     
     const apptsSnap = await db.collection('appointments')
       .where('professionalId', '==', professionalId)
@@ -1053,8 +1035,6 @@ router.post("/appointments/:appointmentId/confirm", requireFirebaseAuth, async (
   const { appointmentId } = req.params;
   const { professionalId } = req.body;
   const uid = req.uid;
-
-  logger.info("BOOKING", "Confirm request received", { professionalId: maskUid(professionalId as string) });
 
   try {
         
@@ -1175,8 +1155,6 @@ router.post("/appointments/:appointmentId/confirm", requireFirebaseAuth, async (
       return { success: true, appointmentId, lockId, status: "confirmed" };
     });
 
-    logger.info("BOOKING", "Confirm finished successfully");
-    
     // Create Google Calendar event (don't await to avoid delaying the response)
     // We could fetch the appointment data again, or pass the data we had
     const apptDoc = await db.collection('appointments').doc(appointmentId).get();
@@ -1201,8 +1179,6 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
   const db = getDb();
   const { appointmentId } = req.params;
   const uid = req.uid;
-
-  logger.info("BOOKING", "Complete request received");
 
   try {
     const result = await db.runTransaction(async (transaction) => {
@@ -1244,7 +1220,6 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
       return { success: true, appointmentId, status: "completed" };
     });
 
-    logger.info("BOOKING", "Complete success");
     return res.json(result);
 
   } catch (err: any) {
@@ -1260,8 +1235,6 @@ router.post("/appointments/:appointmentId/decline", requireFirebaseAuth, async (
   const db = getDb();
   const { appointmentId } = req.params;
   const uid = req.uid;
-
-  logger.info("BOOKING", "Decline request received");
 
   try {
     const result = await db.runTransaction(async (transaction) => {
@@ -1325,7 +1298,6 @@ router.post("/appointments/:appointmentId/decline", requireFirebaseAuth, async (
       return { success: true, appointmentId };
     });
 
-    logger.info("BOOKING", "Decline success");
     return res.json(result);
   } catch (err: any) {
     const status = err.status || 500;
@@ -1340,8 +1312,6 @@ router.post("/appointments/:appointmentId/cancel-by-professional", requireFireba
   const db = getDb();
   const { appointmentId } = req.params;
   const uid = req.uid;
-
-  logger.info("BOOKING", "Cancel request received");
 
   try {
     const result = await db.runTransaction(async (transaction) => {
@@ -1407,7 +1377,6 @@ router.post("/appointments/:appointmentId/cancel-by-professional", requireFireba
       return { success: true, appointmentId };
     });
 
-    logger.info("BOOKING", "Cancel success");
     return res.json(result);
   } catch (err: any) {
     const status = err.status || 500;
@@ -1851,7 +1820,6 @@ router.post("/public/manage/:manageSlug/cancel", async (req: express.Request, re
       return { success: true, appointmentId };
     });
 
-    logger.info("BOOKING", "Cancel by client success");
     return res.json(result);
   } catch (err: any) {
     const status = err.status || 500;
