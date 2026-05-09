@@ -47,13 +47,11 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
       qPending,
       (snapshot) => {
         try {
-          // Just save count, avoid keeping large payload in global state memory to prevent sync crashes
-          setPendingAppointments([]); 
+          const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+          setPendingAppointments(docs); 
+          setPendingCount(docs.length); 
           setLoading(false);
           setError(null);
-          // Only maintain the counts for tabs/badges. 
-          // Real data will be fetched locally in PendingRequestsPage.
-          setPendingCount(snapshot.size); 
         } catch (err) {
           console.error('[PendingAppointmentsProvider] Error parsing snapshot callback:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
