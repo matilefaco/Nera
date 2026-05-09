@@ -238,7 +238,8 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       const currentYear = now.getFullYear();
       const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
       const startOfMonth = `${currentYear}-${currentMonth}-01`;
-      const endOfMonth = `${currentYear}-${currentMonth}-31`; 
+      // Calcula o último dia real do mês atual para evitar bug em meses com menos de 31 dias
+      const endOfMonth = new Date(currentYear, now.getMonth() + 1, 0).toISOString().split('T')[0];
 
       const snapshot = await db.collection('appointments')
         .where('professionalId', '==', professionalId)
