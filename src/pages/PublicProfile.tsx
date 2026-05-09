@@ -580,27 +580,26 @@ function PublicProfileContent() {
         url={`https://usenera.com/p/${profile.slug}`}
       />
 
-      {/* Demo Banner */}
+      {/* Demo Badge */}
       {(slug === 'helena-prado' || slug === 'exemplo') && (
-        <div className="sticky top-0 z-[200] bg-brand-ink text-white/70 py-3 px-6 border-b border-white/5">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <Link 
-              to="/" 
-              className="inline-flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors group"
-            >
-              <ArrowLeft size={10} className="group-hover:-translate-x-1 transition-transform" />
-              Voltar
+        <div className="fixed top-5 left-0 right-0 z-[200] flex justify-center pointer-events-none px-4">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+            className="bg-brand-linen/90 backdrop-blur-xl border border-brand-mist/60 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] rounded-full p-1.5 pl-5 pr-1.5 pointer-events-auto flex items-center gap-4 max-w-full overflow-hidden"
+          >
+            <span className="flex items-center gap-2.5">
+              <Sparkles size={13} className="text-brand-terracotta" />
+              <span className="font-serif text-brand-espresso text-[13px] font-medium tracking-wide whitespace-nowrap">
+                Vitrine de Demonstração
+              </span>
+            </span>
+            <Link to="/register" className="bg-brand-white hover:bg-brand-terracotta text-brand-ink hover:text-brand-white transition-all duration-300 rounded-full px-4 py-2 text-[9px] uppercase tracking-[0.15em] font-bold whitespace-nowrap flex items-center gap-1.5 border border-brand-mist/50">
+              <span className="hidden sm:inline">Crie seu perfil</span> grátis
+              <ArrowRight size={10} />
             </Link>
-            
-            <p className="text-[10px] md:text-[11px] font-light tracking-wide text-center flex-1">
-              Esta é uma página de demonstração do Nera. 
-              <Link to="/register" className="text-brand-terracotta font-bold hover:underline ml-1">
-                Crie a sua agora de forma gratuita →
-              </Link>
-            </p>
-
-            <div className="w-12 md:hidden" /> {/* Spacer for balance */}
-          </div>
+          </motion.div>
         </div>
       )}
 
