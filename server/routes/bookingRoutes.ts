@@ -311,10 +311,12 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 
       // Ownership check (Critical for data integrity after migration)
       if (normalizeId(service.professionalId) !== normalizeId(appointmentData.professionalId)) {
-        logger.warn("BOOKING", `ID MISMATCH: Service ${appointmentData.serviceId} belongs to ${service.professionalId}, but booking requested for ${appointmentData.professionalId}.`);
-        // If they are different, we should probably follow the service's owner to avoid orphan appointments
-
-        // but for now we just log and use the service's proId as the source of truth if needed
+        logger.error("BOOKING", `SECURITY MALFORMED PAYLOAD: Service ${appointmentData.serviceId} belongs to ${service.professionalId}, but booking requested for ${appointmentData.professionalId}.`);
+        throw { 
+          status: 400, 
+          message: "Serviço inválido para este profissional.", 
+          code: "SERVICE_OWNER_MISMATCH" 
+        };
       }
 
       // Force official price and duration from service
@@ -526,7 +528,8 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       requestId: req.requestId,
       error: err
     });
-    res.status(500).json({ 
+    const status = err.status || 500;
+    res.status(status).json({ 
       error: err.message,
       code: err.code || null
     });
