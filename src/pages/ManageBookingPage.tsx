@@ -56,7 +56,8 @@ export default function ManageBookingPage() {
       if (action === 'confirm-presence' && !appointment.clientConfirmed24h) {
         setActionLoading(true);
         try {
-          await confirmPresenceByClient(appointment.id);
+          const manageSlug = token || appointment.manageSlug || appointment.token || appointment.id;
+          await confirmPresenceByClient(manageSlug);
           setAppointment(prev => prev ? { 
             ...prev, 
             clientConfirmed24h: true, 
@@ -212,7 +213,8 @@ setBlockedSchedules(dayBlocked);
     if (!appointment?.id) return;
     setActionLoading(true);
     try {
-      await confirmPresenceByClient(appointment.id);
+      const manageSlug = token || appointment.manageSlug || appointment.token || appointment.id;
+      await confirmPresenceByClient(manageSlug);
       notify.success('Presença confirmada! Nos vemos em breve. 💛');
     } catch (e) {
       notify.error('Erro ao confirmar presença');

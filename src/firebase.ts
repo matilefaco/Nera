@@ -448,33 +448,26 @@ export async function createManualAppointment(data: Partial<Appointment>) {
  * High-precision management functions for CLIENTS
  */
 
-export async function confirmPresenceByClient(appointmentId: string) {
-  console.log(`[Client] Confirming presence for ${appointmentId}`);
-  const apptRef = doc(db, 'appointments', appointmentId);
-  
-  await runTransaction(db, async (transaction) => {
-    const snap = await transaction.get(apptRef);
-    if (!snap.exists()) throw new Error('Agendamento não encontrado');
-    const data = snap.data() as Appointment;
-    const oldStatus = data.status;
+export async function confirmPresenceByClient(manageSlug: string) {
+  console.log(`[Client] Confirming presence via slug ${manageSlug}`);
+  try {
+    const response = await fetch(`/api/public/manage/${manageSlug}/confirm-presence`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
 
-    const updateData = {
-      clientConfirmedAt: serverTimestamp(),
-      clientConfirmed24h: true,
-      status: APPOINTMENT_STATUS.CONFIRMED,
-      updatedAt: serverTimestamp(),
-      lastChangeBy: 'client' as const,
-      changeMessage: 'Cliente confirmou presença 24h'
-    };
-    
-    const safeUpdate = sanitizeAppointment(updateData, true);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Erro ao confirmar presença.');
+    }
 
-    transaction.update(apptRef, safeUpdate);
-
-    // Update Client Summary
-    const updatedAppt = { ...data, ...safeUpdate } as Appointment;
-    await updateClientSummaryInternal(transaction, updatedAppt, data.professionalId, false, oldStatus);
-  });
+    const result = await response.json();
+    return result;
+  } catch (err: any) {
+    console.error('[confirmPresenceByClient]', err);
+    throw err;
+  }
 }
 
 export async function cancelBookingByClient(manageSlug: string, reason?: string) {

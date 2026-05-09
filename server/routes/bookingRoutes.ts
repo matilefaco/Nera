@@ -1705,25 +1705,70 @@ router.get("/debug-bookable-slots", debugOnly, async (req, res) => {
   }
 });
 
-router.post("/booking/:id/confirm-presence", async (req, res) => {
+router.post("/public/manage/:manageSlug/confirm-presence", async (req, res) => {
+  const db = getDb();
+  const { manageSlug } = req.params;
+
   try {
-    const db = getDb();
-    const { id } = req.params;
-    const appRef = db.collection('appointments').doc(id);
-    const appDoc = await appRef.get();
-    
-    if (!appDoc.exists) return res.status(404).json({ error: "Reserva não encontrada" });
-    
-    const updateData = sanitizeAppointment({
-      clientConfirmed24h: true,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp()
-    }, true);
-    
-    await appRef.update(updateData);
-    
-    res.json({ success: true });
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Validate slug
+      const linkRef = db.collection('reservation_links').doc(manageSlug);
+      const linkDoc = await transaction.get(linkRef);
+      
+      if (!linkDoc.exists) {
+        throw { status: 404, message: "Link de gerenciamento inválido." };
+      }
+      
+      const appointmentId = linkDoc.data()?.appointmentId;
+      if (!appointmentId) throw { status: 404, message: "Reserva não encontrada no link." };
+
+      const apptRef = db.collection('appointments').doc(appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+
+      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
+      const data: any = apptDoc.data();
+
+      // Read Client Summary
+      const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+      const summaryId = `${data.professionalId}_${clientKey}`;
+      const summaryRef = db.collection('client_summaries').doc(summaryId);
+      const summarySnap = await transaction.get(summaryRef);
+
+      // Check for terminal or invalid statuses
+      if (['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'declined', 'completed', 'concluido'].includes(data.status)) {
+        throw { status: 409, message: "Esta reserva não pode ser confirmada." };
+      }
+
+      // WRITES
+      const updatePayload: any = {
+        clientConfirmed24h: true,
+        clientConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastChangeBy: 'client',
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Só alterar status para confirmed se o status atual for pending/pending_confirmation
+      if (['pending', 'pending_confirmation'].includes(data.status)) {
+        updatePayload.status = 'confirmed';
+      }
+
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
+      transaction.update(apptRef, safeUpdate);
+
+      const updatedData = { ...data, ...updatePayload };
+      await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
+
+      return { success: true, appointmentId };
+    });
+
+    res.json(result);
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    logger.error("BOOKING", "Manage Confirm Presence Error", { error: err });
+    if (err.status) {
+       res.status(err.status).json({ error: err.message });
+    } else {
+       res.status(500).json({ error: err.message });
+    }
   }
 });
 
