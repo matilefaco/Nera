@@ -146,8 +146,7 @@ service cloud.firestore {
     // Supporting collections
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if true; // Public can create review via token
-      allow update, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
     match /review_requests/{requestId} {

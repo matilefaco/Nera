@@ -600,60 +600,19 @@ router.post("/public/reviews/:token/submit", async (req, res) => {
         tags: tags || [],
         comment: comment ? String(comment).trim() : '',
         publicDisplayMode: publicDisplayMode || 'named',
-        publicApproved: true,
+        publicApproved: false,
+        moderationStatus: 'pending',
         firstName: firstName || 'Cliente',
         neighborhood: neighborhood || '',
         locationLabel: locationLabel,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        submittedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
       // 3. Complete the request
       transaction.update(requestDoc.ref, {
         status: 'submitted',
         submittedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      // 4. Update the review stats
-      let newAverageRating = Number(rating);
-      let newTotalReviews = 1;
-      let newTopTags = tags ? tags.slice(0, 5) : [];
-      
-      if (statsDoc.exists) {
-        const currentStats = statsDoc.data()!;
-        newTotalReviews = (currentStats.totalReviews || 0) + 1;
-        newAverageRating = ((currentStats.averageRating || 0) * (currentStats.totalReviews || 0) + rating) / newTotalReviews;
-        
-        const updatedTags = [...(currentStats.topTags || [])];
-        if (tags) {
-          tags.forEach((tag: string) => {
-            if (!updatedTags.includes(tag)) updatedTags.push(tag);
-          });
-        }
-        newTopTags = updatedTags.slice(0, 5);
-
-        transaction.update(statsRef, {
-          averageRating: Number(newAverageRating.toFixed(1)),
-          totalReviews: newTotalReviews,
-          topTags: newTopTags,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      } else {
-        transaction.set(statsRef, {
-          professionalId: professionalId,
-          averageRating: rating,
-          totalReviews: 1,
-          totalCompletedBookings: 1,
-          topTags: newTopTags,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
-        });
-      }
-
-      // 5. Sync simple stats to user profile
-      const userRef = db.collection('users').doc(professionalId);
-      transaction.update(userRef, {
-        averageRating: Number(newAverageRating.toFixed(1)),
-        totalReviews: newTotalReviews,
-        topTags: newTopTags
       });
 
       return { success: true };
