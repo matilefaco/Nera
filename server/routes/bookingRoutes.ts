@@ -334,11 +334,17 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       // Check Booking Lock (Must be before writes)
       const lockId = getBookingLockId(finalData);
       let lockRef: admin.firestore.DocumentReference | null = null;
+      let lockSnap: admin.firestore.DocumentSnapshot | null = null;
       if (lockId) {
         lockRef = db.collection('booking_locks').doc(lockId);
-        const lockSnap = await transaction.get(lockRef);
+        lockSnap = await transaction.get(lockRef);
         if (lockSnap.exists) {
-          throw new Error('SLOT_LOCKED:Este horário acabou de ser reservado. Escolha outro horário.');
+          const lockData = lockSnap.data();
+          const isPending = lockData?.status === 'pending' || lockData?.status === 'pending_confirmation' || lockData?.status === 'pending_conflict';
+          const isExpired = isPending && lockData?.expiresAt && lockData.expiresAt.toMillis() <= Date.now();
+          if (!isExpired) {
+            throw new Error('SLOT_LOCKED:Este horário acabou de ser reservado. Escolha outro horário.');
+          }
         }
       }
 
@@ -356,6 +362,23 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       for (const doc of existingApptsSnap.docs) {
         const existing = doc.data();
         if (overlapBlockingStatuses.includes(existing.status)) {
+          const isPending = existing.status === 'pending' || existing.status === 'pending_confirmation' || existing.status === 'pending_conflict';
+          if (isPending) {
+            const existingLockId = getBookingLockId(existing);
+            if (existingLockId) {
+              const existingLockSnap = (existingLockId === lockId && lockSnap) ? lockSnap : await transaction.get(db.collection('booking_locks').doc(existingLockId));
+              if (existingLockSnap.exists) {
+                const existingLockData = existingLockSnap.data();
+                const isExpired = existingLockData && existingLockData.expiresAt && existingLockData.expiresAt.toMillis() <= Date.now();
+                if (isExpired) {
+                  continue; // Ignorar o appointment pending cujo lock expirou
+                }
+              } else {
+                continue; // Se não tem lock, não deveria estar bloqueando
+              }
+            }
+          }
+
           const existingStart = timeToMinutes(existing.time);
           const existingDuration = Number(existing.duration || existing.serviceDuration || 60);
           const existingEnd = existingStart + existingDuration;
@@ -403,7 +426,8 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           serviceId: finalData.serviceId || 'unknown',
           status: 'pending',
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
         });
       }
 
