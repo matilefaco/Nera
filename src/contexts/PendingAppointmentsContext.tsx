@@ -30,7 +30,6 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
   useEffect(() => {
     if (!user?.uid) {
       setPendingAppointments([]);
-      setPendingCount(0);
       setLoading(false);
       return;
     }
@@ -48,22 +47,21 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
       qPending,
       (snapshot) => {
         try {
-          const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
-          setPendingAppointments(docs);
-          setPendingCount(docs.length);
+          // Just save count, avoid keeping large payload in global state memory to prevent sync crashes
+          setPendingAppointments([]); 
           setLoading(false);
           setError(null);
+          // Only maintain the counts for tabs/badges. 
+          // Real data will be fetched locally in PendingRequestsPage.
+          setPendingCount(snapshot.size); 
         } catch (err) {
           console.error('[PendingAppointmentsProvider] Error parsing snapshot callback:', err);
           setError(err instanceof Error ? err : new Error(String(err)));
-          setLoading(false);
         }
       },
-      (snapshotError) => {
-        console.error('[PendingAppointmentsProvider] Firestore onSnapshot error:', snapshotError);
-        setPendingAppointments([]);
-        setPendingCount(0);
-        setError(snapshotError);
+      (error) => {
+        console.error('[PendingAppointmentsProvider] Firestore onSnapshot error:', error);
+        setError(error);
         setLoading(false);
       }
     );

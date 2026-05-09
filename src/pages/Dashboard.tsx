@@ -91,7 +91,6 @@ type DashboardTab = "hoje" | "geral" | "insights" | "divulgacao";
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const uid = user?.uid ?? null;
   const { features, plan } = usePlanFeatures();
   
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
@@ -196,34 +195,23 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!uid) return;
-    let isCancelled = false;
-
-    const run = async () => {
-      try {
-        const qCount = query(
-          collection(db, 'client_summaries'),
-          where('professionalId', '==', uid)
-        );
-        const snap = await getCountFromServer(qCount);
-        if (!isCancelled) setTotalClientsCountFromSummaries(snap.data().count);
-      } catch (err) {
-        console.error('Error fetching client summaries count:', err);
-      }
-    };
-
-    void run();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [uid]);
+    if (!user) return;
+    const qCount = query(
+      collection(db, 'client_summaries'),
+      where('professionalId', '==', user.uid)
+    );
+    getCountFromServer(qCount).then(snap => {
+      setTotalClientsCountFromSummaries(snap.data().count);
+    }).catch(err => {
+      console.error('Error fetching client summaries count:', err);
+    });
+  }, [user]);
 
   useEffect(() => {
-    if (!uid) return;
+    if (!user) return;
     const qAlerts = query(
       collection(db, 'alerts'),
-      where('professionalId', '==', uid),
+      where('professionalId', '==', user.uid),
       where('read', '==', false),
       orderBy('createdAt', 'desc')
     );
@@ -240,7 +228,7 @@ setAlerts(docs);
     });
 
     return () => unsubAlerts();
-  }, [uid]);
+  }, [user]);
 
   const handleMarkAlertRead = async (alertId: string) => {
     try {
@@ -253,33 +241,26 @@ setAlerts(docs);
   // Triggers handled by hook
 
   useEffect(() => {
-    if (!uid) return;
+    if (!user) return;
 
-    let isCancelled = false;
+    const qAnalytics = query(
+      collection(db, 'analytics_events'),
+      where('professionalId', '==', user.uid),
+      orderBy('timestamp', 'desc'),
+      limit(100)
+    );
 
-    const run = async () => {
+    getDocs(qAnalytics).then((snapshot) => {
       try {
-        const qAnalytics = query(
-          collection(db, 'analytics_events'),
-          where('professionalId', '==', uid),
-          orderBy('timestamp', 'desc'),
-          limit(100)
-        );
-
-        const snapshot = await getDocs(qAnalytics);
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
-        if (!isCancelled) setAnalyticsEvents(docs);
-      } catch (error) {
-        console.error('[Dashboard] Fetch error on qAnalytics:', error);
+        setAnalyticsEvents(docs);
+      } catch (err) {
+        console.error("Error processing getDocs callback:", err);
       }
-    };
-
-    void run();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [uid]);
+    }).catch((error) => {
+      console.error('[Dashboard] Fetch error on qAnalytics:', error);
+    });
+  }, [user]);
 
 
 
@@ -306,26 +287,14 @@ setAlerts(docs);
   const dailyTip = getContextualTip();
 
   useEffect(() => {
-    if (!uid) return;
-    let isActive = true;
-    let isAllAppointmentsResolved = false;
-    let isTodayResolved = false;
-
-    const finishInitialLoadingIfReady = () => {
-      if (!isActive) return;
-      if (isAllAppointmentsResolved && isTodayResolved) {
-        setIsInitialLoading(false);
-      }
-    };
-
-    setIsInitialLoading(true);
+    if (!user) return;
 
     const today = getTodayLocale();
     
     // Query: All appointments for today
     const qToday = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', uid),
+      where('professionalId', '==', user.uid),
       where('date', '==', today),
       orderBy('time', 'asc')
     );
@@ -338,18 +307,9 @@ setConfirmedToday(relevantToday);
 setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0));
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
-      } finally {
-        if (!isTodayResolved) {
-          isTodayResolved = true;
-          finishInitialLoadingIfReady();
-        }
       }
     }, (error) => {
       console.error('[Dashboard] Subscription error on qToday:', error);
-      if (!isTodayResolved) {
-        isTodayResolved = true;
-        finishInitialLoadingIfReady();
-      }
     });
 
     // Query: Unconfirmed for tomorrow
@@ -359,7 +319,7 @@ setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (c
 
     const qUnconfirmed = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', uid),
+      where('professionalId', '==', user.uid),
       where('date', '==', tomorrowStr),
       where('status', '==', 'pending_confirmation')
     );
@@ -386,7 +346,7 @@ setUnconfirmedTomorrow(docs);
     // Query: Historical and upcoming appointments to calculate metrics
     const qAll = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', uid),
+      where('professionalId', '==', user.uid),
       where('date', '>=', startDateStr),
       where('date', '<=', endDateStr),
       orderBy('date', 'desc')
@@ -394,7 +354,6 @@ setUnconfirmedTomorrow(docs);
 
     getDocs(qAll).then((snapshot) => {
       try {
-        if (!isActive) return;
         const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
         setAppointments(appointmentsData);
         // Metrics calculation moved to hook
@@ -404,15 +363,23 @@ setUnconfirmedTomorrow(docs);
     }).catch((error) => { 
       console.error("Firestore getDocs error:", error); 
     }).finally(() => {
-      if (!isActive) return;
-      isAllAppointmentsResolved = true;
-      finishInitialLoadingIfReady();
+      setIsInitialLoading(false);
     });
+
+    // Sync Profile Settings
+    if (profile) {
+      setWaitlistMode(profile.waitlistMode || 'manual');
+      
+      if (profile.referralCode) {
+        const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+        setReferralLink(`${appUrl}/register?ref=${profile.referralCode}`);
+      }
+    }
 
     // Query: Waitlist
     const qWaitlist = query(
       collection(db, 'waitlist'),
-      where('professionalId', '==', uid),
+      where('professionalId', '==', user.uid),
       where('status', 'in', ['waiting', 'invited']),
       orderBy('createdAt', 'desc')
     );
@@ -435,7 +402,6 @@ setWaitlist(docs);
     
     getDocs(qBlocked).then((snap) => {
       try {
-        if (!isActive) return;
         const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         const todayBlocked = allBlocked.filter(b => {
             const isToday = b.date === today;
@@ -455,7 +421,7 @@ setWaitlist(docs);
 
     const qInactive = query(
       collection(db, 'client_summaries'),
-      where('professionalId', '==', uid),
+      where('professionalId', '==', user.uid),
       where('lastAppointmentDate', '<', thirtyDaysAgoStr),
       orderBy('lastAppointmentDate', 'desc'),
       limit(20)
@@ -463,7 +429,6 @@ setWaitlist(docs);
 
     getDocs(qInactive).then((snapshot) => {
       try {
-        if (!isActive) return;
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setInactiveClientsCount(docs.length);
         setInactiveClients(docs);
@@ -477,12 +442,11 @@ setWaitlist(docs);
     // Query: All services
     const qServices = query(
       collection(db, 'services'),
-      where('professionalId', '==', uid)
+      where('professionalId', '==', user.uid)
     );
 
     getDocs(qServices).then((snapshot) => {
       try {
-        if (!isActive) return;
         const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
         const filtered = rawServices.filter((s: any) => 
             s.active !== false &&
@@ -527,14 +491,13 @@ setWaitlist(docs);
     // Query: WhatsApp Logs
     const qWl = query(
       collection(db, 'whatsapp_logs'),
-      where('userId', '==', uid),
+      where('userId', '==', user.uid),
       orderBy('createdAt', 'desc'),
       limit(5)
     );
 
     getDocs(qWl).then((snapshot) => {
       try {
-        if (!isActive) return;
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
         setWhatsappLogs(docs);
       } catch (err) {
@@ -545,24 +508,11 @@ setWaitlist(docs);
     });
 
     return () => {
-      isActive = false;
       unsubToday();
       unsubUnconfirmed();
       unsubWaitlist();
     };
-  }, [uid]);
-
-  useEffect(() => {
-    if (!profile) return;
-    setWaitlistMode(profile.waitlistMode || 'manual');
-
-    if (profile.referralCode) {
-      const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-      setReferralLink(`${appUrl}/register?ref=${profile.referralCode}`);
-    } else {
-      setReferralLink('');
-    }
-  }, [profile]);
+  }, [user, profile]);
 
   const availability = useMemo(() => {
     if (!profile?.workingHours) return null;

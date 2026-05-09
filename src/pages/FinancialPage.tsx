@@ -37,7 +37,8 @@ export default function FinancialPage() {
 
   useEffect(() => {
     if (!user) return;
-    let cancelled = false;
+    
+    let isMounted = true;
 
     const fetchFinancialData = async () => {
       setLoading(true);
@@ -56,30 +57,32 @@ export default function FinancialPage() {
         );
 
         const snapshot = await getDocs(q);
+        if (!isMounted) return;
+        
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
         
         // Order in memory
         docs.sort((a, b) => b.date.localeCompare(a.date));
         
-        if (!cancelled) {
-          setAppointments(docs);
-        }
+        setAppointments(docs);
       } catch (err: any) {
+        if (!isMounted) return;
         if (err.message && err.message.includes('index')) {
           console.warn('[FinancialPage] Firestore index required: appointments professionalId ASC, date ASC');
         } else {
           console.error('[FinancialPage] Failed to load financial appointments', err);
         }
       } finally {
-        if (!cancelled) {
+        if (isMounted) {
           setLoading(false);
         }
       }
     };
 
     fetchFinancialData();
+    
     return () => {
-      cancelled = true;
+      isMounted = false;
     };
   }, [user]);
 

@@ -18,17 +18,18 @@ import { formatCurrency, getTodayLocale, buildWhatsappLink, cn } from '../lib/ut
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
 import { usePushNotifications } from '../hooks/usePushNotifications';
+import { collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
+import { db } from '../firebase';
+import { usePendingAppointments } from '../contexts/PendingAppointmentsContext';
 import { Zap } from 'lucide-react';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
-import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore';
-import { db } from '../firebase';
 
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
-  const uid = user?.uid ?? null;
   const navigate = useNavigate();
   
   const [truePending, setTruePending] = useState<Appointment[]>([]);
+  
   const [localRequests, setLocalRequests] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -92,26 +93,22 @@ export default function PendingRequestsPage() {
   };
 
   useEffect(() => {
-    if (!uid) return;
+    if (!user) return;
     
     // Check for expired requests on load
-    checkAndExpireAppointments(uid).catch((error) => {
-      console.error('[PendingRequestsPage] Failed to expire appointments:', error);
-      notify.error('Não foi possível atualizar pedidos expirados agora.');
-    });
-  }, [uid]);
+    checkAndExpireAppointments(user.uid);
+  }, [user]);
 
   useEffect(() => {
-    if (!uid) {
+    if (!user?.uid) {
       setTruePending([]);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
     const qPending = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', uid),
+      where('professionalId', '==', user.uid),
       where('status', '==', 'pending'),
       orderBy('date', 'asc'),
       orderBy('time', 'asc'),
@@ -121,19 +118,22 @@ export default function PendingRequestsPage() {
     const unsubscribe = onSnapshot(
       qPending,
       (snapshot) => {
-        const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
-        setTruePending(docs);
-        setLoading(false);
+        try {
+          const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
+          setTruePending(docs);
+          setLoading(false);
+        } catch (err) {
+          console.error('[PendingRequestsPage] Error parsing snapshot callback:', err);
+        }
       },
       (error) => {
         console.error('[PendingRequestsPage] Firestore onSnapshot error:', error);
-        setTruePending([]);
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [uid]);
+  }, [user?.uid]);
 
   // Sync localRequests to include items being confirmed/handling WhatsApp
   useEffect(() => {
@@ -185,38 +185,6 @@ export default function PendingRequestsPage() {
       }
     }
   }, [loading, localRequests]);
-
-
-  const formatDateDisplay = (value: unknown): string => {
-    if (typeof value !== 'string') return 'Data não informada';
-    const trimmed = value.trim();
-    if (!trimmed) return 'Data não informada';
-
-    const parts = trimmed.split('-');
-    if (parts.length === 3 && parts.every(Boolean)) {
-      return parts.reverse().join('/');
-    }
-
-    const parsed = new Date(trimmed);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toLocaleDateString('pt-BR');
-    }
-
-    return 'Data não informada';
-  };
-
-  const formatTimeDisplay = (value: unknown): string => {
-    if (typeof value !== 'string') return 'Horário não informado';
-    const trimmed = value.trim();
-    return trimmed || 'Horário não informado';
-  };
-
-  const getSafeWhatsappLink = (raw: unknown, message?: string): string | null => {
-    if (typeof raw !== 'string') return null;
-    const digits = raw.replace(/\D/g, '');
-    if (digits.length < 10) return null;
-    return buildWhatsappLink(raw, message);
-  };
 
   const handleRespond = async (id: string, decision: typeof APPOINTMENT_STATUS.CONFIRMED | typeof APPOINTMENT_STATUS.CANCELLED_BY_PROFESSIONAL, appointment?: any) => {
     if (processingId === id) return;
@@ -450,14 +418,14 @@ export default function PendingRequestsPage() {
                         <Calendar size={14} className="text-brand-terracotta/60 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left truncate">Data</span>
-                          <span className="text-[13px] font-bold text-brand-ink truncate">{formatDateDisplay(request.date)}</span>
+                          <span className="text-[13px] font-bold text-brand-ink truncate">{request.date.split('-').reverse().join('/')}</span>
                         </div>
                       </div>
                       <div className="bg-brand-parchment/60 rounded-3xl p-4 border border-brand-mist/30 flex items-center gap-3 min-w-0">
                         <Clock size={14} className="text-brand-terracotta/60 shrink-0" />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[10px] text-brand-stone uppercase tracking-widest scale-90 origin-left truncate">Horário</span>
-                          <span className="text-[13px] font-bold text-brand-ink truncate">{formatTimeDisplay(request.time)}</span>
+                          <span className="text-[13px] font-bold text-brand-ink truncate">{request.time}</span>
                         </div>
                       </div>
                     </div>
@@ -503,32 +471,14 @@ export default function PendingRequestsPage() {
                             </>
                           )}
                         </button>
-                        {(() => {
-                          const whatsappLink = getSafeWhatsappLink(request.clientWhatsapp);
-                          if (!whatsappLink) {
-                            return (
-                              <button
-                                type="button"
-                                disabled
-                                className="flex-1 aspect-square bg-brand-white border border-brand-mist rounded-[24px] flex items-center justify-center text-brand-stone/40 cursor-not-allowed"
-                                title="WhatsApp não informado"
-                              >
-                                <MessageCircle size={20} />
-                              </button>
-                            );
-                          }
-
-                          return (
-                            <a 
-                              href={whatsappLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex-1 aspect-square bg-brand-white border border-brand-mist rounded-[24px] flex items-center justify-center text-brand-stone hover:text-green-600 hover:border-green-200 transition-all active:scale-90"
-                            >
-                              <MessageCircle size={20} />
-                            </a>
-                          );
-                        })()}
+                        <a 
+                          href={buildWhatsappLink(request.clientWhatsapp)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 aspect-square bg-brand-white border border-brand-mist rounded-[24px] flex items-center justify-center text-brand-stone hover:text-green-600 hover:border-green-200 transition-all active:scale-90"
+                        >
+                          <MessageCircle size={20} />
+                        </a>
                       </div>
                       
                       <div className="flex gap-3">
@@ -581,31 +531,21 @@ export default function PendingRequestsPage() {
                               </div>
                               <h4 className="text-sm font-bold uppercase tracking-widest mb-3">Avisar cliente?</h4>
                               <p className="text-[11px] opacity-60 mb-8 leading-relaxed max-w-[200px] italic">
-                                "Oi {request.clientName}, seu horário para {request.serviceName} dia {formatDateDisplay(request.date)} às {formatTimeDisplay(request.time)} foi confirmado 💛"
+                                "Oi {request.clientName}, seu horário para {request.serviceName} dia {request.date.split('-').reverse().join('/')} às {request.time} foi confirmado 💛"
                               </p>
                               <div className="flex flex-col w-full gap-4">
-                                {(() => {
-                                  const confirmationText = `Oi ${request.clientName || 'cliente'}, seu horário para ${request.serviceName || 'o serviço'} dia ${formatDateDisplay(request.date)} às ${formatTimeDisplay(request.time)} foi confirmado 💛`;
-                                  const whatsappLink = getSafeWhatsappLink(request.clientWhatsapp, confirmationText);
-                                  if (!whatsappLink) {
-                                    return null;
-                                  }
-
-                                  return (
-                                    <a 
-                                      href={whatsappLink}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={() => {
-                                        setConfirmedId(null);
-                                        setWhatsappCtaId(null);
-                                      }}
-                                      className="w-full py-5 bg-green-500 text-white rounded-[24px] text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-green-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
-                                    >
-                                      Enviar agora
-                                    </a>
-                                  );
-                                })()}
+                                <a 
+                                  href={buildWhatsappLink(request.clientWhatsapp, `Oi ${request.clientName}, seu horário para ${request.serviceName} dia ${request.date.split('-').reverse().join('/')} às ${request.time} foi confirmado 💛`)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={() => {
+                                    setConfirmedId(null);
+                                    setWhatsappCtaId(null);
+                                  }}
+                                  className="w-full py-5 bg-green-500 text-white rounded-[24px] text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-green-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                >
+                                  Enviar agora
+                                </a>
                                 <button 
                                   onClick={() => {
                                     setConfirmedId(null);
@@ -674,11 +614,11 @@ export default function PendingRequestsPage() {
                     <div className="grid grid-cols-1 min-[400px]:grid-cols-2 gap-6">
                       <div className="space-y-2 min-w-0">
                         <p className="text-[9px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Data Escolhida</p>
-                        <p className="text-brand-ink font-serif text-xl truncate">{formatDateDisplay(selectedRequest.date)}</p>
+                        <p className="text-brand-ink font-serif text-xl truncate">{selectedRequest.date.split('-').reverse().join('/')}</p>
                       </div>
                       <div className="space-y-2 min-w-0">
                         <p className="text-[9px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Horário Alvo</p>
-                        <p className="text-brand-ink font-serif text-xl truncate">{formatTimeDisplay(selectedRequest.time)}</p>
+                        <p className="text-brand-ink font-serif text-xl truncate">{selectedRequest.time}</p>
                       </div>
                     </div>
 

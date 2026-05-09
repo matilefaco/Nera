@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, handleBookingError, createManualAppointment, updateAppointmentStatus, sanitizeAppointment } from '../firebase';
@@ -65,8 +65,6 @@ export default function AgendaPage() {
   const [appointments, setAppointments] = useState<any[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(dateFromUrl || getTodayLocale());
-  const userUid = user?.uid ?? null;
-  const selectedDateKey = selectedDate;
   const [allAppointments, setAllAppointments] = useState<any[]>([]);
   const [allBlockedSchedules, setAllBlockedSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
@@ -77,6 +75,7 @@ export default function AgendaPage() {
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
   const [quickBlockTime, setQuickBlockTime] = useState('');
   
+  const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [showNavTip, setShowNavTip] = useState(() => {
     return localStorage.getItem('nera_agenda_nav_tip_dismissed') !== 'true';
@@ -84,21 +83,6 @@ export default function AgendaPage() {
 
   const [blockStartTime, setBlockStartTime] = useState('09:00');
   const [blockEndTime, setBlockEndTime] = useState('18:00');
-  const isMountedRef = useRef(false);
-  const listenerSeqRef = useRef(0);
-
-  const logListener = (event: string, details: Record<string, unknown>) => {
-    console.log(`[AgendaPage][listener] ${event}`, details);
-  };
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    console.log('[AgendaPage] mounted', { route: '/agenda', uid: userUid });
-    return () => {
-      isMountedRef.current = false;
-      console.log('[AgendaPage] unmounted', { route: '/agenda', uid: userUid });
-    };
-  }, [userUid]);
 
   // Sync date from URL if it changes
   useEffect(() => {
@@ -109,15 +93,13 @@ export default function AgendaPage() {
 
   // Handle direct appointment link
   useEffect(() => {
-    if (appointmentIdFromUrl && userUid) {
-      let cancelled = false;
+    if (appointmentIdFromUrl && user) {
       const fetchAppt = async () => {
         try {
           const apptSnap = await getDoc(doc(db, 'appointments', appointmentIdFromUrl));
-          if (cancelled) return;
           if (apptSnap.exists()) {
             const data = apptSnap.data();
-            if (data.date && data.date !== selectedDateKey) setSelectedDate(data.date);
+            if (data.date !== selectedDate) setSelectedDate(data.date);
             setHighlightedId(appointmentIdFromUrl);
           }
         } catch (err) {
@@ -125,11 +107,8 @@ export default function AgendaPage() {
         }
       };
       fetchAppt();
-      return () => {
-        cancelled = true;
-      };
     }
-  }, [appointmentIdFromUrl, userUid, selectedDateKey]);
+  }, [appointmentIdFromUrl, user]);
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [openSlots, setOpenSlots] = useState<string[]>([]);
@@ -216,78 +195,51 @@ export default function AgendaPage() {
   }, []);
 
   useEffect(() => {
-    if (!userUid) return;
+    if (!user) return;
     const q = query(
       collection(db, 'services'),
-      where('professionalId', '==', userUid),
+      where('professionalId', '==', user.uid),
       where('active', '==', true)
     );
-    let cancelled = false;
     getDocs(q).then(snap => {
-      if (cancelled) return;
       setServices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }).catch(err => {
       console.error("[AgendaPage] Failed to fetch services:", err);
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [userUid]);
+  }, [user]);
 
+  // Use derived appointments instead of fetching daily
   useEffect(() => {
-    if (!userUid) return;
-    const listenerId = ++listenerSeqRef.current;
-    logListener('create:appointmentsByDay', { listenerId, uid: userUid, date: selectedDateKey });
-
-    const q = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', userUid),
-      where('date', '==', selectedDateKey),
-      orderBy('time', 'asc'),
-      limit(100)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!isMountedRef.current) {
-        logListener('ignore-callback:appointmentsByDay:unmounted', { listenerId, uid: userUid, date: selectedDateKey });
-        return;
+    // Derived Appointments
+    const dailyAppointments = allAppointments.filter(a => a.date === selectedDate);
+    
+    // Derived audit & conflicts
+    const audit: Record<string, Appointment[]> = {};
+    dailyAppointments.forEach(a => {
+      if (isConfirmedLikeStatus(a.status)) {
+        if (!audit[a.time]) audit[a.time] = [];
+        audit[a.time].push(a as any);
       }
-      logListener('callback:appointmentsByDay', { listenerId, uid: userUid, date: selectedDateKey, size: snapshot.size });
-      try {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-setAppointments(docs);
-const audit: Record<string, Appointment[]> = {};
-docs.forEach(a => {
-            if (isConfirmedLikeStatus(a.status)) {
-              if (!audit[a.time]) audit[a.time] = [];
-              audit[a.time].push(a);
-            }
-          });
-const foundConflicts = Object.values(audit).filter(list => list.length > 1);
-setConflicts(foundConflicts);
-setIsInitialLoading(false);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-        setIsInitialLoading(false);
-      }
-    }, (error) => {
-      console.error('[AgendaPage] Subscription error (appointments q):', error);
-      setIsInitialLoading(false);
     });
+    setConflicts(Object.values(audit).filter(list => list.length > 1) as any);
+    setAppointments(dailyAppointments as any);
 
-    return () => {
-      logListener('cleanup:appointmentsByDay', { listenerId, uid: userUid, date: selectedDateKey });
-      unsubscribe();
-    };
-  }, [userUid, selectedDateKey]);
+    // Derived Blocks
+    const dayOfWeek = parseLocalDate(selectedDate).getDay();
+    const dailyBlocks = allBlockedSchedules.filter(b => {
+      const isToday = b.date === selectedDate;
+      const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
+      return isToday || isRecurringToday;
+    });
+    setBlockedSchedules(dailyBlocks as any);
+  }, [allAppointments, allBlockedSchedules, selectedDate]);
 
   // Fetch all appointments for week/month view with a safe window
   useEffect(() => {
-    if (!userUid) return;
-    const listenerId = ++listenerSeqRef.current;
+    if (!user) return;
     
     // We base the window on 'selectedDate' (which is YYYY-MM-DD)
-    const baseDate = new Date(selectedDateKey + 'T12:00:00');
+    const baseDate = new Date(selectedDate + 'T12:00:00');
     
     // Calculate visibleStart: 30 days before baseDate
     const start = new Date(baseDate);
@@ -301,17 +253,12 @@ setIsInitialLoading(false);
 
     const q = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', userUid),
+      where('professionalId', '==', user.uid),
       where('date', '>=', visibleStartStr),
       where('date', '<=', visibleEndStr)
     );
 
     const unsubAll = onSnapshot(q, (snapshot) => {
-      if (!isMountedRef.current) {
-        logListener('ignore-callback:allAppointmentsWindow:unmounted', { listenerId, uid: userUid, date: selectedDateKey });
-        return;
-      }
-      logListener('callback:allAppointmentsWindow', { listenerId, uid: userUid, date: selectedDateKey, size: snapshot.size });
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         // Sort in memory to avoid complex index requirements while keeping standard behavior
@@ -338,19 +285,7 @@ setIsInitialLoading(false);
     });
 
     const blockedRef = collection(db, 'blocked_schedules');
-    logListener('create:allAppointmentsWindow', {
-      listenerId,
-      uid: userUid,
-      date: selectedDateKey,
-      rangeStart: visibleStartStr,
-      rangeEnd: visibleEndStr
-    });
-    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', userUid)), (snap) => {
-      if (!isMountedRef.current) {
-        logListener('ignore-callback:allBlockedSchedules:unmounted', { listenerId, uid: userUid, date: selectedDateKey });
-        return;
-      }
-      logListener('callback:allBlockedSchedules', { listenerId, uid: userUid, date: selectedDateKey, size: snap.size });
+    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', user.uid)), (snap) => {
       try {
         setAllBlockedSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (err) {
@@ -361,21 +296,10 @@ setIsInitialLoading(false);
     });
 
     return () => {
-      logListener('cleanup:allAppointmentsWindow', { listenerId, uid: userUid, date: selectedDateKey });
       unsubAll();
       unsubBlocked();
     };
-  }, [userUid, selectedDateKey]);
-
-  const blockedSchedulesForSelectedDate = useMemo(() => {
-    const dayOfWeek = parseLocalDate(selectedDateKey).getDay();
-    return allBlockedSchedules.filter((b: any) => {
-      const isToday = b.date === selectedDateKey;
-      const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-      return isToday || isRecurringToday;
-    });
-  }, [allBlockedSchedules, selectedDateKey]);
-
+  }, [user]);
 
   // Save view preference
   useEffect(() => {
@@ -401,9 +325,9 @@ setIsInitialLoading(false);
       serviceDuration: 60,
       workingHours: profile.workingHours,
       appointments,
-      blockedSchedulesForSelectedDate
+      blockedSchedules
     });
-  }, [selectedDate, appointments, blockedSchedulesForSelectedDate, profile]);
+  }, [selectedDate, appointments, blockedSchedules, profile]);
 
   useEffect(() => {
     if (availability) {
@@ -674,7 +598,7 @@ setIsInitialLoading(false);
     });
 
     // Add blocked schedules
-    blockedSchedulesForSelectedDate.forEach(block => {
+    blockedSchedules.forEach(block => {
       items.push({
         type: 'block',
         time: block.startTime,
@@ -689,7 +613,7 @@ setIsInitialLoading(false);
       // Filter out slots that already have an appointment or a block starting exactly at this time
       // Regra crítica: se houver QUALQUER appointment bloqueante, remove o slot livre.
       const hasStrictMeeting = displayedAppointments.some(a => a.time === slot && isActiveSlotStatus(a.status));
-      const hasStrictBlock = blockedSchedulesForSelectedDate.some(b => b.startTime === slot);
+      const hasStrictBlock = blockedSchedules.some(b => b.startTime === slot);
       
       if (!hasStrictMeeting && !hasStrictBlock) {
         items.push({
@@ -700,7 +624,7 @@ setIsInitialLoading(false);
     });
 
     return items.sort((a, b) => a.time.localeCompare(b.time));
-  }, [displayedAppointments, blockedSchedulesForSelectedDate, openSlots]);
+  }, [displayedAppointments, blockedSchedules, openSlots]);
 
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -894,7 +818,7 @@ setIsInitialLoading(false);
           {view === 'day' && (
             <DayView 
               appointments={appointments}
-              blockedSchedules={blockedSchedulesForSelectedDate}
+              blockedSchedules={blockedSchedules}
               date={selectedDate}
               onSelectAppointment={(appt) => { setSelectedAppointment(appt); setIsDetailsOpen(true); }}
               onSelectSlot={(time) => {

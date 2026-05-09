@@ -1,4 +1,4 @@
-import { StrictMode, type ReactNode } from 'react';
+import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App';
 import './index.css';
@@ -19,21 +19,16 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 
 try {
-  const strictModeEnabled = import.meta.env.VITE_ENABLE_STRICT_MODE !== 'false';
   const rootElement = document.getElementById('root');
   if (!rootElement) {
     throw new Error('Root element not found in DOM');
   }
 
-  const appTree: ReactNode = strictModeEnabled ? (
+  createRoot(rootElement).render(
     <StrictMode>
       <App />
     </StrictMode>
-  ) : (
-    <App />
   );
-
-  createRoot(rootElement).render(appTree);
 } catch (err) {
   console.error('[BOOT_FAILURE]', err);
   const debug = document.createElement('div');

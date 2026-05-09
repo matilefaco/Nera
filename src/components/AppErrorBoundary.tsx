@@ -9,22 +9,18 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error: unknown;
-  errorSource: 'react_boundary' | 'window_error' | 'promise_rejection' | null;
-  componentStack: string | null;
+  error: Error | null;
 }
 
 export class AppErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null,
-    errorSource: null,
-    componentStack: null
+    error: null
   };
 
-  public static getDerivedStateFromError(error: unknown): State {
+  public static getDerivedStateFromError(error: Error): State {
     // Update state so the next render will show the fallback UI.
-    return { hasError: true, error, errorSource: 'react_boundary', componentStack: null };
+    return { hasError: true, error };
   }
 
   public componentDidMount() {
@@ -38,90 +34,35 @@ export class AppErrorBoundary extends Component<Props, State> {
   }
 
   private handleWindowError = (event: ErrorEvent) => {
-    runtimeLogger.log('error', {
-      type: 'window_error',
-      message: event.message,
-      stack: event.error?.stack,
-      filename: event.filename,
-      lineno: event.lineno,
-      colno: event.colno,
-      route: window.location.pathname
-    });
-
-    const rawError = event.error || event.message;
-
-    if (this.isRecoverableFirestoreAsyncError(rawError)) {
+    runtimeLogger.log('error', { type: 'window_error', message: event.message });
+    if (this.isFirestoreError(event.error || event.message)) {
       runtimeLogger.dump();
-      event.preventDefault();
-      return;
+      event.preventDefault(); // Prevent default browser console error
+      this.setState({ hasError: true, error: event.error || new Error(event.message) });
     }
-
-    // Async/global runtime errors should be diagnosed, but not crash the app shell.
-    // Only escalate to full fallback for truly critical boot/chunk-load failures.
-    if (!this.isCriticalGlobalError(rawError, event.message)) {
-      return;
-    }
-
-    runtimeLogger.dump();
-    this.setState({ hasError: true, error: rawError ?? event.message, errorSource: 'window_error', componentStack: null });
   };
 
   private handlePromiseRejection = (event: PromiseRejectionEvent) => {
-    runtimeLogger.log('error', {
-      type: 'promise_rejection',
-      reason: event.reason,
-      message: (event.reason as any)?.message,
-      stack: (event.reason as any)?.stack,
-      route: window.location.pathname
-    });
-
-    if (this.isRecoverableFirestoreAsyncError(event.reason)) {
+    runtimeLogger.log('error', { type: 'promise_rejection', reason: event.reason });
+    if (this.isFirestoreError(event.reason)) {
       runtimeLogger.dump();
       event.preventDefault();
-      return;
+      this.setState({ hasError: true, error: event.reason instanceof Error ? event.reason : new Error(String(event.reason)) });
     }
-
-    // Promise rejections during page-level async work should stay local.
-    if (!this.isCriticalGlobalError(event.reason)) {
-      return;
-    }
-
-    event.preventDefault();
-    runtimeLogger.dump();
-    this.setState({ hasError: true, error: event.reason, errorSource: 'promise_rejection', componentStack: null });
   };
 
-  private isCriticalGlobalError = (error: unknown, fallbackMessage?: string): boolean => {
-    const msg = String((error as any)?.message || fallbackMessage || error || '').toLowerCase();
-
-    return msg.includes('loading chunk') ||
-      msg.includes('chunkloaderror') ||
-      msg.includes('failed to fetch dynamically imported module') ||
-      msg.includes('importing a module script failed') ||
-      msg.includes('root element not found') ||
-      msg.includes('boot_failure');
-  };
-
-  private isRecoverableFirestoreAsyncError = (error: any): boolean => {
-    const msg = String(error?.message || error || '').toLowerCase();
-    return msg.includes('firestore') ||
-           msg.includes('internal assertion failed') ||
-           msg.includes('unexpected state');
+  private isFirestoreError = (error: any): boolean => {
+    const msg = error?.message || String(error);
+    return msg.includes('FIRESTORE') || 
+           msg.includes('INTERNAL ASSERTION FAILED') ||
+           msg.includes('Unexpected state');
   };
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    this.setState({ errorSource: 'react_boundary', componentStack: errorInfo.componentStack || null });
-    runtimeLogger.log('error', {
-      type: 'react_boundary',
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      route: window.location.pathname
-    });
-    runtimeLogger.dump();
+    runtimeLogger.log('error', { type: 'react_boundary', message: error.message, stack: error.stack });
     console.error('AppErrorBoundary caught an error:', error, errorInfo);
-    if (this.isRecoverableFirestoreAsyncError(error)) {
-      runtimeLogger.dump();
+    if (this.isFirestoreError(error)) {
+        runtimeLogger.dump();
     }
   }
 
@@ -130,27 +71,16 @@ export class AppErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  private shouldShowDiagnostics = (): boolean => {
-    const hostname = window.location.hostname || '';
-    if (hostname === 'usenera.com' || hostname.endsWith('.usenera.com')) {
-      return false;
-    }
-    return Boolean(import.meta.env.DEV || hostname.includes('.github.dev') || hostname.includes('.run.app'));
-  };
-
-  private getSafeStack = (): string => {
-    const stack = (this.state.error as { stack?: unknown } | null | undefined)?.stack;
-    return typeof stack === 'string'
-      ? stack.split('\n').slice(0, 4).join('\n')
-      : 'Stack unavailable';
-  };
-
   public render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
       
+      const isFirestoreError = this.state.error?.message?.includes('FIRESTORE') || 
+                               this.state.error?.message?.includes('INTERNAL ASSERTION FAILED') ||
+                               this.state.error?.message?.includes('Unexpected state');
+
       return (
         <div className="min-h-screen flex items-center justify-center bg-brand-sand/30 p-6 font-sans">
           <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-brand-sand/50 text-center relative overflow-hidden">
@@ -176,21 +106,6 @@ export class AppErrorBoundary extends Component<Props, State> {
               <RefreshCw size={16} />
               Recarregar com segurança
             </button>
-
-            {this.shouldShowDiagnostics() && (
-              <div className="mt-6 rounded-2xl border border-brand-sand/70 bg-brand-sand/30 p-4 text-left">
-                <p className="text-[11px] uppercase tracking-widest text-brand-stone mb-2">Diagnóstico temporário</p>
-                <pre className="text-xs text-brand-ink whitespace-pre-wrap break-words">
-{`source: ${String(this.state.errorSource ?? 'unknown')}
-message: ${String(this.state.error ?? 'Unknown error')}
-route: ${String(window.location.pathname ?? '/')}
-stack:
-${this.getSafeStack()}
-componentStack:
-${String(this.state.componentStack ?? 'N/A')}`}
-                </pre>
-              </div>
-            )}
             
             {/* Soft subtle pattern in background */}
             <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-brand-peach/20 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
