@@ -1,409 +1,445 @@
-import { motion } from 'motion/react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  ArrowRight, Clock, MapPin, TrendingUp, 
-  Smartphone, Star, ChevronRight, Check
-} from 'lucide-react';
-import Logo from '../components/Logo';
-import { PLANS } from '../config/plans';
-
-// Substituir por depoimentos reais antes de campanhas pagas.
-const TESTIMONIALS_PLACEHOLDER = true;
+import './LandingPage.css';
 
 export default function LandingPage() {
-  const freePlan = PLANS.find(p => p.id === 'free')!;
-  const essencialPlan = PLANS.find(p => p.id === 'essencial')!;
-  const proPlan = PLANS.find(p => p.id === 'pro')!;
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!navRef.current) return;
+      if (window.scrollY > 40) {
+        navRef.current.classList.add('scrolled');
+      } else {
+        navRef.current.classList.remove('scrolled');
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const revealEls = document.querySelectorAll('.reveal');
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    
+    revealEls.forEach(el => obs.observe(el));
+    
+    return () => obs.disconnect();
+  }, []);
 
   return (
-    <div className="flex flex-col min-h-screen bg-brand-parchment">
-      {/* Navigation */}
-      <nav className="flex items-center justify-between px-6 py-8 max-w-7xl mx-auto w-full relative z-20">
-        <Logo />
-        <div className="flex items-center gap-8">
-          <Link to="/profissionais" className="hidden md:block text-[11px] font-medium text-brand-stone uppercase tracking-[0.15em] hover:text-brand-ink transition-colors">
-            Encontrar Profissionais
-          </Link>
-          <Link to="/login" className="text-[11px] font-medium text-brand-stone uppercase tracking-[0.15em] hover:text-brand-ink transition-colors">
-            Entrar
-          </Link>
-          <Link to="/register" className="bg-brand-ink text-brand-white px-6 py-3 rounded-full text-[10px] font-medium uppercase tracking-[0.15em] hover:bg-brand-espresso transition-all">
-            Fazer parte
-          </Link>
+    <div className="landing-page">
+
+      {/* NAV */}
+      <nav id="nav" ref={navRef}>
+        <a href="#" className="logo">
+          <div className="logo-mark">
+            <svg width="22" height="22" viewBox="0 0 36 36" fill="none">
+              <path d="M10 26V10L26 26V10" stroke="#18120E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="28" cy="28" r="3.5" fill="#A85C3A"/>
+            </svg>
+          </div>
+          <span className="logo-text">nera</span>
+        </a>
+        <div className="nav-links">
+          <Link to="/login" className="nav-link">Entrar</Link>
+          <Link to="/register" className="btn-nav">Começar agora</Link>
         </div>
       </nav>
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="px-6 pt-20 pb-32 max-w-7xl mx-auto w-full relative">
-          <div className="max-w-4xl">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              <div className="inline-flex items-center gap-2 bg-brand-linen border border-brand-mist px-4 py-2 rounded-full mb-10">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta" />
-                <span className="text-[10px] font-medium uppercase tracking-[0.15em] text-brand-terracotta">Para profissionais autônomas</span>
-              </div>
+      {/* HERO */}
+      <section id="hero" style={{ paddingLeft: '48px', paddingRight: '48px', maxWidth: 'none' }}>
+        <div className="wrap" style={{ paddingTop: 0, paddingBottom: 0 }}>
+          <div className="hero-bg-glyph">n</div>
+          <div className="hero-inner">
 
-              <h1 className="text-[56px] md:text-[88px] font-serif font-normal leading-[1.05] tracking-tight text-brand-ink mb-10 text-balance">
-                Você responde o dia inteiro. <br />
-                <span className="italic text-brand-terracotta">E ainda perde cliente.</span>
-              </h1>
-              
-              <p className="text-brand-stone text-lg md:text-xl max-w-2xl mb-12 leading-relaxed font-light">
-                Sua agenda inteligente que elimina o caos do WhatsApp e profissionaliza 
-                seu faturamento com reservas automáticas e zero faltas.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row items-center gap-4 mb-16">
-                <Link to="/register" className="w-full sm:w-auto bg-brand-ink text-brand-white px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-espresso transition-all flex items-center justify-between gap-8 group">
-                  <span>Começar grátis</span>
-                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <Link to="/p/helena-prado" className="w-full sm:w-auto bg-transparent text-brand-ink border border-brand-mist px-10 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-linen transition-all text-center">
-                  Ver exemplo real →
-                </Link>
-              </div>
-
-              <div className="flex items-center gap-4 pt-8 border-t border-brand-mist">
-                <div className="flex -space-x-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-10 h-10 rounded-full border-2 border-brand-parchment bg-brand-blush flex items-center justify-center text-[10px] font-medium text-brand-terracotta">
-                      {String.fromCharCode(64 + i)}
-                    </div>
-                  ))}
-                </div>
-                <p className="text-[12px] text-brand-stone font-light">
-                  <span className="font-medium text-brand-ink">+500 profissionais</span> já organizaram sua agenda com a nera
-                </p>
-              </div>
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Pain Points Section */}
-        <section className="bg-brand-espresso py-32 px-6">
-          <div className="max-w-7xl mx-auto w-full">
-            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-sienna mb-6 block">O problema real</span>
-            <h2 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-white leading-tight mb-20 max-w-2xl">
-              Chega de caos <br />
-              <span className="italic text-brand-sienna">na sua agenda.</span>
-            </h2>
-
-            <div className="grid md:grid-cols-3 gap-12">
-              {[
-                { icon: <Smartphone size={20} />, text: "Suas clientes esperam resposta no WhatsApp antes de confirmar" },
-                { icon: <Star size={20} />, text: "Clientes somem depois do primeiro atendimento — sem histórico, sem retorno" },
-                { icon: <TrendingUp size={20} />, text: "Você não sabe quanto perdeu em faltas este mês" }
-              ].map((item, i) => (
-                <div key={i} className="flex gap-5 items-start">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-brand-sienna shrink-0">
-                    {item.icon}
-                  </div>
-                  <p className="text-brand-white/60 text-sm leading-relaxed pt-2 font-light">
-                    {item.text}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Features Section */}
-        <section className="bg-brand-parchment py-32 px-6">
-          <div className="max-w-7xl mx-auto w-full">
-            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-terracotta mb-6 block">A solução</span>
-            <h2 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-ink leading-tight mb-20 max-w-3xl">
-              Tudo para <span className="italic text-brand-terracotta">profissionalizar</span> seu negócio
-            </h2>
-
-            <div className="grid md:grid-cols-3 gap-8">
-              {[
-                { 
-                  title: "Reservas 24/7", 
-                  desc: "Sua cliente reserva sozinha enquanto você atende ou dorme. Sem idas e vindas no WhatsApp.",
-                  icon: <Clock size={24} />
-                },
-                { 
-                  title: "Feita para domicílio", 
-                  desc: "Bairros, taxas e deslocamento gerenciados automaticamente. A primeira agenda construída para quem vai até a cliente.",
-                  icon: <MapPin size={24} />
-                },
-                { 
-                  title: "Visão financeira clara", 
-                  desc: "Saiba exatamente quanto vai receber hoje, esta semana e este mês. Sem planilha.",
-                  icon: <TrendingUp size={24} />
-                }
-              ].map((feat, i) => (
-                <div key={i} className="card-refined hover:border-brand-terracotta/30 group">
-                  <div className="w-12 h-12 rounded-2xl bg-brand-linen border border-brand-mist flex items-center justify-center text-brand-terracotta mb-8 group-hover:bg-brand-terracotta group-hover:text-brand-white transition-all">
-                    {feat.icon}
-                  </div>
-                  <h3 className="text-2xl font-serif font-normal text-brand-ink mb-4">{feat.title}</h3>
-                  <p className="text-brand-stone text-sm leading-relaxed font-light">{feat.desc}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Interactive Demo Section */}
-        <section className="bg-brand-white py-32 px-6 overflow-hidden">
-          <div className="max-w-7xl mx-auto w-full">
-            <div className="grid lg:grid-cols-2 gap-20 items-center">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6 block">Vitrine Profissional</span>
-                <h2 className="text-[42px] md:text-[56px] font-serif font-normal text-brand-ink leading-tight mb-8">
-                  Veja como sua <br />
-                  <span className="italic text-brand-terracotta">página pode ficar.</span>
-                </h2>
-                <p className="text-brand-stone text-lg mb-12 font-light leading-relaxed">
-                  Uma página bonita, profissional e pronta para receber reservas. 
-                  Dê à sua cliente a experiência de um salão de luxo, direto no link da sua bio.
-                </p>
-
-                <div className="space-y-6 mb-12">
-                  {[
-                    "Seus serviços organizados por categoria",
-                    "Agenda automática integrada",
-                    "Cálculo de taxa de serviço por bairro",
-                    "Visual premium que valoriza seu trabalho",
-                    "Funciona perfeitamente em qualquer celular"
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-3">
-                      <div className="w-5 h-5 rounded-full bg-brand-linen flex items-center justify-center text-brand-terracotta">
-                        <Check size={12} />
-                      </div>
-                      <span className="text-sm font-medium text-brand-stone uppercase tracking-tight">{item}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <Link to="/register" className="w-full sm:w-auto bg-brand-ink text-white px-10 py-5 rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg text-center">
-                    Criar a minha agora
-                  </Link>
-                  <Link to="/p/helena-prado" className="w-full sm:w-auto text-brand-ink font-bold text-[11px] uppercase tracking-widest hover:underline text-center">
-                    Ver exemplo completo
-                  </Link>
-                </div>
-              </div>
-
-              <div className="relative">
-                {/* Phone Mockup */}
-                <motion.div 
-                  initial={{ opacity: 0, y: 40 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.9 }}
-                  className="relative mx-auto w-[320px] h-[640px] bg-brand-ink rounded-[52px] p-2 shadow-2xl ring-1 ring-black/10 overflow-hidden"
-                >
-                  <div className="w-full h-full bg-white rounded-[40px] overflow-hidden relative">
-                    {/* Notch Overlay */}
-                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-brand-ink rounded-b-2xl z-50 pointer-events-none" />
-                    
-                    {/* Real Preview Iframe */}
-                    <iframe 
-                      src="/p/helena-prado" 
-                      title="Preview do Nera"
-                      loading="lazy"
-                      className="w-[375px] h-[667px] origin-top-left pointer-events-none border-none select-none"
-                      style={{ 
-                        transform: 'scale(0.81)', // Escale 375 para ~304 (dentro do 320p)
-                        width: '375px',
-                        height: '790px' // Expand height so we can see more content
-                      }}
-                    />
-                  </div>
-                </motion.div>
-
-                {/* Floating Elements */}
-                <motion.div 
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="absolute -right-10 top-1/4 bg-white p-4 rounded-2xl shadow-xl border border-brand-mist z-40 hidden md:block"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600">
-                      <Check size={16} />
-                    </div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
-                      Reserva Confirmada
-                    </div>
-                  </div>
-                </motion.div>
-
-                <motion.div 
-                  animate={{ y: [0, 10, 0] }}
-                  transition={{ duration: 5, repeat: Infinity }}
-                  className="absolute -left-10 bottom-1/4 bg-brand-terracotta text-white p-4 rounded-2xl shadow-xl z-40 hidden md:block"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                      <Clock size={16} />
-                    </div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest">
-                      Agenda Lotada ✨
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Planos */}
-        <section className="bg-brand-parchment py-32 px-6">
-          <div className="max-w-7xl mx-auto w-full">
-            <div className="text-center mb-16">
-              <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-4 block">Planos simples</span>
-              <h2 className="text-[42px] md:text-[52px] font-serif font-normal text-brand-ink leading-tight">
-                Comece grátis, <em className="italic text-brand-terracotta">cresça no seu ritmo.</em>
-              </h2>
+            <div className="hero-tag fade-in">
+              <div className="hero-tag-dot"></div>
+              <span>Para profissionais autônomas de beleza</span>
             </div>
 
-              <div className="grid md:grid-cols-3 gap-12 max-w-6xl mx-auto">
-                {/* GRATUITO */}
-                <div className="card-refined p-10 flex flex-col h-full">
-                  <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">{freePlan.name}</div>
-                  <div className="text-[52px] font-serif font-normal text-brand-ink leading-none mb-2">R$ {freePlan.price}</div>
-                  <div className="text-brand-stone text-sm font-light mb-1">{freePlan.subtitle}</div>
-                  <div className="text-brand-stone/40 text-[9px] font-medium tracking-widest mb-8 italic">{freePlan.tagline}</div>
-                  <ul className="space-y-3 mb-10 flex-1">
-                  {freePlan.features.map(f => (
-                    <li key={f.text} className="text-sm text-brand-stone font-light flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f.text}
-                    </li>
-                  ))}
-                </ul>
-                <Link to="/register" className="block text-center border border-brand-mist py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:bg-brand-linen transition-all">
-                  {freePlan.cta}
-                </Link>
-              </div>
+            <h1 className="hero-h1 fade-in d1">
+              Você responde<br/>
+              o dia inteiro.<br/>
+              <em>E ainda perde cliente.</em>
+            </h1>
 
-              {/* ESSENCIAL */}
-              <div className="bg-brand-ink rounded-[32px] p-10 relative flex flex-col h-full">
-                <div className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6">{essencialPlan.name}</div>
-                <div className="text-[52px] font-serif font-normal text-brand-white leading-none mb-2">R$ {essencialPlan.price}</div>
-                <div className="text-brand-stone text-sm font-light mb-8">{essencialPlan.subtitle}</div>
-                <ul className="space-y-3 mb-10 flex-1">
-                  {essencialPlan.features.map(f => (
-                    <li key={f.text} className="text-sm text-brand-white/70 font-light flex items-center gap-3">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0" />{f.text}
-                    </li>
-                  ))}
-                </ul>
-                <Link to="/register?plan=essencial" className="block text-center bg-brand-terracotta text-white py-4 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-sienna transition-all">
-                  {essencialPlan.cta}
-                </Link>
-              </div>
-
-                {/* PRO */}
-              <div 
-                className="rounded-[32px] p-12 lg:p-14 border border-[#C49A7A] shadow-[0_64px_100px_rgba(91,52,35,0.25)] bg-[#F2E8DF] relative transition-all hover:translate-y-[-8px] hover:shadow-[0_80px_120px_rgba(91,52,35,0.3)] group scale-[1.02] z-10 flex flex-col h-full"
-              >
-                <div className="absolute top-0 right-10 -translate-y-1/2 bg-brand-terracotta text-white px-4 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-widest shadow-lg">
-                  Recomendado para quem quer crescer
-                </div>
-                <div className="text-[9px] font-bold uppercase tracking-[0.35em] text-brand-terracotta mb-6 block">Plano {proPlan.name}</div>
-                <div className="flex items-baseline gap-1 mb-2">
-                  <span className="text-[52px] font-serif font-normal text-brand-ink leading-none">R$ {proPlan.price}</span>
-                  <span className="text-xs text-brand-stone font-bold uppercase tracking-widest">{proPlan.priceDescriptor}</span>
-                </div>
-                <div className="text-brand-stone/60 text-[10px] font-bold uppercase tracking-widest mb-8">{proPlan.subtitle}</div>
-                <ul className="space-y-4 mb-10 flex-1">
-                  {proPlan.features.map((f, i) => (
-                    <li key={f.text} className={`text-[13px] text-brand-ink font-medium flex items-center gap-4 ${f.isHighlight ? 'text-brand-terracotta font-bold' : ''}`}>
-                      <div className={`w-1.5 h-1.5 rounded-full bg-brand-terracotta shrink-0 ${f.isHighlight ? 'animate-pulse' : ''}`} />
-                      <span className="tracking-tight">{f.text}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Link 
-                  to="/register?plan=pro" 
-                  className="block text-center bg-brand-terracotta text-white py-5 rounded-full text-[11px] font-bold uppercase tracking-[0.2em] shadow-[0_12px_24px_rgba(168,92,58,0.3)] hover:bg-brand-sienna hover:shadow-xl transition-all"
-                >
-                  {proPlan.cta}
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Testimonials */}
-        <section className="bg-brand-white py-32 px-6">
-          <div className="max-w-7xl mx-auto w-full">
-            <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-12 block text-center">O que dizem as profissionais</span>
-            
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <div className="bg-brand-ink p-10 rounded-[32px] text-brand-white">
-                <div className="flex gap-1 text-brand-sienna mb-6">
-                  {[...Array(5)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
-                </div>
-                <p className="text-xl font-serif italic font-normal leading-relaxed mb-8">
-                  "Minha página ficou com cara de marca grande. Minhas clientes amaram a facilidade de agendar sozinhas e eu parei de perder tempo no WhatsApp."
-                </p>
-                <div className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/30">
-                  Karina M. · Nail Designer · São Paulo
-                </div>
-              </div>
-              
-              <div className="bg-brand-linen p-10 rounded-[32px] border border-brand-mist">
-                <div className="flex gap-1 text-brand-terracotta mb-6">
-                  {[...Array(5)].map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
-                </div>
-                <p className="text-xl font-serif italic font-normal leading-relaxed mb-8 text-brand-ink">
-                  "O sistema de taxa por bairro mudou tudo. Agora cobro o valor justo pelo meu deslocamento de forma automática e profissional."
-                </p>
-                <div className="text-[10px] font-medium uppercase tracking-[0.15em] text-brand-stone">
-                  Ana P. · Esteticista · Curitiba
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Final CTA */}
-        <section className="bg-brand-terracotta py-32 px-6 text-center">
-          <div className="max-w-3xl mx-auto">
-            <h2 className="text-[48px] md:text-[72px] font-serif font-normal text-brand-white leading-[1.1] mb-8">
-              Pronta para o próximo nível?
-            </h2>
-            <p className="text-brand-white/70 text-lg mb-12 font-light">
-              Crie sua conta em 2 minutos e comece a receber agendamentos hoje mesmo.
+            <p className="hero-sub fade-in d2">
+              Sua agenda inteligente que elimina o caos do WhatsApp e profissionaliza seu negócio — com reservas automáticas, lembretes e visão financeira clara.
             </p>
-            <Link to="/register" className="inline-flex w-full sm:w-auto bg-brand-white text-brand-terracotta px-12 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.15em] hover:bg-brand-parchment transition-all items-center justify-center gap-8 group">
-              <span>Fazer parte da revolução</span>
-              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <p className="text-brand-white/40 text-[10px] uppercase tracking-[0.1em] mt-8">
-              Sem cartão de crédito · Setup em 2 min · Cancele quando quiser
-            </p>
-          </div>
-        </section>
-      </main>
 
-      {/* Footer */}
-      <footer className="bg-brand-ink py-20 px-6">
-        <div className="max-w-7xl mx-auto w-full flex flex-col items-center">
-          <Logo variant="dark" className="mb-12" />
-          
-          <div className="flex gap-10 mb-12">
-            <Link to="/profissionais" className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/50 hover:text-brand-white transition-colors">
-              Diretório
-            </Link>
-            {['Termos', 'Privacidade', 'Suporte', 'Instagram'].map((item) => (
-              <Link key={item} to="#" className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/20 hover:text-brand-white transition-colors">
-                {item}
+            <div className="hero-ctas fade-in d3">
+              <Link to="/register" className="btn-primary">
+                <span>Começar grátis</span>
+                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </Link>
-            ))}
+              <Link to="/p/helena-prado" className="btn-ghost">
+                Ver vitrine de exemplo →
+              </Link>
+            </div>
+
           </div>
-          
-          <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-white/10">
-            © 2025 nera · Feito para profissionais que valorizam excelência
+        </div>
+      </section>
+
+      {/* MARQUEE */}
+      <div className="marquee-strip">
+        <div className="marquee-track">
+          <span className="marquee-item">Agenda 24h <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Menos vai-e-vem no WhatsApp <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Lembretes automáticos <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Visão financeira clara <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Para profissionais de beleza <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Anti no-show <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Feita no Brasil <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Agenda 24h <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Menos vai-e-vem no WhatsApp <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Lembretes automáticos <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Visão financeira clara <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Para profissionais de beleza <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Anti no-show <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Feita no Brasil <span className="marquee-sep">·</span></span>
+        </div>
+      </div>
+
+      {/* PROBLEM */}
+      <section id="problem">
+        <div className="wrap" style={{ paddingBottom: 0 }}>
+          <span className="label section-eyebrow-light reveal">O problema real</span>
+          <h2 className="problem-h2 reveal">
+            Chega de caos<br/>
+            <em>na sua agenda.</em>
+          </h2>
+        </div>
+        <div className="problem-grid reveal">
+          <div className="problem-card">
+            <div className="problem-num">01</div>
+            <p className="problem-text">Suas clientes esperam resposta antes de confirmar — e você perde tempo (e horário) a cada conversa perdida no meio do atendimento.</p>
+          </div>
+          <div className="problem-card">
+            <div className="problem-num">02</div>
+            <p className="problem-text">Clientes somem depois do primeiro atendimento. E no meio da correria, você nem percebe quem nunca mais voltou.</p>
+          </div>
+          <div className="problem-card">
+            <div className="problem-num">03</div>
+            <p className="problem-text">Você não sabe quanto perdeu em faltas este mês. Sem dado, sem controle. O dinheiro escapa sem você ver.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* MANIFESTO */}
+      <section id="manifesto">
+        <div className="manifesto-inner">
+          <span className="label manifesto-label reveal">— A promessa da nera</span>
+          <p className="manifesto-quote reveal">
+            Você não precisa de mais aplicativos.<br/>
+            Você precisa de <em>um sistema que funcione</em><br/>
+            enquanto você trabalha.
           </p>
+          <p className="manifesto-sub reveal">Construímos a plataforma que as profissionais merecem.</p>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section id="how">
+        <div className="wrap">
+          <span className="label section-eyebrow-terra reveal">Como funciona</span>
+          <h2 className="how-h2 reveal">
+            Três passos.<br/>
+            <em>Uma nova realidade.</em>
+          </h2>
+          <div className="steps">
+            <div className="step reveal">
+              <div className="step-num">1</div>
+              <div className="step-body">
+                <h3 className="step-title"><em>Crie seu perfil</em> em minutos</h3>
+                <p className="step-desc">Fotos, serviços, preços e disponibilidade. Sua vitrine pública fica pronta para receber clientes antes de você terminar o café.</p>
+              </div>
+            </div>
+            <div className="step reveal rd1">
+              <div className="step-num">2</div>
+              <div className="step-body">
+                <h3 className="step-title">Clientes agendam <em>sozinhos</em></h3>
+                <p className="step-desc">Compartilhe seu link e pronto. Confirmação automática por WhatsApp para você e para a cliente — sem nenhum esforço da sua parte.</p>
+              </div>
+            </div>
+            <div className="step reveal rd2">
+              <div className="step-num">3</div>
+              <div className="step-body">
+                <h3 className="step-title">Você só <em>atende e cresce</em></h3>
+                <p className="step-desc">Acompanhe resultados, fidelize clientes e tome decisões com dados reais. A nera cuida da operação. Você cuida da arte.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURES */}
+      <section id="features">
+        <div className="wrap">
+          <div className="features-header">
+            <span className="label section-eyebrow-terra reveal">Funcionalidades</span>
+            <h2 className="features-h2 reveal">
+              Tudo que você precisa.<br/>
+              <em>Nada que não usa.</em>
+            </h2>
+            <p className="features-intro reveal">Chega de agenda no papel, lembrete no WhatsApp manual e planilha no celular. A Nera centraliza tudo para que você pense só no que importa: atender bem.</p>
+          </div>
+        </div>
+        <div className="features-grid reveal">
+          <div className="feat-card">
+            <div className="feat-icon">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            </div>
+            <h3 className="feat-title">Agenda inteligente</h3>
+            <p className="feat-desc">Sua cliente agenda pelo seu link, 24h por dia. Sem vai-e-vem, sem erro humano. Você define os horários, a nera faz o resto.</p>
+          </div>
+          <div className="feat-card">
+            <div className="feat-icon">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </div>
+            <h3 className="feat-title">Confirmação automática</h3>
+            <p className="feat-desc">Lembrete 24h antes via WhatsApp com sua identidade. Falta virou exceção — não regra.</p>
+          </div>
+          <div className="feat-card">
+            <div className="feat-icon">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+            </div>
+            <h3 className="feat-title">Vitrine digital</h3>
+            <p className="feat-desc">Sua página que trabalha enquanto você atende. Bonita, rápida e personalizada — pronta para compartilhar em qualquer lugar.</p>
+          </div>
+          <div className="feat-card">
+            <div className="feat-icon">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <h3 className="feat-title">Relatório financeiro</h3>
+            <p className="feat-desc">Saiba exatamente quanto entrou, quanto escapou em faltas e para onde crescer. Sem planilha, sem susto no fim do mês.</p>
+          </div>
+          <div className="feat-card">
+            <div className="feat-icon">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            </div>
+            <h3 className="feat-title">Histórico de clientes</h3>
+            <p className="feat-desc">Quem atendeu, quando, o quê. Fidelize com contexto — e nunca mais esqueça quem é quem.</p>
+          </div>
+          <div className="feat-card">
+            <div className="feat-icon">
+              <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+            <h3 className="feat-title">Cupons e indicações</h3>
+            <p className="feat-desc">Programe promoções e premie quem te indica. Crescimento por referência, automático e sem esforço.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* FOR WHO */}
+      <section id="forwho">
+        <div className="wrap">
+          <div className="forwho-inner">
+            <div>
+              <span className="label section-eyebrow-light reveal">Para quem é a nera</span>
+              <h2 className="forwho-h2 reveal">
+                Feita para quem<br/>
+                leva o próprio<br/>
+                negócio <em>a sério.</em>
+              </h2>
+              <p className="forwho-sub reveal">Profissionais autônomas de beleza que atendem em domicílio ou em estúdio próprio e querem parar de perder tempo com gestão manual.</p>
+            </div>
+            <div className="professions reveal">
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Nail designer</span></div>
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Cabeleireira</span></div>
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Esteticista</span></div>
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Maquiadora</span></div>
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Podóloga</span></div>
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Depiladora</span></div>
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Sobrancelhista</span></div>
+              <div className="prof-item"><div className="prof-dot"></div><span className="prof-name">Massagista</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* TESTIMONIALS */}
+      <section id="testimonials">
+        <div className="wrap">
+          <span className="label test-eyebrow reveal">O que dizem as profissionais</span>
+          <h2 className="test-h2 reveal">
+            Reputação que<br/>
+            <em>converte.</em>
+          </h2>
+          <div className="testimonials-grid reveal">
+            <div className="test-card dark">
+              <div className="stars">
+                <span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span>
+              </div>
+              <p className="test-quote">"Minha página ficou com cara de marca grande. Minhas clientes amaram a facilidade de agendar sozinhas — e eu parei de perder tempo no WhatsApp."</p>
+              <div className="test-author-block">
+                <div className="test-avatar">K</div>
+                <div className="test-author-info">
+                  <div className="test-author-name">Karina M.</div>
+                  <div className="test-author-role">Nail Designer · São Paulo</div>
+                </div>
+              </div>
+            </div>
+            <div className="test-card light">
+              <div className="stars">
+                <span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span>
+              </div>
+              <p className="test-quote">"A nera me deu uma coisa que dinheiro não compra: tempo de qualidade com minha família. Meu negócio roda mesmo quando desligo o celular."</p>
+              <div className="test-author-block">
+                <div className="test-avatar">J</div>
+                <div className="test-author-info">
+                  <div className="test-author-name">Juliana F.</div>
+                  <div className="test-author-role">Esteticista · Belo Horizonte</div>
+                </div>
+              </div>
+            </div>
+            <div className="test-card dark" style={{ gridColumn: '1 / -1' }}>
+              <div className="stars">
+                <span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span>
+              </div>
+              <p className="test-quote" style={{ maxWidth: '680px' }}>"Parece que alguém está cuidando da minha agenda enquanto eu atendo. As clientes recebem as informações certas, os horários ficam claros e eu não termino o dia tentando lembrar o que esqueci."</p>
+              <div className="test-author-block">
+                <div className="test-avatar">B</div>
+                <div className="test-author-info">
+                  <div className="test-author-name">Bianca Rocha</div>
+                  <div className="test-author-role">Esteticista · Rio de Janeiro</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="pricing">
+        <div className="wrap" style={{ paddingBottom: 0 }}>
+          <span className="label section-eyebrow-terra reveal">Planos</span>
+          <h2 className="pricing-h2 reveal">O investimento<br/><em>certo para você.</em></h2>
+          <p className="pricing-sub reveal">Sem contrato de fidelidade. Cancele quando quiser.</p>
+        </div>
+        <div className="plans-grid reveal" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 48px' }}>
+
+          {/* FREE */}
+          <div className="plan-card free">
+            <div className="plan-tier">Gratuito</div>
+            <div className="plan-price">R$&nbsp;0</div>
+            <div className="plan-period">para sempre</div>
+            <p className="plan-tagline">Para começar, sentir a diferença e nunca mais voltar atrás.</p>
+            <ul className="plan-features">
+              <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium (foto, bio e serviços)</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Até 15 agendamentos por mês</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Aprovação manual (seu filtro)</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Link direto para bio</li>
+            </ul>
+            <Link to="/register" className="btn-plan outline">Criar conta grátis</Link>
+          </div>
+
+          {/* ESSENTIAL */}
+          <div className="plan-card essential">
+            <div className="plan-tier">Essencial</div>
+            <div className="plan-price">R$&nbsp;49</div>
+            <div className="plan-period">por mês · cancele quando quiser</div>
+            <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)' }}>&nbsp;</p>
+            <ul className="plan-features">
+              <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos ilimitados</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Notificações WhatsApp</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio de horários</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Lembrete automático 24h para reduzir faltas</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Histórico de clientes</li>
+            </ul>
+            <Link to="/register?plan=essencial" className="btn-plan white-solid">Testar Essencial por 15 dias</Link>
+          </div>
+
+          {/* PRO */}
+          <div className="plan-card pro">
+            <div className="plan-badge">Recomendado para quem quer crescer</div>
+            <div className="plan-tier">Plano Pro</div>
+            <div className="plan-price">R$&nbsp;89</div>
+            <div className="plan-period">por mês · ferramentas completas para crescer mais rápido</div>
+            <p className="plan-tagline">&nbsp;</p>
+            <ul className="plan-features">
+              <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial, com recursos para crescer mais rápido</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente para preencher horários vagos automaticamente</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Cupons de desconto</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Relatório mensal em PDF</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Link de indicação premiado</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Badge Pro Nera na vitrine</li>
+              <li className="plan-feat"><span className="feat-bullet"></span>Suporte prioritário</li>
+            </ul>
+            <Link to="/register?plan=pro" className="btn-plan terra-solid">Começar como Pro</Link>
+          </div>
+
+        </div>
+      </section>
+
+      {/* FINAL CTA */}
+      <section id="cta">
+        <div className="cta-bg-n"><span>n</span></div>
+        <div className="cta-inner">
+          <span className="cta-label reveal">Sua próxima cliente</span>
+          <h2 className="cta-h2 reveal">
+            pode te<br/>
+            encontrar<br/>
+            <em>agora mesmo.</em>
+          </h2>
+          <p className="cta-sub reveal">
+            Menos tempo no WhatsApp.<br/>
+            Mais tempo fazendo o que faz você ser lembrada.
+          </p>
+          <Link to="/register" className="btn-cta-main reveal">
+            <span>Começar minha agenda</span>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </Link>
+          <p className="cta-fine reveal">Setup em poucos minutos · cobrança mensal simples · cancele quando quiser</p>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer>
+        <div className="footer-inner">
+          <div>
+            <a href="#" className="logo">
+              <div className="logo-mark" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <svg width="22" height="22" viewBox="0 0 36 36" fill="none">
+                  <path d="M10 26V10L26 26V10" stroke="rgba(253,250,247,0.7)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  <circle cx="28" cy="28" r="3.5" fill="#C47250"/>
+                </svg>
+              </div>
+              <span className="logo-text" style={{ color: 'rgba(253,250,247,0.75)' }}>nera</span>
+            </a>
+            <p className="footer-brand-desc">Plataforma de agendamento para profissionais de beleza que levam o próprio negócio a sério.</p>
+          </div>
+          <div>
+            <div className="footer-col-title">Plataforma</div>
+            <div className="footer-links">
+              <a href="#how" className="footer-link">Como funciona</a>
+              <a href="#features" className="footer-link">Funcionalidades</a>
+              <a href="#pricing" className="footer-link">Planos e preços</a>
+              <Link to="/profissionais" className="footer-link">Diretório</Link>
+            </div>
+          </div>
+          <div>
+            <div className="footer-col-title">Legal</div>
+            <div className="footer-links">
+              <a href="#" className="footer-link">Privacidade</a>
+              <a href="#" className="footer-link">Termos de uso</a>
+              <a href="#" className="footer-link">Suporte</a>
+              <a href="#" className="footer-link">Instagram</a>
+            </div>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span className="footer-copy">© 2026 nera · Feito com intenção no Brasil 🇧🇷</span>
+          <span className="footer-copy">Para profissionais que valorizam excelência</span>
         </div>
       </footer>
     </div>

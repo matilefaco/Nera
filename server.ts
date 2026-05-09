@@ -33,6 +33,8 @@ function isAllowedOrigin(origin?: string): boolean {
   if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
   
   if (process.env.CLOUD_RUN_PUBLIC_URL && origin === process.env.CLOUD_RUN_PUBLIC_URL) return true;
+  
+  if (origin.endsWith('.run.app')) return true;
 
   return false;
 }
