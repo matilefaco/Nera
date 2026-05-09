@@ -34,7 +34,8 @@ function isAllowedOrigin(origin?: string): boolean {
   
   if (process.env.CLOUD_RUN_PUBLIC_URL && origin === process.env.CLOUD_RUN_PUBLIC_URL) return true;
   
-  if (origin.endsWith('.run.app')) return true;
+  const isAiStudioPreviewOrigin = /^https:\/\/ais-(dev|pre)-[a-z0-9-]+\.run\.app$/.test(origin);
+  if (isAiStudioPreviewOrigin) return true;
 
   return false;
 }
