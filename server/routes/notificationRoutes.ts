@@ -125,6 +125,7 @@ import {
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
+import { authMutationLimiter } from "../middleware/rateLimiter.js";
 
 
 // Tokens públicos de acesso precisam ser criptograficamente seguros. Não usar Math.random.
@@ -430,7 +431,7 @@ router.post("/push/subscribe", async (req, res) => {
   }
 });
 
-router.post("/notify", requireFirebaseAuth, checkPlanFeature('whatsappNotifications'), async (req, res) => {
+router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeature('whatsappNotifications'), async (req, res) => {
   const authReq = req as AuthenticatedRequest;
   const uid = authReq.uid;
 

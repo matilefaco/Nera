@@ -1,4 +1,4 @@
-import { bookingRateLimiter } from "../middleware/rateLimiter.js";
+import { bookingRateLimiter, reviewSubmitLimiter } from "../middleware/rateLimiter.js";
 import express from "express";
 import { randomBytes } from "crypto";
 import admin from "firebase-admin";
@@ -539,7 +539,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 });
 
 // --- NEW: PUBLIC ENDPOINT TO SUBMIT REVIEW ---
-router.post("/public/reviews/:token/submit", async (req, res) => {
+router.post("/public/reviews/:token/submit", reviewSubmitLimiter, async (req, res) => {
   const db = getDb();
   const { token } = req.params;
   const { 
