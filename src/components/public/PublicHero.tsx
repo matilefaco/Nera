@@ -210,56 +210,63 @@ export const PublicHero = ({
           </div>
 
           {nextSlot ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 relative z-20">
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="inline-flex items-center gap-3 bg-brand-white border border-brand-mist px-5 py-3 rounded-full shadow-sm w-fit"
+                className="inline-flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 bg-brand-white border border-brand-mist px-5 py-3.5 rounded-2xl md:rounded-full shadow-sm w-fit group"
               >
-                <div className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary,var(--color-brand-terracotta))] animate-pulse" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-ink">
-                  Próxima vaga: <span className="text-[var(--theme-primary,var(--color-brand-terracotta))]">
-                    {(() => {
-                      const today = getLocalDateStr();
-                      const tomorrowDate = new Date();
-                      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
-                      const tomorrow = getLocalDateStr(tomorrowDate);
-                      
-                      if (nextSlot.date === today) return `hoje às ${nextSlot.time}`;
-                      if (nextSlot.date === tomorrow) return `amanhã às ${nextSlot.time}`;
-                      
-                      const dateObj = parseLocalDate(nextSlot.date);
-                      const weekDay = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-')[0].split(',')[0];
-                      const day = String(dateObj.getDate()).padStart(2, '0');
-                      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-                      
-                      return `${weekDay}, ${day}/${month} às ${nextSlot.time}`;
-                    })()}
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary,var(--color-brand-terracotta))] animate-pulse" />
+                  <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
+                    Próximo horário disponível
                   </span>
+                </div>
+                <div className="hidden md:block w-px h-3 bg-brand-mist" />
+                <span className="text-sm font-serif text-[var(--theme-primary,var(--color-brand-terracotta))] pl-3.5 md:pl-0">
+                  {(() => {
+                    const today = getLocalDateStr();
+                    const tomorrowDate = new Date();
+                    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+                    const tomorrow = getLocalDateStr(tomorrowDate);
+                    
+                    if (nextSlot.date === today) return `Hoje às ${nextSlot.time}`;
+                    if (nextSlot.date === tomorrow) return `Amanhã às ${nextSlot.time}`;
+                    
+                    const dateObj = parseLocalDate(nextSlot.date);
+                    const weekDay = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-')[0].split(',')[0];
+                    const day = String(dateObj.getDate()).padStart(2, '0');
+                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                    
+                    return `${weekDay.charAt(0).toUpperCase() + weekDay.slice(1)} às ${nextSlot.time}`;
+                  })()}
                 </span>
               </motion.div>
             </div>
           ) : isAgendaFull ? (
-            hasWaitlistFeature ? (
-              <div className="inline-flex items-center gap-3 bg-brand-linen border border-brand-terracotta/20 px-5 py-3 rounded-full shadow-sm">
-                <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/40" />
-                <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
-                  Alta procura no momento • <span className="text-brand-terracotta">Novos horários em breve</span>
-                </span>
-              </div>
-            ) : (
-              <div className="inline-flex flex-col md:flex-row md:items-center gap-3 bg-brand-linen border border-brand-mist px-5 py-3 rounded-2xl md:rounded-full shadow-sm max-w-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/40 shrink-0" />
-                  <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
-                    Não há horários disponíveis
+            <div className="flex flex-col gap-2 relative z-20">
+              {hasWaitlistFeature ? (
+                <div className="inline-flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 bg-brand-linen border border-[var(--theme-primary,var(--color-brand-terracotta))]/20 px-5 py-3.5 rounded-2xl md:rounded-full shadow-sm w-fit">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary,var(--color-brand-terracotta))]/40" />
+                    <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
+                      Sem horários disponíveis no momento
+                    </span>
+                  </div>
+                  <div className="hidden md:block w-px h-3 bg-[var(--theme-primary,var(--color-brand-terracotta))]/20" />
+                  <span className="text-sm font-serif text-[var(--theme-primary,var(--color-brand-terracotta))] pl-3.5 md:pl-0">
+                    Lista de espera aberta
                   </span>
                 </div>
-                <span className="text-[9px] text-brand-stone/60 leading-tight">
-                  Escolha outra data ou fale diretamente com a profissional.
-                </span>
-              </div>
-            )
+              ) : (
+                <div className="inline-flex items-center gap-2 bg-brand-linen border border-brand-mist px-5 py-3.5 rounded-full shadow-sm w-fit">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--theme-primary,var(--color-brand-terracotta))]/40 shrink-0" />
+                  <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-brand-stone">
+                    Sem horários disponíveis no momento
+                  </span>
+                </div>
+              )}
+            </div>
           ) : null}
 
           <p className="body-text text-brand-stone max-w-sm">
