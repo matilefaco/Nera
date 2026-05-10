@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { isRevenueStatus, isCancelledStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { db, updateClientSummaryFromAppointment } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { 
   Users, Search, MessageCircle, 
   TrendingUp, Calendar, ChevronRight, Star,
@@ -42,6 +42,24 @@ export default function ClientsPage() {
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isMigrating, setIsMigrating] = useState(false);
+  const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
+
+  const handleUpdateNotes = async (clientId: string, newNotes: string) => {
+    if (!user || clientId.startsWith('derived_')) {
+      if (clientId.startsWith('derived_')) {
+        notify.info('Este é um cliente derivado de agendamentos antigos e não possui cadastro completo para notas.');
+      }
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'client_summaries', clientId), { notes: newNotes });
+      setClients(prev => prev.map(c => c.id === clientId ? { ...c, notes: newNotes } : c));
+      notify.success('Notas salvas com sucesso');
+    } catch (err) {
+      console.error('Error updating notes', err);
+      notify.error('Erro ao salvar notas.');
+    }
+  };
 
   const uniqueServices = useMemo(() => {
     const s = new Set<string>();
@@ -687,9 +705,13 @@ export default function ClientsPage() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(idx * 0.02, 0.5) }}
-                  className="bg-brand-white p-5 md:p-6 rounded-[32px] border border-brand-mist flex items-center justify-between hover:border-brand-stone transition-all shadow-sm group"
+                  className="bg-brand-white p-5 md:p-6 rounded-[32px] border border-brand-mist flex flex-col gap-4 hover:border-brand-stone transition-all shadow-sm group"
                 >
-                  <div className="flex items-center gap-4 md:gap-6 overflow-hidden">
+                  <div className="flex items-center justify-between w-full">
+                  <div 
+                    className="flex items-center gap-4 md:gap-6 overflow-hidden cursor-pointer flex-1"
+                    onClick={() => setExpandedClientId(expandedClientId === client.id ? null : client.id)}
+                  >
                     <div className="flex-shrink-0 w-14 h-14 rounded-[20px] bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-mist">
                       <span className="font-serif text-xl">{client.clientName?.[0] || 'C'}</span>
                     </div>
@@ -740,7 +762,7 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {(() => {
                       const isInactive = getDaysSinceLastVisit(client.lastAppointmentDate) >= 30;
                       const hasPhone = !!client.clientPhone && client.clientPhone.length >= 10;
@@ -777,6 +799,29 @@ export default function ClientsPage() {
                       );
                     })()}
                   </div>
+                  </div>
+
+                  {expandedClientId === client.id && (
+                    <div className="mt-2 pt-4 border-t border-brand-mist animate-in slide-in-from-top-2 fade-in duration-200">
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-2">
+                        Notas privadas
+                      </label>
+                      <textarea
+                        defaultValue={client.notes || ''}
+                        onBlur={(e) => {
+                          const currentNotes = client.notes || '';
+                          if (e.target.value !== currentNotes) {
+                            handleUpdateNotes(client.id, e.target.value);
+                          }
+                        }}
+                        placeholder="Ex: alérgica a produto X, prefere manhã, aniversário em março..."
+                        className="w-full bg-brand-linen/30 border border-brand-mist rounded-xl p-3 text-sm text-brand-ink placeholder:text-brand-stone/40 focus:outline-none focus:border-brand-stone focus:ring-1 focus:ring-brand-stone min-h-[80px] resize-y"
+                      />
+                      <span className="text-[9px] text-brand-stone/60 italic mt-1.5 block">
+                        Visível apenas para você. Salvo automaticamente ao sair do campo.
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               ))}
               
