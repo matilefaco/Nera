@@ -247,7 +247,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       if (bookingCountOfMonth >= 15) {
         logger.warn("BOOKING", `Booking limit reached for free plan`, { professionalId: maskUid(professionalId), meta: { currentCount: bookingCountOfMonth } });
         return res.status(403).json({
-          error: "Esta profissional atingiu o limite de agendamentos do mês. Entre em contato com ela para agendar.",
+          error: "A agenda desta profissional já está lotada para este mês ✨ Entre em contato diretamente com ela para verificar possibilidades de encaixe.",
           code: "BOOKING_LIMIT_REACHED"
         });
       }

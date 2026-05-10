@@ -837,6 +837,27 @@ setWaitlist(docs);
           </motion.div>
         )}
 
+        {/* Soft Upgrade CTA for Free Plan */}
+        {plan === 'free' && usageCount >= 10 && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-brand-linen/50 border border-brand-mist p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm"
+          >
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Sucesso na Agenda</p>
+              <h2 className="text-xl font-serif text-brand-ink mb-1">Você recebeu {usageCount} reservas este mês.</h2>
+              <p className="text-sm text-brand-stone/80">Profissionais em crescimento normalmente migram para o Essencial para continuar recebendo reservas ilimitadas.</p>
+            </div>
+            <Link 
+              to="/planos" 
+              className="px-6 py-3 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-stone transition-all shrink-0 text-center"
+            >
+              Ver Planos
+            </Link>
+          </motion.div>
+        )}
+
         {/* Missing Service Duration Banner */}
         {services.some(s => !s.duration) && (
           <motion.div 
