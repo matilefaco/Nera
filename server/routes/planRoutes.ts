@@ -118,7 +118,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
 /**
  * STRIPE WEBHOOK
  */
-router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+router.post("/webhook", async (req, res) => {
   const db = getDb();
   const stripe = getStripe();
   const sig = req.headers["stripe-signature"];
@@ -131,8 +131,11 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
     return res.status(400).send('Webhook Error: Missing verification details');
   }
 
+  // Use req.rawBody in Firebase Functions, otherwise req.body from express.raw()
+  const payload = (req as any).rawBody || req.body;
+
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    event = stripe.webhooks.constructEvent(payload, sig, webhookSecret);
   } catch (err: any) {
     logger.error("STRIPE", "Verification failed", { requestId: req.requestId, error: err });
     return res.status(400).send(`Webhook Error: ${err.message}`);

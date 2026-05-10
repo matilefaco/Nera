@@ -90,10 +90,18 @@ export async function createServerApp() {
     next();
   });
 
-  // 3. Skip express.json for Stripe Webhook
+  // 3. Body Parsing Middleware
+  // Firebase Functions v2 automatically parses the body into req.body and req.rawBody.
+  // To prevent 'stream is not readable' errors, we mock '_body = true' so express.json skips reading the stream.
   app.use((req, res, next) => {
-    if (req.originalUrl === "/api/plans/webhook") {
-      next();
+    const isFirebaseParser = (req as any).rawBody !== undefined;
+    
+    if (isFirebaseParser) {
+      (req as any)._body = true;
+    }
+
+    if (req.originalUrl.includes("/api/plans/webhook") || req.path.includes("/api/plans/webhook")) {
+      express.raw({ type: "application/json" })(req, res, next);
     } else {
       express.json()(req, res, next);
     }
