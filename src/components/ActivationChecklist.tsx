@@ -5,7 +5,6 @@ import {
   Camera, FileText, Settings, Calendar, Share2, Star, Sparkles, X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import confetti from 'canvas-confetti';
 import { UserProfile, Appointment, Service } from '../types';
 import { cn } from '../lib/utils';
 
@@ -35,30 +34,13 @@ export const ActivationChecklist = ({
   const [isMinimized, setIsMinimized] = useState(() => {
     return localStorage.getItem('nera_checklist_minimized') === 'true';
   });
-  const [isFullyComplete, setIsFullyComplete] = useState(false);
-  const [shouldDestroy, setShouldDestroy] = useState(false);
+  const [wowDismissed, setWowDismissed] = useState(() => {
+    return localStorage.getItem('nera_wow_celebrated') === 'true';
+  });
+  const [copied, setCopied] = useState(false);
   const [hasShared, setHasShared] = useState(() => {
     return localStorage.getItem('nera_link_shared') === 'true';
   });
-
-  // Profile completeness logic from ProfilePage.tsx
-  const profileCompleteness = useMemo(() => {
-    if (!profile) return 0;
-    const fields = [
-      !!profile.avatar,
-      !!profile.bio,
-      !!profile.headline,
-      !!profile.instagram,
-      (profile.portfolio?.length || 0) >= 3,
-      (profile.professionalIdentity?.differentials?.length || 0) >= 2,
-      !!profile.professionalIdentity?.yearsExperience,
-      !!profile.studioAddress?.street || (profile.serviceAreas?.length || 0) > 0,
-    ];
-    const pts = [15,15,10,10,20,10,10,10];
-    let total = 0;
-    fields.forEach((f, i) => { if (f) total += pts[i]; });
-    return total;
-  }, [profile]);
 
   const steps: Step[] = [
     {
@@ -117,32 +99,73 @@ export const ActivationChecklist = ({
   const completedSteps = steps.filter(s => s.isComplete).length;
   const checklistProgress = (completedSteps / steps.length) * 100;
 
-  useEffect(() => {
-    if (completedSteps === steps.length && !isFullyComplete) {
-      setIsFullyComplete(true);
-      confetti({
-        particleCount: 150,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#A85C3A', '#C47A5A', '#E2D1C3']
-      });
-      
-      const timer = setTimeout(() => {
-        setShouldDestroy(true);
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [completedSteps, steps.length, isFullyComplete]);
-
   const toggleMinimize = () => {
     const newState = !isMinimized;
     setIsMinimized(newState);
     localStorage.setItem('nera_checklist_minimized', String(newState));
   };
 
-  if (profileCompleteness === 100 && !isFullyComplete) return null;
-  if (shouldDestroy) return null;
+  const handleDismissWow = () => {
+    setWowDismissed(true);
+    localStorage.setItem('nera_wow_celebrated', 'true');
+  };
+
+  const handleCopy = () => {
+    const profileUrl = `${window.location.origin}/p/${profile?.slug}`;
+    navigator.clipboard.writeText(profileUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (checklistProgress === 100) {
+    if (wowDismissed) return null;
+
+    return (
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-brand-parchment rounded-[32px] border border-brand-mist p-8 shadow-sm relative overflow-hidden"
+      >
+        <button 
+          onClick={handleDismissWow}
+          className="absolute top-6 right-6 p-2 text-brand-stone hover:bg-brand-linen rounded-full transition-colors"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="flex flex-col items-center text-center max-w-sm mx-auto">
+          <div className="w-12 h-12 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta mb-6">
+            <Sparkles size={24} />
+          </div>
+          
+          <h3 className="text-2xl font-serif text-brand-ink mb-2">
+            A beleza da sua nova vitrine ✨
+          </h3>
+          <p className="text-base text-brand-stone font-light mb-8 leading-relaxed">
+            Sua agenda online Nera está pronta para receber clientes. Comece compartilhando seu link oficial com suas clientes de maior confiança.
+          </p>
+
+          <div className="w-full flex justify-center gap-3 flex-col sm:flex-row">
+            <button 
+              onClick={handleCopy}
+              className="px-6 py-4 bg-brand-ink text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-stone transition-all flex items-center justify-center gap-2 flex-1"
+            >
+              {copied ? 'Copiado!' : 'Copiar link oficial'}
+            </button>
+            <a 
+              href={`/p/${profile?.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-4 bg-brand-white border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-2 flex-1 text-center"
+            >
+              Ver minha vitrine
+            </a>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 
