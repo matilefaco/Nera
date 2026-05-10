@@ -1705,68 +1705,122 @@ setWaitlist(docs);
 
                   {/* Retention Status */}
                   <div className="flex flex-col gap-4 border-t border-brand-linen pt-6">
-                    {inactiveClientsCount > 0 ? (
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Clientes há +30 dias sem voltar</p>
-                            <p className="text-[11px] text-brand-stone italic">{inactiveClientsCount} {inactiveClientsCount === 1 ? 'pronta' : 'prontas'} para retorno</p>
-                          </div>
-                          <Link to="/clients" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver todas</Link>
-                        </div>
+                    {(() => {
+                      // Calculate the qualified insight
+                      let insight = null;
+                      
+                      const qualifiedClient = inactiveClients.find(c => {
+                        if ((c.confirmedAppointments || 0) < 3) return false;
+                        if (!c.firstAppointmentDate || !c.lastAppointmentDate || !c.clientName) return false;
                         
-                        <div className="space-y-2">
-                          {inactiveClients.slice(0, 2).map((client, idx) => (
-                            <div key={idx} className="bg-brand-parchment/10 p-4 rounded-2xl border border-brand-mist flex items-center justify-between gap-4">
-                              <div className="flex-1">
-                                <p className="text-[11px] font-bold text-brand-ink">{client.clientName || client.name}</p>
-                                <p className="text-[9px] text-brand-stone italic">Não volta desde {safeDateLabel(client.lastDate)}</p>
-                              </div>
-                              {idx === 0 && (client.clientWhatsapp || client.whatsapp) && (
-                                <button 
-                                  onClick={() => {
-                                    const firstName = safeString(client.clientName || client.name, 'Cliente').split(' ')[0];
-                                    const msg = `Oi ${firstName} ✨ Saudades! Notamos que faz um tempinho que você não vem nos visitar. Que tal garantir um horário agora?`;
-                                    window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || '', msg), '_blank');
-                                  }}
-                                  className="bg-[#25D366] text-white p-2 rounded-lg hover:scale-105 transition-transform"
-                                  title="Enviar mensagem"
-                                >
-                                  <MessageCircle size={14} />
-                                </button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                        const first = new Date(c.firstAppointmentDate);
+                        const last = new Date(c.lastAppointmentDate);
+                        if (isNaN(first.getTime()) || isNaN(last.getTime())) return false;
+                        
+                        const diffTime = Math.abs(last.getTime() - first.getTime());
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        if (diffDays <= 0) return false;
+                        
+                        const avgFreq = Math.round(diffDays / ((c.confirmedAppointments || 3) - 1));
+                        return avgFreq >= 5 && avgFreq <= 90;
+                      });
 
-                        <div className="flex gap-2">
-                          <Link 
-                            to="/clients" 
-                            className="flex-1 py-3 bg-brand-linen text-brand-ink rounded-xl text-[9px] font-bold uppercase tracking-widest text-center hover:bg-brand-mist transition-colors"
-                          >
-                            Ver clientes
-                          </Link>
-                          {inactiveClients.length > 0 && (inactiveClients[0].clientWhatsapp || inactiveClients[0].whatsapp) && (
-                            <button 
-                              onClick={() => {
-                                const client = inactiveClients[0];
-                                const firstName = safeString(client.clientName || client.name, 'Cliente').split(' ')[0];
-                                const msg = `Oi ${firstName} ✨ Saudades! Notamos que faz um tempinho que você não vem nos visitar. Que tal garantir um horário agora?`;
-                                window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || '', msg), '_blank');
-                              }}
-                              className="flex-1 py-3 bg-brand-ink text-brand-white rounded-xl text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-colors"
-                            >
-                              Enviar mensagem
-                            </button>
-                          )}
+                      if (qualifiedClient) {
+                        const first = new Date(qualifiedClient.firstAppointmentDate);
+                        const last = new Date(qualifiedClient.lastAppointmentDate);
+                        const diffTime = Math.abs(last.getTime() - first.getTime());
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        const avgFreq = Math.round(diffDays / ((qualifiedClient.confirmedAppointments || 3) - 1));
+                        
+                        const today = new Date();
+                        const timeSinceLast = Math.abs(today.getTime() - last.getTime());
+                        const daysSinceLast = Math.ceil(timeSinceLast / (1000 * 60 * 60 * 24));
+                        
+                        const firstName = safeString(qualifiedClient.clientName, 'Cliente').split(' ')[0];
+                        const whatsappInfo = qualifiedClient.clientWhatsapp || qualifiedClient.clientPhone || '';
+                        
+                        insight = {
+                          firstName,
+                          avgFreq,
+                          daysSinceLast,
+                          whatsappInfo
+                        };
+                      }
+
+                      if (insight) {
+                        return (
+                          <div className="bg-brand-parchment/30 rounded-3xl border border-brand-mist/50 p-6 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                              <Heart size={48} className="text-brand-terracotta" />
+                            </div>
+                            
+                            <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest mb-4">Cuidado com a sua clientela</p>
+                            
+                            <blockquote className="text-sm font-serif text-brand-stone italic leading-relaxed mb-6">
+                              "{insight.firstName} costumava voltar aproximadamente a cada {insight.avgFreq} dias. 
+                              Já faz {insight.daysSinceLast} dias desde sua última visita. 
+                              Talvez seja um ótimo momento para retomar esse contato."
+                            </blockquote>
+
+                            {insight.whatsappInfo && (
+                              <button 
+                                onClick={() => {
+                                  // Abre explicitamente sem mensagem automática, apenas o número
+                                  window.open(buildWhatsappLink(insight.whatsappInfo, ''), '_blank');
+                                }}
+                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-white border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors shadow-sm"
+                              >
+                                <MessageCircle size={14} className="text-brand-terracotta" />
+                                Abrir WhatsApp
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      if (inactiveClientsCount > 0) {
+                        return (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Clientes há +30 dias sem voltar</p>
+                                <p className="text-[11px] text-brand-stone italic">{inactiveClientsCount} {inactiveClientsCount === 1 ? 'pronta' : 'prontas'} para retorno</p>
+                              </div>
+                              <Link to="/clients" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver todas</Link>
+                            </div>
+                            
+                            <div className="space-y-2">
+                              {inactiveClients.slice(0, 2).map((client, idx) => (
+                                <div key={idx} className="bg-brand-parchment/10 p-4 rounded-2xl border border-brand-mist flex items-center justify-between gap-4">
+                                  <div className="flex-1">
+                                    <p className="text-[11px] font-bold text-brand-ink">{client.clientName || client.name}</p>
+                                    <p className="text-[9px] text-brand-stone italic">Não volta desde {safeDateLabel(client.lastDate || client.lastAppointmentDate)}</p>
+                                  </div>
+                                  {idx === 0 && (client.clientWhatsapp || client.whatsapp || client.clientPhone) && (
+                                    <button 
+                                      onClick={() => {
+                                        window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || client.clientPhone || '', ''), '_blank');
+                                      }}
+                                      className="bg-brand-white border border-brand-mist text-brand-ink p-2.5 rounded-full hover:bg-brand-linen transition-colors shadow-sm"
+                                      title="Abrir WhatsApp"
+                                    >
+                                      <MessageCircle size={14} className="text-brand-terracotta" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Retenção: ok</span>
+                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
                         </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Retenção: ok</span>
-                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
 
                   {!(waitlist && waitlist.length > 0) && !(blockedSchedules && blockedSchedules.length > 0) && inactiveClientsCount === 0 && (
