@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskEmail, maskPhone, maskToken, maskUid } from "../utils/logger.js";
-import { sendBookingConfirmedEmail } from "../emails/sendEmail.js";
+import { sendBookingConfirmedEmail, sendDigitalReceiptEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
@@ -1194,10 +1194,46 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
       const updatedData = { ...data, ...safeUpdate };
       await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
 
-      return { success: true, appointmentId, status: "completed" };
+      return { success: true, appointmentId, status: "completed", updatedData };
     });
 
-    return res.json(result);
+    // -------------------------------------------------------------
+    // Post-Transaction Async Tasks
+    // -------------------------------------------------------------
+    const updatedData = result.updatedData;
+
+    try {
+      if (updatedData && updatedData.clientEmail) {
+        let slug = '';
+        try {
+          const userDoc = await db.collection('users').doc(updatedData.professionalId).get();
+          if (userDoc.exists) {
+            slug = userDoc.data()?.slug || '';
+          }
+        } catch (e) {
+          logger.warn("BOOKING", "Failed to fetch professional slug for digital receipt", { error: e });
+        }
+
+        sendDigitalReceiptEmail({
+          clientEmail: updatedData.clientEmail,
+          clientName: updatedData.clientName,
+          professionalName: updatedData.professionalName || updatedData.serviceName, // fallback
+          appointmentId: updatedData.id || appointmentId,
+          serviceName: updatedData.serviceName,
+          date: updatedData.date,
+          time: updatedData.time,
+          totalPrice: updatedData.totalPrice,
+          price: updatedData.price,
+          slug
+        }).catch(e => {
+          logger.error("BOOKING", "Failed to send digital receipt email after completion", { error: e });
+        });
+      }
+    } catch (postError) {
+      logger.error("BOOKING", "Post-completion email error", { error: postError });
+    }
+
+    return res.json({ success: result.success, appointmentId: result.appointmentId, status: result.status });
 
   } catch (err: any) {
     logger.error("BOOKING", "Complete endpoint error", { error: err });
