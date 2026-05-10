@@ -5,11 +5,14 @@ export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
   return async (req: any, res: any, next: any) => {
     const db = getDb();
     // Identifying professionalId from different possible places
-    const professionalId = req.uid || 
-                           req.headers['x-professional-id'] || 
-                           req.body?.professionalId || 
-                           req.body?.payload?.professionalId || 
-                           req.query?.professionalId;
+    // If req.uid exists, use it exclusively and ignore spoofed body/header values.
+    let professionalId = req.uid;
+    if (!professionalId) {
+      professionalId = req.headers['x-professional-id'] || 
+                       req.body?.professionalId || 
+                       req.body?.payload?.professionalId || 
+                       req.query?.professionalId;
+    }
     
     if (!professionalId) {
       return res.status(401).json({

@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskEmail, maskPhone, maskToken, maskUid } from "../utils/logger.js";
+import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { 
   sendProfessionalNewBookingEmail,
   sendBookingPendingEmail,
@@ -429,9 +430,21 @@ router.post("/push/subscribe", async (req, res) => {
   }
 });
 
-router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, res) => {
+router.post("/notify", requireFirebaseAuth, checkPlanFeature('whatsappNotifications'), async (req, res) => {
+  const authReq = req as AuthenticatedRequest;
+  const uid = authReq.uid;
+
   const db = getDb();
   const { type, payload } = req.body;
+
+  if (payload && payload.professionalId && payload.professionalId !== uid) {
+    return res.status(403).json({ error: 'Acesso negado' });
+  }
+
+  if (payload) {
+    payload.professionalId = uid;
+  }
+
   const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
   
   if (type === 'BOOKING_PENDING_CLIENT' || type === 'NEW_BOOKING_REQUEST') {
