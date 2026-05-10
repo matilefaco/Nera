@@ -283,24 +283,35 @@ export default function FinancialPage() {
                     )}
                   </div>
                   
-                  <div className="flex flex-col md:flex-row md:items-end gap-2 md:gap-8">
-                    <div>
-                      <p className="text-4xl md:text-5xl font-serif mb-2">
+                  <div className="flex flex-col md:flex-row md:items-end gap-4 md:gap-6 lg:gap-8">
+                    <div className="flex-1">
+                      <p className="text-4xl lg:text-5xl font-serif mb-2 text-brand-white">
                         {formatCurrency(currentMonthData.current?.revenue || 0)}
                       </p>
                       <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-mist/40">
-                        Total Recebido este mês
+                        Recebido
                       </p>
                     </div>
                     
-                    <div className="h-px md:h-12 w-full md:w-px bg-brand-mist/20" />
+                    <div className="hidden md:block h-px md:h-12 w-full md:w-px bg-brand-mist/20" />
                     
-                    <div>
-                      <p className="text-xl md:text-2xl font-serif text-brand-linen mb-1">
+                    <div className="flex-1">
+                      <p className="text-2xl lg:text-3xl font-serif text-brand-linen mb-1">
                         {formatCurrency(currentMonthData.current?.plannedRevenue || 0)}
                       </p>
                       <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-mist/40">
-                        Receita Prevista
+                        A receber
+                      </p>
+                    </div>
+
+                    <div className="hidden md:block h-px md:h-12 w-full md:w-px bg-brand-mist/20" />
+
+                    <div className="flex-1">
+                      <p className="text-xl lg:text-2xl font-serif text-brand-linen/60 mb-1">
+                        {formatCurrency(currentMonthData.current?.pendingRevenue || 0)}
+                      </p>
+                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-mist/40">
+                        Aguardando confirmação
                       </p>
                     </div>
                   </div>
@@ -412,22 +423,27 @@ export default function FinancialPage() {
                           <span className="text-lg font-serif text-brand-ink">{group.monthLabel}</span>
                         </div>
                         
-                        <div>
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Realizado</span>
+                        <div className="min-w-[120px]">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Recebido</span>
                           <span className="text-sm font-bold text-brand-ink">{formatCurrency(group.revenue)}</span>
                         </div>
                         
-                        <div className="hidden sm:block">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Aprovação</span>
-                          <span className="text-sm font-medium text-brand-stone">{formatCurrency(group.pendingRevenue)}</span>
+                        <div className="hidden sm:block min-w-[100px]">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">A receber</span>
+                          <span className="text-sm font-medium text-brand-stone">{formatCurrency(group.plannedRevenue)}</span>
                         </div>
                         
-                        <div className="hidden md:block">
+                        <div className="hidden md:block min-w-[120px]">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Aguardando</span>
+                          <span className="text-sm font-medium text-brand-stone opacity-80">{formatCurrency(group.pendingRevenue)}</span>
+                        </div>
+                        
+                        <div className="hidden lg:block min-w-[100px]">
                           <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Cancelado</span>
                           <span className="text-sm font-medium text-brand-stone opacity-60">{formatCurrency(group.cancelledRevenue)}</span>
                         </div>
                         
-                        <div className="hidden sm:block">
+                        <div className="hidden xl:block">
                           <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Atendimentos</span>
                           <span className="text-sm font-medium text-brand-stone">{group.appointmentsCount} concluídos</span>
                         </div>
@@ -500,11 +516,16 @@ export default function FinancialPage() {
                                       <td className="py-4 text-right">
                                         <span className={cn(
                                           "px-2.5 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest",
-                                          appt.status === 'completed' ? "bg-green-50 text-green-600 border border-green-100" :
-                                          appt.status === 'confirmed' ? "bg-blue-50 text-blue-600 border border-blue-100" :
+                                          isCompletedStatus(appt.status) ? "bg-green-50 text-green-600 border border-green-100" :
+                                          isConfirmedLikeStatus(appt.status) ? "bg-blue-50 text-blue-600 border border-blue-100" :
+                                          isPendingStatus(appt.status) ? "bg-amber-50 text-amber-600 border border-amber-100" :
+                                          isCancelledStatus(appt.status) ? "bg-red-50 text-red-600 border border-red-100" :
                                           "bg-brand-linen text-brand-stone"
                                         )}>
-                                          {appt.status === 'completed' ? 'Concluído' : appt.status === 'confirmed' ? 'Confirmado' : appt.status}
+                                          {isCompletedStatus(appt.status) ? 'Recebido' : 
+                                           isConfirmedLikeStatus(appt.status) ? 'A receber' : 
+                                           isPendingStatus(appt.status) ? 'Aguardando' : 
+                                           isCancelledStatus(appt.status) ? 'Cancelado' : appt.status}
                                         </span>
                                       </td>
                                     </tr>
