@@ -1276,6 +1276,13 @@ setWaitlist(docs);
         {/* HOJE SIMPLE VIEW */}
         {activeTab === "hoje" && (
           <div className="flex flex-col gap-8">
+            <ActivationChecklist 
+              profile={profile}
+              appointments={appointments}
+              services={services}
+              onShareClick={() => setIsShareModalOpen(true)}
+            />
+
             {/* Notificações Banner */}
             {!isSubscribed && !pushBannerDismissed && (
               <motion.div
@@ -1901,12 +1908,6 @@ setWaitlist(docs);
         {false && activeTab === "geral" && (
           <>
             <div className="flex flex-col gap-8">
-          <ActivationChecklist 
-            profile={profile}
-            appointments={appointments}
-            services={services}
-            onShareClick={() => setIsShareModalOpen(true)}
-          />
 
         {/* HOJE CONTENT */}
             {/* 1. Hoje Financeiro (Simple Card) */}

@@ -79,7 +79,7 @@ export const ActivationChecklist = ({
     },
     {
       id: 'service',
-      label: 'Cadastrar ao menos 1 serviço',
+      label: 'Cadastre seu primeiro serviço',
       description: 'Suas clientes precisam saber o que você faz.',
       icon: Settings,
       isComplete: services.length > 0,
@@ -87,15 +87,15 @@ export const ActivationChecklist = ({
     },
     {
       id: 'schedule',
-      label: 'Configurar horários',
-      description: 'Defina os dias e horas que você atende.',
+      label: 'Defina seus horários',
+      description: 'Escolha os dias e horas que você atende.',
       icon: Calendar,
       isComplete: (profile?.workingDays?.length ?? 0) > 0,
       link: '/perfil#horarios'
     },
     {
       id: 'share',
-      label: 'Compartilhar seu link',
+      label: 'Seu link personalizado',
       description: 'Divulgue sua vitrine para suas clientes.',
       icon: Share2,
       isComplete: hasShared,
