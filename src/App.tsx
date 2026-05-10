@@ -46,6 +46,7 @@ import CheckoutCanceledPage from './pages/CheckoutCanceledPage';
 import ReferralsPage from './pages/ReferralsPage';
 import WhatsAppHistoryPage from './pages/WhatsAppHistoryPage';
 import FinancialPage from './pages/FinancialPage';
+import { ReviewsModerationPage } from './pages/ReviewsModerationPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -149,6 +150,11 @@ export default function App() {
               <Route path="/cupons" element={
                 <PrivateRoute>
                   <CouponsPage />
+                </PrivateRoute>
+              } />
+              <Route path="/avaliacoes" element={
+                <PrivateRoute>
+                  <ReviewsModerationPage />
                 </PrivateRoute>
               } />
               <Route path="/profile" element={

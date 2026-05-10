@@ -1562,10 +1562,10 @@ setWaitlist(docs);
                     <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Clientes</p>
                     <p className="text-xl font-serif text-brand-ink">{monthlyStats.clientsCount || 0}</p>
                   </div>
-                  <div className="text-center">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Avaliações</p>
+                  <Link to="/avaliacoes" className="text-center hover:bg-brand-linen transition-colors rounded-xl py-1 block">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1 flex justify-center items-center gap-1 group">Avaliações <span className="opacity-0 group-hover:opacity-100 transition-opacity">&rarr;</span></p>
                     <p className="text-xl font-serif text-brand-ink">{profile?.totalReviews || 0}</p>
-                  </div>
+                  </Link>
                 </div>
               </div>
             </section>

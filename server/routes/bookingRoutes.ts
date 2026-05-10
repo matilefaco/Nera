@@ -221,11 +221,12 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 
     if (plan === 'free') {
       const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+      const currentYear = now.getUTCFullYear();
+      const currentMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
       const startOfMonth = `${currentYear}-${currentMonth}-01`;
       // Calcula o último dia real do mês atual para evitar bug em meses com menos de 31 dias
-      const endOfMonth = new Date(currentYear, now.getMonth() + 1, 0).toISOString().split('T')[0];
+      const endOfM = new Date(Date.UTC(currentYear, now.getUTCMonth() + 1, 0));
+      const endOfMonth = endOfM.toISOString().split('T')[0];
 
       const snapshot = await db.collection('appointments')
         .where('professionalId', '==', professionalId)
@@ -294,13 +295,12 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       const service = serviceSnap.data() as any;
 
       // Ownership check (Critical for data integrity after migration)
-      if (normalizeId(service.professionalId) !== normalizeId(appointmentData.professionalId)) {
+      if (service.professionalId && normalizeId(service.professionalId) !== normalizeId(appointmentData.professionalId)) {
         logger.error("BOOKING", `SECURITY MALFORMED PAYLOAD: Service ${appointmentData.serviceId} belongs to ${service.professionalId}, but booking requested for ${appointmentData.professionalId}.`);
-        throw { 
-          status: 400, 
-          message: "Serviço inválido para este profissional.", 
-          code: "SERVICE_OWNER_MISMATCH" 
-        };
+        const err = new Error("Serviço inválido para este profissional.");
+        (err as any).status = 400;
+        (err as any).code = "SERVICE_OWNER_MISMATCH";
+        throw err;
       }
 
       // Force official price and duration from service
@@ -327,8 +327,17 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         if (lockSnap.exists) {
           const lockData = lockSnap.data();
           const isPending = lockData?.status === 'pending' || lockData?.status === 'pending_confirmation' || lockData?.status === 'pending_conflict';
-          const isExpired = isPending && lockData?.expiresAt && lockData.expiresAt.toMillis() <= Date.now();
-          if (!isExpired) {
+          let isExpired = false;
+          if (isPending && lockData?.expiresAt) {
+            if (typeof lockData.expiresAt.toMillis === 'function') {
+              isExpired = lockData.expiresAt.toMillis() <= Date.now();
+            } else if (typeof lockData.expiresAt === 'string' || typeof lockData.expiresAt === 'number') {
+              isExpired = new Date(lockData.expiresAt).getTime() <= Date.now();
+            } else if (lockData.expiresAt instanceof Date) {
+              isExpired = lockData.expiresAt.getTime() <= Date.now();
+            }
+          }
+          if (isPending && !isExpired) {
             throw new Error('SLOT_LOCKED:Este horário acabou de ser reservado. Escolha outro horário.');
           }
         }
@@ -355,7 +364,16 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
               const existingLockSnap = (existingLockId === lockId && lockSnap) ? lockSnap : await transaction.get(db.collection('booking_locks').doc(existingLockId));
               if (existingLockSnap.exists) {
                 const existingLockData = existingLockSnap.data();
-                const isExpired = existingLockData && existingLockData.expiresAt && existingLockData.expiresAt.toMillis() <= Date.now();
+                let isExpired = false;
+                if (existingLockData && existingLockData.expiresAt) {
+                  if (typeof existingLockData.expiresAt.toMillis === 'function') {
+                    isExpired = existingLockData.expiresAt.toMillis() <= Date.now();
+                  } else if (typeof existingLockData.expiresAt === 'string' || typeof existingLockData.expiresAt === 'number') {
+                    isExpired = new Date(existingLockData.expiresAt).getTime() <= Date.now();
+                  } else if (existingLockData.expiresAt instanceof Date) {
+                    isExpired = existingLockData.expiresAt.getTime() <= Date.now();
+                  }
+                }
                 if (isExpired) {
                   continue; // Ignorar o appointment pending cujo lock expirou
                 }
@@ -1785,6 +1803,137 @@ router.post("/public/manage/:manageSlug/cancel", async (req: express.Request, re
     const message = err.message || "Erro interno do servidor";
     logger.error("BOOKING", "Cancel by client error", { error: err });
     return res.status(status).json({ error: message });
+  }
+});
+
+// --- NEW: REVIEW MODERATION ROUTES ---
+router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const { reviewId } = req.params;
+  const uid = req.uid;
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const reviewRef = db.collection('reviews').doc(reviewId);
+      const reviewSnap = await transaction.get(reviewRef);
+
+      if (!reviewSnap.exists) {
+        throw { status: 404, message: "Avaliação não encontrada." };
+      }
+
+      const reviewData = reviewSnap.data() as any;
+
+      if (reviewData.professionalId !== uid) {
+        throw { status: 403, message: "Sem permissão para aprovar esta avaliação." };
+      }
+
+      if (reviewData.publicApproved || reviewData.moderationStatus === 'approved') {
+        throw { status: 400, message: "Avaliação já foi aprovada." };
+      }
+
+      // 1. Update review
+      transaction.update(reviewRef, {
+        publicApproved: true,
+        moderationStatus: 'approved',
+        approvedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 2. Update review_stats
+      const statsRef = db.collection('review_stats').doc(uid as string);
+      const statsSnap = await transaction.get(statsRef);
+      
+      const rating = Number(reviewData.rating) || 5;
+      const tags = Array.isArray(reviewData.tags) ? reviewData.tags : [];
+
+      let newAverageRating = rating;
+      let newTotalReviews = 1;
+      let newTopTags = tags.slice(0, 5);
+
+      if (statsSnap.exists) {
+        const currentStats = statsSnap.data()!;
+        newTotalReviews = (currentStats.totalReviews || 0) + 1;
+        newAverageRating = ((currentStats.averageRating || 0) * (currentStats.totalReviews || 0) + rating) / newTotalReviews;
+        
+        const updatedTags = [...(currentStats.topTags || [])];
+        if (tags) {
+          tags.forEach((tag: string) => {
+            if (!updatedTags.includes(tag)) updatedTags.push(tag);
+          });
+        }
+        newTopTags = updatedTags.slice(0, 5);
+
+        transaction.update(statsRef, {
+          averageRating: Number(newAverageRating.toFixed(1)),
+          totalReviews: newTotalReviews,
+          topTags: newTopTags,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      } else {
+        transaction.set(statsRef, {
+          professionalId: uid,
+          averageRating: rating,
+          totalReviews: 1,
+          totalCompletedBookings: 1,
+          topTags: newTopTags,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      // 3. Sync to user profile
+      const userRef = db.collection('users').doc(uid as string);
+      transaction.update(userRef, {
+        averageRating: Number(newAverageRating.toFixed(1)),
+        totalReviews: newTotalReviews,
+        topTags: newTopTags
+      });
+
+      return { success: true };
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    logger.error("REVIEW", "Approve review error", { error: err });
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || "Erro interno" });
+  }
+});
+
+router.post("/reviews/:reviewId/reject", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const { reviewId } = req.params;
+  const uid = req.uid;
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      const reviewRef = db.collection('reviews').doc(reviewId);
+      const reviewSnap = await transaction.get(reviewRef);
+
+      if (!reviewSnap.exists) {
+        throw { status: 404, message: "Avaliação não encontrada." };
+      }
+
+      const reviewData = reviewSnap.data() as any;
+
+      if (reviewData.professionalId !== uid) {
+        throw { status: 403, message: "Sem permissão para rejeitar esta avaliação." };
+      }
+
+      transaction.update(reviewRef, {
+        publicApproved: false,
+        moderationStatus: 'rejected',
+        rejectedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      return { success: true };
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    logger.error("REVIEW", "Reject review error", { error: err });
+    const status = err.status || 500;
+    res.status(status).json({ error: err.message || "Erro interno" });
   }
 });
 
