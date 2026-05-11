@@ -40,15 +40,15 @@ export const PLANS: Plan[] = [
     name: 'Essencial',
     price: 49,
     priceDescriptor: '/mês',
-    subtitle: 'por mês · cancele quando quiser',
+    subtitle: 'Sua vitrine impecável e agenda sob controle.',
     trialDays: 15,
-    tagline: 'Professional',
+    tagline: 'Presença e Controle',
     features: [
-      { text: 'Agendamentos ilimitados' },
-      { text: 'Notificações WhatsApp' },
-      { text: 'Bloqueio de horários' },
-      { text: 'Lembrete automático 24h (reduz faltas)' },
-      { text: 'Histórico de clientes' }
+      { text: 'Agenda digital com agendamentos ilimitados' },
+      { text: 'Vitrine pública premium com seus serviços' },
+      { text: 'Lembretes por WhatsApp (reduz faltas)' },
+      { text: 'Gestão de clientes e histórico de atendimentos' },
+      { text: 'Flexibilidade com bloqueio de horários' }
     ],
     cta: 'Testar Essencial por 15 dias'
   },
@@ -57,17 +57,17 @@ export const PLANS: Plan[] = [
     name: 'Pro',
     price: 89,
     priceDescriptor: '/mês',
-    subtitle: 'Ferramentas completas para crescer mais rápido',
+    subtitle: 'Recursos avançados para crescer e recuperar oportunidades.',
     trialDays: 15,
     popular: true,
-    tagline: 'Nera Elite',
+    tagline: 'Crescimento e Autoridade',
     features: [
-      { text: 'Tudo do Essencial, com recursos para crescer mais rápido', isHighlight: true },
-      { text: 'Lista de espera inteligente para preencher horários vagos automaticamente' },
-      { text: 'Cupons de desconto' },
+      { text: 'Tudo do Essencial, mais recursos para crescer com controle', isHighlight: true },
+      { text: 'Lista de espera para recuperar horários' },
+      { text: 'Cupons de desconto para clientes' },
       { text: 'Relatório mensal em PDF' },
+      { text: 'Badge Pro na vitrine' },
       { text: 'Link de indicação premiado' },
-      { text: 'Badge Pro Nera na vitrine' },
       { text: 'Suporte prioritário' }
     ],
     cta: 'Começar como Pro'
