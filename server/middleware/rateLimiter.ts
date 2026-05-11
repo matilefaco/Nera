@@ -18,6 +18,8 @@ export const bookingRateLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator,
+  skip: skipHandler,
   message: {
     error: "Muitas tentativas. Tente novamente em alguns minutos."
   }
