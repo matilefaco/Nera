@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskPhone } from "../utils/logger.js";
+import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
 import { sendProfessionalNewBookingEmail, sendBookingPendingEmail, sendBookingCancelledEmail, sendBookingRescheduledEmail, sendBookingReminder24hEmail, sendReviewRequestEmail, sendConfirmationRequest24hEmail, sendRetentionEmail } from "../emails/sendEmail.js";
 import { sendWhatsApp, handleInboundMessage } from "../services/whatsappService.js";
 import webpush from "web-push";
@@ -88,6 +89,7 @@ import { buildNewBookingMessageForPro, buildBookingConfirmedMessageForClient, bu
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
+import { authMutationLimiter } from "../middleware/rateLimiter.js";
 // Tokens públicos de acesso precisam ser criptograficamente seguros. Não usar Math.random.
 function generateSecureToken(bytes = 16) {
     return randomBytes(bytes).toString("hex");
@@ -341,9 +343,17 @@ router.post("/push/subscribe", async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
-router.post("/notify", checkPlanFeature('whatsappNotifications'), async (req, res) => {
+router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeature('whatsappNotifications'), async (req, res) => {
+    const authReq = req;
+    const uid = authReq.uid;
     const db = getDb();
     const { type, payload } = req.body;
+    if (payload && payload.professionalId && payload.professionalId !== uid) {
+        return res.status(403).json({ error: 'Acesso negado' });
+    }
+    if (payload) {
+        payload.professionalId = uid;
+    }
     const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
     if (type === 'BOOKING_PENDING_CLIENT' || type === 'NEW_BOOKING_REQUEST') {
         logger.warn("NOTIFICATION", `Deprecated POST /notify used for type ${type}. Please migrate this call to the backend.`, {

@@ -26,6 +26,9 @@ function isAllowedOrigin(origin) {
         return true;
     if (process.env.CLOUD_RUN_PUBLIC_URL && origin === process.env.CLOUD_RUN_PUBLIC_URL)
         return true;
+    const isAiStudioPreviewOrigin = /^https:\/\/ais-(dev|pre)-[a-z0-9-]+\.run\.app$/.test(origin);
+    if (isAiStudioPreviewOrigin)
+        return true;
     return false;
 }
 export async function createServerApp() {
@@ -70,10 +73,16 @@ export async function createServerApp() {
         }
         next();
     });
-    // 3. Skip express.json for Stripe Webhook
+    // 3. Body Parsing Middleware
+    // Firebase Functions v2 automatically parses the body into req.body and req.rawBody.
+    // To prevent 'stream is not readable' errors, we mock '_body = true' so express.json skips reading the stream.
     app.use((req, res, next) => {
-        if (req.originalUrl === "/api/plans/webhook") {
-            next();
+        const isFirebaseParser = req.rawBody !== undefined;
+        if (isFirebaseParser) {
+            req._body = true;
+        }
+        if (req.originalUrl.includes("/api/plans/webhook") || req.path.includes("/api/plans/webhook")) {
+            express.raw({ type: "application/json" })(req, res, next);
         }
         else {
             express.json()(req, res, next);

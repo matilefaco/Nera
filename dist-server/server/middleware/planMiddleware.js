@@ -3,15 +3,28 @@ export const checkPlanFeature = (featureName) => {
     return async (req, res, next) => {
         const db = getDb();
         // Identifying professionalId from different possible places
-        const professionalId = req.headers['x-professional-id'] || req.body.professionalId || req.query.professionalId;
+        // If req.uid exists, use it exclusively and ignore spoofed body/header values.
+        let professionalId = req.uid;
         if (!professionalId) {
-            // If we can't identify the professional, we assume it's a request that shouldn't be gated or will be caught later
-            return next();
+            professionalId = req.headers['x-professional-id'] ||
+                req.body?.professionalId ||
+                req.body?.payload?.professionalId ||
+                req.query?.professionalId;
+        }
+        if (!professionalId) {
+            return res.status(401).json({
+                error: "Identificação do profissional ausente.",
+                code: "PLAN_AUTH_REQUIRED"
+            });
         }
         try {
             const proDoc = await db.collection('users').doc(String(professionalId)).get();
-            if (!proDoc.exists)
-                return next();
+            if (!proDoc.exists) {
+                return res.status(403).json({
+                    error: "Profissional não encontrado.",
+                    code: "PLAN_USER_NOT_FOUND"
+                });
+            }
             const pro = proDoc.data();
             const plan = pro?.plan || 'free';
             const expiresAt = pro?.planExpiresAt;
@@ -39,7 +52,10 @@ export const checkPlanFeature = (featureName) => {
         }
         catch (err) {
             console.error('Error checking plan feature:', err);
-            next();
+            return res.status(503).json({
+                error: "Falha ao verificar os limites do plano.",
+                code: "PLAN_CHECK_UNAVAILABLE"
+            });
         }
     };
 };

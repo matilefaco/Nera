@@ -102,7 +102,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req, res) => {
 /**
  * STRIPE WEBHOOK
  */
-router.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+router.post("/webhook", async (req, res) => {
     const db = getDb();
     const stripe = getStripe();
     const sig = req.headers["stripe-signature"];
@@ -112,8 +112,10 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
         logger.error("STRIPE", "Missing webhookSecret or signature", { requestId: req.requestId });
         return res.status(400).send('Webhook Error: Missing verification details');
     }
+    // Use req.rawBody in Firebase Functions, otherwise req.body from express.raw()
+    const payload = req.rawBody || req.body;
     try {
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        event = stripe.webhooks.constructEvent(payload, sig, webhookSecret);
     }
     catch (err) {
         logger.error("STRIPE", "Verification failed", { requestId: req.requestId, error: err });
@@ -254,6 +256,33 @@ router.post("/webhook", express.raw({ type: "application/json" }), async (req, r
         catch (err) {
             logger.error("STRIPE", "Critical error processing invoice.paid", { requestId: req.requestId, error: err });
             return res.status(500).json({ error: 'Internal error updating renewal' });
+        }
+    }
+    if (event.type === 'invoice.payment_failed') {
+        const invoice = event.data.object;
+        const customerId = invoice.customer;
+        const hosted_invoice_url = invoice.hosted_invoice_url;
+        const next_payment_attempt = invoice.next_payment_attempt;
+        const attempt_count = invoice.attempt_count;
+        logger.info("STRIPE", "Received invoice.payment_failed", { requestId: req.requestId, meta: { customerId: maskToken(customerId) } });
+        try {
+            const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+            if (!usersSnap.empty) {
+                await usersSnap.docs[0].ref.update({
+                    paymentStatus: 'past_due',
+                    lastPaymentFailedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    failedPaymentAttemptCount: attempt_count || 1,
+                    stripeHostedInvoiceUrl: hosted_invoice_url || null,
+                    nextPaymentAttemptAt: next_payment_attempt || null
+                });
+                logger.info("STRIPE", "Payment failed status updated", { professionalId: maskUid(usersSnap.docs[0].id) });
+            }
+            else {
+                logger.warn("STRIPE", "Customer for payment failure not found in system", { meta: { customerId: maskToken(customerId) } });
+            }
+        }
+        catch (err) {
+            logger.error("STRIPE", "Error processing invoice.payment_failed", { requestId: req.requestId, error: err });
         }
     }
     if (event.type === 'customer.subscription.deleted') {

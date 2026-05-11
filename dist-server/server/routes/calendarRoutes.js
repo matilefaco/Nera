@@ -32,12 +32,14 @@ router.get("/callback", async (req, res) => {
     const professionalId = state;
     const origin = `${req.protocol}://${req.get("host")}`.replace(/\/+$/, "");
     const redirectUri = `${origin}/api/calendar/callback`;
+    const appUrl = process.env.APP_URL || "https://usenera.com";
     if (!code || !professionalId) {
+        const safeError = JSON.stringify("Missing code or state");
         return res.send(`
       <html>
         <body>
           <script>
-            window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: 'Missing code or state' }, '*');
+            window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
             window.close();
           </script>
         </body>
@@ -59,7 +61,7 @@ router.get("/callback", async (req, res) => {
       <html>
         <body>
           <script>
-            window.opener.postMessage({ type: 'CALENDAR_AUTH_SUCCESS' }, '*');
+            window.opener.postMessage({ type: 'CALENDAR_AUTH_SUCCESS' }, '${appUrl}');
             window.close();
           </script>
           <p>Conexão realizada com sucesso! Você já pode fechar esta janela.</p>
@@ -69,11 +71,12 @@ router.get("/callback", async (req, res) => {
     }
     catch (err) {
         logger.error("CALENDAR", "Failed to process OAuth callback", { requestId: req.requestId, professionalId: maskUid(professionalId), error: err });
+        const safeError = JSON.stringify(String(err?.message || "Erro desconhecido"));
         res.send(`
       <html>
         <body>
           <script>
-            window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: '${err.message}' }, '*');
+            window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
             window.close();
           </script>
         </body>

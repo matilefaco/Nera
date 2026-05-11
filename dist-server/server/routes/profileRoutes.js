@@ -5,6 +5,7 @@ import { isValidWhatsapp } from "../utils.js";
 import { PLAN_CONFIGS } from "../../src/constants/plans.js";
 import { requireFirebaseAuth } from "../middleware/authMiddleware.js";
 import { logger, maskUid } from "../utils/logger.js";
+import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimiter.js";
 const router = express.Router();
 const debugOnly = (req, res, next) => {
     if (process.env.NODE_ENV === "production") {
@@ -30,7 +31,7 @@ const removeUndefinedDeep = (value) => {
  * POST /api/profile/save
  * Transactional save that claims a slug and updates the user profile.
  */
-router.post("/save", requireFirebaseAuth, async (req, res) => {
+router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req, res) => {
     const { profileData, services } = req.body;
     const uid = req.uid;
     logger.info("PROFILE", "Profile save requested", {
@@ -133,7 +134,7 @@ router.post("/save", requireFirebaseAuth, async (req, res) => {
     }
 });
 // --- NEW: ROBUST RESERVATION LOOKUP API ---
-router.get("/reservation/:slug", async (req, res) => {
+router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
     try {
         const { slug } = req.params;
         if (!slug)

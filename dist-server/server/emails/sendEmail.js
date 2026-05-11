@@ -11,6 +11,7 @@ import { buildPasswordResetEmail } from './templates/passwordReset.js';
 import { buildWaitlistInviteEmail } from './templates/waitlistInvite.js';
 import { buildBookingReminder24hEmail } from './templates/bookingReminder24h.js';
 import { buildBookingRescheduledEmail } from './templates/bookingRescheduled.js';
+import { buildDigitalReceiptEmail } from './templates/digitalReceipt.js';
 import { logger, maskEmail, maskToken } from '../utils/logger.js';
 // Lazy initialization of Resend client
 let _resendClient = null;
@@ -578,6 +579,53 @@ export async function sendTrialWillEndEmail(data) {
     }
     catch (err) {
         logEmail('ERROR', 'trial_will_end', { error: err.message });
+        return { success: false, error: err.message };
+    }
+}
+/**
+ * EVENT: digital_receipt (Sent upon appointment completion)
+ */
+export async function sendDigitalReceiptEmail(data) {
+    const { clientEmail, clientName, professionalName, appointmentId, serviceName, date, time, totalPrice, price, bookingUrl } = data;
+    logEmail('START', 'digital_receipt', { to: clientEmail, appointmentId });
+    if (!isValidEmail(clientEmail)) {
+        logEmail('ERROR', 'digital_receipt', { error: 'Missing client email' });
+        return { success: false, error: 'Email missing' };
+    }
+    const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', {
+        day: '2-digit', month: 'long', year: 'numeric'
+    });
+    const finalPrice = totalPrice || price || 0;
+    const formattedPrice = `R$ ${Number(finalPrice).toFixed(2).replace('.', ',')}`;
+    // Use slug to build bookingUrl if available and not explicitly provided
+    const finalBookingUrl = bookingUrl || (data.slug ? `${APP_URL}/p/${data.slug}` : APP_URL);
+    const html = buildDigitalReceiptEmail({
+        clientName,
+        professionalName: professionalName || 'Sua profissional',
+        serviceName,
+        formattedDate,
+        time,
+        price: formattedPrice,
+        bookingUrl: finalBookingUrl
+    });
+    try {
+        const resend = getResendClient();
+        const { data: resendData, error } = await resend.emails.send({
+            from: FROM_EMAIL,
+            to: [clientEmail],
+            replyTo: "oi@usenera.com",
+            subject: `Resumo do seu atendimento com ${professionalName || 'Sua profissional'} ✨`,
+            html,
+        });
+        if (error) {
+            logEmail('ERROR', 'digital_receipt', { error });
+            return { success: false, error };
+        }
+        logEmail('SUCCESS', 'digital_receipt', { resendId: resendData?.id });
+        return { success: true, id: resendData?.id };
+    }
+    catch (err) {
+        logEmail('ERROR', 'digital_receipt', { error: err.message });
         return { success: false, error: err.message };
     }
 }
