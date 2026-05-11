@@ -304,6 +304,34 @@ router.post("/webhook", async (req, res) => {
     }
   }
 
+  if (event.type === 'invoice.payment_failed') {
+    const invoice = event.data.object as any;
+    const customerId = invoice.customer;
+    const hosted_invoice_url = invoice.hosted_invoice_url;
+    const next_payment_attempt = invoice.next_payment_attempt;
+    const attempt_count = invoice.attempt_count;
+
+    logger.info("STRIPE", "Received invoice.payment_failed", { requestId: req.requestId, meta: { customerId: maskToken(customerId as string) } });
+
+    try {
+      const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+      if (!usersSnap.empty) {
+        await usersSnap.docs[0].ref.update({
+          paymentStatus: 'past_due',
+          lastPaymentFailedAt: admin.firestore.FieldValue.serverTimestamp(),
+          failedPaymentAttemptCount: attempt_count || 1,
+          stripeHostedInvoiceUrl: hosted_invoice_url || null,
+          nextPaymentAttemptAt: next_payment_attempt || null
+        });
+        logger.info("STRIPE", "Payment failed status updated", { professionalId: maskUid(usersSnap.docs[0].id) });
+      } else {
+        logger.warn("STRIPE", "Customer for payment failure not found in system", { meta: { customerId: maskToken(customerId as string) } });
+      }
+    } catch (err: any) {
+      logger.error("STRIPE", "Error processing invoice.payment_failed", { requestId: req.requestId, error: err });
+    }
+  }
+
   if (event.type === 'customer.subscription.deleted') {
     const subscription = event.data.object as Stripe.Subscription;
     const customerId = subscription.customer;
