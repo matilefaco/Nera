@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { isRevenueStatus, isCancelledStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { db, updateClientSummaryFromAppointment } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { 
   Users, Search, MessageCircle, 
   TrendingUp, Calendar, ChevronRight, Star,
@@ -22,6 +22,79 @@ const PAGE_SIZE = 50;
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
 import { PageErrorBoundary } from '../components/PageErrorBoundary';
+
+const ClientNotes = ({
+  client,
+  onSave
+}: {
+  client: ClientSummary;
+  onSave: (clientId: string, notes: string) => Promise<void>;
+}) => {
+  const [notes, setNotes] = useState(client.notes || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setNotes(client.notes || '');
+  }, [client.notes]);
+
+  const handleSave = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsSaving(true);
+    setSaved(false);
+    try {
+      if (typeof notes !== 'string') {
+        throw new Error('Notas inválidas');
+      }
+      await onSave(client.id, notes || '');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e: any) {
+      notify.error(e.message || 'Erro interno ao salvar.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 pt-4 border-t border-brand-mist animate-in slide-in-from-top-2 fade-in duration-200">
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone">
+          Notas privadas
+        </label>
+        {saved && (
+          <span className="text-[10px] text-green-600 font-medium animate-in fade-in">
+            Salvo
+          </span>
+        )}
+      </div>
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Ex: alérgica a produto X, prefere manhã, aniversário em março..."
+        className="w-full bg-brand-linen/30 border border-brand-mist rounded-xl p-3 text-sm text-brand-ink placeholder:text-brand-stone/40 focus:outline-none focus:border-brand-stone focus:ring-1 focus:ring-brand-stone min-h-[80px] resize-y"
+      />
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-[9px] text-brand-stone/60 italic">
+          Visível apenas para você.
+        </span>
+        <button
+          onClick={handleSave}
+          disabled={isSaving || (client.id.startsWith('derived_'))}
+          className={cn(
+            "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all",
+            isSaving 
+              ? "bg-brand-mist text-brand-stone opacity-70"
+              : "bg-brand-ink text-brand-white hover:bg-brand-stone shadow-sm"
+          )}
+        >
+          {isSaving ? 'Salvando...' : 'Salvar'}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default function ClientsPage() {
   const { user, profile } = useAuth();
@@ -47,17 +120,37 @@ export default function ClientsPage() {
   const handleUpdateNotes = async (clientId: string, newNotes: string) => {
     if (!user || clientId.startsWith('derived_')) {
       if (clientId.startsWith('derived_')) {
-        notify.info('Este é um cliente derivado de agendamentos antigos e não possui cadastro completo para notas.');
+        notify.info('Este é um cliente derivado de agendamentos antigos e não possui cadastro completo para notas. Sincronize o histórico primeiro.');
       }
-      return;
+      throw new Error('derived_client');
     }
     try {
-      await updateDoc(doc(db, 'client_summaries', clientId), { notes: newNotes });
-      setClients(prev => prev.map(c => c.id === clientId ? { ...c, notes: newNotes } : c));
-      notify.success('Notas salvas com sucesso');
-    } catch (err) {
-      console.error('Error updating notes', err);
-      notify.error('Erro ao salvar notas.');
+      const safeNotes = newNotes || '';
+      await setDoc(
+        doc(db, 'users', user.uid, 'client_notes', clientId),
+        { 
+          clientId, 
+          notes: safeNotes, 
+          updatedAt: serverTimestamp() 
+        },
+        { merge: true }
+      );
+      setClients(prev => prev.map(c => {
+        if (c.id === clientId) {
+          return { ...c, notes: safeNotes };
+        }
+        return c;
+      }));
+    } catch (err: any) {
+      const isPermissionErr = err.message && (
+        err.message.includes('permission') || 
+        err.message.includes('not authorized') || 
+        err.message.includes('Missing or insufficient')
+      );
+      if (isPermissionErr) {
+        throw new Error('Sem permissão para salvar esta nota.');
+      }
+      throw new Error('Erro ao salvar notas no banco.');
     }
   };
 
@@ -99,6 +192,18 @@ export default function ClientsPage() {
     if (!user) return;
     setLoading(true);
 
+    const mergeNotes = async (clientDocs: ClientSummary[]) => {
+      try {
+        const notesQ = query(collection(db, 'users', user.uid, 'client_notes'));
+        const notesSnap = await getDocs(notesQ);
+        const notesMap = new Map();
+        notesSnap.forEach(doc => notesMap.set(doc.id, doc.data().notes));
+        return clientDocs.map(d => ({ ...d, notes: notesMap.get(d.id) || d.notes || '' }));
+      } catch (err) {
+        return clientDocs;
+      }
+    };
+
     try {
       const q = query(
         collection(db, 'client_summaries'),
@@ -120,6 +225,8 @@ export default function ClientsPage() {
       });
       
       docs.sort((a, b) => new Date(b.lastAppointmentDate).getTime() - new Date(a.lastAppointmentDate).getTime());
+      
+      docs = await mergeNotes(docs);
       
       setClients(docs);
       setHasMore(false);
@@ -204,9 +311,11 @@ export default function ClientsPage() {
               derivedClients.set(key, existing);
             });
             
-            const docs = Array.from(derivedClients.values()).sort((a, b) => 
+            let docs = Array.from(derivedClients.values()).sort((a, b) => 
               new Date(b.lastAppointmentDate).getTime() - new Date(a.lastAppointmentDate).getTime()
             );
+            
+            docs = await mergeNotes(docs);
             
             setClients(docs);
             setHasMore(false);
@@ -776,25 +885,7 @@ export default function ClientsPage() {
                   </div>
 
                   {expandedClientId === client.id && (
-                    <div className="mt-2 pt-4 border-t border-brand-mist animate-in slide-in-from-top-2 fade-in duration-200">
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-2">
-                        Notas privadas
-                      </label>
-                      <textarea
-                        defaultValue={client.notes || ''}
-                        onBlur={(e) => {
-                          const currentNotes = client.notes || '';
-                          if (e.target.value !== currentNotes) {
-                            handleUpdateNotes(client.id, e.target.value);
-                          }
-                        }}
-                        placeholder="Ex: alérgica a produto X, prefere manhã, aniversário em março..."
-                        className="w-full bg-brand-linen/30 border border-brand-mist rounded-xl p-3 text-sm text-brand-ink placeholder:text-brand-stone/40 focus:outline-none focus:border-brand-stone focus:ring-1 focus:ring-brand-stone min-h-[80px] resize-y"
-                      />
-                      <span className="text-[9px] text-brand-stone/60 italic mt-1.5 block">
-                        Visível apenas para você. Salvo automaticamente ao sair do campo.
-                      </span>
-                    </div>
+                    <ClientNotes client={client} onSave={handleUpdateNotes} />
                   )}
                 </motion.div>
               ))}

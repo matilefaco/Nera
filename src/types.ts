@@ -344,6 +344,7 @@ export interface ClientSummary {
   segment?: 'diamond' | 'gold' | 'silver' | 'bronze' | 'new' | 'churn_risk' | 'lost';
   totalSpent: number;
   lastAppointmentDate: string;
+  notes?: string;
   lastServiceName: string;
   firstAppointmentDate: string;
   updatedAt: string;

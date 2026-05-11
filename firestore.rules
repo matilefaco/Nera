@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Default Deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Helper Functions
     function isSignedIn() {
       return request.auth != null;
@@ -102,6 +97,10 @@ service cloud.firestore {
       allow read: if true; 
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if (isOwner(userId) && isValidUser(incoming())) || isAdmin();
+      
+      match /client_notes/{noteId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     match /services/{serviceId} {
@@ -228,6 +227,11 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.professionalId == request.auth.uid && 
                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
       allow create: if false; // System only
+    }
+
+    // Default Deny (Catch-all)
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

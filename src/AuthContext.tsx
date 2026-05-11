@@ -41,6 +41,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (user && profile && !profile.referralCode) {
+      // Prevent infinite loop if updateDoc fails and reverts state constantly
+      const key = `referral_attempt_${user.uid}`;
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, 'true');
+
       const code = user.uid.slice(0, 8).toUpperCase();
       updateDoc(doc(db, 'users', user.uid), { referralCode: code })
         .catch(err => console.error('[AuthContext] Error saving referralCode:', err));
