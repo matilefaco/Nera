@@ -485,18 +485,6 @@ setIsLoadingSlots(false);
   const handleBooking = async () => {
     const totalPrice = calculateTotalPrice();
     
-    // LOGS OBRIGATÓRIOS DO USUÁRIO
-    console.log("BOOKING PAYLOAD SENDING:", {
-      professionalId: profile?.uid,
-      serviceId: selectedService?.id,
-      serviceName: selectedService?.name,
-      totalPrice: totalPrice,
-      date: selectedDate,
-      time: selectedTime,
-      clientName,
-      clientPhone
-    });
-    
     setBookingAttempted(true);
     
     if (!profile?.uid || !selectedService?.id || (selectedService?.price ?? 0) < 0) {
@@ -592,12 +580,6 @@ setIsLoadingSlots(false);
         couponId: appliedCoupon?.id,
         appliedCouponCode: appliedCoupon?.code,
       });
-
-      // LOGS OBRIGATÓRIOS DO USUÁRIO
-      console.log(`[RESERVATION CREATE] appointmentId: ${bookingId}`);
-      console.log(`[RESERVATION CREATE] token: ${token}`);
-      console.log(`[RESERVATION CREATE] reservationCode: ${resCode}`);
-      console.log(`[RESERVATION CREATE] manageUrl: ${window.location.origin}/r/${token}`);
 
       setAppointmentId(bookingId);
       setAppointmentToken(token);

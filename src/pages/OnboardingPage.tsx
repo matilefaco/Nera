@@ -272,7 +272,6 @@ export default function OnboardingPage() {
       return;
     }
     setIsGeneratingContent(true);
-    console.log(`[BioAI] Generating for ${name} (${specialty}) with style: ${selectedBioStyle}`);
 
     try {
       const token = await user?.getIdToken();
@@ -341,11 +340,9 @@ export default function OnboardingPage() {
   };
 
   const uploadImage = async (file: File, path: string): Promise<string> => {
-    console.log(`[OnboardingSave] Uploading image to ${path}...`);
     const storageRef = ref(storage, path);
     await uploadBytes(storageRef, file);
     const url = await getDownloadURL(storageRef);
-    console.log(`[OnboardingSave] Upload successful: ${url}`);
     return url;
   };
 
@@ -479,18 +476,12 @@ export default function OnboardingPage() {
     setFormErrors({});
 
     if (!user || isFinalizing || profile?.onboardingCompleted) {
-      console.log('[OnboardingSave] handleFinish blocked:', { 
-        noUser: !user, 
-        isFinalizing, 
-        alreadyCompleted: profile?.onboardingCompleted 
-      });
       if (profile?.onboardingCompleted) navigate('/dashboard');
       return;
     }
 
     // 1. Validation
     try {
-      console.log('[OnboardingSave] Validating payload...');
       const errors: Record<string, string> = {};
       
       if (!name.trim()) errors.name = 'O nome profissional é obrigatório';
@@ -643,7 +634,6 @@ export default function OnboardingPage() {
   };
 
   const completeOnboarding = async () => {
-    console.log('[ONBOARDING] completeOnboarding triggered. Navigating to dashboard.');
     if (!user) return;
     
     setIsFinalizing(true);
@@ -652,7 +642,6 @@ export default function OnboardingPage() {
         onboardingCompleted: true,
         onboardingStep: 3
       });
-      console.log('[ONBOARDING] Navigation starting...');
       navigate('/dashboard');
     } catch (error) {
       console.error('[ONBOARDING ERROR] final step failed:', error);
@@ -744,7 +733,6 @@ export default function OnboardingPage() {
         
         // 3. Upload
         const downloadUrl = await uploadImageToStorage(compressedFile, `portfolio/${user.uid}`);
-        console.log('[Portfolio] upload finished:', downloadUrl);
         
         // 3b. AI Categorization
         let autoCategory = '';
@@ -755,9 +743,7 @@ export default function OnboardingPage() {
         }
 
         // 4. Persistence
-        console.log('[Portfolio] saving to Firestore');
         const docId = await savePortfolioItem(user.uid, downloadUrl, autoCategory || specialty || 'Geral');
-        console.log('[Portfolio] saved successfully');
         
         // Update local state with real ID
         setPortfolio(prev => prev.map(item => 
@@ -784,7 +770,6 @@ export default function OnboardingPage() {
 
     setDeletingId(id);
     try {
-      console.log('[Portfolio] Removing item:', id);
       const itemToDelete = portfolio.find(item => item.id === id);
       if (itemToDelete) {
         await deletePortfolioItem(user.uid, itemToDelete as any);

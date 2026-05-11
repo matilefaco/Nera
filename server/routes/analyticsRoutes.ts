@@ -22,7 +22,6 @@ const debugOnly = (req: any, res: any, next: any) => {
 
 router.post("/generate-content", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req: AuthenticatedRequest, res: any) => {
   const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
-  console.log(`[AI AUTH] Generating content for user: ${req.uid}`);
   
   // Simple rate limit check
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous') as string;
@@ -86,7 +85,6 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato:
 
 router.post("/analyze-portfolio-image", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req: AuthenticatedRequest, res: any) => {
   const { imageUrl, specialty } = req.body;
-  console.log(`[AI AUTH] Analyzing portfolio image for user: ${req.uid}`);
   
   if (!process.env.NVIDIA_API_KEY) {
     console.error("[PortfolioAI] NVIDIA_API_KEY is missing");
@@ -152,7 +150,6 @@ router.get("/test-ai-service-description", debugOnly, async (req, res) => {
 
 router.post("/ai/service-description", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req: AuthenticatedRequest, res: any) => {
   const { serviceName, professionalSpecialty, duration, price, tone } = req.body;
-  console.log(`[AI AUTH] service-description requested for: ${serviceName} by user: ${req.uid}`);
   
   const result = await getServiceDescriptionWithFallback(
     serviceName, 
@@ -167,7 +164,6 @@ router.post("/ai/service-description", requireFirebaseAuth, checkPlanFeature('ad
 
 router.post("/ai/categorize-service", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { serviceName } = req.body;
-  console.log(`[AI AUTH] Categorize service requested for: ${serviceName} by user: ${req.uid}`);
   if (!process.env.NVIDIA_API_KEY) {
     console.warn("[AI SERVICE] NVIDIA failed (missing key), using local fallback");
     return res.json({ category: "Outros" });
@@ -189,7 +185,6 @@ router.post("/ai/categorize-service", requireFirebaseAuth, async (req: Authentic
 
 router.post("/ai/categorize-portfolio-item", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { title, description } = req.body;
-  console.log(`[AI AUTH] Categorize portfolio item requested for title: ${title} by user: ${req.uid}`);
   if (!process.env.NVIDIA_API_KEY) {
     console.warn("[AI SERVICE] NVIDIA failed (missing key), using local fallback");
     return res.json({ category: "Geral" });
@@ -213,8 +208,6 @@ router.get("/reports/monthly", requireFirebaseAuth, checkPlanFeature('reports'),
   const db = getDb();
   const { month } = req.query;
   const professionalId = String(req.query.professionalId || req.uid);
-
-  console.log(`[REPORT AUTH] Monthly report requested for user: ${req.uid}, target professionalId: ${professionalId}`);
 
   if (professionalId !== req.uid) {
     console.warn(`[REPORT AUTH] User ${req.uid} attempted to access report of ${professionalId}. Access denied.`);

@@ -41,6 +41,42 @@ export const ActivationChecklist = ({
   const [hasShared, setHasShared] = useState(() => {
     return localStorage.getItem('nera_link_shared') === 'true';
   });
+  const [hasHistoricalBooking, setHasHistoricalBooking] = useState(false);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+    
+    // Fast path: if appointments from props already contains a valid booking
+    const hasActiveProp = appointments.some(app => 
+      app.status && 
+      !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(app.status)
+    );
+    if (hasActiveProp) return;
+
+    let isMounted = true;
+    (async () => {
+      try {
+        const { collection, query, where, limit, getDocs } = await import('firebase/firestore');
+        const { db } = await import('../firebase');
+        
+        const q = query(
+          collection(db, 'appointments'),
+          where('professionalId', '==', profile.uid),
+          limit(10)
+        );
+        const snap = await getDocs(q);
+        if (!isMounted) return;
+        const valid = snap.docs.some(doc => {
+          const st = doc.data().status;
+          return st && !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(st);
+        });
+        if (valid) setHasHistoricalBooking(true);
+      } catch (err) {
+        // Ignore silently
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [profile?.uid, appointments]);
 
   const steps: Step[] = [
     {
@@ -49,7 +85,7 @@ export const ActivationChecklist = ({
       description: 'Perfis com foto recebem 3x mais cliques.',
       icon: Camera,
       isComplete: !!profile?.avatar,
-      link: '/perfil'
+      link: '/profile'
     },
     {
       id: 'bio',
@@ -57,7 +93,7 @@ export const ActivationChecklist = ({
       description: 'Conte quem você é e sua especialidade.',
       icon: FileText,
       isComplete: !!profile?.bio,
-      link: '/perfil#bio'
+      link: '/profile#bio'
     },
     {
       id: 'service',
@@ -65,15 +101,15 @@ export const ActivationChecklist = ({
       description: 'Suas clientes precisam saber o que você faz.',
       icon: Settings,
       isComplete: services.length > 0,
-      link: '/servicos'
+      link: '/services'
     },
     {
       id: 'schedule',
       label: 'Defina seus horários',
       description: 'Escolha os dias e horas que você atende.',
       icon: Calendar,
-      isComplete: (profile?.workingDays?.length ?? 0) > 0,
-      link: '/perfil#horarios'
+      isComplete: (profile?.workingHours?.workingDays?.length ?? 0) > 0,
+      link: '/profile#horarios'
     },
     {
       id: 'share',
@@ -92,12 +128,16 @@ export const ActivationChecklist = ({
       label: 'Receber sua primeira reserva',
       description: 'O momento mais esperado!',
       icon: Star,
-      isComplete: appointments.length > 0
+      isComplete: hasHistoricalBooking || appointments.some(app => 
+        app.status && 
+        !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(app.status)
+      )
     }
   ];
 
   const completedSteps = steps.filter(s => s.isComplete).length;
   const checklistProgress = (completedSteps / steps.length) * 100;
+  const isFullyComplete = checklistProgress === 100;
 
   const toggleMinimize = () => {
     const newState = !isMinimized;

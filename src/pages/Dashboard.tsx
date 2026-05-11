@@ -732,7 +732,6 @@ setWaitlist(docs);
       setIsPushLoading(true);
       
       const success = await requestPermission();
-
       console.log("[PUSH BUTTON] requestPermission finished. Success:", success);
 
       if (success) {

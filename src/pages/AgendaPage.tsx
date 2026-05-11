@@ -136,7 +136,6 @@ export default function AgendaPage() {
     if (!code) return;
 
     setIsSearchingCode(true);
-    console.log(`[RESERVATION SEARCH] code: ${code}, professionalId: ${user?.uid}`);
 
     try {
       // 1. Try finding by reservationCode (exact or parts)
@@ -171,12 +170,10 @@ export default function AgendaPage() {
 
       if (!snap.empty) {
         const appt = { id: snap.docs[0].id, ...snap.docs[0].data() };
-        console.log(`[RESERVATION SEARCH] found: true, appointmentId: ${appt.id}`);
         setSelectedAppointment(appt);
         setIsDetailsOpen(true);
         setSearchCode('');
       } else {
-        console.log(`[RESERVATION SEARCH] found: false`);
         notify.error('Nenhuma reserva encontrada com esse código.');
       }
     } catch (err) {

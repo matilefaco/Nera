@@ -74,8 +74,9 @@ export const FormServices = ({
 
   const calculateSlots = (duration: number) => {
     if (!duration || duration <= 0) return 0;
-    const start = workingHours.startTime || '09:00';
-    const end = workingHours.endTime || '18:00';
+    const safeWorkingHours = workingHours || { startTime: '09:00', endTime: '18:00' };
+    const start = safeWorkingHours.startTime || '09:00';
+    const end = safeWorkingHours.endTime || '18:00';
     
     const [startH, startM] = start.split(':').map(Number);
     const [endH, endM] = end.split(':').map(Number);

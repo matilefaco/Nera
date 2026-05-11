@@ -41,7 +41,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (user && profile && !profile.referralCode) {
-      console.log('[AuthContext] Generating referralCode for user:', user.uid);
       const code = user.uid.slice(0, 8).toUpperCase();
       updateDoc(doc(db, 'users', user.uid), { referralCode: code })
         .catch(err => console.error('[AuthContext] Error saving referralCode:', err));
@@ -61,17 +60,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, 5000);
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-      console.log('[AuthContext] Auth state changed:', currentUser?.uid || 'null');
       setUser(currentUser);
       
       if (unsubscribeProfile) {
-        console.log('[AuthContext] Unsubscribing from previous profile...');
         unsubscribeProfile();
         unsubscribeProfile = null;
       }
 
       if (currentUser) {
-        console.log('[AuthContext] Starting profile snapshot for:', currentUser.uid);
         const docRef = doc(db, 'users', currentUser.uid);
         
         // Use onSnapshot for real-time updates
@@ -82,7 +78,6 @@ if (docSnap.exists()) {
                     const data = docSnap.data() as UserProfile;
                     setProfile({ ...data, uid: docSnap.id });
                   } else {
-                    console.log('[AuthContext] Profile document does not exist yet.');
                     setProfile(null);
                   }
 setLoading(false);
@@ -98,7 +93,6 @@ clearTimeout(safetyTimeout);
           clearTimeout(safetyTimeout);
         });
       } else {
-        console.log('[AuthContext] No user, setting loading to false.');
         setProfile(null);
         setLoading(false);
         setIsAuthReady(true);

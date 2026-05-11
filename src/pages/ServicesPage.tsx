@@ -61,13 +61,6 @@ export default function ServicesPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Log diagnostic info in dev
-    console.log("[SERVICES AI CONTEXT]", {
-      hasProfile: !!profile,
-      specialty: profile?.professionalIdentity?.mainSpecialty || profile?.specialty,
-      city: profile?.studioCity || profile?.city || profile?.address?.city
-    });
-
     const q = query(collection(db, 'services'), where('professionalId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       try {
@@ -176,14 +169,6 @@ setIsInitialLoading(false);
     setLoading(true);
 
     const professionalId = user?.uid;
-    
-    console.log('[SERVICE SAVE] starting', { 
-      editingId, 
-      professionalId,
-      name,
-      duration,
-      price 
-    });
 
     if (!professionalId) {
       notify.error('Sessão expirada. Por favor, faça login novamente.');
@@ -203,12 +188,9 @@ setIsInitialLoading(false);
         updatedAt: new Date().toISOString()
       };
 
-      console.log('[SERVICE SAVE] payload:', serviceData);
-
       if (editingId) {
         const docRef = doc(db, 'services', editingId);
         await updateDoc(docRef, serviceData);
-        console.log('[SERVICE SAVE] update success');
         notify.success('Serviço atualizado com sucesso.');
       } else {
         const colRef = collection(db, 'services');
@@ -216,7 +198,6 @@ setIsInitialLoading(false);
           ...serviceData,
           createdAt: new Date().toISOString()
         });
-        console.log('[SERVICE SAVE] create success');
         notify.success('Novo serviço adicionado com sucesso.');
       }
       closeModal();

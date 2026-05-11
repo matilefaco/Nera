@@ -27,10 +27,6 @@ export default function RegisterPage() {
       return;
     }
 
-    console.log('[SIGNUP FLOW DEBUG] selectedPlan:', selectedPlan);
-    console.log('[SIGNUP FLOW DEBUG] user.uid exists:', !!user.uid);
-    console.log('[SIGNUP FLOW DEBUG] user.email exists:', !!user.email);
-
     try {
       const token = await user.getIdToken();
       const response = await fetch('/api/plans/create-checkout', {
@@ -64,7 +60,6 @@ export default function RegisterPage() {
 
   const handleGoogleRegister = async () => {
     setLoading(true);
-    console.log('[SIGNUP FLOW] Starting with Google');
     try {
       if (auth.currentUser) {
         await signOut(auth);
@@ -73,7 +68,6 @@ export default function RegisterPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
-      console.log('[SIGNUP FLOW] Auth success (Google):', user.uid);
       
       const slug = generateSlug(user.displayName || 'profissional');
       const userReferralCode = generateReferralCode(user.displayName || 'PROFISSIONAL');
@@ -95,13 +89,11 @@ export default function RegisterPage() {
           credits: 0,
           createdAt: new Date().toISOString()
         }, { merge: true });
-        console.log('[SIGNUP FLOW] Profile creation success (Google)');
       } catch (firestoreError: any) {
         console.error('[SIGNUP FLOW] Firestore profile creation failed:', firestoreError);
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      console.log('[SIGNUP FLOW] Completed (Google)');
       notify.success('Que prazer ter você conosco! Bem-vinda à Nera.', {
         icon: <Sparkles className="text-brand-terracotta" size={18} />
       });
@@ -121,7 +113,6 @@ export default function RegisterPage() {
     if (loading) return;
     
     setLoading(true);
-    console.log('[SIGNUP FLOW] Starting manual flow for:', email);
     
     try {
       if (auth.currentUser) {
@@ -130,7 +121,6 @@ export default function RegisterPage() {
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      console.log('[SIGNUP FLOW] Auth success:', user.uid);
       
       try {
         await updateProfile(user, { displayName: name });
@@ -158,14 +148,11 @@ export default function RegisterPage() {
           credits: 0,
           createdAt: new Date().toISOString()
         });
-        console.log('[SIGNUP FLOW] Firestore profile creation success');
       } catch (firestoreError: any) {
         console.error('[SIGNUP FLOW] Firestore creation failed:', firestoreError);
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      console.log('[SIGNUP FLOW] Completed manual registration');
-      
       notify.success('Perfil criado com sucesso. Vamos começar?', {
         icon: <Sparkles className="text-brand-terracotta" size={18} />
       });

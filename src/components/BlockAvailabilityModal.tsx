@@ -31,7 +31,7 @@ export default function BlockAvailabilityModal({
   selectedDate,
   professionalId,
   appointments,
-  workingHours,
+  workingHours = { startTime: '09:00', endTime: '18:00' },
   initialStartTime,
   initialEndTime
 }: BlockAvailabilityModalProps) {
@@ -54,13 +54,15 @@ export default function BlockAvailabilityModal({
   const [loading, setLoading] = useState(false);
   const [conflicts, setConflicts] = useState<Appointment[]>([]);
 
+  const safeWorkingHours = workingHours || { startTime: '09:00', endTime: '18:00' };
+
   const quickOptions = [
-    { id: 'full_day', label: 'Dia Inteiro', icon: Zap, start: workingHours.startTime || '09:00', end: workingHours.endTime || '18:00' },
-    { id: 'morning', label: 'Manhã', icon: Sunrise, start: workingHours.startTime || '09:00', end: '12:00' },
+    { id: 'full_day', label: 'Dia Inteiro', icon: Zap, start: safeWorkingHours.startTime || '09:00', end: safeWorkingHours.endTime || '18:00' },
+    { id: 'morning', label: 'Manhã', icon: Sunrise, start: safeWorkingHours.startTime || '09:00', end: '12:00' },
     { id: 'afternoon', label: 'Tarde', icon: Sun, start: '12:00', end: '18:00' },
-    { id: 'night', label: 'Noite', icon: Moon, start: '18:00', end: workingHours.endTime || '22:00' },
+    { id: 'night', label: 'Noite', icon: Moon, start: '18:00', end: safeWorkingHours.endTime || '22:00' },
     { id: 'next_2h', label: 'Próximas 2h', icon: Clock, start: getTodayLocaleTime(), end: '' }, // end calculated below
-    { id: 'rest_of_day', label: 'Resto do dia', icon: Coffee, start: getTodayLocaleTime(), end: workingHours.endTime || '22:00' },
+    { id: 'rest_of_day', label: 'Resto do dia', icon: Coffee, start: getTodayLocaleTime(), end: safeWorkingHours.endTime || '22:00' },
   ];
 
   const reasons = [
@@ -130,7 +132,7 @@ export default function BlockAvailabilityModal({
         startTime: start,
         endTime: end,
         reason,
-        type: start === workingHours.startTime && end === workingHours.endTime ? 'full_day' : 'manual',
+        type: start === safeWorkingHours.startTime && end === safeWorkingHours.endTime ? 'full_day' : 'manual',
         isRecurring,
         recurringDays: isRecurring ? [new Date(date + 'T12:00:00').getDay()] : [],
         createdAt: serverTimestamp()
@@ -155,7 +157,7 @@ export default function BlockAvailabilityModal({
         startTime,
         endTime,
         reason,
-        type: startTime === workingHours.startTime && endTime === workingHours.endTime ? 'full_day' : 'manual',
+        type: startTime === safeWorkingHours.startTime && endTime === safeWorkingHours.endTime ? 'full_day' : 'manual',
         isRecurring,
         recurringDays: isRecurring ? [new Date(date + 'T12:00:00').getDay()] : [],
         createdAt: serverTimestamp()

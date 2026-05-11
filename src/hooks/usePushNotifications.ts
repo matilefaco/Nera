@@ -44,7 +44,6 @@ export function usePushNotifications() {
   }
 
   async function requestPermission() {
-    console.log("[PUSH STEP 1] requestPermission iniciado");
     
     if (!isSupported) {
       console.error("[PUSH] Web Push is not supported in this browser.");
@@ -57,27 +56,21 @@ export function usePushNotifications() {
     }
 
     try {
-      console.log("[PUSH STEP 2] permissão solicitada. Atual:", Notification.permission);
       const result = await Notification.requestPermission();
-      console.log("[PUSH STEP 3] resultado da permissão:", result);
       setPermission(result);
 
       if (result !== 'granted') {
         return false;
       }
 
-      console.log("[PUSH STEP 4] verificando registros do service worker...");
       let registrations = await navigator.serviceWorker.getRegistrations();
-      console.log("[PUSH DEBUG] service worker registrations found:", registrations.length);
       
       if (registrations.length === 0) {
-        console.log("[PUSH] Nenhum SW encontrado. Registrando /sw-push.js...");
         try {
           await navigator.serviceWorker.register('/sw-push.js', { scope: '/' });
           // Give it a moment to register
           await new Promise(resolve => setTimeout(resolve, 1000));
           registrations = await navigator.serviceWorker.getRegistrations();
-          console.log("[PUSH DEBUG] service worker registrations after manual registration:", registrations.length);
         } catch (regErr) {
           console.error("[PUSH] Falha ao registrar SW manualmente:", regErr);
         }
@@ -87,22 +80,18 @@ export function usePushNotifications() {
         throw new Error("Service Worker não registrado. Certifique-se de que está usando HTTPS e que o app está instalado.");
       }
 
-      console.log("[PUSH STEP 5] aguardando serviceWorker.ready...");
       const registration = await withTimeout(
         navigator.serviceWorker.ready,
         8000,
         "Service Worker não ficou pronto a tempo. Recarregue o app e tente novamente."
       );
-      console.log("[PUSH STEP 6] service worker pronto");
       
       // Subscribe to push notifications
-      console.log("[PUSH STEP 7] criando subscription...");
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
       });
 
-      console.log("[PUSH STEP 8] subscription obtida:", !!subscription);
       if (!subscription) {
         throw new Error("Falha ao criar inscrição de notificações.");
       }
@@ -114,7 +103,6 @@ export function usePushNotifications() {
       }
 
       const token = await user.getIdToken();
-      console.log("[PUSH STEP 9] enviando subscription ao backend...");
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -135,12 +123,10 @@ export function usePushNotifications() {
         });
 
         clearTimeout(timeoutId);
-        console.log("[PUSH STEP 10] backend respondeu");
 
         const responseData = await response.json();
 
         if (response.ok && responseData.success) {
-          console.log("[PUSH SUCCESS] Inscrição salva e verificada no backend:", responseData.path);
           setIsSubscribed(true);
           return true;
         } else {

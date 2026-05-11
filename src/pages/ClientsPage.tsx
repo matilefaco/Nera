@@ -65,9 +65,11 @@ export default function ClientsPage() {
     const s = new Set<string>();
     clients.forEach((c: any) => {
       if (c.services && Array.isArray(c.services)) {
-        c.services.forEach((srv: string) => s.add(srv));
-      } else if (c.lastServiceName) {
-        s.add(c.lastServiceName);
+        c.services.forEach((srv: string) => {
+          if (srv && typeof srv === 'string' && srv.trim().length > 0) s.add(srv.trim());
+        });
+      } else if (c.lastServiceName && typeof c.lastServiceName === 'string' && c.lastServiceName.trim().length > 0) {
+        s.add(c.lastServiceName.trim());
       }
     });
     return Array.from(s).sort();
@@ -93,25 +95,18 @@ export default function ClientsPage() {
     risk: 0
   });
 
-  const fetchClients = useCallback(async (isNextPage = false) => {
+  const fetchClients = useCallback(async () => {
     if (!user) return;
-    if (isNextPage) setLoadingMore(true);
-    else setLoading(true);
+    setLoading(true);
 
     try {
-      let q = query(
+      const q = query(
         collection(db, 'client_summaries'),
-        where('professionalId', '==', user.uid),
-        orderBy('lastAppointmentDate', 'desc'),
-        limit(PAGE_SIZE)
+        where('professionalId', '==', user.uid)
       );
 
-      if (isNextPage && lastVisible) {
-        q = query(q, startAfter(lastVisible));
-      }
-
       const snapshot = await getDocs(q);
-      const docs = snapshot.docs.map(doc => {
+      let docs = snapshot.docs.map(doc => {
         const data = doc.data();
         return { 
           id: doc.id,
@@ -124,23 +119,13 @@ export default function ClientsPage() {
         } as ClientSummary;
       });
       
-      if (isNextPage) {
-        setClients(prev => {
-          const uniqueDocs = [...prev];
-          docs.forEach(doc => {
-            if (!uniqueDocs.find(d => d.id === doc.id)) uniqueDocs.push(doc);
-          });
-          return uniqueDocs;
-        });
-      } else {
-        setClients(docs);
-      }
-
-      setLastVisible(snapshot.docs[snapshot.docs.length - 1] || null);
-      setHasMore(snapshot.docs.length === PAGE_SIZE);
+      docs.sort((a, b) => new Date(b.lastAppointmentDate).getTime() - new Date(a.lastAppointmentDate).getTime());
+      
+      setClients(docs);
+      setHasMore(false);
 
       // If no clients found or index error, we'll try to fallback
-      if (!isNextPage && snapshot.empty) {
+      if (snapshot.empty) {
         throw new Error('empty_summaries');
       }
     } catch (err: any) {
@@ -151,16 +136,9 @@ export default function ClientsPage() {
         
         // Fallback: derive clients from appointments collection safely
         try {
-          const now = new Date();
-          const past = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-          const fallbackStartDateStr = past.toISOString().split('T')[0];
-
           const apptQuery = query(
             collection(db, 'appointments'),
-            where('professionalId', '==', user.uid),
-            where('date', '>=', fallbackStartDateStr),
-            orderBy('date', 'desc'),
-            limit(500)
+            where('professionalId', '==', user.uid)
           );
           const apptSnap = await getDocs(apptQuery);
           
@@ -247,118 +225,106 @@ export default function ClientsPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [user, lastVisible]);
+  }, [user]);
 
   useEffect(() => {
     fetchClients();
   }, [user]);
 
-  // Handle migration
   const handleMigrate = async () => {
     if (!user) return;
     setIsMigrating(true);
     notify.info('Iniciando atualização inteligente da base de clientes...', {
-      description: 'Isso pode processar dados em lotes. Por favor, aguarde.'
+      description: 'Isso pode processar dados. Por favor, aguarde.'
     });
 
     try {
       let count = 0;
-      let hasMore = true;
-      let lastVisibleDoc = null;
       const MAX_MIGRATION_DOCS = 3000;
-      const PAGE_SIZE = 300;
       
       const batchMap = new Map<string, any>();
       
-      while (hasMore) {
-        let q = query(
-          collection(db, 'appointments'), 
-          where('professionalId', '==', user.uid),
-          orderBy('date', 'desc'),
-          limit(PAGE_SIZE)
-        );
+      const q = query(
+        collection(db, 'appointments'), 
+        where('professionalId', '==', user.uid)
+      );
+
+      const snap = await getDocs(q);
+      
+      if (snap.empty) {
+        notify.info('Não há agendamentos para migrar.');
+        setIsMigrating(false);
+        return;
+      }
+
+      let appointments = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
+      appointments.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      
+      if (appointments.length > MAX_MIGRATION_DOCS) {
+        appointments = appointments.slice(0, MAX_MIGRATION_DOCS);
+        notify.warning('Muitos registros encontrados', {
+          description: `Sincronizamos os mais recentes (${MAX_MIGRATION_DOCS}). Para uma migração total de histórico gigante, use uma rotina administrativa fora do app.`
+        });
+      }
+
+      for (const appt of appointments as Array<Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string }>) {
+        if (!appt.clientName || !appt.date) continue;
         
-        if (lastVisibleDoc) {
-          q = query(q, startAfter(lastVisibleDoc));
-        }
-
-        const snap = await getDocs(q);
+        const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
+        const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
+        const summaryId = `${user.uid}_${key}`;
         
-        if (snap.empty) {
-          hasMore = false;
-          break;
-        }
-
-        lastVisibleDoc = snap.docs[snap.docs.length - 1];
-        const appointments = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
+        const existing = batchMap.get(summaryId) || {
+          professionalId: user.uid,
+          clientKey: key,
+          clientName: appt.clientName || 'Cliente',
+          clientPhone: phone,
+          clientEmail: appt.clientEmail || appt.customerEmail || '',
+          totalAppointments: 0,
+          confirmedAppointments: 0,
+          cancelledAppointments: 0,
+          noShowCount: 0,
+          totalSpent: 0,
+          firstAppointmentDate: appt.date,
+          lastAppointmentDate: appt.date,
+          lastServiceId: appt.serviceId || '',
+          lastServiceName: appt.serviceName || '',
+          segment: 'new',
+          notes: '',
+          services: []
+        };
         
-        for (const appt of appointments as Array<Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string }>) {
-          if (!appt.clientName || !appt.date) continue;
-          
-          const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
-          const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
-          const summaryId = `${user.uid}_${key}`;
-          
-          const existing = batchMap.get(summaryId) || {
-            professionalId: user.uid,
-            clientKey: key,
-            clientName: appt.clientName || 'Cliente',
-            clientPhone: phone,
-            clientEmail: appt.clientEmail || appt.customerEmail || '',
-            totalAppointments: 0,
-            confirmedAppointments: 0,
-            cancelledAppointments: 0,
-            noShowCount: 0,
-            totalSpent: 0,
-            firstAppointmentDate: appt.date,
-            lastAppointmentDate: appt.date,
-            lastServiceId: appt.serviceId || '',
-            lastServiceName: appt.serviceName || '',
-            segment: 'new',
-            notes: '',
-            services: []
-          };
-          
-          const isConfirmed = isRevenueStatus(appt.status);
-          const isCancelled = isCancelledStatus(appt.status);
-          const isNoShow = appt.status === APPOINTMENT_STATUS.NO_SHOW;
-          
-          if (isConfirmed || isCancelled || isNoShow) {
-            existing.totalAppointments += 1;
-          }
-
-          if (isConfirmed) {
-            existing.confirmedAppointments += 1;
-            existing.totalSpent += (Number(appt.price) || 0);
-          }
-          if (isNoShow) existing.noShowCount += 1;
-          if (isCancelled) existing.cancelledAppointments += 1;
-          
-          if (!existing.services) existing.services = [];
-          if (!existing.services.includes(appt.serviceName || '') && appt.serviceName) {
-            existing.services.push(appt.serviceName);
-          }
-          
-          if (appt.date > existing.lastAppointmentDate) {
-            existing.lastAppointmentDate = appt.date;
-            existing.lastServiceId = appt.serviceId || '';
-            existing.lastServiceName = appt.serviceName || '';
-          }
-          if (appt.date < existing.firstAppointmentDate) {
-            existing.firstAppointmentDate = appt.date;
-          }
-          
-          batchMap.set(summaryId, existing);
-          count++;
+        const isConfirmed = isRevenueStatus(appt.status);
+        const isCancelled = isCancelledStatus(appt.status);
+        const isNoShow = appt.status === APPOINTMENT_STATUS.NO_SHOW;
+        
+        if (isConfirmed || isCancelled || isNoShow) {
+          existing.totalAppointments += 1;
         }
 
-        if (count >= MAX_MIGRATION_DOCS) {
-          notify.warning('Muitos registros encontrados', {
-            description: 'Sincronizamos os mais recentes. Para uma migração total de histórico gigante, use uma rotina administrativa fora do app.'
-          });
-          hasMore = false;
-          break;
+        if (isConfirmed) {
+          existing.confirmedAppointments += 1;
+          existing.totalSpent += (Number(appt.price) || 0);
         }
+        if (isNoShow) existing.noShowCount += 1;
+        if (isCancelled) existing.cancelledAppointments += 1;
+        
+        if (!existing.services) existing.services = [];
+        if (!existing.services.includes(appt.serviceName || '') && appt.serviceName) {
+          existing.services.push(appt.serviceName);
+        }
+        
+        if (appt.date > existing.lastAppointmentDate) {
+          existing.lastAppointmentDate = appt.date;
+          existing.lastServiceId = appt.serviceId || '';
+          existing.lastServiceName = appt.serviceName || '';
+        }
+        if (appt.date < existing.firstAppointmentDate) {
+          existing.firstAppointmentDate = appt.date;
+        }
+        
+        batchMap.set(summaryId, existing);
+        count++;
       }
       
       // Write to Firestore in batches
@@ -387,7 +353,6 @@ export default function ClientsPage() {
       
       // Refresh the page data
       setClients([]);
-      setLastVisible(null);
       fetchClients(); // Refresh
     } catch (err) {
       console.error('[Migration] Failed:', err);
@@ -445,7 +410,16 @@ export default function ClientsPage() {
         const matchSearch = (client.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                             (client.clientPhone || '').includes(searchTerm);
         
-        const matchService = !filterService || (client.services && client.services.includes(filterService));
+        let matchService = true;
+        if (filterService) {
+          const normalizedFilterService = filterService.toLowerCase().trim();
+          const hasInServices = client.services && Array.isArray(client.services) && 
+            client.services.some(s => typeof s === 'string' && s.toLowerCase().trim() === normalizedFilterService);
+          const hasInLastService = typeof client.lastServiceName === 'string' && 
+            client.lastServiceName.toLowerCase().trim() === normalizedFilterService;
+          
+          matchService = Boolean(hasInServices || hasInLastService);
+        }
         
         const matchStatus = filterStatus === "all" || client.segment === filterStatus;
           
@@ -828,7 +802,7 @@ export default function ClientsPage() {
               {hasMore && (
                 <div className="pt-8 text-center">
                   <PremiumButton 
-                    onClick={() => fetchClients(true)} 
+                    onClick={() => fetchClients()} 
                     disabled={loadingMore}
                     variant="linen" 
                     className="text-[10px] py-4 px-10 flex items-center gap-2 mx-auto"

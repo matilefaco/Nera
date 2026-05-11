@@ -55,7 +55,6 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) return <AppLoadingScreen />;
   
   if (!user) {
-    console.log('[Guard] No user found, redirecting to login');
     return <Navigate to="/login" />;
   }
 
