@@ -718,21 +718,23 @@ setWaitlist(docs);
   const [isPushLoading, setIsPushLoading] = useState(false);
 
   useEffect(() => {
-    console.log("[PUSH UI] Notification supported:", "Notification" in window);
-    console.log("[PUSH UI] ServiceWorker supported:", "serviceWorker" in navigator);
-    console.log("[PUSH UI] PushManager supported:", "PushManager" in window);
-    if ("Notification" in window) {
-      console.log("[PUSH UI] permission:", Notification.permission);
+    if (import.meta.env.DEV) {
+      console.log("[PUSH UI] Notification supported:", "Notification" in window);
+      console.log("[PUSH UI] ServiceWorker supported:", "serviceWorker" in navigator);
+      console.log("[PUSH UI] PushManager supported:", "PushManager" in window);
+      if ("Notification" in window) {
+        console.log("[PUSH UI] permission:", Notification.permission);
+      }
     }
   }, []);
 
   const handleEnablePushNotifications = async () => {
     try {
-      console.log("[PUSH BUTTON] clicked");
+      if (import.meta.env.DEV) console.log("[PUSH BUTTON] clicked");
       setIsPushLoading(true);
       
       const success = await requestPermission();
-      console.log("[PUSH BUTTON] requestPermission finished. Success:", success);
+      if (import.meta.env.DEV) console.log("[PUSH BUTTON] requestPermission finished. Success:", success);
 
       if (success) {
         notify.success('Notificações ativadas com sucesso!');

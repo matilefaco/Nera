@@ -61,23 +61,13 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   // CRITICAL: Single Source of Truth for Onboarding
   const isCompleted = profile?.onboardingCompleted === true;
   
-  console.log('[Guard] Checking access:', {
-    path: location.pathname,
-    uid: user.uid,
-    hasProfile: !!profile,
-    isCompleted,
-    step: profile?.onboardingStep
-  });
-
   // If user is logged in but hasn't finished onboarding, redirect to onboarding
   if (profile && !isCompleted && location.pathname !== '/onboarding') {
-    console.log('[Guard] Onboarding incomplete, forcing redirect to /onboarding');
     return <Navigate to="/onboarding" />;
   }
 
   // If user HAS finished onboarding and tries to go back to onboarding, send to dashboard
   if (isCompleted && location.pathname === '/onboarding') {
-    console.log('[Guard] Onboarding already completed, forcing redirect to /dashboard');
     return <Navigate to="/dashboard" />;
   }
 
