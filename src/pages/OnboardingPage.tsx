@@ -1101,9 +1101,9 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-4">
-                <h1 className="text-5xl font-serif font-normal text-brand-ink">Seu perfil está no ar!</h1>
+                <h1 className="text-5xl font-serif font-normal text-brand-ink">Sua vitrine está no ar.</h1>
                 <p className="text-brand-stone text-lg max-w-sm mx-auto font-light">
-                  Sua página profissional está pronta para receber agendamentos.
+                  Seu perfil profissional está pronto para ser visto. Compartilhe seu link para começar a receber clientes.
                 </p>
               </div>
 
@@ -1117,7 +1117,7 @@ export default function OnboardingPage() {
                   <CopyLinkButton slug={slug} />
                   <button 
                     onClick={() => {
-                      const text = `Olá! Agora você pode agendar seus horários comigo diretamente pelo meu link: ${getPublicProfileUrl(slug)} ✨`;
+                      const text = `Olá! Minha agenda já está disponível. Você pode conferir meus serviços e agendar seu horário diretamente pelo meu link: ${getPublicProfileUrl(slug)}`;
                       window.open(buildWhatsappLink('', text), '_blank');
                     }}
                     className="flex flex-col items-center gap-4 p-8 bg-brand-parchment rounded-[32px] border border-brand-mist hover:bg-brand-linen transition-all group"
@@ -1125,7 +1125,7 @@ export default function OnboardingPage() {
                     <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center text-brand-ink border border-brand-mist group-hover:scale-110 transition-transform">
                       <Share2 size={24} />
                     </div>
-                    <span className="text-[10px] font-medium uppercase tracking-widest">Divulgar</span>
+                    <span className="text-[10px] font-medium uppercase tracking-widest">Compartilhar</span>
                   </button>
                 </div>
               </div>
@@ -1136,7 +1136,7 @@ export default function OnboardingPage() {
                   className="w-full bg-brand-ink text-brand-white py-7 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-50"
                   disabled={isFinalizing}
                 >
-                  {isFinalizing ? 'Preparando acesso...' : 'Acessar meu Painel'} <ArrowRight size={20} />
+                  {isFinalizing ? 'Preparando...' : 'Acessar meu painel'} <ArrowRight size={20} />
                 </button>
                 <Link 
                   to={`/p/${slug}`} 
