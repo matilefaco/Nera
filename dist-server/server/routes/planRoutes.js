@@ -285,6 +285,38 @@ router.post("/webhook", async (req, res) => {
             logger.error("STRIPE", "Error processing invoice.payment_failed", { requestId: req.requestId, error: err });
         }
     }
+    if (event.type === 'customer.subscription.updated') {
+        const subscription = event.data.object;
+        const subscriptionId = subscription.id;
+        const customerId = subscription.customer;
+        logger.info("STRIPE", "Received customer.subscription.updated", { requestId: req.requestId, meta: { subscriptionId: maskToken(subscriptionId) } });
+        try {
+            let userQuery = await db.collection('users').where('stripeSubscriptionId', '==', subscriptionId).limit(1).get();
+            if (userQuery.empty) {
+                userQuery = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+            }
+            if (!userQuery.empty) {
+                const updateData = {
+                    stripeSubscriptionStatus: subscription.status,
+                    stripeSubscriptionId: subscriptionId,
+                    stripeCustomerId: customerId,
+                    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+                    updatedAt: new Date().toISOString()
+                };
+                if (subscription.current_period_end) {
+                    updateData.currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+                }
+                await userQuery.docs[0].ref.update(updateData);
+                logger.info("STRIPE", "Subscription sync updated", { professionalId: maskUid(userQuery.docs[0].id) });
+            }
+            else {
+                logger.warn("STRIPE", "Customer for subscription.updated not found in system", { meta: { customerId: maskToken(customerId) } });
+            }
+        }
+        catch (err) {
+            logger.error("STRIPE", "Error processing customer.subscription.updated", { requestId: req.requestId, error: err });
+        }
+    }
     if (event.type === 'customer.subscription.deleted') {
         const subscription = event.data.object;
         const customerId = subscription.customer;

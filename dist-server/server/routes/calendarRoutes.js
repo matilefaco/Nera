@@ -161,12 +161,17 @@ export async function createGoogleCalendarEvent(appointment, professionalId) {
         oauth2Client.setCredentials(integration.tokens);
         // Refresh token if needed
         oauth2Client.on("tokens", (tokens) => {
-            if (tokens.refresh_token) {
-                // Updated refresh token
-                db.collection("users").doc(professionalId).update({
-                    "integrations.google_calendar.tokens": tokens
-                });
-            }
+            const cleanNewTokens = Object.fromEntries(Object.entries(tokens).filter(([_, v]) => v !== undefined));
+            const existingTokens = integration?.tokens || {};
+            const updatedTokens = {
+                ...existingTokens,
+                ...cleanNewTokens
+            };
+            db.collection("users").doc(professionalId).update({
+                "integrations.google_calendar.tokens": updatedTokens
+            }).catch(err => {
+                logger.error("CALENDAR", "Failed to persist refreshed tokens", { professionalId: maskUid(professionalId), error: err });
+            });
         });
         const calendar = google.calendar({ version: "v3", auth: oauth2Client });
         // Calculate start/end
