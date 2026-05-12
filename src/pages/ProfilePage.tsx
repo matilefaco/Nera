@@ -40,6 +40,29 @@ const IDENTITY_DIFFERENTIALS = [
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
 
+const THEME_MOODS: Record<string, { label: string, subtitle: string }> = {
+  terracotta: {
+    label: "Editorial quente",
+    subtitle: "Sofisticado e acolhedor."
+  },
+  rose: {
+    label: "Delicado autoral",
+    subtitle: "Suave, feminino e sensível."
+  },
+  sage: {
+    label: "Natural preciso",
+    subtitle: "Leve, calmo e orgânico."
+  },
+  navy: {
+    label: "Clássico intenso",
+    subtitle: "Contraste e autoridade."
+  },
+  plum: {
+    label: "Noturno refinado",
+    subtitle: "Profundo e luxuoso."
+  }
+};
+
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -953,44 +976,69 @@ export default function ProfilePage() {
 
                 <p className="text-[11px] text-brand-stone font-light mb-5">Escolha o tema visual que melhor representa sua marca.</p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {Object.entries(THEMES).map(([variant, theme]) => {
                     const locked = isThemeLocked(variant);
+                    const mood = THEME_MOODS[variant] || { label: theme.name, subtitle: 'Tema visual para a vitrine.' };
+                    const isSelected = profileTheme.variant === variant;
+                    
                     return (
                       <button
                         key={variant}
                         type="button"
                         onClick={() => handleThemeClick(variant)}
                         className={cn(
-                          "flex flex-col items-center gap-3 p-4 rounded-3xl border transition-all duration-300 ease-out relative overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
-                          profileTheme.variant === variant 
-                            ? "border-brand-ink bg-brand-linen/30 shadow-md scale-[1.02]"
-                            : "border-brand-mist bg-white hover:border-brand-stone/40 hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]",
-                          locked && "opacity-80 hover:scale-100 active:scale-100"
+                          "flex flex-row items-center gap-3.5 p-3.5 rounded-2xl border transition-all duration-300 ease-out relative overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-1 text-left",
+                          isSelected 
+                            ? "border-brand-terracotta/30 bg-[#FAF9F8] shadow-sm"
+                            : "border-brand-mist bg-white hover:border-brand-stone/30 hover:bg-brand-mist/10",
+                          locked && "opacity-90 hover:bg-white hover:border-brand-mist cursor-default"
                         )}
                       >
                         <div 
-                          className="w-12 h-12 rounded-full shadow-inner border border-black/5 relative"
-                          style={{ backgroundColor: theme.primary }}
+                          className="relative shrink-0 flex items-center justify-center w-10 h-10 rounded-full shadow-inner border border-black/5"
+                          style={{ backgroundColor: theme.background }}
                         >
-                          {locked && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-brand-ink/20 rounded-full backdrop-blur-[1px]">
-                              <Lock size={14} className="text-white" />
-                            </div>
+                          <div 
+                            className="w-5 h-5 rounded-full opacity-90 shadow-sm"
+                            style={{ backgroundColor: theme.primary }}
+                          />
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full absolute -bottom-0.5 -right-0.5 border-2 border-white shadow-sm"
+                            style={{ backgroundColor: theme.text }}
+                          />
+                        </div>
+
+                        <div className="flex-1 min-w-0 flex flex-col items-start gap-0.5">
+                          <div className="flex items-center gap-1.5 w-full">
+                            <h4 className={cn(
+                              "text-[13px] font-semibold tracking-tight truncate",
+                              isSelected ? "text-brand-ink" : "text-brand-ink/80 group-hover:text-brand-ink",
+                              locked && "text-brand-ink/60"
+                            )}>
+                              {mood.label}
+                            </h4>
+                            {locked && (
+                              <div className="bg-brand-mist/50 px-1.5 py-[1px] rounded flex items-center gap-0.5 shrink-0">
+                                <Lock size={8} className="text-brand-stone" />
+                                <span className="text-[8px] font-bold uppercase tracking-wider text-brand-stone">Pro</span>
+                              </div>
+                            )}
+                          </div>
+                          <p className={cn(
+                            "text-[11px] leading-tight truncate w-full",
+                            isSelected ? "text-brand-stone" : "text-brand-stone/70 group-hover:text-brand-stone",
+                            locked && "text-brand-stone/50"
+                          )}>
+                            {mood.subtitle}
+                          </p>
+                        </div>
+                        
+                        <div className="shrink-0 flex items-center justify-center w-5 h-5">
+                          {isSelected && (
+                            <CheckCircle2 size={16} fill="currentColor" className="text-brand-terracotta bg-white rounded-full animate-in zoom-in duration-300" />
                           )}
                         </div>
-                        <span className={cn(
-                          "text-[9px] font-bold uppercase tracking-widest text-center leading-tight",
-                          profileTheme.variant === variant ? "text-brand-ink" : "text-brand-stone"
-                        )}>
-                          {theme.name.split(' ')[0]}
-                        </span>
-                        
-                        {profileTheme.variant === variant && (
-                          <div className="absolute top-2 right-2 bg-brand-ink text-white rounded-full p-1">
-                            <CheckCircle2 size={10} />
-                          </div>
-                        )}
                       </button>
                     );
                   })}
