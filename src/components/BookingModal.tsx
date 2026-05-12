@@ -418,30 +418,30 @@ export default function BookingModal({ profile, services, onClose, open, initial
   }, [selectedDate, availableSlots]);
 
   useEffect(() => {
-    if (!selectedDate || !profile?.uid || !open) return;
-
-    setIsLoadingSlots(true);
+    if (!profile?.uid || !open) return;
 
     // Listener de bloqueios novos (blocked_schedules)
     const blockedRef = collection(db, 'blocked_schedules');
-    const dayOfWeek = new Date(selectedDate + 'T12:00:00').getDay();
 
     const unsubBlocked = onSnapshot(
       query(blockedRef, where('professionalId', '==', profile.uid)),
       (snap) => {
         try {
           const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-const dayBlocked = allBlocked.filter(b => {
-                const isToday = b.date === selectedDate;
-                const isRecurring = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
-                return isToday || isRecurring;
-              });
-setBlockedSchedules(dayBlocked);
+          setBlockedSchedules(allBlocked);
         } catch (err) {
           console.error("Error in onSnapshot callback:", err);
         }
       }, (error) => { console.error("Firestore onSnapshot error:", error); }
     );
+
+    return () => unsubBlocked();
+  }, [profile?.uid, open]);
+
+  useEffect(() => {
+    if (!selectedDate || !profile?.uid || !open) return;
+
+    setIsLoadingSlots(true);
 
     // Listener de agendamentos para excluir slots ocupados
     const apptsRef = collection(db, 'appointments');
@@ -455,16 +455,13 @@ setBlockedSchedules(dayBlocked);
     const unsubAppts = onSnapshot(apptsQ, (snapshot) => {
       try {
         setDayAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment)));
-setIsLoadingSlots(false);
+        setIsLoadingSlots(false);
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
       }
     }, (error) => { console.error("Firestore onSnapshot error:", error); });
 
-    return () => {
-      unsubBlocked();
-      unsubAppts();
-    };
+    return () => unsubAppts();
   }, [selectedDate, profile?.uid, open]);
 
   const calculateTotalPrice = () => {
