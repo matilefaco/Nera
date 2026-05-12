@@ -886,52 +886,53 @@ setWaitlist(docs);
         {/* 1. HEADER LIMPO */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-3">
-            <div>
-              <h1 className="text-[28px] md:text-3xl font-serif text-brand-ink tracking-tight">
+            <div className="space-y-1">
+              <h1 className="text-3xl font-serif text-brand-ink tracking-tight">
                 Olá, {safeString(profile?.name).split(' ')[0]} ✨
               </h1>
-              <p className="text-[13px] text-brand-stone font-light mt-1.5">
-                Você tem <strong className="font-medium text-brand-ink">{appointments.filter(a => {
-                  if (!a.date) return false;
-                  const d = safeParseLocalDate(a.date);
-                  if (!d) return false;
-                  const now = new Date();
-                  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                }).length} agendamentos</strong> este mês.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className={cn(
-                "text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-md",
-                plan === 'pro' || plan === 'essencial' 
-                  ? "text-brand-ink bg-brand-parchment/60 border border-brand-mist/50" 
-                  : "text-brand-stone bg-brand-mist/20"
-              )}>
-                Plano {
-                  plan === 'pro' ? 'Pro' : 
-                  plan === 'essencial' ? 'Essencial' : 
-                  'Gratuito'
-                }
-              </span>
-              {(plan === 'free') && (
-                <Link to="/planos" className="text-[10px] text-brand-terracotta underline hover:text-brand-terracotta/80 transition-all font-medium">
-                  Fazer upgrade
-                </Link>
-              )}
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <span className={cn(
+                  "text-[9px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded flex items-center",
+                  plan === 'pro' || plan === 'essencial' 
+                    ? "text-brand-ink bg-brand-linen border border-brand-mist/50" 
+                    : "text-brand-stone bg-brand-mist/10 border border-brand-mist/30"
+                )}>
+                  Plano {
+                    plan === 'pro' ? 'Pro' : 
+                    plan === 'essencial' ? 'Essencial' : 
+                    'Gratuito'
+                  }
+                </span>
+                {(plan === 'free') && (
+                  <Link to="/planos" className="text-[10px] text-brand-terracotta hover:text-brand-sienna transition-colors font-medium relative top-[-1px]">
+                    Upgrade
+                  </Link>
+                )}
+                <span className="text-brand-mist text-[10px] hidden sm:inline">|</span>
+                <p className="text-[12px] text-brand-stone font-light hidden sm:block">
+                  <strong className="font-medium text-brand-ink">{appointments.filter(a => {
+                    if (!a.date) return false;
+                    const d = safeParseLocalDate(a.date);
+                    if (!d) return false;
+                    const now = new Date();
+                    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                  }).length}</strong> atendimentos no mês
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar pt-2 md:pt-0">
+          <div className="flex items-center gap-2.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar pt-4 md:pt-0">
             <button 
               onClick={() => setIsQuickBlockOpen(true)}
-              className="flex flex-1 md:flex-none justify-center items-center gap-2 px-4 py-2.5 bg-brand-white text-brand-ink border border-brand-mist/50 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-parchment/50 transition-all shadow-sm whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-ink"
+              className="flex flex-1 md:flex-none justify-center items-center gap-2 px-4 py-2 border border-brand-mist/80 bg-brand-white text-brand-ink rounded-[12px] text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors shadow-none whitespace-nowrap"
             >
-              <Lock size={14} className="text-brand-stone/70" /> Bloquear
+              <Lock size={12} className="text-brand-stone/80" /> Bloquear
             </button>
             <button 
               onClick={() => setIsShareModalOpen(true)}
-              className="flex flex-1 md:flex-none justify-center items-center gap-2 px-5 py-2.5 bg-brand-ink text-brand-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 transition-all shadow-sm whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-ink"
+              className="flex flex-1 md:flex-none justify-center items-center gap-2 px-5 py-2 bg-brand-ink text-brand-white rounded-[12px] text-[9px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 transition-colors shadow-sm whitespace-nowrap"
             >
-              <Share2 size={14} /> Link profissional
+              <Share2 size={12} /> Link direto
             </button>
           </div>
         </header>
@@ -1369,16 +1370,16 @@ setWaitlist(docs);
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-[#FAF9F8] p-4 md:px-5 md:py-4 rounded-xl border border-brand-terracotta/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0"
+                className="bg-brand-linen/40 px-5 py-4 rounded-[20px] border border-brand-mist/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 group hover:border-brand-mist transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/80 animate-pulse shrink-0" />
-                  <p className="text-[13px] font-serif text-brand-ink leading-snug">
-                    Você tem <span className="font-medium text-brand-terracotta">{pendingCount} {pendingCount === 1 ? 'pedido pendente' : 'pedidos pendentes'}</span> aguardando confirmação
+                  <div className="w-2 h-2 rounded-full bg-brand-terracotta/80 shrink-0" />
+                  <p className="text-[13px] font-serif text-brand-ink">
+                    <span className="font-medium text-brand-terracotta">{pendingCount} {pendingCount === 1 ? 'novo pedido' : 'pedidos pendentes'}</span> na fila de confirmação
                   </p>
                 </div>
-                <Link to="/pedidos" className="w-fit ml-4 sm:ml-0 px-3 py-1.5 sm:p-0 bg-white sm:bg-transparent border border-brand-mist/50 sm:border-0 rounded-md text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:text-brand-terracotta/80 transition-all flex items-center gap-1.5 shrink-0 shadow-sm sm:shadow-none">
-                  Ver pedidos <span className="text-brand-terracotta/40 hidden sm:inline text-[10px]">→</span>
+                <Link to="/pedidos" className="w-fit ml-5 sm:ml-0 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:text-brand-sienna transition-colors py-1">
+                  Avaliar <ChevronRight size={12} className="text-brand-terracotta/50 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               </motion.div>
             )}
@@ -1463,42 +1464,36 @@ setWaitlist(docs);
                     <div 
                       key={appt.id} 
                       className={cn(
-                        "bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex items-center justify-between group transition-all",
-                        appt.status === 'completed' && "bg-brand-linen opacity-80"
+                        "bg-brand-white px-5 py-4 md:px-6 md:py-5 rounded-[24px] border border-brand-mist shadow-sm flex items-center justify-between group hover:border-brand-mist/80 transition-colors",
+                        isCompletedStatus(appt.status) && "bg-brand-linen/40 border-dashed shadow-none"
                       )}
                     >
-                      <div className="flex items-center gap-5">
-                        <div className="text-center min-w-[50px]">
-                          <p className="text-lg font-serif font-bold text-brand-ink leading-none">{appt.time}</p>
+                      <div className="flex items-center gap-4 md:gap-5 w-full">
+                        <div className="text-center min-w-[48px] shrink-0">
+                          <p className={cn("text-[17px] font-serif font-bold leading-none", isCompletedStatus(appt.status) ? "text-brand-stone opacity-60" : "text-brand-ink")}>{appt.time}</p>
                         </div>
-                        <div className="h-10 w-px bg-brand-linen" />
-                        <div>
-                          <h4 className="text-sm font-bold text-brand-ink">{appt.clientName}</h4>
-                          <p className="text-xs text-brand-stone italic">{appt.serviceName}</p>
-                          <span className={cn(
-                            "text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block",
-                            isCompletedStatus(appt.status) ? "text-brand-terracotta bg-white" : 
-                            isConfirmedLikeStatus(appt.status) ? "text-green-600 bg-green-50" : "text-brand-stone bg-brand-linen"
-                          )}>
-                            {isCompletedStatus(appt.status) ? 'Concluído ✓' : 
-                             isConfirmedLikeStatus(appt.status) ? 'Confirmado' : appt.status}
-                          </span>
+                        <div className="h-8 w-px bg-brand-mist/60 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone opacity-60" : "text-brand-ink")}>{appt.clientName}</h4>
+                            {isCompletedStatus(appt.status) && <CheckCircle2 size={12} className="text-brand-stone opacity-50 shrink-0" />}
+                          </div>
+                          <p className="text-[11px] text-brand-stone italic truncate leading-tight pr-2 mt-0.5">{appt.serviceName}</p>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0 pl-2">
                         {isConfirmedLikeStatus(appt.status) && isPastTime(appt.time) && (
                           <button
                             onClick={() => handleComplete(appt)}
                             disabled={processingId === appt.id}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-brand-terracotta text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all active:scale-95"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-brand-parchment/60 border border-brand-mist/50 text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors active:scale-95 whitespace-nowrap"
                           >
                             {processingId === appt.id ? "..." : "Finalizar"}
-                            <CheckCircle2 size={14} />
                           </button>
                         )}
-                        <Link to="/agenda" className="p-3 text-brand-stone hover:text-brand-terracotta">
-                          <ChevronRight size={18} />
+                        <Link to="/agenda" className="p-2 text-brand-mist hover:text-brand-terracotta transition-colors">
+                          <ChevronRight size={16} />
                         </Link>
                       </div>
                     </div>
@@ -2909,20 +2904,18 @@ setWaitlist(docs);
 
       {/* Floating Action Button for active appointment */}
       {ongoingAppt && (
-        <div className="fixed bottom-24 right-6 md:hidden z-40">
+        <div className="fixed bottom-[104px] right-5 md:hidden z-40">
           <motion.button
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            initial={{ scale: 0, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             onClick={() => handleComplete(ongoingAppt)}
             disabled={processingId === ongoingAppt.id}
-            className="w-14 h-14 bg-brand-terracotta text-white rounded-full shadow-2xl flex items-center justify-center relative group"
+            className="h-12 px-5 bg-brand-white/95 backdrop-blur-md text-brand-ink rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-brand-mist/80 flex items-center justify-center gap-2 relative group"
           >
-            <CheckCircle2 size={24} />
-            <div className="absolute right-full mr-3 bg-brand-ink text-white text-[10px] font-bold uppercase tracking-widest py-2 px-4 rounded-xl whitespace-nowrap opacity-0 transition-opacity pointer-events-none">
-              Finalizar {safeString(ongoingAppt.clientName, 'Cliente').split(' ')[0]}
-            </div>
+            <CheckCircle2 size={16} className="text-brand-terracotta" />
+            <span className="text-[10px] font-bold uppercase tracking-widest pt-[1px]">Finalizar</span>
           </motion.button>
         </div>
       )}
