@@ -93,6 +93,13 @@ export const FormLocation = ({
   subtitle,
   showLabels = true
 }: FormLocationProps) => {
+  const [showAdvancedLocation, setShowAdvancedLocation] = React.useState(() => {
+    return !!(studioAddress && (
+      (studioAddress.city && studioAddress.city.trim() !== '' && studioAddress.city !== city) ||
+      (studioAddress.neighborhood && studioAddress.neighborhood.trim() !== '' && studioAddress.neighborhood !== neighborhood)
+    ));
+  });
+
   return (
     <div className="w-full space-y-6">
       {(title || subtitle) && (
@@ -107,7 +114,7 @@ export const FormLocation = ({
           <div className="space-y-1">
             {showLabels && (
               <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-0.5 block">
-                Cidade <span className="text-brand-terracotta">*</span>
+                Cidade base <span className="text-brand-terracotta">*</span>
               </label>
             )}
             <div className="relative">
@@ -128,7 +135,7 @@ export const FormLocation = ({
           <div className="space-y-1">
             {showLabels && (
               <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-0.5 block">
-                Bairro
+                Bairro base
               </label>
             )}
             <input 
@@ -212,27 +219,41 @@ export const FormLocation = ({
                 />
               </div>
               
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 block">Bairro do Estúdio</label>
-                <input 
-                  type="text"
-                  value={studioAddress.neighborhood} 
-                  onChange={(e) => setStudioAddress({...studioAddress, neighborhood: e.target.value})} 
-                  placeholder="Ex: Meireles" 
-                  className="w-full px-3 py-2 bg-brand-white border border-brand-mist/60 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/40"
-                />
-              </div>
+              {!showAdvancedLocation ? (
+                <div className="md:col-span-4 flex justify-start my-1.5 ml-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAdvancedLocation(true)}
+                    className="text-[9px] font-bold uppercase tracking-[0.1em] text-brand-stone/60 hover:text-brand-terracotta transition-colors flex items-center gap-1.5"
+                  >
+                    <span className="text-lg leading-none mb-[2px] font-light">+</span> O estúdio fica em outra cidade ou bairro?
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 block">Bairro do Estúdio</label>
+                    <input 
+                      type="text"
+                      value={studioAddress.neighborhood} 
+                      onChange={(e) => setStudioAddress({...studioAddress, neighborhood: e.target.value})} 
+                      placeholder="Ex: Meireles" 
+                      className="w-full px-3 py-2 bg-brand-white border border-brand-mist/60 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/40"
+                    />
+                  </div>
 
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 block">Cidade do Estúdio</label>
-                <input 
-                  type="text"
-                  value={studioAddress.city} 
-                  onChange={(e) => setStudioAddress({...studioAddress, city: e.target.value})} 
-                  placeholder="Ex: Fortaleza" 
-                  className="w-full px-3 py-2 bg-brand-white border border-brand-mist/60 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/40"
-                />
-              </div>
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 block">Cidade do Estúdio</label>
+                    <input 
+                      type="text"
+                      value={studioAddress.city} 
+                      onChange={(e) => setStudioAddress({...studioAddress, city: e.target.value})} 
+                      placeholder="Ex: Fortaleza" 
+                      className="w-full px-3 py-2 bg-brand-white border border-brand-mist/60 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/40"
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="space-y-1 md:col-span-2">
                 <label className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 block">Complemento (opcional)</label>
