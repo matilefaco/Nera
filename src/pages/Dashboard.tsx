@@ -89,6 +89,14 @@ const devLog = (...args: any[]) => isDev && console.log(...args);
 
 type DashboardTab = "hoje" | "geral" | "insights" | "divulgacao";
 
+interface AnalyticsCacheEntry {
+  data: AnalyticsEvent[];
+  fetchedAt: number;
+}
+
+const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
+const analyticsEventsCache = new Map<string, AnalyticsCacheEntry>();
+
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const { features, plan } = usePlanFeatures();
@@ -249,6 +257,12 @@ setAlerts(docs);
     if (!user) return;
     let isMounted = true;
 
+    const cached = analyticsEventsCache.get(user.uid);
+    if (cached && Date.now() - cached.fetchedAt < ANALYTICS_CACHE_TTL_MS) {
+      setAnalyticsEvents(cached.data);
+      return;
+    }
+
     const qAnalytics = query(
       collection(db, 'analytics_events'),
       where('professionalId', '==', user.uid),
@@ -260,6 +274,7 @@ setAlerts(docs);
       if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
+        analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
         setAnalyticsEvents(docs);
       } catch (err) {
         console.error("Error processing getDocs callback:", err);
@@ -268,7 +283,7 @@ setAlerts(docs);
       console.error('[Dashboard] Fetch error on qAnalytics:', error);
     });
     return () => { isMounted = false; };
-  }, [user]);
+  }, [user?.uid]);
 
 
 
