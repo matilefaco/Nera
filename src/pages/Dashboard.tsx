@@ -97,6 +97,14 @@ interface AnalyticsCacheEntry {
 const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
 const analyticsEventsCache = new Map<string, AnalyticsCacheEntry>();
 
+interface AppointmentsCacheEntry {
+  data: Appointment[];
+  fetchedAt: number;
+}
+
+const APPOINTMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+const appointmentsHistoryCache = new Map<string, AppointmentsCacheEntry>();
+
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const { features, plan } = usePlanFeatures();
@@ -367,31 +375,42 @@ setUnconfirmedTomorrow(docs);
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
     const endDateStr = formatDateKey(thirtyDaysFromNow);
 
-    // Query: Historical and upcoming appointments to calculate metrics
-    const qAll = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', user.uid),
-      where('date', '>=', startDateStr),
-      where('date', '<=', endDateStr),
-      orderBy('date', 'desc')
-    );
+    const appointmentsCacheKey = `${user.uid}:${startDateStr}:${endDateStr}`;
+    const cachedAppointments = appointmentsHistoryCache.get(appointmentsCacheKey);
 
-    getDocs(qAll).then((snapshot) => {
-      if (!isMounted) return;
-      try {
-        const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
-        setAppointments(appointmentsData);
-        // Metrics calculation moved to hook
-      } catch (err) {
-        console.error("Error processing getDocs callback:", err);
-      }
-    }).catch((error) => { 
-      console.error("Firestore getDocs error:", error); 
-    }).finally(() => {
+    if (cachedAppointments && Date.now() - cachedAppointments.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
+      setAppointments(cachedAppointments.data);
       if (isMounted) {
         setIsInitialLoading(false);
       }
-    });
+    } else {
+      // Query: Historical and upcoming appointments to calculate metrics
+      const qAll = query(
+        collection(db, 'appointments'),
+        where('professionalId', '==', user.uid),
+        where('date', '>=', startDateStr),
+        where('date', '<=', endDateStr),
+        orderBy('date', 'desc')
+      );
+
+      getDocs(qAll).then((snapshot) => {
+        if (!isMounted) return;
+        try {
+          const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+          appointmentsHistoryCache.set(appointmentsCacheKey, { data: appointmentsData, fetchedAt: Date.now() });
+          setAppointments(appointmentsData);
+          // Metrics calculation moved to hook
+        } catch (err) {
+          console.error("Error processing getDocs callback:", err);
+        }
+      }).catch((error) => { 
+        console.error("Firestore getDocs error:", error); 
+      }).finally(() => {
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
+      });
+    }
 
     // Profile Settings are now handled in a separate useEffect
 
