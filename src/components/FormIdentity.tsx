@@ -119,36 +119,36 @@ export const FormIdentity = ({
   ];
 
   return (
-    <div className="w-full space-y-10">
+    <div className="w-full space-y-6">
       {(title || subtitle) && (
-        <div className="text-center space-y-4">
-          {title && <h1 className="text-4xl font-serif font-normal text-brand-ink">{title}</h1>}
-          {subtitle && <p className="text-brand-stone font-light">{subtitle}</p>}
+        <div className="text-center space-y-3">
+          {title && <h1 className="text-2xl sm:text-3xl font-serif font-normal text-brand-ink">{title}</h1>}
+          {subtitle && <p className="text-[11px] sm:text-sm text-brand-stone font-light">{subtitle}</p>}
         </div>
       )}
 
-      <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
-        <div className="flex flex-col items-center">
-          <div className="relative group">
+      <div className="space-y-0 text-center sm:text-left px-1">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 border-b border-brand-mist pb-6 mb-6">
+          <div className="relative group shrink-0">
             <div 
               onClick={onAvatarClick}
-              className="w-32 h-32 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden relative cursor-pointer"
+              className="w-24 h-24 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta border-4 border-brand-white shadow-sm overflow-hidden relative cursor-pointer"
             >
               {avatarPreview || avatar ? (
                 <img src={avatarPreview || avatar} className="w-full h-full object-cover" referrerPolicy="no-referrer" alt="Avatar Preview" />
               ) : (
-                <User size={48} className="opacity-20" />
+                <User size={32} className="opacity-20" />
               )}
               {uploadingImage && (
                 <div className="absolute inset-0 bg-brand-ink/40 flex items-center justify-center">
                   <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                    <Sparkles size={24} className="text-brand-white" />
+                    <Sparkles size={20} className="text-brand-white" />
                   </motion.div>
                 </div>
               )}
             </div>
-            <div className="absolute bottom-0 right-0 w-10 h-10 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-4 border-brand-white shadow-lg pointer-events-none">
-              <Camera size={18} />
+            <div className="absolute bottom-0 right-0 w-8 h-8 bg-brand-ink text-brand-white rounded-full flex items-center justify-center border-2 border-brand-white shadow-lg pointer-events-none">
+              <Camera size={14} />
             </div>
             <input 
               ref={inputRef}
@@ -159,58 +159,65 @@ export const FormIdentity = ({
               disabled={uploadingImage}
             />
           </div>
-          <p className="mt-4 text-[10px] font-medium text-brand-stone uppercase tracking-widest">Sua melhor foto profissional</p>
+          <div className="flex-1 space-y-1 sm:pt-2">
+            <h3 className="text-lg font-serif italic text-brand-ink">Sua melhor foto</h3>
+            <p className="text-[10px] sm:text-xs font-light text-brand-stone leading-relaxed max-w-xs mx-auto sm:mx-0">
+              Uma boa foto profissional transmite confiança e aumenta as chances de agendamento.
+            </p>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="space-y-2">
-            {showLabels && (
-              <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                Nome que aparece na agenda <span className="text-brand-terracotta">*</span>
-              </label>
-            )}
-            <input 
-              type="text" 
-              value={name} 
-              onChange={(e) => setName(e.target.value)} 
-              placeholder="Ex: Bruna Designer" 
-              className={cn(
-                "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
-                errors.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              {showLabels && (
+                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
+                  Nome que aparece na agenda <span className="text-brand-terracotta">*</span>
+                </label>
               )}
-            />
-            <FormError message={errors.name} />
-          </div>
-          <div className="space-y-2">
-            {showLabels && (
-              <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                Sua Especialidade Principal <span className="text-brand-terracotta">*</span>
-              </label>
-            )}
-            <input 
-              type="text" 
-              value={specialty} 
-              onChange={(e) => setSpecialty(e.target.value)} 
-              placeholder="Ex: Nail Designer" 
-              className={cn(
-                "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
-                errors.specialty ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+              <input 
+                type="text" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                placeholder="Ex: Bruna Designer" 
+                className={cn(
+                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
+                  errors.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
+                )}
+              />
+              <FormError message={errors.name} />
+            </div>
+            <div className="space-y-1.5">
+              {showLabels && (
+                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
+                  Sua Especialidade Principal <span className="text-brand-terracotta">*</span>
+                </label>
               )}
-            />
-            <FormError message={errors.specialty} />
+              <input 
+                type="text" 
+                value={specialty} 
+                onChange={(e) => setSpecialty(e.target.value)} 
+                placeholder="Ex: Nail Designer" 
+                className={cn(
+                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
+                  errors.specialty ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
+                )}
+              />
+              <FormError message={errors.specialty} />
+            </div>
           </div>
 
           {(headline !== undefined && setHeadline) && (
             <div className="space-y-2">
               <div className="flex justify-between items-end">
-                {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Frase principal do seu perfil</label>}
+                {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">Frase principal do seu perfil</label>}
               </div>
               <input 
                 type="text" 
                 value={headline} 
                 onChange={(e) => setHeadline(e.target.value)} 
                 placeholder="Ex: Especialista em beleza natural"
-                className="w-full px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm"
+                className="w-full px-4 py-2.5 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50"
               />
             </div>
           )}
@@ -254,7 +261,7 @@ export const FormIdentity = ({
               <textarea 
                 value={bio} 
                 onChange={(e) => setBio(e.target.value)} 
-                className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] outline-none focus:ring-1 focus:ring-brand-ink transition-all h-32 resize-none font-light italic text-sm leading-relaxed" 
+                className="w-full px-4 py-3 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all h-24 resize-none font-light italic text-sm leading-relaxed placeholder:text-brand-stone/50" 
                 placeholder="Conte um pouco sobre seu trabalho e diferenciais..." 
               />
               <p className="text-[10px] text-brand-stone/60 font-light ml-1">
@@ -266,7 +273,7 @@ export const FormIdentity = ({
           {(differentials !== undefined && setDifferentials) && (
             <div className="space-y-4">
               <div className="flex flex-col gap-1">
-                {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>}
+                {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">Seus Diferenciais</label>}
                 <p className="text-[10px] text-brand-stone/60 font-light ml-1 mb-2">
                   Selecione os pontos que tornam seu atendimento único. Eles aparecerão em uma seção especial na sua vitrine.
                 </p>
@@ -323,7 +330,7 @@ export const FormIdentity = ({
                 <input 
                   type="text" 
                   placeholder="Ex: Estacionamento gratuito"
-                  className="flex-1 px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-[11px]"
+                  className="flex-1 px-4 py-2.5 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-xs placeholder:text-brand-stone/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
@@ -345,7 +352,7 @@ export const FormIdentity = ({
                       input.value = '';
                     }
                   }}
-                  className="px-5 py-3 bg-brand-linen text-brand-ink border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
+                  className="px-4 py-2.5 bg-brand-linen text-brand-ink border border-brand-mist/50 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
                 >
                   Ok
                 </button>
@@ -356,7 +363,7 @@ export const FormIdentity = ({
           {(whatsapp !== undefined && setWhatsapp) && (
             <div className="space-y-2">
               {showLabels && (
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
                   WhatsApp da Profissional <span className="text-brand-terracotta">*</span>
                 </label>
               )}
@@ -374,8 +381,8 @@ export const FormIdentity = ({
                 }} 
                 placeholder="(00) 00000-0000" 
                 className={cn(
-                  "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
-                  errors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
+                  errors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
                 )}
               />
               <FormError message={errors.whatsapp} />
@@ -384,12 +391,12 @@ export const FormIdentity = ({
 
           {(instagram !== undefined && setInstagram) && (
             <div className="space-y-2">
-              {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>}
+              {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">Instagram (@usuario)</label>}
               <div className={cn(
-                "flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border transition-all",
+                "flex items-center gap-2 bg-brand-parchment/60 px-4 py-2.5 rounded-lg border transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50",
                 instagramStatus === 'valid' ? "border-green-200 ring-1 ring-green-100" :
                 instagramStatus === 'invalid' ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
-                "border-brand-mist shadow-sm"
+                "border-brand-mist/50 shadow-sm"
               )}>
                 <span className="text-brand-stone text-xs ml-1">@</span>
                 <input 
@@ -460,15 +467,15 @@ export const FormIdentity = ({
           {(slug !== undefined && setSlug) && (
             <div className="space-y-3">
               {showLabels && (
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
                   Link Personalizado (Slug) <span className="text-brand-terracotta">*</span>
                 </label>
               )}
               <div className={cn(
-                "flex items-center gap-2 p-3.5 rounded-[18px] border transition-all",
+                "flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50",
                 slugStatus === 'available' ? "bg-green-50 border-green-200 ring-1 ring-green-100" :
-                slugStatus === 'unavailable' || slugStatus === 'invalid' || errors.slug ? "bg-brand-parchment border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
-                "bg-brand-parchment border-brand-mist"
+                slugStatus === 'unavailable' || slugStatus === 'invalid' || errors.slug ? "bg-brand-parchment/60 border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
+                "bg-brand-parchment/60 border-brand-mist/50"
               )}>
                 <span className="text-brand-stone text-xs ml-1">usenera.com/p/</span>
                 <input 
@@ -530,7 +537,7 @@ export const FormIdentity = ({
           {(paymentMethods !== undefined && setPaymentMethods) && (
             <div className="space-y-4 pt-4 border-t border-brand-mist/30">
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
                   Formas de pagamento aceitas <span className="text-brand-terracotta">*</span>
                 </label>
                 <p className="text-[10px] text-brand-stone font-light ml-1">

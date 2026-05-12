@@ -534,75 +534,99 @@ export default function ProfilePage() {
   return (
     <AppLayout activeRoute="profile">
       <div className="p-6 md:p-12 pb-32 md:pb-12 max-w-5xl mx-auto w-full">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-          <div>
-            <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Meu Perfil Profissional</h1>
-            <p className="text-brand-stone font-light">Personalize como sua página pública aparece para as clientes.</p>
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone">Página Pública Ativa</span>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-serif font-normal text-brand-ink">Meu Perfil Profissional</h1>
+            <p className="text-sm text-brand-stone font-light">Configure as informações que aparecem na sua vitrine.</p>
           </div>
-          <Link to={`/p/${profile?.slug}`} target="_blank" className="flex items-center gap-2 text-brand-terracotta font-medium text-sm hover:text-brand-sienna transition-colors">
-            Ver meu perfil <ExternalLink size={16} />
+          <Link to={`/p/${profile?.slug}`} target="_blank" className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-white border border-brand-mist rounded-xl text-brand-ink text-[11px] font-bold uppercase tracking-widest hover:border-brand-ink transition-colors">
+            Ver página <ExternalLink size={14} />
           </Link>
         </header>
 
         {profileCompleteness < 100 ? (
-          <div className="mb-8 p-6 bg-brand-linen rounded-3xl border border-brand-mist/50">
-            <div className="flex items-center justify-between mb-4">
-              <div>
+          <div className="mb-10 px-5 py-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
                   Perfil {profileCompleteness}% completo
                 </span>
-                <p className="text-[10px] text-brand-stone font-light italic mt-1 leading-none">
-                  Complete seu perfil para atrair e converter mais clientes.
-                </p>
+                <span className="text-[9px] text-brand-stone font-medium uppercase tracking-wider md:hidden">Falta pouco</span>
               </div>
-              <span className="text-[10px] text-brand-terracotta font-bold uppercase animate-pulse">Quase lá!</span>
+              <div className="w-full h-1 bg-brand-mist/50 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-brand-terracotta rounded-full transition-all duration-1000 ease-out"
+                  style={{ width: `${profileCompleteness}%` }}
+                />
+              </div>
             </div>
-            <div className="w-full h-1.5 bg-brand-white rounded-full overflow-hidden shadow-inner">
-              <div 
-                className="h-full bg-brand-terracotta rounded-full transition-all duration-1000 ease-out shadow-sm"
-                style={{ width: `${profileCompleteness}%` }}
-              />
-            </div>
+            <p className="text-[10px] text-brand-stone font-light hidden md:block max-w-[200px] text-right leading-relaxed">
+              Complete as informações para atrair clientes
+            </p>
           </div>
         ) : (
-          <div className="mb-8 flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-full w-fit border border-green-100">
-            <CheckCircle2 size={16} />
-            <span className="text-[10px] font-bold uppercase tracking-widest">Perfil completo!</span>
+          <div className="mb-10 flex items-center gap-2 px-3 py-1.5 bg-brand-linen/50 text-brand-ink rounded-lg w-fit border border-brand-mist/50">
+            <CheckCircle2 size={14} className="text-brand-terracotta" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em]">Perfil completo</span>
           </div>
         )}
 
-        <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Left Column: Avatar & Basic Identity */}
-          <div className="lg:col-span-1 space-y-8">
-            <FormIdentity
-              name={name}
-              setName={setName}
-              specialty={specialty}
-              setSpecialty={setSpecialty}
-              avatar={avatar}
-              avatarPreview={avatarPreview}
-              uploadingImage={uploadingImage}
-              onAvatarClick={() => avatarInputRef.current?.click()}
-              inputRef={avatarInputRef}
-              onFileUpload={handleAvatarUpload}
-              showLabels={true}
-              errors={formErrors}
-            />
-          </div>
+        <form 
+          onSubmit={handleSave} 
+          className="max-w-4xl mx-auto space-y-8"
+        >
+          
+          {/* 1. IDENTIDADE */}
+          <section className="space-y-6 pt-2">
+            <div className="flex items-center gap-3 pb-2 px-2">
+              <User size={20} className="text-brand-terracotta" />
+              <h2 className="text-xl font-serif text-brand-ink">1. Identidade</h2>
+            </div>
+            
+            <div className="flex flex-col gap-8">
+              <FormIdentity
+                name={name}
+                setName={setName}
+                specialty={specialty}
+                setSpecialty={setSpecialty}
+                avatar={avatar}
+                avatarPreview={avatarPreview}
+                uploadingImage={uploadingImage}
+                onAvatarClick={() => avatarInputRef.current?.click()}
+                inputRef={avatarInputRef}
+                onFileUpload={handleAvatarUpload}
+                headline={headline}
+                setHeadline={setHeadline}
+                bio={bio}
+                setBio={setBio}
+                showLabels={true}
+                errors={formErrors}
+              />
+            </div>
+          </section>
 
-          {/* Right Column: Portfolio, Rich Identity, Location & Schedule */}
-          <div className="lg:col-span-2 space-y-10">
+          {/* 2. VITRINE */}
+          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+            <div className="flex items-center gap-3 pb-2 px-2">
+              <Sparkles size={20} className="text-brand-terracotta" />
+              <h2 className="text-xl font-serif text-brand-ink">2. Vitrine</h2>
+            </div>
+
             {/* Portfolio Section */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm space-y-8">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <Camera size={20} className="text-brand-terracotta" />
-                  <h3 className="font-serif italic text-xl text-brand-ink">Meu Portfólio</h3>
+            <div className="space-y-4 px-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
+                <div className="flex items-center gap-3 mb-2 sm:mb-0">
+                  <Camera size={18} className="text-brand-terracotta/70" />
+                  <h3 className="font-serif italic text-lg text-brand-ink">Meu Portfólio</h3>
                 </div>
                 <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Exiba fotos do seu trabalho</p>
               </div>
               
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {portfolio.map((item, idx) => (
                   <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
                     <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" alt={`Portfolio ${idx}`} />
@@ -679,52 +703,149 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            {/* Rich Identity Section */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
-              <FormIdentity
-                name={name}
-                setName={setName}
-                specialty={specialty}
-                setSpecialty={setSpecialty}
-                avatar={avatar}
-                avatarPreview={avatarPreview}
-                uploadingImage={uploadingImage}
-                onAvatarClick={() => avatarInputRef.current?.click()}
-                inputRef={avatarInputRef}
-                onFileUpload={handleAvatarUpload}
-                headline={headline}
-                setHeadline={setHeadline}
-                bio={bio}
-                setBio={setBio}
-                whatsapp={whatsapp}
-                setWhatsapp={setWhatsapp}
-                instagram={instagram}
-                setInstagram={setInstagram}
-                slug={slug}
-                setSlug={setSlug}
-                differentials={differentials}
-                setDifferentials={setDifferentials}
-                availableDifferentials={IDENTITY_DIFFERENTIALS}
-                showLabels={true}
-                errors={formErrors}
-              />
+            {/* Diferenciais, Instagram, Slug */}
+            <div className="space-y-6 px-2">
+              
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seus Diferenciais</label>
+                  <p className="text-[10px] text-brand-stone/60 font-light ml-1 mb-2">
+                    Selecione os pontos que tornam seu atendimento único.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {IDENTITY_DIFFERENTIALS.map(diff => (
+                    <button
+                      key={diff}
+                      type="button"
+                      onClick={() => {
+                        if (differentials.includes(diff)) {
+                          setDifferentials(differentials.filter(d => d !== diff));
+                        } else {
+                          setDifferentials([...differentials, diff]);
+                        }
+                      }}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-[10px] font-medium transition-all border",
+                        differentials.includes(diff)
+                          ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm"
+                          : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                      )}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
+                {differentials.filter(d => !IDENTITY_DIFFERENTIALS.includes(d)).length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Personalizados</p>
+                    <div className="flex flex-wrap gap-2">
+                      {differentials.filter(d => !IDENTITY_DIFFERENTIALS.includes(d)).map(diff => (
+                        <div key={diff} className="flex items-center gap-2 px-4 py-2 bg-brand-terracotta/10 border border-brand-terracotta/20 rounded-full text-[10px] font-medium text-brand-terracotta">
+                          {diff}
+                          <button 
+                            type="button" 
+                            onClick={() => setDifferentials(differentials.filter(d => d !== diff))}
+                            className="hover:text-brand-ink"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Estacionamento gratuito"
+                    className="flex-1 px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-[11px]"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val && !differentials.includes(val)) {
+                          setDifferentials([...differentials, val]);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                      const val = input.value.trim();
+                      if (val && !differentials.includes(val)) {
+                        setDifferentials([...differentials, val]);
+                        input.value = '';
+                      }
+                    }}
+                    className="px-5 py-3 bg-brand-linen text-brand-ink border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
+                  >
+                    Ok
+                  </button>
+                </div>
+              </div>
+
+              <hr className="border-brand-mist" />
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>
+                <div className="flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border border-brand-mist shadow-sm transition-all">
+                  <span className="text-brand-stone text-xs ml-1">@</span>
+                  <input 
+                    type="text" 
+                    value={instagram} 
+                    onChange={(e) => setInstagram(e.target.value.replace(/@/g, '').trim())} 
+                    placeholder="seu.usuario" 
+                    className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs placeholder:font-light" 
+                  />
+                </div>
+              </div>
+
+              <hr className="border-brand-mist/50 my-6" />
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                  Link Personalizado <span className="text-brand-terracotta">*</span>
+                </label>
+                <p className="text-[10px] text-brand-stone/60 font-light mt-0.5 mb-2 ml-1">Compartilhe este link com as clientes para que elas possam agendar.</p>
+                <div className={cn(
+                  "flex items-center gap-2 p-3.5 rounded-[18px] border transition-all",
+                  formErrors.slug ? "border-brand-terracotta ring-1 ring-brand-terracotta/20 bg-white" : "bg-brand-parchment border-brand-mist"
+                )}>
+                  <span className="text-brand-stone text-xs ml-1 hidden sm:inline">usenera.com/p/</span>
+                  <span className="text-brand-stone text-xs ml-1 sm:hidden">.../p/</span>
+                  <input 
+                    type="text" 
+                    value={slug} 
+                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} 
+                    placeholder="seu-nome"
+                    className="flex-1 min-w-0 bg-transparent outline-none text-brand-ink font-medium text-xs"
+                  />
+                </div>
+                {formErrors.slug && <p className="text-[10px] text-brand-terracotta ml-1">{formErrors.slug}</p>}
+              </div>
             </div>
 
+            <hr className="border-brand-mist/50 my-6 mx-2" />
+
             {/* Estilo da vitrine */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
+            <div className="space-y-4 px-2">
               <div className="pt-2">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-brand-terracotta/10 rounded-xl">
-                    <Sparkles size={20} className="text-brand-terracotta" />
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-1.5 bg-brand-terracotta/5 rounded-lg border border-brand-terracotta/10">
+                    <Sparkles size={16} className="text-brand-terracotta" />
                   </div>
-                  <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
                     Estilo da sua vitrine
                   </h3>
                 </div>
 
-                <p className="text-xs text-brand-stone font-light mb-6">Escolha o tema visual que melhor representa sua marca.</p>
+                <p className="text-[11px] text-brand-stone font-light mb-5">Escolha o tema visual que melhor representa sua marca.</p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   {Object.entries(THEMES).map(([variant, theme]) => {
                     const locked = isThemeLocked(variant);
                     return (
@@ -768,120 +889,92 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
+          </section>
 
-            {/* Anti No-Show Section */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
-              <div className="pt-2">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-brand-terracotta/10 rounded-xl">
-                    <ShieldCheck size={20} className="text-brand-terracotta" />
-                  </div>
-                  <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone">
-                    Proteção Anti No-Show
-                  </h3>
-                </div>
-
-                <div className="space-y-8">
-                  <div className="flex items-center justify-between p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-1">Confirmação 24h</p>
-                      <p className="text-xs text-brand-stone font-light italic">Enviar lembrete automático 24h antes do horário para o cliente confirmar presença.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAntiNoShowEnabled(!antiNoShowEnabled)}
-                      className={cn(
-                        "w-14 h-8 rounded-full transition-all relative",
-                        antiNoShowEnabled ? "bg-brand-ink" : "bg-brand-mist"
-                      )}
-                    >
-                      <div className={cn(
-                        "absolute top-1 w-6 h-6 rounded-full bg-brand-white transition-all",
-                        antiNoShowEnabled ? "left-7" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                    <div>
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-1">Sinal Antecipado (Opcional)</p>
-                      <p className="text-xs text-brand-stone font-light italic">Indicar na vitrine que você solicita um sinal via Pix para garantir a reserva.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAdvancePaymentRequired(!advancePaymentRequired)}
-                      className={cn(
-                        "w-14 h-8 rounded-full transition-all relative",
-                        advancePaymentRequired ? "bg-brand-ink" : "bg-brand-mist"
-                      )}
-                    >
-                      <div className={cn(
-                        "absolute top-1 w-6 h-6 rounded-full bg-brand-white transition-all",
-                        advancePaymentRequired ? "left-7" : "left-1"
-                      )} />
-                    </button>
-                  </div>
-
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-4 ml-1">Tolerância de Atraso</p>
-                    <div className="flex gap-3">
-                      {[10, 15, 20].map(val => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setDelayTolerance(val as 10 | 15 | 20)}
-                          className={cn(
-                            "flex-1 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-all",
-                            delayTolerance === val
-                              ? "bg-brand-ink text-brand-white border-brand-ink"
-                              : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
-                          )}
-                        >
-                          {val} min
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+          {/* 3. ATENDIMENTO */}
+          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+            <div className="flex items-center gap-3 pb-2 px-2">
+              <Briefcase size={20} className="text-brand-terracotta" />
+              <h2 className="text-xl font-serif text-brand-ink">3. Atendimento</h2>
             </div>
+            
+            <div className="space-y-8 px-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                  WhatsApp da Profissional <span className="text-brand-terracotta">*</span>
+                </label>
+                <p className="text-[10px] text-brand-stone font-light mt-1 mb-2 ml-1">
+                  Você receberá novos agendamentos por aqui.
+                </p>
+                <input 
+                  type="tel" 
+                  value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 
+                  onChange={(e) => {
+                    const cleaned = cleanWhatsapp(e.target.value);
+                    if (cleaned.length <= 11) {
+                      setWhatsapp(cleaned);
+                    }
+                  }} 
+                  placeholder="(00) 00000-0000" 
+                  className={cn(
+                    "w-full px-6 py-3.5 bg-brand-parchment border rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
+                    formErrors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
+                  )}
+                />
+                {formErrors.whatsapp && <p className="text-[10px] text-brand-terracotta ml-1 mt-1">{formErrors.whatsapp}</p>}
+              </div>
 
-            {/* Payment Methods Section */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
-              <div className="pt-2">
-                <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-6">
-                  Formas de Pagamento Aceitas
-                </h3>
-                <div className="flex flex-wrap gap-3">
-                  {[
-                    { id: 'pix', label: 'Pix' },
-                    { id: 'credito', label: 'Cartão de Crédito' },
-                    { id: 'debito', label: 'Cartão de Débito' },
-                    { id: 'dinheiro', label: 'Dinheiro' },
-                    { id: 'transferencia', label: 'Transferência' }
-                  ].map(m => (
-                    <button
-                      key={m.id}
+              <hr className="border-brand-mist/50 my-6" />
+
+              {/* Working Hours Section */}
+              <div className="space-y-5">
+                <div className="flex items-center gap-3">
+                  <Calendar size={18} className="text-brand-terracotta/70" />
+                  <h3 className="font-serif italic text-lg text-brand-ink">Horários de Atendimento</h3>
+                </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((day, idx) => (
+                    <button 
+                      key={idx}
                       type="button"
-                      onClick={() => setPaymentMethods(prev =>
-                        prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
-                      )}
-                      className={cn(
-                        "px-5 py-3 rounded-2xl text-[10px] font-bold uppercase tracking-widest border transition-all",
-                        paymentMethods.includes(m.id)
-                          ? "bg-brand-ink text-brand-white border-brand-ink"
-                          : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink"
-                      )}
+                      onClick={() => toggleDay(idx)}
+                      className={`min-w-[36px] h-[36px] px-3 flex-1 sm:flex-none rounded-full font-medium text-[10px] transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone border border-brand-mist hover:border-brand-stone'}`}
                     >
-                      {m.label}
+                      {day}
                     </button>
                   ))}
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3 py-1">
+                <div className="space-y-1 min-w-0">
+                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início</label>
+                  <input 
+                    type="time" 
+                    value={startTime} 
+                    onChange={(e) => setStartTime(e.target.value)} 
+                    className="w-full px-4 py-2.5 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                  />
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim</label>
+                  <input 
+                    type="time" 
+                    value={endTime} 
+                    onChange={(e) => setEndTime(e.target.value)} 
+                    className="w-full px-4 py-2.5 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                  />
+                </div>
+              </div>
             </div>
 
+            <hr className="border-brand-mist/50 my-6" />
+
             {/* Location Section */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm">
+            <div className="mb-2">
               <FormLocation
                 title="Sua Localização"
                 subtitle="Configure como e onde você atende."
@@ -910,59 +1003,144 @@ export default function ProfilePage() {
               />
             </div>
 
-            {/* Working Hours Section */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm space-y-8">
-              <div className="flex items-center gap-3">
-                <Calendar size={20} className="text-brand-terracotta" />
-                <h3 className="font-serif italic text-xl text-brand-ink">Horários de Atendimento</h3>
-              </div>
+            <hr className="border-brand-mist/50 my-6" />
 
-              <div className="space-y-4">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
+            {/* Payment Methods Section */}
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center gap-3 mb-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
+                    Formas de Pagamento Aceitas
+                  </h3>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {WEEKDAYS.map((day, idx) => (
-                    <button 
-                      key={idx}
+                  {[
+                    { id: 'pix', label: 'Pix' },
+                    { id: 'credito', label: 'Cartão de Crédito' },
+                    { id: 'debito', label: 'Cartão de Débito' },
+                    { id: 'dinheiro', label: 'Dinheiro' },
+                    { id: 'transferencia', label: 'Transferência' }
+                  ].map(m => (
+                    <button
+                      key={m.id}
                       type="button"
-                      onClick={() => toggleDay(idx)}
-                      className={`min-w-[44px] h-[44px] flex-1 sm:flex-none rounded-full font-medium text-[10px] transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone border border-brand-mist hover:border-brand-stone'}`}
+                      onClick={() => setPaymentMethods(prev =>
+                        prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
+                      )}
+                      className={cn(
+                        "px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all",
+                        paymentMethods.includes(m.id)
+                          ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
+                          : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone"
+                      )}
                     >
-                      {day}
+                      {m.label}
                     </button>
                   ))}
                 </div>
               </div>
+            </div>
+          </section>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
-                <div className="space-y-2 min-w-0">
-                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início</label>
-                  <input 
-                    type="time" 
-                    value={startTime} 
-                    onChange={(e) => setStartTime(e.target.value)} 
-                    className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
-                  />
+          {/* 4. PROTEÇÃO */}
+          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+            <div className="flex items-center gap-3 pb-2 px-2">
+              <ShieldCheck size={20} className="text-brand-terracotta" />
+              <h2 className="text-xl font-serif text-brand-ink">4. Proteção</h2>
+            </div>
+            
+            {/* Anti No-Show Section */}
+            <div className="space-y-4 px-2">
+              <div className="pt-2">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-1.5 bg-brand-terracotta/5 rounded-lg border border-brand-terracotta/10">
+                    <ShieldCheck size={16} className="text-brand-terracotta" />
+                  </div>
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
+                    Proteção Anti No-Show
+                  </h3>
                 </div>
-                <div className="space-y-2 min-w-0">
-                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim</label>
-                  <input 
-                    type="time" 
-                    value={endTime} 
-                    onChange={(e) => setEndTime(e.target.value)} 
-                    className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
-                  />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-3 border-b border-brand-mist/50">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-0.5">Confirmação 24h</p>
+                      <p className="text-[10px] text-brand-stone font-light italic">Enviar lembrete 24h antes sugerindo confirmação.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAntiNoShowEnabled(!antiNoShowEnabled)}
+                      className={cn(
+                        "w-10 h-5 rounded-full transition-all relative",
+                        antiNoShowEnabled ? "bg-brand-ink" : "bg-brand-mist/60"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-4 h-4 rounded-full bg-brand-white transition-all shadow-sm",
+                        antiNoShowEnabled ? "left-[22px]" : "left-0.5"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between py-3 border-b border-brand-mist/50">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-0.5">Sinal Antecipado</p>
+                      <p className="text-[10px] text-brand-stone font-light italic">Solicitar sinal via Pix para garantir reserva.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAdvancePaymentRequired(!advancePaymentRequired)}
+                      className={cn(
+                        "w-10 h-5 rounded-full transition-all relative",
+                        advancePaymentRequired ? "bg-brand-ink" : "bg-brand-mist/60"
+                      )}
+                    >
+                      <div className={cn(
+                        "absolute top-0.5 w-4 h-4 rounded-full bg-brand-white transition-all shadow-sm",
+                        advancePaymentRequired ? "left-[22px]" : "left-0.5"
+                      )} />
+                    </button>
+                  </div>
+
+                  <div className="pt-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-3 ml-1">Tolerância de Atraso</p>
+                    <div className="flex gap-2">
+                      {[10, 15, 20].map(val => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setDelayTolerance(val as 10 | 15 | 20)}
+                          className={cn(
+                            "px-5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all",
+                            delayTolerance === val
+                              ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
+                              : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone"
+                          )}
+                        >
+                          {val} min
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+          </section>
+
+          {/* 5. INTEGRAÇÕES */}
+          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+            <div className="flex items-center gap-3 pb-2 px-2">
+              <LinkIcon size={20} className="text-brand-terracotta" />
+              <h2 className="text-xl font-serif text-brand-ink">5. Integrações</h2>
+            </div>
             
             {/* Google Calendar Section */}
-            <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm space-y-8">
+            <div className="space-y-4 px-2">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                    <Calendar size={20} />
+                <div className="flex items-center gap-2 mb-2 sm:mb-0">
+                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
+                    <Calendar size={16} />
                   </div>
-                  <h3 className="font-serif italic text-xl text-brand-ink">Google Calendar</h3>
+                  <h3 className="font-serif italic text-lg text-brand-ink">Google Calendar</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={cn(
@@ -975,32 +1153,32 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="p-6 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
+              <div className="p-4 bg-brand-white/80 rounded-2xl border border-brand-mist/50 shadow-sm">
                 {!googleCalendarConnected ? (
-                  <div className="space-y-4">
-                    <p className="text-xs text-brand-stone font-light leading-relaxed">
-                      Sincronize sua agenda do Nera com seu Google Calendar pessoal. Novos agendamentos confirmados serão adicionados automaticamente com todos os detalhes da cliente.
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-brand-stone font-light leading-relaxed">
+                      Sincronize sua agenda do Nera com seu Google Calendar pessoal. Novos agendamentos confirmados serão adicionados automaticamente.
                     </p>
                     <button
                       type="button"
                       onClick={handleConnectCalendar}
                       disabled={calendarLoading}
-                      className="w-full py-4 bg-white border border-brand-mist rounded-2xl flex items-center justify-center gap-3 text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-linen transition-all disabled:opacity-50"
+                      className="w-full sm:w-auto px-6 py-2.5 bg-brand-ink/5 border-none rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-ink/10 transition-all disabled:opacity-50 mx-auto"
                     >
                       {calendarLoading ? (
                         <RefreshCw size={14} className="animate-spin" />
                       ) : (
                         <>
-                          <Calendar size={14} /> Conectar Google Calendar
+                          <Calendar size={14} /> Conectar Conta
                         </>
                       )}
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-1">Sincronização Ativa</p>
+                        <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-0.5">Sincronização Ativa</p>
                         <p className="text-[10px] text-brand-stone font-light italic">
                           {googleCalendarEnabled 
                             ? "Sua agenda está sendo sincronizada automaticamente." 
@@ -1011,18 +1189,18 @@ export default function ProfilePage() {
                         type="button"
                         onClick={() => handleToggleCalendar(!googleCalendarEnabled)}
                         className={cn(
-                          "w-14 h-8 rounded-full transition-all relative",
-                          googleCalendarEnabled ? "bg-brand-ink" : "bg-brand-mist"
+                          "w-12 h-6 rounded-full transition-all relative shrink-0",
+                          googleCalendarEnabled ? "bg-brand-ink" : "bg-brand-mist/50 border border-brand-mist"
                         )}
                       >
                         <div className={cn(
-                          "absolute top-1 w-6 h-6 rounded-full bg-brand-white transition-all",
-                          googleCalendarEnabled ? "left-7" : "left-1"
+                          "absolute top-[2px] w-[20px] h-[20px] rounded-full bg-brand-white transition-all shadow-sm",
+                          googleCalendarEnabled ? "left-[26px]" : "left-[2px]"
                         )} />
                       </button>
                     </div>
 
-                    <div className="pt-4 border-t border-brand-mist/50 flex items-center justify-between">
+                    <div className="pt-3 border-t border-brand-mist/50 flex items-center justify-between">
                       <div className="flex items-center gap-2 text-[10px] text-green-600 font-medium">
                         <CheckCircle2 size={12} />
                         Conectado ao seu Google
@@ -1040,15 +1218,18 @@ export default function ProfilePage() {
               </div>
             </div>
 
+          </section>
+
+          <div className="pt-8 pb-20 md:pb-8 flex flex-col items-center border-t border-brand-mist/30 mt-8">
             <button 
               type="submit" 
               disabled={loading} 
-              className="w-full bg-brand-ink text-brand-white py-8 rounded-[32px] text-[12px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+              className="w-full max-w-[240px] bg-brand-white text-brand-ink border border-brand-mist py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
             >
-              <Save size={18} /> {loading ? 'Salvando...' : 'Salvar Alterações'}
+              {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
 
-            <div className="pt-8 border-t border-brand-mist">
+            <div className="pt-4 mt-2">
               <button 
                 type="button"
                 onClick={async () => {
@@ -1057,25 +1238,13 @@ export default function ProfilePage() {
                      window.location.href = '/login';
                    }
                 }}
-                className="w-full bg-white border border-red-100 text-red-500 py-6 rounded-[32px] text-[11px] font-bold uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-3"
+                className="w-auto bg-transparent text-brand-stone/60 py-2 px-4 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:text-red-500 transition-colors flex items-center justify-center gap-2"
               >
-                <LogOut size={18} /> Sair da conta
+                <LogOut size={14} /> Sair da conta
               </button>
             </div>
           </div>
         </form>
-
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-brand-mist md:hidden z-50">
-          <button 
-            type="button"
-            onClick={handleSave} 
-            disabled={loading}
-            className="w-full py-4 bg-brand-ink text-white rounded-full text-[11px] font-bold uppercase tracking-widest shadow-lg flex items-center justify-center gap-2"
-          >
-            {loading ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-            {loading ? "Salvando..." : "Salvar Alterações"}
-          </button>
-        </div>
 
         <UpgradeModal 
           open={isUpgradeModalOpen}
