@@ -121,6 +121,68 @@ export default function ProfilePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  const [savedSnapshotString, setSavedSnapshotString] = useState<string | null>(null);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (profile?.uid && savedSnapshotString === null) {
+      const initialSnapshot = JSON.stringify({
+        name: profile.name || '',
+        specialty: profile.specialty || '',
+        bio: profile.bio || '',
+        headline: profile.headline || '',
+        city: profile.city || '',
+        whatsapp: profile.whatsapp || '',
+        instagram: profile.instagram || '',
+        slug: profile.slug || '',
+        neighborhood: profile.neighborhood || '',
+        serviceMode: profile.serviceMode || 'studio',
+        studioAddress: profile.studioAddress || {
+          street: '',
+          number: '',
+          complement: '',
+          neighborhood: '',
+          city: '',
+          reference: '',
+          privacyMode: 'reveal_after_booking'
+        },
+        serviceAreaType: profile.serviceAreaType || 'city_wide',
+        pricingStrategy: profile.pricingStrategy || 'none',
+        antiNoShowEnabled: profile.antiNoShowEnabled || false,
+        advancePaymentRequired: profile.advancePaymentRequired || false,
+        delayTolerance: profile.delayTolerance || 15,
+        profileTheme: profile.profileTheme?.variant || 'terracotta',
+        differentials: [...(profile.professionalIdentity?.differentials || [])].sort(),
+        serviceAreas: [...(profile.serviceAreas || [])].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
+        workingDays: [...(profile.workingHours?.workingDays || profile.workingDays || [1, 2, 3, 4, 5])].sort((a, b) => a - b),
+        startTime: profile.workingHours?.startTime || profile.startTime || '09:00',
+        endTime: profile.workingHours?.endTime || profile.endTime || '18:00',
+        paymentMethods: [...(profile.paymentMethods || [])].sort()
+      });
+      setSavedSnapshotString(initialSnapshot);
+    }
+  }, [profile?.uid, savedSnapshotString, profile]);
+
+  const currentSnapshotString = useMemo(() => {
+    return JSON.stringify({
+      name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
+      studioAddress, serviceAreaType, pricingStrategy, antiNoShowEnabled,
+      advancePaymentRequired, delayTolerance, profileTheme: profileTheme.variant,
+      differentials: [...differentials].sort(),
+      serviceAreas: [...serviceAreas].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
+      workingDays: [...workingDays].sort((a, b) => a - b),
+      startTime, endTime,
+      paymentMethods: [...paymentMethods].sort()
+    });
+  }, [
+    name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
+    studioAddress, serviceAreaType, pricingStrategy, antiNoShowEnabled,
+    advancePaymentRequired, delayTolerance, profileTheme.variant,
+    differentials, serviceAreas, workingDays, startTime, endTime, paymentMethods
+  ]);
+
+  const hasUnsavedChanges = savedSnapshotString !== null && currentSnapshotString !== savedSnapshotString;
+
   useEffect(() => {
     if (profile && user) {
       setAvatarPreview(profile.avatar || '');
@@ -373,6 +435,9 @@ export default function ProfilePage() {
 
         console.log('[ProfileSave] Success');
         notify.success('Seu perfil foi atualizado com sucesso.');
+        setSavedSnapshotString(currentSnapshotString);
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3000);
       } catch (err: any) {
         console.error('[ProfileSave] Failed:', err);
         notify.error(err, 'Não foi possível salvar seu perfil agora.');
@@ -1245,6 +1310,35 @@ export default function ProfilePage() {
             </div>
           </div>
         </form>
+
+        {/* Sticky Save Bar */}
+        {(hasUnsavedChanges || showSaveSuccess) && (
+          <div className="fixed bottom-20 md:bottom-8 left-0 right-0 z-[60] flex justify-center px-4 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="bg-white/90 backdrop-blur-md border border-brand-mist shadow-lg rounded-2xl p-3 flex items-center justify-between gap-4 max-w-sm w-full pointer-events-auto">
+              <div className="flex-1">
+                <p className="text-xs font-bold text-brand-ink">
+                  {showSaveSuccess ? 'Alterações salvas' : 'Alterações não salvas'}
+                </p>
+                <p className="text-[10px] text-brand-stone font-light">
+                  {showSaveSuccess ? 'Seu perfil está atualizado.' : 'Não esqueça de salvar suas edições.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={loading || showSaveSuccess || !hasUnsavedChanges}
+                className={cn(
+                  "px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0",
+                  showSaveSuccess 
+                    ? "bg-green-50 text-green-600 border border-green-200 cursor-default" 
+                    : "bg-brand-ink text-brand-white hover:bg-brand-espresso shadow-sm"
+                )}
+              >
+                {loading ? '...' : showSaveSuccess ? 'Salvo' : 'Salvar'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <UpgradeModal 
           open={isUpgradeModalOpen}
