@@ -293,10 +293,10 @@ export const FormIdentity = ({
                       }
                     }}
                     className={cn(
-                      "px-4 py-2 rounded-full text-[10px] font-medium transition-all border",
+                      "px-4 py-2 rounded-full text-[10px] font-medium transition-all duration-300 ease-out border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
                       differentials.includes(diff)
-                        ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm"
-                        : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                        ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
+                        : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
                     )}
                   >
                     {diff}
@@ -310,12 +310,12 @@ export const FormIdentity = ({
                   <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Personalizados</p>
                   <div className="flex flex-wrap gap-2">
                     {differentials.filter(d => !availableDifferentials.includes(d)).map(diff => (
-                      <div key={diff} className="flex items-center gap-2 px-4 py-2 bg-brand-terracotta/10 border border-brand-terracotta/20 rounded-full text-[10px] font-medium text-brand-terracotta">
+                      <div key={diff} className="flex items-center gap-2 px-4 py-2 bg-brand-terracotta/10 border border-brand-terracotta/20 rounded-full text-[10px] font-medium text-brand-terracotta transition-all duration-300 hover:bg-brand-terracotta/15">
                         {diff}
                         <button 
                           type="button" 
                           onClick={() => setDifferentials(differentials.filter(d => d !== diff))}
-                          className="hover:text-brand-ink"
+                          className="hover:text-brand-terracotta/80 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-terracotta rounded-full p-0.5"
                         >
                           <X size={12} />
                         </button>
@@ -352,7 +352,7 @@ export const FormIdentity = ({
                       input.value = '';
                     }
                   }}
-                  className="px-4 py-2.5 bg-brand-linen text-brand-ink border border-brand-mist/50 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
+                  className="px-4 py-2.5 bg-brand-linen text-brand-ink border border-brand-mist/50 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
                 >
                   Ok
                 </button>
@@ -450,7 +450,7 @@ export const FormIdentity = ({
                           type="checkbox" 
                           checked={instagramConfirmed} 
                           onChange={(e) => setInstagramConfirmed(e.target.checked)}
-                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all"
+                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1"
                         />
                         <CheckCircle2 size={10} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity" />
                       </div>
@@ -521,7 +521,7 @@ export const FormIdentity = ({
                         key={suggestion}
                         type="button"
                         onClick={() => onSelectSuggestion?.(suggestion)}
-                        className="px-3 py-1.5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
+                        className="px-3 py-1.5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
                       >
                         {suggestion}
                       </button>
@@ -558,10 +558,10 @@ export const FormIdentity = ({
                       }
                     }}
                     className={cn(
-                      "px-5 py-2.5 rounded-full text-[10px] font-bold tracking-wider transition-all border uppercase",
+                      "px-5 py-2.5 rounded-full text-[10px] font-bold tracking-wider transition-all duration-300 ease-out border uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-1",
                       paymentMethods.includes(method)
-                        ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
-                        : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                        ? "bg-brand-ink text-brand-white border-brand-ink shadow-md scale-[1.02]"
+                        : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
                     )}
                   >
                     {method}

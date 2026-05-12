@@ -608,7 +608,7 @@ export default function ProfilePage() {
             <h1 className="text-3xl md:text-4xl font-serif font-normal text-brand-ink">Meu Perfil Profissional</h1>
             <p className="text-sm text-brand-stone font-light">Configure as informações que aparecem na sua vitrine.</p>
           </div>
-          <Link to={`/p/${profile?.slug}`} target="_blank" className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-white border border-brand-mist rounded-xl text-brand-ink text-[11px] font-bold uppercase tracking-widest hover:border-brand-ink transition-colors">
+          <Link to={`/p/${profile?.slug}`} target="_blank" className="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-white border border-brand-mist rounded-xl text-brand-ink text-[11px] font-bold uppercase tracking-widest hover:border-brand-ink transition-all duration-300 ease-out hover:shadow-sm hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2">
             Ver página <ExternalLink size={14} />
           </Link>
         </header>
@@ -709,7 +709,7 @@ export default function ProfilePage() {
                     type="button"
                     disabled={uploadingImage}
                     onClick={() => portfolioInputRef.current?.click()}
-                    className="flex items-center gap-2 px-5 py-2.5 bg-brand-ink text-brand-white rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm disabled:opacity-50 inline-flex"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-brand-ink text-brand-white rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all duration-300 ease-out hover:shadow-md hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-sm inline-flex focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2"
                   >
                     {uploadingImage ? (
                       <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
@@ -786,7 +786,7 @@ export default function ProfilePage() {
                   ))}
                   <div 
                     onClick={() => portfolioInputRef.current?.click()}
-                    className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all text-brand-terracotta"
+                    className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all duration-300 text-brand-terracotta hover:border-brand-terracotta/60 hover:scale-[1.02] active:scale-[0.98]"
                   >
                     {uploadingImage ? (
                       <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
@@ -834,10 +834,10 @@ export default function ProfilePage() {
                         }
                       }}
                       className={cn(
-                        "px-4 py-2 rounded-full text-[10px] font-medium transition-all border",
+                        "px-4 py-2 rounded-full text-[10px] font-medium transition-all duration-300 ease-out border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
                         differentials.includes(diff)
-                          ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm"
-                          : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                          ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
+                          : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
                       )}
                     >
                       {diff}
@@ -849,12 +849,12 @@ export default function ProfilePage() {
                     <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">Personalizados</p>
                     <div className="flex flex-wrap gap-2">
                       {differentials.filter(d => !IDENTITY_DIFFERENTIALS.includes(d)).map(diff => (
-                        <div key={diff} className="flex items-center gap-2 px-4 py-2 bg-brand-terracotta/10 border border-brand-terracotta/20 rounded-full text-[10px] font-medium text-brand-terracotta">
+                        <div key={diff} className="flex items-center gap-2 px-4 py-2 bg-brand-terracotta/10 border border-brand-terracotta/20 rounded-full text-[10px] font-medium text-brand-terracotta transition-all duration-300 hover:bg-brand-terracotta/15">
                           {diff}
                           <button 
                             type="button" 
                             onClick={() => setDifferentials(differentials.filter(d => d !== diff))}
-                            className="hover:text-brand-ink"
+                            className="hover:text-brand-terracotta/80 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-terracotta rounded-full p-0.5"
                           >
                             <X size={12} />
                           </button>
@@ -889,7 +889,7 @@ export default function ProfilePage() {
                         input.value = '';
                       }
                     }}
-                    className="px-5 py-3 bg-brand-linen text-brand-ink border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm"
+                    className="px-5 py-3 bg-brand-linen text-brand-ink border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
                   >
                     Ok
                   </button>
@@ -962,11 +962,11 @@ export default function ProfilePage() {
                         type="button"
                         onClick={() => handleThemeClick(variant)}
                         className={cn(
-                          "flex flex-col items-center gap-3 p-4 rounded-3xl border transition-all relative overflow-hidden group",
+                          "flex flex-col items-center gap-3 p-4 rounded-3xl border transition-all duration-300 ease-out relative overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                           profileTheme.variant === variant 
-                            ? "border-brand-ink bg-brand-linen/30 shadow-sm"
-                            : "border-brand-mist bg-white hover:border-brand-stone",
-                          locked && "opacity-80"
+                            ? "border-brand-ink bg-brand-linen/30 shadow-md scale-[1.02]"
+                            : "border-brand-mist bg-white hover:border-brand-stone/40 hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]",
+                          locked && "opacity-80 hover:scale-100 active:scale-100"
                         )}
                       >
                         <div 
@@ -1049,7 +1049,12 @@ export default function ProfilePage() {
                       key={idx}
                       type="button"
                       onClick={() => toggleDay(idx)}
-                      className={`min-w-[36px] h-[36px] px-3 flex-1 sm:flex-none rounded-full font-medium text-[10px] transition-all ${workingDays.includes(idx) ? 'bg-brand-ink text-brand-white shadow-lg' : 'bg-brand-parchment text-brand-stone border border-brand-mist hover:border-brand-stone'}`}
+                      className={cn(
+                        "min-w-[36px] h-[36px] px-3 flex-1 sm:flex-none rounded-full font-medium text-[10px] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
+                        workingDays.includes(idx) 
+                          ? "bg-brand-ink text-brand-white shadow-md scale-[1.05]" 
+                          : "bg-brand-parchment text-brand-stone border border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.05] active:scale-[0.95]"
+                      )}
                     >
                       {day}
                     </button>
@@ -1135,10 +1140,10 @@ export default function ProfilePage() {
                         prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
                       )}
                       className={cn(
-                        "px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all",
+                        "px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                         paymentMethods.includes(m.id)
-                          ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
-                          : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone"
+                          ? "bg-brand-ink text-brand-white border-brand-ink shadow-md scale-[1.02]"
+                          : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
                       )}
                     >
                       {m.label}
@@ -1178,13 +1183,15 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => setAntiNoShowEnabled(!antiNoShowEnabled)}
                       className={cn(
-                        "w-10 h-5 rounded-full transition-all relative",
-                        antiNoShowEnabled ? "bg-brand-ink" : "bg-brand-mist/60"
+                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2 active:scale-[0.92] border",
+                        antiNoShowEnabled
+                          ? "bg-brand-ink border-brand-ink"
+                          : "bg-brand-parchment border-brand-mist/80 hover:border-brand-stone/30 hover:bg-white"
                       )}
                     >
                       <div className={cn(
-                        "absolute top-0.5 w-4 h-4 rounded-full bg-brand-white transition-all shadow-sm",
-                        antiNoShowEnabled ? "left-[22px]" : "left-0.5"
+                        "absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shadow-[0_2px_4px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)]",
+                        antiNoShowEnabled ? "left-[17px] shadow-[0_1px_3px_rgba(0,0,0,0.15),0_0_1px_rgba(0,0,0,0.1)]" : "left-[1px]"
                       )} />
                     </button>
                   </div>
@@ -1198,13 +1205,15 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => setAdvancePaymentRequired(!advancePaymentRequired)}
                       className={cn(
-                        "w-10 h-5 rounded-full transition-all relative",
-                        advancePaymentRequired ? "bg-brand-ink" : "bg-brand-mist/60"
+                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2 active:scale-[0.92] border",
+                        advancePaymentRequired
+                          ? "bg-brand-ink border-brand-ink"
+                          : "bg-brand-parchment border-brand-mist/80 hover:border-brand-stone/30 hover:bg-white"
                       )}
                     >
                       <div className={cn(
-                        "absolute top-0.5 w-4 h-4 rounded-full bg-brand-white transition-all shadow-sm",
-                        advancePaymentRequired ? "left-[22px]" : "left-0.5"
+                        "absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shadow-[0_2px_4px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)]",
+                        advancePaymentRequired ? "left-[17px] shadow-[0_1px_3px_rgba(0,0,0,0.15),0_0_1px_rgba(0,0,0,0.1)]" : "left-[1px]"
                       )} />
                     </button>
                   </div>
@@ -1218,10 +1227,10 @@ export default function ProfilePage() {
                           type="button"
                           onClick={() => setDelayTolerance(val as 10 | 15 | 20)}
                           className={cn(
-                            "px-5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all",
+                            "px-5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                             delayTolerance === val
-                              ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
-                              : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone"
+                              ? "bg-brand-ink text-brand-white border-brand-ink shadow-md scale-[1.02]"
+                              : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
                           )}
                         >
                           {val} min
@@ -1271,7 +1280,7 @@ export default function ProfilePage() {
                       type="button"
                       onClick={handleConnectCalendar}
                       disabled={calendarLoading}
-                      className="w-full sm:w-auto px-6 py-2.5 bg-brand-ink/5 border-none rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-ink/10 transition-all disabled:opacity-50 mx-auto"
+                      className="w-full sm:w-auto px-6 py-2.5 bg-brand-ink/5 border-none rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-ink/10 transition-all duration-300 ease-out hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 mx-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50"
                     >
                       {calendarLoading ? (
                         <RefreshCw size={14} className="animate-spin" />
@@ -1297,13 +1306,15 @@ export default function ProfilePage() {
                         type="button"
                         onClick={() => handleToggleCalendar(!googleCalendarEnabled)}
                         className={cn(
-                          "w-12 h-6 rounded-full transition-all relative shrink-0",
-                          googleCalendarEnabled ? "bg-brand-ink" : "bg-brand-mist/50 border border-brand-mist"
+                          "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2 active:scale-[0.92] border",
+                          googleCalendarEnabled
+                            ? "bg-brand-ink border-brand-ink"
+                            : "bg-brand-parchment border-brand-mist/80 hover:border-brand-stone/30 hover:bg-white"
                         )}
                       >
                         <div className={cn(
-                          "absolute top-[2px] w-[20px] h-[20px] rounded-full bg-brand-white transition-all shadow-sm",
-                          googleCalendarEnabled ? "left-[26px]" : "left-[2px]"
+                          "absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shadow-[0_2px_4px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)]",
+                          googleCalendarEnabled ? "left-[17px] shadow-[0_1px_3px_rgba(0,0,0,0.15),0_0_1px_rgba(0,0,0,0.1)]" : "left-[1px]"
                         )} />
                       </button>
                     </div>
@@ -1316,7 +1327,7 @@ export default function ProfilePage() {
                       <button
                         type="button"
                         onClick={handleDisconnectCalendar}
-                        className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-600 transition-colors flex items-center gap-2"
+                        className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 hover:bg-red-50/50 px-3 py-1.5 rounded-lg transition-all duration-300 ease-out flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
                       >
                         <Trash2 size={12} /> Desconectar
                       </button>
@@ -1332,7 +1343,7 @@ export default function ProfilePage() {
             <button 
               type="submit" 
               disabled={loading} 
-              className="w-full max-w-[240px] bg-brand-white text-brand-ink border border-brand-mist py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm"
+              className="w-full max-w-[240px] bg-brand-white text-brand-ink border border-brand-mist py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all duration-300 ease-out flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50"
             >
               {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
@@ -1346,7 +1357,7 @@ export default function ProfilePage() {
                      window.location.href = '/login';
                    }
                 }}
-                className="w-auto bg-transparent text-brand-stone/60 py-2 px-4 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:text-red-500 transition-colors flex items-center justify-center gap-2"
+                className="w-auto bg-transparent text-brand-stone/60 py-2 px-4 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:text-red-500 hover:bg-red-50 transition-all duration-300 ease-out flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
               >
                 <LogOut size={14} /> Sair da conta
               </button>
@@ -1371,10 +1382,10 @@ export default function ProfilePage() {
                 onClick={handleSave}
                 disabled={loading || showSaveSuccess || !hasUnsavedChanges}
                 className={cn(
-                  "px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all shrink-0",
+                  "px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ease-out shrink-0 focus-visible:outline-none",
                   showSaveSuccess 
                     ? "bg-green-50 text-green-600 border border-green-200 cursor-default" 
-                    : "bg-brand-ink text-brand-white hover:bg-brand-espresso shadow-sm"
+                    : "bg-brand-ink text-brand-white hover:bg-brand-espresso shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2"
                 )}
               >
                 {loading ? '...' : showSaveSuccess ? 'Salvo' : 'Salvar'}

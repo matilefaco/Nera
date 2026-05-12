@@ -161,10 +161,10 @@ export const FormLocation = ({
                   type="button"
                   onClick={() => setServiceMode(key)}
                   className={cn(
-                    "p-3 rounded-2xl border transition-all flex flex-row sm:flex-col items-center sm:items-start gap-3 text-left group relative overflow-hidden",
+                    "p-3 rounded-2xl border transition-all duration-300 ease-out flex flex-row sm:flex-col items-center sm:items-start gap-3 text-left group relative overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                     isSelected 
-                      ? 'border-brand-ink/30 bg-brand-linen/80 text-brand-ink shadow-sm ring-1 ring-brand-ink/10' 
-                      : 'border-brand-mist/50 bg-brand-white text-brand-stone hover:border-brand-stone/50'
+                      ? 'border-brand-ink/30 bg-brand-linen/80 text-brand-ink shadow-sm ring-1 ring-brand-ink/10 scale-[1.02]' 
+                      : 'border-brand-mist/50 bg-brand-white text-brand-stone hover:border-brand-stone/40 hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]'
                   )}
                 >
                   {isSelected && (
@@ -285,7 +285,7 @@ export const FormLocation = ({
                           type="checkbox"
                           checked={studioAddress.hasParking}
                           onChange={(e) => setStudioAddress({...studioAddress, hasParking: e.target.checked})}
-                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all cursor-pointer"
+                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1"
                         />
                         <div className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-[3px] top-[3px]">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -314,7 +314,7 @@ export const FormLocation = ({
                           type="checkbox"
                           checked={studioAddress.hasAccessibility}
                           onChange={(e) => setStudioAddress({...studioAddress, hasAccessibility: e.target.checked})}
-                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all cursor-pointer"
+                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1"
                         />
                         <div className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-[3px] top-[3px]">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -334,7 +334,7 @@ export const FormLocation = ({
                           type="checkbox"
                           checked={studioAddress.isSafeLocation}
                           onChange={(e) => setStudioAddress({...studioAddress, isSafeLocation: e.target.checked})}
-                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all cursor-pointer"
+                          className="peer appearance-none w-4 h-4 rounded border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1"
                         />
                         <div className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-[3px] top-[3px]">
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -377,10 +377,10 @@ export const FormLocation = ({
                       type="button"
                       onClick={() => setServiceAreaType('city_wide')}
                       className={cn(
-                        "flex-1 py-2.5 px-4 rounded-lg border transition-all text-[10px] font-bold uppercase tracking-widest",
+                        "flex-1 py-2.5 px-4 rounded-lg border transition-all duration-300 text-[10px] font-bold uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                         serviceAreaType === 'city_wide' 
-                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm' 
-                          : 'border-brand-mist/50 bg-transparent text-brand-stone hover:border-brand-stone/50 hover:bg-brand-parchment/50'
+                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm scale-[1.02]' 
+                          : 'border-brand-mist/50 bg-transparent text-brand-stone hover:border-brand-stone/40 hover:bg-brand-parchment/80 hover:scale-[1.02] active:scale-[0.98]'
                       )}
                     >
                       Toda a cidade
@@ -389,10 +389,10 @@ export const FormLocation = ({
                       type="button"
                       onClick={() => setServiceAreaType('specific_neighborhoods')}
                       className={cn(
-                        "flex-1 py-2.5 px-4 rounded-lg border transition-all text-[10px] font-bold uppercase tracking-widest",
+                        "flex-1 py-2.5 px-4 rounded-lg border transition-all duration-300 text-[10px] font-bold uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                         serviceAreaType === 'specific_neighborhoods' 
-                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm' 
-                          : 'border-brand-mist/50 bg-transparent text-brand-stone hover:border-brand-stone/50 hover:bg-brand-parchment/50'
+                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm scale-[1.02]' 
+                          : 'border-brand-mist/50 bg-transparent text-brand-stone hover:border-brand-stone/40 hover:bg-brand-parchment/80 hover:scale-[1.02] active:scale-[0.98]'
                       )}
                     >
                       Bairros específicos
@@ -409,10 +409,10 @@ export const FormLocation = ({
                       type="button"
                       onClick={() => setPricingStrategy!('none')}
                       className={cn(
-                        "flex-1 py-3 px-4 rounded-xl border transition-all text-[11px] font-bold uppercase tracking-widest",
+                        "flex-1 py-3 px-4 rounded-xl border transition-all text-[11px] font-bold uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                         pricingStrategy === 'none' 
-                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm' 
-                          : 'border-brand-mist bg-transparent text-brand-stone hover:border-brand-stone'
+                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm scale-[1.02]' 
+                          : 'border-brand-mist bg-transparent text-brand-stone hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]'
                       )}
                     >
                       Sim, mesmo valor
@@ -421,10 +421,10 @@ export const FormLocation = ({
                       type="button"
                       onClick={() => setPricingStrategy!('extra')}
                       className={cn(
-                        "flex-1 py-3 px-4 rounded-xl border transition-all text-[11px] font-bold uppercase tracking-widest",
+                        "flex-1 py-3 px-4 rounded-xl border transition-all text-[11px] font-bold uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                         pricingStrategy === 'extra' 
-                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm' 
-                          : 'border-brand-mist bg-transparent text-brand-stone hover:border-brand-stone'
+                          ? 'border-brand-ink bg-brand-ink text-brand-white shadow-sm scale-[1.02]' 
+                          : 'border-brand-mist bg-transparent text-brand-stone hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]'
                       )}
                     >
                       Não, varia por região
