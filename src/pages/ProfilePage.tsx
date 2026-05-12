@@ -1387,7 +1387,7 @@ export default function ProfilePage() {
 
           </section>
 
-          <div className="pt-8 pb-20 md:pb-8 flex flex-col items-center border-t border-brand-mist/30 mt-8">
+          <div className="pt-8 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-8 flex flex-col items-center border-t border-brand-mist/30 mt-8">
             <button 
               type="submit" 
               disabled={loading} 
@@ -1396,7 +1396,7 @@ export default function ProfilePage() {
               {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
 
-            <div className="pt-4 mt-2">
+            <div className="pt-4 mt-2 mb-20 md:mb-0">
               <button 
                 type="button"
                 onClick={async () => {
@@ -1415,8 +1415,8 @@ export default function ProfilePage() {
 
         {/* Sticky Save Bar */}
         {(hasUnsavedChanges || showSaveSuccess) && (
-          <div className="fixed bottom-20 md:bottom-8 left-0 right-0 z-[60] flex justify-center px-4 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-300">
-            <div className="bg-white/90 backdrop-blur-md border border-brand-mist shadow-lg rounded-2xl p-3 flex items-center justify-between gap-4 max-w-sm w-full pointer-events-auto">
+          <div className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] md:bottom-8 left-0 right-0 z-[60] flex justify-center px-4 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="bg-white/90 backdrop-blur-md border border-brand-mist/80 shadow-2xl shadow-brand-ink/5 rounded-2xl p-3 flex items-center justify-between gap-4 max-w-sm w-full pointer-events-auto">
               <div className="flex-1">
                 <p className="text-xs font-bold text-brand-ink">
                   {showSaveSuccess ? 'Alterações salvas' : 'Alterações não salvas'}
