@@ -7,7 +7,7 @@ import {
   handleBookingError,
   logAnalyticsEvent,
 } from "../firebase";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Clock,
@@ -447,6 +447,7 @@ function PublicProfileContent() {
               where("professionalId", "==", professionalId),
               where("publicApproved", "==", true),
               where("publicDisplayMode", "in", ["named", "anonymous"]),
+              limit(15)
             );
             const reviewsSnapshot = await getDocs(reviewsQ);
             setReviews(
@@ -464,6 +465,7 @@ function PublicProfileContent() {
               const portfolioQ = query(
                 collection(db, "users", professionalId, "portfolio"),
                 orderBy("createdAt", "desc"),
+                limit(12)
               );
               const portfolioSnapshot = await getDocs(portfolioQ);
               if (!portfolioSnapshot.empty) {
