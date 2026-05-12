@@ -54,7 +54,12 @@ function logEmail(stage: 'START' | 'SUCCESS' | 'ERROR' | 'SKIP_DUPLICATE', event
   };
 
   if (stage === 'ERROR') {
-    logger.error("EMAIL", `Email dispatch failed`, ctx);
+    const errorStr = (meta.error || '').toString();
+    if (errorStr.includes('testing emails') || errorStr.includes('verify a domain')) {
+      logger.warn("EMAIL", `Email dispatch skipped (Sandbox environment requires verified domain)`, ctx);
+    } else {
+      logger.error("EMAIL", `Email dispatch failed`, ctx);
+    }
   } else if (stage === 'SUCCESS') {
     logger.info("EMAIL", `Email verified delivery`, ctx);
   } else if (stage === 'SKIP_DUPLICATE') {

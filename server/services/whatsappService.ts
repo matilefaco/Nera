@@ -266,6 +266,12 @@ export async function sendWhatsApp(
         }
       } catch (err: any) {
         lastError = err;
+        
+        if (err.message && err.message.includes('subscribe to this instance again')) {
+          logger.warn("WHATSAPP", `Subscription expired. Message skipped for ${maskPhone(normalizedPhone)}`, { userId: metadata.userId });
+          break; // Do not retry fatal errors
+        }
+        
         logger.warn("WHATSAPP", `Attempt ${attempt + 1} failed for ${maskPhone(normalizedPhone)}:`, { error: err.message, userId: metadata.userId });
         if (attempt < MAX_RETRIES) {
           await new Promise(r => setTimeout(r, 2000));

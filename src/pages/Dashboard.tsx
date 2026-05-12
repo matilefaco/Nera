@@ -378,15 +378,7 @@ setUnconfirmedTomorrow(docs);
       }
     });
 
-    // Sync Profile Settings
-    if (profile) {
-      setWaitlistMode(profile.waitlistMode || 'manual');
-      
-      if (profile.referralCode) {
-        const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-        setReferralLink(`${appUrl}/register?ref=${profile.referralCode}`);
-      }
-    }
+    // Profile Settings are now handled in a separate useEffect
 
     // Query: Waitlist
     const qWaitlist = query(
@@ -529,7 +521,16 @@ setWaitlist(docs);
       unsubUnconfirmed();
       unsubWaitlist();
     };
-  }, [user, profile]);
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!profile) return;
+    setWaitlistMode(profile.waitlistMode || 'manual');
+    if (profile.referralCode) {
+      const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+      setReferralLink(`${appUrl}/register?ref=${profile.referralCode}`);
+    }
+  }, [profile]);
 
   const availability = useMemo(() => {
     if (!profile?.workingHours) return null;
