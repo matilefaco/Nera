@@ -216,7 +216,7 @@ export const FormIdentity = ({
                 type="text" 
                 value={headline} 
                 onChange={(e) => setHeadline(e.target.value)} 
-                placeholder="Ex: Especialista em beleza natural"
+                placeholder="Ex: Design de sobrancelhas natural, preciso e elegante."
                 className="w-full px-4 py-2.5 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50"
               />
             </div>
@@ -262,10 +262,10 @@ export const FormIdentity = ({
                 value={bio} 
                 onChange={(e) => setBio(e.target.value)} 
                 className="w-full px-4 py-3 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all h-24 resize-none font-light italic text-sm leading-relaxed placeholder:text-brand-stone/50" 
-                placeholder="Conte um pouco sobre seu trabalho e diferenciais..." 
+                placeholder="Conte em poucas linhas como você atende, qual transformação entrega e por que sua cliente pode confiar em você." 
               />
               <p className="text-[10px] text-brand-stone/60 font-light ml-1">
-                A IA cria uma primeira versão da sua headline e da sua bio para facilitar. Depois você pode ajustar tudo para ficar com a sua cara.
+                Essa descrição aparece na sua vitrine e ajuda a cliente a entender seu valor antes de agendar.
               </p>
             </div>
           )}
