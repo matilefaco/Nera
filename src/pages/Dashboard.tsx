@@ -811,7 +811,7 @@ setWaitlist(docs);
         title="Sua central de operações"
         description="Aqui você vê todos os agendamentos, receita e ações rápidas. Tudo que você precisa para o dia a dia está nesta página."
       />
-      <div className="p-6 md:p-12 pb-32 max-w-2xl mx-auto w-full space-y-10">
+      <div className="p-6 md:p-12 pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-16 max-w-2xl mx-auto w-full space-y-10">
         
         {/* Avatar Skipped Reminder Banner */}
         {profile?.avatarSkipped && !profile?.avatar && (
@@ -885,52 +885,52 @@ setWaitlist(docs);
         )}
 
         {/* 1. HEADER LIMPO */}
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-serif text-brand-ink">
-              Olá, {safeString(profile?.name).split(' ')[0]} ✨
-            </h1>
-            <div className="flex flex-col mt-1">
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "text-[10px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full",
-                  plan === 'pro' || plan === 'essencial' 
-                    ? "text-green-600 bg-green-50 border border-green-200" 
-                    : "text-brand-stone"
-                )}>
-                  Plano {
-                    plan === 'pro' ? 'Pro' : 
-                    plan === 'essencial' ? 'Essencial' : 
-                    'Gratuito'
-                  }
-                </span>
-                {(plan === 'free') && (
-                  <Link to="/planos" className="text-[9px] text-brand-terracotta border border-brand-terracotta/20 px-2 py-0.5 rounded-full hover:bg-brand-terracotta hover:text-white transition-all uppercase tracking-widest font-bold">
-                    Upgrade
-                  </Link>
-                )}
-              </div>
-              <p className="text-[11px] text-brand-stone font-medium mt-1">
-                Você recebeu {appointments.filter(a => {
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-3">
+            <div>
+              <h1 className="text-[28px] md:text-3xl font-serif text-brand-ink tracking-tight">
+                Olá, {safeString(profile?.name).split(' ')[0]} ✨
+              </h1>
+              <p className="text-[13px] text-brand-stone font-light mt-1.5">
+                Você tem <strong className="font-medium text-brand-ink">{appointments.filter(a => {
                   if (!a.date) return false;
                   const d = safeParseLocalDate(a.date);
                   if (!d) return false;
                   const now = new Date();
                   return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                }).length} agendamentos este mês ✨
+                }).length} agendamentos</strong> este mês.
               </p>
             </div>
+            <div className="flex items-center gap-3">
+              <span className={cn(
+                "text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-md",
+                plan === 'pro' || plan === 'essencial' 
+                  ? "text-brand-ink bg-brand-parchment/60 border border-brand-mist/50" 
+                  : "text-brand-stone bg-brand-mist/20"
+              )}>
+                Plano {
+                  plan === 'pro' ? 'Pro' : 
+                  plan === 'essencial' ? 'Essencial' : 
+                  'Gratuito'
+                }
+              </span>
+              {(plan === 'free') && (
+                <Link to="/planos" className="text-[10px] text-brand-terracotta underline hover:text-brand-terracotta/80 transition-all font-medium">
+                  Fazer upgrade
+                </Link>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar pt-2 md:pt-0">
             <button 
               onClick={() => setIsQuickBlockOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-parchment text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all shadow-sm"
+              className="flex flex-1 md:flex-none justify-center items-center gap-2 px-4 py-2.5 bg-brand-white text-brand-ink border border-brand-mist/50 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-parchment/50 transition-all shadow-sm whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-ink"
             >
-              <Lock size={14} className="text-brand-terracotta" /> Bloquear Agenda
+              <Lock size={14} className="text-brand-stone/70" /> Bloquear
             </button>
             <button 
               onClick={() => setIsShareModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-brand-linen text-brand-terracotta rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all"
+              className="flex flex-1 md:flex-none justify-center items-center gap-2 px-5 py-2.5 bg-brand-ink text-brand-white rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 transition-all shadow-sm whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand-ink"
             >
               <Share2 size={14} /> Link profissional
             </button>
@@ -938,12 +938,12 @@ setWaitlist(docs);
         </header>
 
         {/* DASHBOARD TABS */}
-        <div className="flex bg-brand-linen p-1 rounded-full text-[9px] font-bold uppercase tracking-widest w-fit">
+        <div className="flex bg-[#FAF9F8] p-1.5 rounded-xl border border-brand-mist/30 text-[10px] font-bold uppercase tracking-widest w-full md:w-fit overflow-x-auto hide-scrollbar">
           <button 
             onClick={() => setActiveTab("hoje")}
             className={cn(
-              "px-5 py-2 rounded-full transition-all flex items-center gap-2 relative",
-              activeTab === "hoje" ? "bg-white shadow-sm text-brand-ink" : "text-brand-stone"
+              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 relative whitespace-nowrap",
+              activeTab === "hoje" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
             )}
           >
             Hoje
@@ -956,8 +956,8 @@ setWaitlist(docs);
           <button 
             onClick={() => setActiveTab("geral")}
             className={cn(
-              "px-5 py-2 rounded-full transition-all flex items-center gap-2 relative",
-              activeTab === "geral" ? "bg-white shadow-sm text-brand-ink" : "text-brand-stone"
+              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 relative whitespace-nowrap",
+              activeTab === "geral" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
             )}
           >
             Geral
@@ -968,8 +968,8 @@ setWaitlist(docs);
           <button 
             onClick={() => setActiveTab("divulgacao")}
             className={cn(
-              "px-5 py-2 rounded-full transition-all flex items-center gap-2",
-              activeTab === "divulgacao" ? "bg-white shadow-sm text-brand-ink" : "text-brand-stone"
+              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 whitespace-nowrap",
+              activeTab === "divulgacao" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
             )}
           >
             Divulgação
@@ -977,8 +977,8 @@ setWaitlist(docs);
           <button 
             onClick={() => setActiveTab("insights")}
             className={cn(
-              "px-5 py-2 rounded-full transition-all flex items-center gap-2",
-              activeTab === "insights" ? "bg-white shadow-sm text-brand-ink" : "text-brand-stone"
+              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 whitespace-nowrap",
+              activeTab === "insights" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
             )}
           >
             Insights
@@ -1425,41 +1425,34 @@ setWaitlist(docs);
                 </div>
               </motion.div>
             ) : (
-              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
+              <div className="bg-[#FAF9F8] p-5 rounded-2xl border border-brand-mist/50">
                 {displayedConfirmedToday.length === 0 && (
-                  <div className="mb-6 pb-6 border-b border-brand-linen">
-                    <p className="text-sm font-serif text-brand-ink italic">Dia tranquilo até agora — vamos preencher?</p>
+                  <div className="mb-4 pb-4 border-b border-brand-mist/40">
+                    <p className="text-[14px] font-serif text-brand-stone italic">Dia tranquilo até agora — vamos preencher?</p>
                     {daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mt-2">
+                      <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone/60 mt-2">
                         Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
                       </p>
                     )}
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-8 divide-x divide-brand-linen">
-                  <div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Faturamento Hoje</p>
-                    <p className="text-3xl font-serif text-brand-ink">{formatCurrency(displayedDailyRevenue)}</p>
-                  </div>
-                  <div className="pl-8">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Agendamentos</p>
-                    <p className="text-3xl font-serif text-brand-ink">{displayedConfirmedToday.length}</p>
-                  </div>
-                </div>
                 
-                <div className="mt-6 pt-6 border-t border-brand-linen flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-brand-linen text-brand-terracotta rounded-xl flex items-center justify-center shrink-0">
-                      <DollarSign size={20} />
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+                  <div className="flex items-center gap-5 md:gap-8 overflow-x-auto hide-scrollbar">
+                    <div className="flex-none">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/80 mb-1.5">Faturamento Hoje</p>
+                      <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{formatCurrency(displayedDailyRevenue)}</p>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-serif text-brand-ink">Painel Financeiro</h4>
-                      <p className="text-[10px] text-brand-stone font-light italic">Histórico e exportação CSV</p>
+                    <div className="w-px h-8 bg-brand-mist/60 shrink-0" />
+                    <div className="flex-none">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/80 mb-1.5">Agendamentos</p>
+                      <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{displayedConfirmedToday.length}</p>
                     </div>
                   </div>
-                  <Link to="/financeiro">
-                    <button className="px-5 py-2 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:scale-105 transition-all">
-                      Acessar
+                  
+                  <Link to="/financeiro" className="mt-2 md:mt-0 pt-4 md:pt-0 border-t border-brand-mist/40 md:border-0 w-full md:w-auto shrink-0">
+                    <button className="w-full md:w-auto px-5 py-2.5 bg-brand-white text-brand-ink border border-brand-mist/60 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#F2EFEA] hover:border-brand-mist transition-all flex items-center justify-center gap-2 group shadow-sm">
+                      Ver financeiro <span className="transform transition-transform text-brand-stone group-hover:translate-x-0.5 group-hover:text-brand-ink">→</span>
                     </button>
                   </Link>
                 </div>
