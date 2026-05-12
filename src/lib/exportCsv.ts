@@ -1,6 +1,7 @@
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { notify } from './notify';
+import { formatDateKey } from './utils';
 import { Appointment, ClientSummary } from '../types';
 
 function downloadCSV(csvContent: string, filename: string) {
@@ -68,7 +69,7 @@ export async function exportAppointmentsCsv(professionalId: string) {
   try {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0];
+    const oneYearAgoStr = formatDateKey(oneYearAgo);
 
     const q = query(
       collection(db, 'appointments'),
@@ -115,7 +116,7 @@ export async function exportFinancialCsv(professionalId: string) {
   try {
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    const oneYearAgoStr = oneYearAgo.toISOString().split('T')[0];
+    const oneYearAgoStr = formatDateKey(oneYearAgo);
 
     const q = query(
       collection(db, 'appointments'),

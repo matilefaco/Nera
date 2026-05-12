@@ -5,7 +5,7 @@ import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { notify } from '../lib/notify';
 import PremiumButton from './PremiumButton';
-import { cn } from '../lib/utils';
+import { cn, formatDateKey, getTodayLocale } from '../lib/utils';
 
 interface QuickBlockModalProps {
   open: boolean;
@@ -48,7 +48,7 @@ export default function QuickBlockModal({
   const handleBlock = async () => {
     setLoading(true);
     try {
-      let blockDate = date || new Date().toISOString().split('T')[0];
+      let blockDate = date || getTodayLocale();
       let startTime = '08:00';
       let endTime = '22:00';
 
@@ -65,7 +65,7 @@ export default function QuickBlockModal({
       } else if (selectedOption === 'tomorrow_full') {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
-        blockDate = tomorrow.toISOString().split('T')[0];
+        blockDate = formatDateKey(tomorrow);
       } else if (selectedOption === 'custom') {
         startTime = customRange.start;
         endTime = customRange.end;

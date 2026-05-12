@@ -19,6 +19,7 @@ import {
   formatCurrency, getTodayLocale, buildWhatsappLink, 
   generateWaitlistInviteMessage, cn, formatDateKey, parseLocalDate, cleanWhatsapp
 } from '../lib/utils';
+import { calculateFinancialMetrics } from '../lib/financialMetrics';
 import { getClientScore } from '../lib/clientUtils';
 import HelpTooltip from '../components/HelpTooltip';
 import Logo from '../components/Logo';
@@ -149,7 +150,7 @@ export default function Dashboard() {
   }, [confirmedToday, pendingRequests, optimisticUpdates]);
 
   const displayedDailyRevenue = useMemo(() => {
-    return displayedConfirmedToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0);
+    return calculateFinancialMetrics(displayedConfirmedToday).monthlyRevenue;
   }, [displayedConfirmedToday]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -185,7 +186,8 @@ export default function Dashboard() {
     monthlyStats,
     servicesByMonth,
     daysSinceLastAppointment,
-    growthMetrics
+    growthMetrics,
+    financialMetrics
   } = useDashboardMetrics(appointments, analyticsEvents, totalClientsCountFromSummaries);
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
@@ -195,15 +197,19 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
+    let isMounted = true;
     const qCount = query(
       collection(db, 'client_summaries'),
       where('professionalId', '==', user.uid)
     );
     getCountFromServer(qCount).then(snap => {
-      setTotalClientsCountFromSummaries(snap.data().count);
+      if (isMounted) {
+        setTotalClientsCountFromSummaries(snap.data().count);
+      }
     }).catch(err => {
       console.error('Error fetching client summaries count:', err);
     });
+    return () => { isMounted = false; };
   }, [user]);
 
   useEffect(() => {
@@ -241,6 +247,7 @@ setAlerts(docs);
 
   useEffect(() => {
     if (!user) return;
+    let isMounted = true;
 
     const qAnalytics = query(
       collection(db, 'analytics_events'),
@@ -250,6 +257,7 @@ setAlerts(docs);
     );
 
     getDocs(qAnalytics).then((snapshot) => {
+      if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
         setAnalyticsEvents(docs);
@@ -259,6 +267,7 @@ setAlerts(docs);
     }).catch((error) => {
       console.error('[Dashboard] Fetch error on qAnalytics:', error);
     });
+    return () => { isMounted = false; };
   }, [user]);
 
 
@@ -267,7 +276,7 @@ setAlerts(docs);
 
 
   const getContextualTip = () => {
-    if (pendingCount > 0) return `Você tem ${pendingCount} reserva${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
+    if (pendingCount > 0) return `Você tem ${pendingCount} pedido${pendingCount > 1 ? 's' : ''} aguardando confirmação.`;
     if (displayedConfirmedToday.length === 0) return 'Nenhuma reserva hoje. Que tal compartilhar seu link nos Stories para atrair clientes?';
     
     const variations = [
@@ -287,6 +296,7 @@ setAlerts(docs);
 
   useEffect(() => {
     if (!user) return;
+    let isMounted = true;
 
     const today = getTodayLocale();
     
@@ -303,7 +313,7 @@ setAlerts(docs);
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
 const relevantToday = docs.filter(a => isRevenueStatus(a.status));
 setConfirmedToday(relevantToday);
-setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (curr.travelFee || 0), 0));
+setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
       }
@@ -314,7 +324,7 @@ setDailyRevenue(relevantToday.reduce((acc, curr) => acc + (curr.price || 0) + (c
     // Query: Unconfirmed for tomorrow
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const tomorrowStr = formatDateKey(tomorrow);
 
     const qUnconfirmed = query(
       collection(db, 'appointments'),
@@ -336,11 +346,11 @@ setUnconfirmedTomorrow(docs);
 
     const todayNum = new Date();
     const firstDayLastMonth = new Date(todayNum.getFullYear(), todayNum.getMonth() - 1, 1);
-    const startDateStr = firstDayLastMonth.toISOString().split('T')[0];
+    const startDateStr = formatDateKey(firstDayLastMonth);
 
     const thirtyDaysFromNow = new Date(todayNum);
     thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    const endDateStr = thirtyDaysFromNow.toISOString().split('T')[0];
+    const endDateStr = formatDateKey(thirtyDaysFromNow);
 
     // Query: Historical and upcoming appointments to calculate metrics
     const qAll = query(
@@ -352,6 +362,7 @@ setUnconfirmedTomorrow(docs);
     );
 
     getDocs(qAll).then((snapshot) => {
+      if (!isMounted) return;
       try {
         const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
         setAppointments(appointmentsData);
@@ -362,7 +373,9 @@ setUnconfirmedTomorrow(docs);
     }).catch((error) => { 
       console.error("Firestore getDocs error:", error); 
     }).finally(() => {
-      setIsInitialLoading(false);
+      if (isMounted) {
+        setIsInitialLoading(false);
+      }
     });
 
     // Sync Profile Settings
@@ -400,6 +413,7 @@ setWaitlist(docs);
     const qBlocked = query(blockedRef, where('professionalId', '==', user.uid), limit(100));
     
     getDocs(qBlocked).then((snap) => {
+      if (!isMounted) return;
       try {
         const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
         const todayBlocked = allBlocked.filter(b => {
@@ -416,7 +430,7 @@ setWaitlist(docs);
     // Query: Inactive clients from summaries
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+    const thirtyDaysAgoStr = formatDateKey(thirtyDaysAgo);
 
     const qInactive = query(
       collection(db, 'client_summaries'),
@@ -427,6 +441,7 @@ setWaitlist(docs);
     );
 
     getDocs(qInactive).then((snapshot) => {
+      if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setInactiveClientsCount(docs.length);
@@ -445,6 +460,7 @@ setWaitlist(docs);
     );
 
     getDocs(qServices).then((snapshot) => {
+      if (!isMounted) return;
       try {
         const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Service));
         const filtered = rawServices.filter((s: any) => 
@@ -496,6 +512,7 @@ setWaitlist(docs);
     );
 
     getDocs(qWl).then((snapshot) => {
+      if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
         setWhatsappLogs(docs);
@@ -507,6 +524,7 @@ setWaitlist(docs);
     });
 
     return () => {
+      isMounted = false;
       unsubToday();
       unsubUnconfirmed();
       unsubWaitlist();
@@ -2129,10 +2147,15 @@ setWaitlist(docs);
               animate={{ opacity: 1, y: 0 }}
               className="bg-brand-white p-6 rounded-[32px] border-2 border-brand-terracotta shadow-md flex items-center justify-between"
             >
-              <div className="flex items-center gap-4">
-                <div className="w-2 h-2 rounded-full bg-brand-terracotta animate-pulse" />
-                <p className="text-xs font-serif text-brand-ink">
-                  {pendingCount} {pendingCount === 1 ? 'novo pedido' : 'novos pedidos'} aguardando confirmação
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-4">
+                  <div className="w-2 h-2 rounded-full bg-brand-terracotta animate-pulse" />
+                  <p className="text-xs font-serif text-brand-ink">
+                    {pendingCount} {pendingCount === 1 ? 'pedido aguardando confirmação' : 'pedidos aguardando confirmação'}
+                  </p>
+                </div>
+                <p className="text-[9px] text-brand-stone font-light ml-6">
+                  Pedidos ainda não aprovados.
                 </p>
               </div>
               <Link 
@@ -2895,11 +2918,7 @@ setWaitlist(docs);
         feature={upgradeFeature}
         count={usageCount}
         totalClients={totalClientsCount}
-        averageTicket={
-          appointments.filter(a => isRevenueStatus(a.status)).length > 0 
-            ? monthlyRevenue / appointments.filter(a => isRevenueStatus(a.status)).length 
-            : 0
-        }
+        averageTicket={financialMetrics.averageTicket}
       />
 
       {/* Floating Action Button for active appointment */}

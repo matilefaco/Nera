@@ -10,7 +10,7 @@ import {
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } from '../firebase';
 import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, WaitlistEntry } from '../types';
-import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage } from '../lib/utils';
+import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage, formatDateKey, getTodayLocale } from '../lib/utils';
 import { getAvailableSlots, canBookSlot } from '../lib/bookingUtils';
 import { notify } from '../lib/notify';
 import { SERVICE_MODES, getServiceModeShortLabel } from '../lib/copy';
@@ -215,7 +215,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       }
       if (draft.mode) setBookingMode(draft.mode);
       if (draft.date) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayLocale();
         if (draft.date < today) {
           // Date is in the past, don't restore date/time but keep the rest
           setSelectedDate('');
@@ -679,7 +679,7 @@ setIsLoadingSlots(false);
                         {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(offset => {
                           const date = new Date();
                           date.setDate(date.getDate() + offset);
-                          const dateStr = date.toISOString().split('T')[0];
+                          const dateStr = formatDateKey(date);
                           const isSelected = selectedDate === dateStr;
                           const dayOfWeek = date.getDay();
                           const isWorkingDay = profile?.workingHours?.workingDays?.includes(dayOfWeek);

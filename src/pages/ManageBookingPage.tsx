@@ -18,7 +18,7 @@ import {
 import { doc, getDoc, collection, query, where, onSnapshot, getDocs, limit } from 'firebase/firestore';
 import { Appointment, UserProfile, Service } from '../types';
 import PremiumButton from '../components/PremiumButton';
-import { formatCurrency, formatLocalDate, buildWhatsappLink, cn } from '../lib/utils';
+import { formatCurrency, formatLocalDate, buildWhatsappLink, cn, getTodayLocale } from '../lib/utils';
 import { isCancelledStatus, isPendingStatus, isRevenueStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { getAvailableSlots } from '../lib/bookingUtils';
 import { notify } from '../lib/notify';
@@ -78,7 +78,7 @@ export default function ManageBookingPage() {
       } else if (action === 'reschedule' && view !== 'reschedule') {
         setView('reschedule');
         // Pre-select current date if it's in the future
-        const today = new Date().toISOString().split('T')[0];
+        const today = getTodayLocale();
         if (appointment.date >= today) {
           setSelectedDate(appointment.date);
         }
@@ -294,7 +294,7 @@ setBlockedSchedules(dayBlocked);
   const isCompleted = appointment.status === 'completed'; // Existent explicit check
   const isPending = isPendingStatus(appointment.status);
   const isConfirmed = isRevenueStatus(appointment.status) && !isCompleted;
-  const isPast = new Date(appointment.date) < new Date(new Date().toISOString().split('T')[0]);
+  const isPast = new Date(appointment.date) < new Date(getTodayLocale());
 
   const handleCalendarAdd = () => {
     if (!appointment || !professional) return;
@@ -719,7 +719,7 @@ setBlockedSchedules(dayBlocked);
                     <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Escolha a data</label>
                     <input 
                       type="date" 
-                      min={new Date().toISOString().split('T')[0]}
+                      min={getTodayLocale()}
                       value={selectedDate}
                       onChange={(e) => { setSelectedDate(e.target.value); setSelectedTime(''); }}
                       className="w-full px-6 py-4 bg-brand-linen rounded-[24px] outline-none border border-brand-mist focus:border-brand-ink transition-all text-sm font-medium"

@@ -9,23 +9,26 @@ import {
   ChevronDown, ChevronUp, Download, PieChart,
   ArrowUpRight, ArrowDownRight, Info, Plus
 } from 'lucide-react';
-import { formatCurrency, cn } from '../lib/utils';
+import { formatCurrency, cn, formatDateKey } from '../lib/utils';
 import { Appointment } from '../types';
 import AppLayout from '../components/AppLayout';
 import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { exportFinancialCsv } from '../lib/exportCsv';
 import { FinancialSkeleton } from '../components/ui/FinancialSkeleton';
 import { notify } from '../lib/notify';
+import { calculateFinancialMetrics, RevenueByService } from '../lib/financialMetrics';
 
 interface MonthlyGroup {
   monthKey: string; // YYYY-MM
   monthLabel: string; // "Março 2024"
-  revenue: number;
-  plannedRevenue: number;
+  revenue: number; // completed
+  plannedRevenue: number; // confirmed+accepted
   pendingRevenue: number;
   cancelledRevenue: number;
-  appointmentsCount: number;
+  appointmentsCount: number; // totalValidAppointments
   ticketAverage: number;
+  monthTotalRevenue: number; // monthlyRevenue (revenue + plannedRevenue)
+  revenueByService: RevenueByService[];
   appointments: Appointment[];
 }
 
@@ -45,9 +48,9 @@ export default function FinancialPage() {
       try {
         const now = new Date();
         const past = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-        const startDateStr = past.toISOString().split('T')[0];
+        const startDateStr = formatDateKey(past);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const endDateStr = end.toISOString().split('T')[0];
+        const endDateStr = formatDateKey(end);
 
         const q = query(
           collection(db, 'appointments'),
@@ -87,52 +90,42 @@ export default function FinancialPage() {
   }, [user]);
 
   const monthlyGroups = useMemo(() => {
-    const groups: Record<string, MonthlyGroup> = {};
+    const rawGroups: Record<string, Appointment[]> = {};
     const monthsNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
     appointments.forEach(appt => {
+      if (!appt.date) return;
       const [year, month] = appt.date.split('-');
       const monthKey = `${year}-${month}`;
       
-      if (!groups[monthKey]) {
-        groups[monthKey] = {
-          monthKey,
-          monthLabel: `${monthsNames[parseInt(month) - 1]} ${year}`,
-          revenue: 0,
-          plannedRevenue: 0,
-          pendingRevenue: 0,
-          cancelledRevenue: 0,
-          appointmentsCount: 0,
-          ticketAverage: 0,
-          appointments: []
-        };
+      if (!rawGroups[monthKey]) {
+        rawGroups[monthKey] = [];
       }
-
-      const value = (appt.price || 0) + (appt.travelFee || 0);
-
-      if (isCancelledStatus(appt.status)) {
-        groups[monthKey].cancelledRevenue += value;
-      } else if (isCompletedStatus(appt.status)) {
-        groups[monthKey].revenue += value;
-        groups[monthKey].appointmentsCount++;
-      } else if (isConfirmedLikeStatus(appt.status)) {
-        groups[monthKey].plannedRevenue += value;
-      } else if (isPendingStatus(appt.status)) {
-        groups[monthKey].pendingRevenue += value;
-      }
-
-      groups[monthKey].appointments.push(appt);
+      rawGroups[monthKey].push(appt);
     });
 
-    // Calculate ticket averages
-    Object.values(groups).forEach(group => {
-      if (group.appointmentsCount > 0) {
-        group.ticketAverage = group.revenue / group.appointmentsCount;
-      }
+    const groups: MonthlyGroup[] = Object.keys(rawGroups).map(monthKey => {
+      const appts = rawGroups[monthKey];
+      const metrics = calculateFinancialMetrics(appts);
+      const [year, month] = monthKey.split('-');
+      
+      return {
+        monthKey,
+        monthLabel: `${monthsNames[parseInt(month) - 1]} ${year}`,
+        revenue: metrics.receivedRevenue,
+        plannedRevenue: metrics.receivableRevenue,
+        pendingRevenue: metrics.pendingConfirmationRevenue,
+        cancelledRevenue: metrics.cancelledRevenue,
+        appointmentsCount: metrics.totalValidAppointments,
+        ticketAverage: metrics.averageTicket,
+        monthTotalRevenue: metrics.monthlyRevenue,
+        revenueByService: metrics.revenueByService,
+        appointments: appts
+      };
     });
 
     // Sort by date (desc)
-    return Object.values(groups).sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+    return groups.sort((a, b) => b.monthKey.localeCompare(a.monthKey));
   }, [appointments]);
 
   const currentMonthData = useMemo(() => {
@@ -153,23 +146,7 @@ export default function FinancialPage() {
   }, [monthlyGroups]);
 
   const servicesRevenue = useMemo(() => {
-    // Filter by current month appointments to match "seu mês" text, or fallback to all if needed?
-    // Let's use current month to be exact to the requested text.
-    const currentAppointments = currentMonthData.current?.appointments || [];
-    const validAppts = currentAppointments.filter(a => isRevenueStatus(a.status));
-
-    const grouped: Record<string, { serviceName: string, revenue: number, count: number }> = {};
-
-    validAppts.forEach(appt => {
-      const name = appt.serviceName || 'Serviço';
-      if (!grouped[name]) {
-        grouped[name] = { serviceName: name, revenue: 0, count: 0 };
-      }
-      grouped[name].revenue += (Number(appt.price) || 0);
-      grouped[name].count += 1;
-    });
-
-    return Object.values(grouped).sort((a, b) => b.revenue - a.revenue);
+    return currentMonthData.current?.revenueByService || [];
   }, [currentMonthData]);
 
   const handleExportCSV = (group: MonthlyGroup) => {
@@ -254,99 +231,114 @@ export default function FinancialPage() {
         ) : (
           <div className="space-y-10">
             {/* Main Month Card */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="md:col-span-2 bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-xl relative overflow-hidden"
+                className="lg:col-span-2 bg-brand-white p-8 rounded-[32px] border border-brand-mist/60 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.04)] relative overflow-hidden flex flex-col justify-between min-h-[300px]"
               >
-                <div className="absolute top-0 right-0 p-12 opacity-10">
-                  <TrendingUp size={120} />
+                <div className="absolute -top-12 -right-12 p-12 opacity-[0.02] text-brand-ink pointer-events-none">
+                  <TrendingUp size={280} strokeWidth={1} />
                 </div>
                 
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-8">
+                <div className="relative z-10 flex flex-col h-full justify-between">
+                  <div className="flex md:items-center flex-col md:flex-row justify-between gap-4 mb-10">
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-mist/60 mb-1">Receita Realizada</p>
-                      <h4 className="text-lg font-serif">Mês de {currentMonthData.current?.monthLabel.split(' ')[0] || 'Atual'}</h4>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-1 flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-brand-terracotta"></span>
+                        Receita Realizada
+                      </p>
+                      <h4 className="text-xl font-serif text-brand-ink">Mês de {currentMonthData.current?.monthLabel.split(' ')[0] || 'Atual'}</h4>
                     </div>
                     {currentMonthData.growth !== 0 && (
                       <div className={cn(
-                        "flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold border",
+                        "flex items-center self-start md:self-auto gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold border",
                         currentMonthData.growth > 0 
-                          ? "bg-green-500/10 text-green-400 border-green-500/20" 
-                          : "bg-red-500/10 text-red-400 border-red-500/20"
+                          ? "bg-green-500/5 text-green-600 border-green-500/10" 
+                          : "bg-red-500/5 text-red-600 border-red-500/10"
                       )}>
-                        {currentMonthData.growth > 0 ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                        {Math.abs(Math.round(currentMonthData.growth))}%
+                        {currentMonthData.growth > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                        {Math.abs(Math.round(currentMonthData.growth))}% vs. mês anterior
                       </div>
                     )}
                   </div>
                   
-                  <div className="flex flex-col md:flex-row md:items-end gap-4 md:gap-6 lg:gap-8">
+                  <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-8">
                     <div className="flex-1">
-                      <p className="text-4xl lg:text-5xl font-serif mb-2 text-brand-white">
-                        {formatCurrency(currentMonthData.current?.revenue || 0)}
-                      </p>
-                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-mist/40">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1.5">
                         Recebido
                       </p>
+                      <p className="text-4xl lg:text-5xl font-serif text-brand-ink tracking-tight">
+                        {formatCurrency(currentMonthData.current?.revenue || 0)}
+                      </p>
                     </div>
                     
-                    <div className="hidden md:block h-px md:h-12 w-full md:w-px bg-brand-mist/20" />
+                    <div className="hidden lg:block h-16 w-px bg-brand-mist/40" />
+                    <div className="block lg:hidden h-px w-full bg-brand-mist/40" />
                     
-                    <div className="flex-1">
-                      <p className="text-2xl lg:text-3xl font-serif text-brand-linen mb-1">
+                    <div className="flex-[0.8] flex flex-col justify-end">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1.5">
+                        Previsto
+                      </p>
+                      <p className="text-2xl lg:text-3xl font-serif text-brand-ink/80 mb-1 leading-none tracking-tight">
                         {formatCurrency(currentMonthData.current?.plannedRevenue || 0)}
                       </p>
-                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-mist/40">
-                        A receber
+                      <p className="text-[9px] text-brand-stone/60 font-light max-w-[160px] leading-relaxed mt-1">
+                        Agendamentos confirmados ainda não finalizados.
                       </p>
                     </div>
 
-                    <div className="hidden md:block h-px md:h-12 w-full md:w-px bg-brand-mist/20" />
+                    <div className="hidden lg:block h-16 w-px bg-brand-mist/40" />
+                    <div className="block lg:hidden h-px w-full bg-brand-mist/40" />
 
-                    <div className="flex-1">
-                      <p className="text-xl lg:text-2xl font-serif text-brand-linen/60 mb-1">
+                    <div className="flex-[0.8] flex flex-col justify-end">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1.5">
+                        Aguardando confirmação
+                      </p>
+                      <p className="text-xl lg:text-2xl font-serif text-brand-ink/60 mb-1 leading-none tracking-tight">
                         {formatCurrency(currentMonthData.current?.pendingRevenue || 0)}
                       </p>
-                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-brand-mist/40">
-                        Aguardando confirmação
+                      <p className="text-[9px] text-brand-stone/60 font-light max-w-[160px] leading-relaxed mt-1">
+                        Pedidos ainda não aprovados.
                       </p>
                     </div>
                   </div>
                 </div>
               </motion.div>
 
-              <div className="space-y-6">
+              <div className="flex flex-col gap-4 md:gap-6 lg:col-span-1">
                 <motion.div 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 }}
-                  className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm"
+                  className="bg-brand-parchment/50 p-6 rounded-[32px] border border-brand-mist/50 shadow-sm flex-1 flex flex-col justify-center min-h-[140px]"
                 >
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-4 flex items-center gap-2">
-                    <PieChart size={12} /> Ticket Médio
-                  </p>
-                  <p className="text-2xl font-serif text-brand-ink mb-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone flex items-center gap-2">
+                      <PieChart size={12} className="text-brand-terracotta" /> Ticket Médio
+                    </p>
+                    <p className="text-[10px] text-brand-stone italic font-light">Este mês</p>
+                  </div>
+                  <p className="text-3xl font-serif text-brand-ink tracking-tight">
                     {formatCurrency(currentMonthData.current?.ticketAverage || 0)}
                   </p>
-                  <p className="text-[10px] text-brand-stone italic font-light">Este mês</p>
                 </motion.div>
 
                 <motion.div 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm"
+                  className="bg-brand-parchment/50 p-6 rounded-[32px] border border-brand-mist/50 shadow-sm flex-1 flex flex-col justify-center min-h-[140px]"
                 >
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-4 flex items-center gap-2">
-                    <Users size={12} /> Atendimentos
-                  </p>
-                  <p className="text-2xl font-serif text-brand-ink mb-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone flex items-center gap-2">
+                      <Users size={12} className="text-brand-terracotta" /> Atendimentos
+                    </p>
+                    <p className="text-[10px] text-brand-stone italic font-light">Já realizados</p>
+                  </div>
+                  <p className="text-3xl font-serif text-brand-ink tracking-tight">
                     {currentMonthData.current?.appointmentsCount || 0}
                   </p>
-                  <p className="text-[10px] text-brand-stone italic font-light">Já realizados hoje</p>
                 </motion.div>
               </div>
             </div>
@@ -359,29 +351,29 @@ export default function FinancialPage() {
               </div>
 
               {servicesRevenue.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {servicesRevenue.map((srv, idx) => (
                     <motion.div
-                      key={srv.serviceName + idx}
+                      key={srv.name + idx}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex flex-col justify-between"
+                      className="bg-brand-white p-5 rounded-2xl border border-brand-mist/50 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.02)] flex flex-col justify-between hover:border-brand-mist transition-colors group"
                     >
                       <div className="mb-4">
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-brand-stone mb-1 line-clamp-1">
-                          {srv.serviceName}
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-1.5 line-clamp-1 group-hover:text-brand-ink transition-colors">
+                          {srv.name}
                         </p>
-                        <p className="text-2xl font-serif text-brand-ink">
+                        <p className="text-xl font-serif text-brand-ink tracking-tight">
                           {formatCurrency(srv.revenue)}
                         </p>
                       </div>
-                      <div className="flex items-center justify-between text-[10px] text-brand-stone">
-                        <span className="font-medium bg-brand-linen/50 px-2 py-1 rounded-md">
+                      <div className="flex items-center gap-3 text-[9px] text-brand-stone">
+                        <span className="font-medium bg-brand-linen/50 px-2 py-1 rounded text-brand-ink">
                           {srv.count} {srv.count === 1 ? 'agendamento' : 'agendamentos'}
                         </span>
                         {srv.count > 0 && (
-                          <span className="italic font-light">
+                          <span className="italic font-light opacity-80">
                             Méd. {formatCurrency(srv.revenue / srv.count)}
                           </span>
                         )}
@@ -411,56 +403,58 @@ export default function FinancialPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="bg-brand-white rounded-3xl border border-brand-mist overflow-hidden shadow-sm"
+                    className="bg-brand-white rounded-[24px] border border-brand-mist/70 overflow-hidden shadow-[0_4px_20px_-10px_rgba(0,0,0,0.03)] transition-all hover:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.06)]"
                   >
                     <button 
                       onClick={() => setExpandedMonth(expandedMonth === group.monthKey ? null : group.monthKey)}
-                      className="w-full px-8 py-6 flex items-center justify-between text-left hover:bg-brand-linen/30 transition-colors"
+                      className="w-full px-6 py-5 lg:px-8 lg:py-6 flex items-center justify-between text-left hover:bg-brand-parchment/30 transition-colors"
                     >
-                      <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-12">
+                      <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8 flex-1">
                         <div className="min-w-[140px]">
                           <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Mês</span>
-                          <span className="text-lg font-serif text-brand-ink">{group.monthLabel}</span>
+                          <span className="text-lg font-serif text-brand-ink tracking-tight">{group.monthLabel}</span>
                         </div>
                         
                         <div className="min-w-[120px]">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Recebido</span>
-                          <span className="text-sm font-bold text-brand-ink">{formatCurrency(group.revenue)}</span>
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-500/60"></span> Recebido</span>
+                          <span className="text-base font-serif text-brand-ink tracking-tight">{formatCurrency(group.revenue)}</span>
                         </div>
                         
                         <div className="hidden sm:block min-w-[100px]">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">A receber</span>
-                          <span className="text-sm font-medium text-brand-stone">{formatCurrency(group.plannedRevenue)}</span>
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Previsto</span>
+                          <span className="text-sm font-medium text-brand-ink/80">{formatCurrency(group.plannedRevenue)}</span>
                         </div>
                         
-                        <div className="hidden md:block min-w-[120px]">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Aguardando</span>
-                          <span className="text-sm font-medium text-brand-stone opacity-80">{formatCurrency(group.pendingRevenue)}</span>
+                        <div className="hidden md:block min-w-[140px]">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Aguardando confirmação</span>
+                          <span className="text-sm font-medium text-brand-stone">{formatCurrency(group.pendingRevenue)}</span>
                         </div>
                         
                         <div className="hidden lg:block min-w-[100px]">
                           <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Cancelado</span>
-                          <span className="text-sm font-medium text-brand-stone opacity-60">{formatCurrency(group.cancelledRevenue)}</span>
+                          <span className="text-sm font-medium text-brand-stone/60">{formatCurrency(group.cancelledRevenue)}</span>
                         </div>
                         
-                        <div className="hidden xl:block">
+                        <div className="hidden xl:block ml-auto text-right">
                           <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-1">Atendimentos</span>
-                          <span className="text-sm font-medium text-brand-stone">{group.appointmentsCount} concluídos</span>
+                          <span className="text-[11px] font-medium text-brand-stone bg-brand-linen/40 px-2 py-1 rounded inline-block">{group.appointmentsCount} concluídos</span>
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-4">
-                        {expandedMonth === group.monthKey ? <ChevronUp className="text-brand-stone" /> : <ChevronDown className="text-brand-stone" />}
+                      <div className="flex items-center gap-4 ml-4">
+                        <div className={`p-2 rounded-full transition-colors ${expandedMonth === group.monthKey ? 'bg-brand-mist/30 text-brand-ink' : 'text-brand-stone hover:bg-brand-mist/20'}`}>
+                          {expandedMonth === group.monthKey ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </div>
                       </div>
                     </button>
 
                     <AnimatePresence>
                       {expandedMonth === group.monthKey && (
                         <motion.div 
-                          initial={{ height: 0 }}
-                          animate={{ height: 'auto' }}
-                          exit={{ height: 0 }}
-                          className="overflow-hidden border-t border-brand-mist bg-brand-parchment/30"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden border-t border-brand-mist/40 bg-brand-parchment/20"
                         >
                           <div className="p-8">
                             <div className="flex items-center justify-between mb-8">
@@ -523,8 +517,8 @@ export default function FinancialPage() {
                                           "bg-brand-linen text-brand-stone"
                                         )}>
                                           {isCompletedStatus(appt.status) ? 'Recebido' : 
-                                           isConfirmedLikeStatus(appt.status) ? 'A receber' : 
-                                           isPendingStatus(appt.status) ? 'Aguardando' : 
+                                           isConfirmedLikeStatus(appt.status) ? 'Previsto' : 
+                                           isPendingStatus(appt.status) ? 'Aguardando confirmação' : 
                                            isCancelledStatus(appt.status) ? 'Cancelado' : appt.status}
                                         </span>
                                       </td>

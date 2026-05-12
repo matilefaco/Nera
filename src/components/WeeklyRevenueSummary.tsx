@@ -11,6 +11,7 @@ import { db } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { notify } from '../lib/notify';
 import { isRevenueStatus, isPendingStatus, isCompletedStatus, isConfirmedLikeStatus } from '../constants/appointmentStatus';
+import { calculateFinancialMetrics } from '../lib/financialMetrics';
 
 interface WeeklyRevenueSummaryProps {
   appointments: Appointment[];
@@ -54,59 +55,46 @@ export default function WeeklyRevenueSummary({
   endOfPrevMonth.setDate(0);
 
   // Calculations
-  const metrics = appointments.reduce((acc, app) => {
+  const todayApps = appointments.filter(app => app.date === todayStr);
+  
+  const weekApps = appointments.filter(app => {
+    if (!app.date) return false;
     const appDate = new Date(app.date + 'T12:00:00');
-    const appValue = (app.price || 0) + (app.travelFee || 0);
-
-    // Today
-    if (app.date === todayStr) {
-      if (isRevenueStatus(app.status)) {
-        acc.todayRevenue += appValue;
-        acc.todayCount++;
-      }
-      acc.todayAll.push(app);
-    }
-
-    // This Week
-    if (appDate >= startOfWeek) {
-      if (isRevenueStatus(app.status)) {
-        acc.weekRevenue += appValue;
-        acc.weekCount++;
-      }
-      if (isPendingStatus(app.status)) {
-        acc.weekProjected += appValue;
-      }
-    }
-
-    // This Month
-    if (appDate >= startOfMonth) {
-      if (isRevenueStatus(app.status)) {
-        acc.monthRevenue += appValue;
-      }
-    }
-
-    // Prev Month
-    if (appDate >= startOfPrevMonth && appDate <= endOfPrevMonth) {
-      if (isRevenueStatus(app.status)) {
-        acc.prevMonthRevenue += appValue;
-      }
-    }
-
-    return acc;
-  }, {
-    todayRevenue: 0,
-    todayCount: 0,
-    todayAll: [] as Appointment[],
-    weekRevenue: 0,
-    weekCount: 0,
-    weekProjected: 0,
-    monthRevenue: 0,
-    prevMonthRevenue: 0
+    return appDate >= startOfWeek;
   });
+
+  const monthApps = appointments.filter(app => {
+    if (!app.date) return false;
+    const appDate = new Date(app.date + 'T12:00:00');
+    return appDate >= startOfMonth;
+  });
+
+  const prevMonthApps = appointments.filter(app => {
+    if (!app.date) return false;
+    const appDate = new Date(app.date + 'T12:00:00');
+    return appDate >= startOfPrevMonth && appDate <= endOfPrevMonth;
+  });
+
+  const todayMetrics = calculateFinancialMetrics(todayApps);
+  const weekMetrics = calculateFinancialMetrics(weekApps);
+  const monthMetrics = calculateFinancialMetrics(monthApps);
+  const prevMonthMetrics = calculateFinancialMetrics(prevMonthApps);
+
+  const metrics = {
+    todayRevenue: todayMetrics.monthlyRevenue,
+    todayCount: todayMetrics.totalValidAppointments,
+    todayAll: todayApps,
+    weekRevenue: weekMetrics.monthlyRevenue,
+    weekCount: weekMetrics.totalValidAppointments,
+    weekProjected: weekMetrics.pendingConfirmationRevenue, // approximation of projected
+    monthRevenue: monthMetrics.monthlyRevenue,
+    prevMonthRevenue: prevMonthMetrics.monthlyRevenue
+  };
 
   const monthVariation = metrics.prevMonthRevenue > 0 
     ? ((metrics.monthRevenue - metrics.prevMonthRevenue) / metrics.prevMonthRevenue) * 100 
     : 0;
+
 
   const weekMetaProgress = profile?.monthlyRevenueGoal 
     ? (metrics.weekRevenue / (profile.monthlyRevenueGoal / 4)) * 100 

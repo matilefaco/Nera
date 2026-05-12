@@ -241,12 +241,12 @@ export default function AgendaPage() {
     // Calculate visibleStart: 30 days before baseDate
     const start = new Date(baseDate);
     start.setDate(start.getDate() - 30);
-    const visibleStartStr = start.toISOString().split('T')[0];
+    const visibleStartStr = formatDateKey(start);
     
     // Calculate visibleEnd: 60 days after baseDate
     const end = new Date(baseDate);
     end.setDate(end.getDate() + 60);
-    const visibleEndStr = end.toISOString().split('T')[0];
+    const visibleEndStr = formatDateKey(end);
 
     const q = query(
       collection(db, 'appointments'),

@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Appointment, AnalyticsEvent } from '../types';
 import { isRevenueStatus } from '../constants/appointmentStatus';
-import { getTodayLocale } from '../lib/utils';
+import { getTodayLocale, formatDateKey } from '../lib/utils';
+import { calculateFinancialMetrics, filterAppointmentsByCurrentMonth } from '../lib/financialMetrics';
 
 export function useDashboardMetrics(
   appointments: Appointment[],
@@ -25,7 +26,7 @@ export function useDashboardMetrics(
     
     const nextWeek = new Date();
     nextWeek.setDate(nextWeek.getDate() + 7);
-    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+    const nextWeekStr = formatDateKey(nextWeek);
 
     // Analytics Events Accumulation (Single Pass)
     let visits30d = 0;
@@ -61,15 +62,11 @@ export function useDashboardMetrics(
 
     // Appointments Accumulation (Single Pass)
     let appointments30d = 0;
-    let monthlyCount = 0;
-    let monthlyRevenue = 0;
-    let prevMonthlyRevenue = 0;
     let returningThisWeek = 0;
 
     const clientMap = new Map<string, string>();
     const monthlyClients = new Set<string>();
     
-    const servicesMap: Record<string, { count: number, revenue: number }> = {};
     const timesMap: Record<string, number> = {};
     const daysMap: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
     
@@ -116,26 +113,8 @@ export function useDashboardMetrics(
 
             // Monthly stats logic (Current Month)
             if (appMonth === currentMonth && appYear === currentYear) {
-                monthlyCount++;
                 if (clientKey) monthlyClients.add(clientKey);
-                
-                // Revenue
-                if (isRevenue) {
-                    monthlyRevenue += (app.price || 0) + (app.travelFee || 0);
-                }
-
-                // Top services (Current Month, isDoneOrAccepted)
-                const sName = app.serviceName || '-';
-                if (!servicesMap[sName]) servicesMap[sName] = { count: 0, revenue: 0 };
-                servicesMap[sName].count++;
-                servicesMap[sName].revenue += (app.price || 0) + (app.travelFee || 0);
             } 
-            // Prev month revenue
-            else if (appMonth === prevMonth && appYear === prevMonthYear) {
-                if (isRevenue) {
-                    prevMonthlyRevenue += (app.price || 0) + (app.travelFee || 0);
-                }
-            }
 
             // Returning this week
             if (app.date >= todayStr && app.date <= nextWeekStr && isRevenue) {
@@ -166,21 +145,20 @@ export function useDashboardMetrics(
         daysSinceLastAppointment = diffDays >= 0 ? diffDays : null;
     }
 
+    // Now use the centralized calculation
+    const currentMonthAppointments = filterAppointmentsByCurrentMonth(appointments, now);
+    
+    // We also need previous month for comparison
+    const prevMonthDate = new Date();
+    prevMonthDate.setMonth(prevMonthDate.getMonth() - 1);
+    const prevMonthAppointments = filterAppointmentsByCurrentMonth(appointments, prevMonthDate);
+    
+    const currentMetrics = calculateFinancialMetrics(currentMonthAppointments);
+    const prevMetrics = calculateFinancialMetrics(prevMonthAppointments);
+    
     // Top Service
-    let topService = '-';
-    let maxSvcCount = -1;
-    for (const sName in servicesMap) {
-        if (servicesMap[sName].count > maxSvcCount) {
-            maxSvcCount = servicesMap[sName].count;
-            topService = sName;
-        }
-    }
-
-    // Services by month
-    const servicesByMonth = Object.entries(servicesMap)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+    const servicesByMonth = currentMetrics.revenueByService.slice(0, 5);
+    const topService = servicesByMonth.length > 0 ? servicesByMonth[0].name : '-';
 
     // Best Time
     let bestTime = '-';
@@ -220,15 +198,16 @@ export function useDashboardMetrics(
     return {
         confirmedAppointments,
         totalClientsCount: typeof totalClientsCountOverride === 'number' ? totalClientsCountOverride : clientMap.size,
-        monthlyRevenue,
-        prevMonthlyRevenue,
+        monthlyRevenue: currentMetrics.monthlyRevenue,
+        prevMonthlyRevenue: prevMetrics.monthlyRevenue,
         returningThisWeek,
         monthlyStats: {
-            count: monthlyCount,
+            count: currentMetrics.totalValidAppointments,
             clientsCount: monthlyClients.size
         },
         servicesByMonth,
         daysSinceLastAppointment,
+        financialMetrics: currentMetrics, // add it to the return for anything else that might need it
         growthMetrics: isBothEmpty ? null : {
             visits7d,
             visits30d,
