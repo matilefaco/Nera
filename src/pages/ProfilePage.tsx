@@ -665,7 +665,7 @@ export default function ProfilePage() {
 
         <form 
           onSubmit={handleSave} 
-          className="max-w-4xl mx-auto space-y-8"
+          className="max-w-4xl mx-auto space-y-8 pb-32 md:pb-24"
         >
           
           {/* 1. IDENTIDADE */}
@@ -1167,8 +1167,8 @@ export default function ProfilePage() {
             <hr className="border-brand-mist/50 my-6" />
 
             {/* Payment Methods Section */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center gap-3 mb-3">
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center gap-2 mb-2">
                   <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
                     Formas de Pagamento Aceitas
                   </h3>
@@ -1188,10 +1188,10 @@ export default function ProfilePage() {
                         prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
                       )}
                       className={cn(
-                        "px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
+                        "px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
                         paymentMethods.includes(m.id)
-                          ? "bg-brand-ink text-brand-white border-brand-ink shadow-md scale-[1.02]"
-                          : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
+                          ? "bg-[#FAF9F8] text-brand-ink border-brand-ink/30"
+                          : "bg-white text-brand-stone border-brand-mist/60 hover:border-brand-stone/40 hover:bg-brand-mist/10"
                       )}
                     >
                       {m.label}
