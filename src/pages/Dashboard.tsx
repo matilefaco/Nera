@@ -26,7 +26,6 @@ import { Appointment, WaitlistEntry, BlockedSchedule, AnalyticsEvent, Service, W
 import { isRevenueStatus, isPendingStatus, isCompletedStatus, isConfirmedLikeStatus } from '../constants/appointmentStatus';
 import { AnimatePresence } from 'motion/react';
 import AppLayout from '../components/AppLayout';
-import { ActivationChecklist } from '../components/ActivationChecklist';
 import { SharingPreviewSection } from '../components/SharingPreviewSection';
 import BlockAvailabilityModal from '../components/BlockAvailabilityModal';
 import QuickBlockModal from '../components/QuickBlockModal';
@@ -1277,13 +1276,6 @@ setWaitlist(docs);
         {/* HOJE SIMPLE VIEW */}
         {activeTab === "hoje" && (
           <div className="flex flex-col gap-8">
-            <ActivationChecklist 
-              profile={profile}
-              appointments={appointments}
-              services={services}
-              onShareClick={() => setIsShareModalOpen(true)}
-            />
-
             {/* Notificações Banner */}
             {!isSubscribed && !pushBannerDismissed && (
               <motion.div
@@ -1377,16 +1369,16 @@ setWaitlist(docs);
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-brand-white p-6 rounded-[32px] border-2 border-brand-terracotta shadow-md flex items-center justify-between"
+                className="bg-[#FAF9F8] p-4 md:px-5 md:py-4 rounded-xl border border-brand-terracotta/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0"
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-2 h-2 rounded-full bg-brand-terracotta animate-pulse" />
-                  <p className="text-xs font-serif text-brand-ink">
-                    Você tem {pendingCount} {pendingCount === 1 ? 'pedido pendente' : 'pedidos pendentes'} aguardando confirmação
+                <div className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/80 animate-pulse shrink-0" />
+                  <p className="text-[13px] font-serif text-brand-ink leading-snug">
+                    Você tem <span className="font-medium text-brand-terracotta">{pendingCount} {pendingCount === 1 ? 'pedido pendente' : 'pedidos pendentes'}</span> aguardando confirmação
                   </p>
                 </div>
-                <Link to="/pedidos" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
-                  Ver pedidos
+                <Link to="/pedidos" className="w-fit ml-4 sm:ml-0 px-3 py-1.5 sm:p-0 bg-white sm:bg-transparent border border-brand-mist/50 sm:border-0 rounded-md text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:text-brand-terracotta/80 transition-all flex items-center gap-1.5 shrink-0 shadow-sm sm:shadow-none">
+                  Ver pedidos <span className="text-brand-terracotta/40 hidden sm:inline text-[10px]">→</span>
                 </Link>
               </motion.div>
             )}
