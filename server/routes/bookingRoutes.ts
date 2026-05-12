@@ -309,6 +309,60 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       finalData.serviceName = service.name;
       finalData.professionalId = service.professionalId; // Force owner from service
 
+      // --- VALIDATION: Working Days & Hours & Blocked Schedules ---
+      const apptDateStr = finalData.date;
+      const apptDayOfWeek = new Date(apptDateStr + 'T12:00:00').getDay();
+      const apptStartMin = timeToMinutes(finalData.time);
+      const apptEndMin = apptStartMin + finalData.duration;
+
+      const proData = proSnap.data() as any;
+      if (proData && proData.workingHours) {
+        if (Array.isArray(proData.workingHours.workingDays) && proData.workingHours.workingDays.length > 0) {
+          if (!proData.workingHours.workingDays.includes(apptDayOfWeek)) {
+            const err = new Error("Horário indisponível. Escolha outro horário.");
+            (err as any).status = 400;
+            throw err;
+          }
+        }
+        
+        if (proData.workingHours.startTime && proData.workingHours.endTime) {
+          const whStart = timeToMinutes(proData.workingHours.startTime);
+          const whEnd = timeToMinutes(proData.workingHours.endTime);
+          if (apptStartMin < whStart || apptEndMin > whEnd) {
+             const err = new Error("Horário indisponível. Escolha outro horário.");
+             (err as any).status = 400;
+             throw err;
+          }
+        }
+      }
+
+      const blockedQ = db.collection('blocked_schedules').where('professionalId', '==', finalData.professionalId);
+      const blockedSnap = await transaction.get(blockedQ);
+      
+      for (const bDoc of blockedSnap.docs) {
+        const b = bDoc.data();
+        const isFixed = b.date === apptDateStr;
+        const isRecurring = b.isRecurring && Array.isArray(b.recurringDays) && b.recurringDays.includes(apptDayOfWeek);
+        
+        if (isFixed || isRecurring) {
+          if (b.type === 'full_day' || b.allDay) {
+            const err = new Error("Horário indisponível. Escolha outro horário.");
+            (err as any).status = 400;
+            throw err;
+          }
+          if (b.startTime && b.endTime) {
+            const bStart = timeToMinutes(b.startTime);
+            const bEnd = timeToMinutes(b.endTime);
+            if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) {
+              const err = new Error("Horário indisponível. Escolha outro horário.");
+              (err as any).status = 400;
+              throw err;
+            }
+          }
+        }
+      }
+      // --- END OF VALIDATION ---
+
       // Coupon (if any)
       let couponSnap = null;
       let couponRef = null;
