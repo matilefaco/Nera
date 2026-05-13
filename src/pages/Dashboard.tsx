@@ -87,7 +87,7 @@ function safeLocaleCompare(a?: string | null, b?: string | null): number {
 const isDev = import.meta.env.DEV;
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
-type DashboardTab = "hoje" | "geral" | "insights" | "divulgacao";
+type DashboardTab = "hoje" | "crescimento";
 
 interface AnalyticsCacheEntry {
   data: AnalyticsEvent[];
@@ -111,7 +111,7 @@ export default function Dashboard() {
   
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
     const saved = localStorage.getItem("nera_dashboard_tab");
-    return saved === "hoje" || saved === "geral" || saved === "insights" || saved === "divulgacao" ? saved : "hoje";
+    return saved === "hoje" || saved === "crescimento" ? saved : "hoje";
   });
 
   useEffect(() => {
@@ -1007,325 +1007,153 @@ setWaitlist(docs);
             )}
           </button>
           <button 
-            onClick={() => setActiveTab("geral")}
+            onClick={() => setActiveTab("crescimento")}
             className={cn(
               "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 relative whitespace-nowrap",
-              activeTab === "geral" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
+              activeTab === "crescimento" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
             )}
           >
-            Geral
+            Crescimento
             {inactiveClientsCount > 0 && (
               <span className="w-1.5 h-1.5 bg-brand-terracotta rounded-full" />
             )}
           </button>
-          <button 
-            onClick={() => setActiveTab("divulgacao")}
-            className={cn(
-              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 whitespace-nowrap",
-              activeTab === "divulgacao" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
-            )}
-          >
-            Divulgação
-          </button>
-          <button 
-            onClick={() => setActiveTab("insights")}
-            className={cn(
-              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 whitespace-nowrap",
-              activeTab === "insights" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
-            )}
-          >
-            Insights
-          </button>
         </div>
 
-        {/* INSIGHTS CONTENT */}
-        {activeTab === "insights" && (
+        {/* CRESCIMENTO CONTENT */}
+        {activeTab === "crescimento" && (
           <div className="flex flex-col gap-8">
-            {/* Componente Interno para Métricas Bloqueadas */}
-            {(() => {
-              const LockedMetric = ({ value, label, locked, icon: Icon }: { value: any, label: string, locked: boolean, icon?: any }) => (
-                <div className="space-y-1">
-                  <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">{label}</p>
-                  <div className="flex items-center gap-2">
-                    {locked ? (
-                      <div className="flex items-center gap-2 group relative cursor-help">
-                        <p className="text-2xl font-serif text-brand-mist">---</p>
-                        <div className="flex items-center gap-1">
-                          <Lock size={12} className="text-brand-mist" />
-                          <Link 
-                            to="/planos" 
-                            className="p-1 hover:bg-brand-linen rounded-full transition-colors"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ChevronRight size={10} className="text-brand-terracotta" />
-                          </Link>
-                        </div>
-                        <div className="absolute bottom-full left-0 mb-2 px-2 py-1 bg-brand-ink text-white text-[7px] font-bold uppercase tracking-widest rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-30">
-                          Disponível no Plano Pro
-                        </div>
-                      </div>
+            {profile && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <SharingPreviewSection profile={profile} />
+              </motion.div>
+            )}
+
+            {/* Growth Dashboard: KPIs simplificados e Growth Pro */}
+            {growthMetrics && (
+              <section className="bg-brand-white p-6 md:p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col gap-6 relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-brand-linen pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                      <TrendingUp size={16} />
+                    </div>
+                    <div>
+                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
+                        Performance
+                      </h3>
+                      <p className="text-xs font-serif text-brand-ink italic">Resultados da vitrine</p>
+                    </div>
+                  </div>
+                  <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
+                    <span className="px-3 py-1 bg-brand-white rounded-full shadow-sm text-brand-ink">Últimos 30 dias</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-6">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas na vitrine</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
+                      <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
+                    <p className="text-xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Taxa de Conversão</p>
+                    {features.advancedDashboard ? (
+                      <p className="text-xl font-serif text-brand-ink">{growthMetrics.convRate.toFixed(1)}%</p>
                     ) : (
                       <div className="flex items-center gap-2">
-                         {Icon && <div className="w-4 h-4 rounded bg-brand-linen flex items-center justify-center"><Icon size={10} /></div>}
-                         <p className="text-2xl font-serif text-brand-ink">{value}</p>
+                        <p className="text-xl font-serif text-brand-mist">---</p>
+                        <Lock size={10} className="text-brand-mist" />
                       </div>
                     )}
                   </div>
                 </div>
-              );
 
-              return (
-                <>
-                  {/* Header com Status do Plano */}
-                  <section className="px-6 mt-4">
-                    <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-serif text-brand-ink italic">
-                          {features.advancedDashboard 
-                            ? "Performance completa dos últimos 30 dias."
-                            : "Vendo quantas pessoas visitaram sua vitrine. 🔒 Acesse insights completos no Plano Pro."}
-                        </p>
-                        {!features.advancedDashboard && (
-                          <Link to="/planos" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
-                            Fazer Upgrade
-                          </Link>
-                        )}
+                {/* BLOCO ÚNICO "Growth Pro" */}
+                {!features.advancedDashboard ? (
+                  <div className="mt-2 bg-brand-parchment/60 p-5 rounded-[20px] border border-brand-mist/50 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm">
+                        <Sparkles size={18} className="text-brand-terracotta" />
+                      </div>
+                      <div>
+                         <h4 className="text-sm font-serif text-brand-ink mb-0.5">Growth Pro</h4>
+                         <p className="text-[10px] text-brand-stone font-light italic max-w-[280px]">
+                           Descubra origem das clientes, serviço campeão e melhores horários.
+                         </p>
                       </div>
                     </div>
-                  </section>
-
-                  {/* Growth Dashboard: KPIs de Conversão e Insights */}
-                  {growthMetrics && (
-                    <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-10 relative overflow-hidden">
-                      <div className="flex items-center justify-between border-b border-brand-linen pb-6">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
-                            <TrendingUp size={20} />
-                          </div>
-                          <div>
-                            <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
-                              Growth Dashboard
-                              <HelpTooltip content="Dados da sua vitrine: visitas, cliques e conversão em reservas." />
-                            </h3>
-                            <p className="text-sm font-serif text-brand-ink italic">Sua performance de conversão</p>
-                          </div>
-                        </div>
-                        <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
-                          <span className="px-3 py-1.5 bg-brand-white rounded-full shadow-sm text-brand-ink">30 Dias</span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10">
-                        <div className="space-y-1">
-                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas 30d</p>
-                          <div className="flex items-baseline gap-2">
-                            <p className="text-2xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
-                            <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
-                          <p className="text-2xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
-                        </div>
-                        
-                        <LockedMetric 
-                          label="Taxa de Conversão" 
-                          value={`${growthMetrics.convRate.toFixed(1)}%`} 
-                          locked={!features.advancedDashboard} 
-                        />
-                        
-                        <LockedMetric 
-                          label="Origem Principal" 
-                          value={growthMetrics.mainOrigin} 
-                          locked={!features.advancedDashboard}
-                          icon={growthMetrics.mainOrigin === 'Instagram' ? Instagram : Share2}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6 border-t border-brand-linen">
-                        <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                          <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                            {features.advancedDashboard ? <Sparkles size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                            <span className="text-[8px] font-bold uppercase tracking-widest">Serviço Campeão</span>
-                          </div>
-                          {features.advancedDashboard ? (
-                            <p className="text-sm font-serif text-brand-ink leading-tight">{growthMetrics.topService}</p>
-                          ) : (
-                            <div className="space-y-1">
-                              <p className="text-sm font-serif text-brand-mist">---</p>
-                              <div className="flex items-center gap-1">
-                                <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Plano Pro</p>
-                                <Link to="/planos"><ChevronRight size={10} className="text-brand-terracotta" /></Link>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                          <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                            {features.advancedDashboard ? <Clock size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                            <span className="text-[8px] font-bold uppercase tracking-widest">Horário + Vendido</span>
-                          </div>
-                          {features.advancedDashboard ? (
-                            <p className="text-sm font-serif text-brand-ink">{growthMetrics.bestTime}</p>
-                          ) : (
-                            <div className="space-y-1">
-                              <p className="text-sm font-serif text-brand-mist">---</p>
-                              <div className="flex items-center gap-1">
-                                <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Plano Pro</p>
-                                <Link to="/planos"><ChevronRight size={10} className="text-brand-terracotta" /></Link>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="p-5 bg-brand-parchment/30 rounded-3xl border border-brand-mist/50">
-                          <div className="flex items-center gap-2 mb-3 text-brand-stone">
-                            {features.advancedDashboard ? <Sun size={14} /> : <Lock size={14} className="text-brand-mist" />}
-                            <span className="text-[8px] font-bold uppercase tracking-widest">Dia mais fraco</span>
-                          </div>
-                          {features.advancedDashboard ? (
-                            <p className="text-sm font-serif text-brand-ink">{growthMetrics.weakestDay}</p>
-                          ) : (
-                            <div className="space-y-1">
-                              <p className="text-sm font-serif text-brand-mist">---</p>
-                              <div className="flex items-center gap-1">
-                                <p className="text-[7px] text-brand-stone uppercase tracking-widest font-medium">Plano Pro</p>
-                                <Link to="/planos"><ChevronRight size={10} className="text-brand-terracotta" /></Link>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* AI Insights */}
-                      <AnimatePresence>
-                        {!insightDismissed && (
-                          <motion.div 
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="bg-brand-linen/40 p-6 rounded-[32px] border border-brand-mist/30 flex items-start gap-4 overflow-hidden relative"
-                          >
-                            {!features.advancedDashboard && (
-                              <div className="absolute inset-0 z-10 bg-brand-white/80 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-4">
-                                <Lock size={16} className="text-brand-terracotta mb-2" />
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">Bloqueado</p>
-                                <p className="text-[9px] text-brand-stone font-light">Growth Insights é exclusivo do Plano Pro</p>
-                                <Link to="/planos" className="mt-2 text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Fazer Upgrade</Link>
-                              </div>
-                            )}
-                            <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm border border-brand-mist/20">
-                              <Zap size={20} />
-                            </div>
-                            <div className="flex-1 pr-8">
-                              <h4 className="text-xs font-bold text-brand-ink uppercase tracking-widest mb-1">Dica de Performance</h4>
-                              <p className="text-xs text-brand-stone font-light leading-relaxed italic">
-                                {growthMetrics.growthInsight}
-                              </p>
-                            </div>
-                            <button 
-                              onClick={() => setInsightDismissed(true)}
-                              className="absolute top-6 right-6 p-1 text-brand-stone hover:text-brand-ink"
-                            >
-                              <X size={14} />
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </section>
-                  )}
-
-                  {/* Serviços do Mês Ranking */}
-                  <div className="px-6">
-                    <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative overflow-hidden">
-                      {!features.advancedDashboard && (
-                        <div className="absolute inset-0 z-20 bg-brand-white/70 backdrop-blur-[2px] flex items-center justify-center p-8 text-center">
-                          <div className="bg-brand-white/95 p-6 rounded-[32px] shadow-xl border border-brand-mist max-w-[220px]">
-                            <div className="w-10 h-10 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center mx-auto mb-3">
-                              <Lock size={18} />
-                            </div>
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-1">Ranking de Serviços</p>
-                            <p className="text-[9px] text-brand-stone font-light mb-4">Insights detalhados estão disponíveis apenas no Plano Pro</p>
-                            <Link to="/planos">
-                              <PremiumButton variant="terracotta" className="w-full !py-2 !text-[8px]">Ver Planos</PremiumButton>
-                            </Link>
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center justify-between mb-8">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
-                            <Sparkles size={20} />
-                          </div>
-                          <div>
-                            <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
-                              Serviços do mês
-                              <HelpTooltip content="Ranking dos 5 serviços mais reservados e realizados no mês atual." />
-                            </h3>
-                            <p className="text-sm font-serif text-brand-ink italic">Sua performance por serviço</p>
-                          </div>
-                        </div>
-                        <div className="bg-brand-parchment px-3 py-1 rounded-full border border-brand-mist/50">
-                          <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">
-                            {new Date().toLocaleDateString('pt-BR', { month: 'long' })}
-                          </span>
-                        </div>
-                      </div>
-
-                      {servicesByMonth.length > 0 ? (
-                        <div className="space-y-6">
-                          {servicesByMonth.map((s, idx) => (
-                            <div key={s.name} className="space-y-2">
-                              <div className="flex justify-between items-end">
-                                <div className="flex-1 min-w-0 pr-4">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <span className="w-4 h-4 bg-brand-parchment rounded flex items-center justify-center text-[9px] font-bold text-brand-stone">{idx + 1}</span>
-                                    <p className="text-[11px] font-bold text-brand-ink truncate">
-                                      {s.name}
-                                    </p>
-                                  </div>
-                                  <p className="text-[9px] text-brand-stone uppercase tracking-widest font-medium pl-6">
-                                    {s.count} {s.count === 1 ? 'reserva' : 'reservas'} • {formatCurrency(s.revenue)}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="h-1.5 w-full bg-brand-linen rounded-full overflow-hidden ml-6">
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${(s.count / servicesByMonth[0].count) * 100}%` }}
-                                  className="h-full bg-brand-terracotta rounded-full transition-all duration-1000"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="py-12 border-t border-brand-linen text-center flex flex-col items-center">
-                          <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta mb-3 opacity-80">
-                            <Star size={18} />
-                          </div>
-                          <p className="text-sm font-serif text-brand-ink">O pódio deste mês está livre.</p>
-                          <p className="text-[10px] text-brand-stone font-light max-w-[240px] mx-auto mt-2 leading-relaxed">
-                            Assim que os primeiros clientes agendarem, você verá aqui o ranking inteligente dos serviços que mais geram receita.
-                          </p>
-                        </div>
-                      )}
-                    </section>
+                    <Link to="/planos" className="w-full sm:w-auto mt-2 sm:mt-0">
+                      <PremiumButton variant="terracotta" className="w-full text-[9px] py-3 px-6 flex items-center justify-center gap-2">
+                        Ver planos <ChevronRight size={12} />
+                      </PremiumButton>
+                    </Link>
                   </div>
-                </>
-              );
-            })()}
+                ) : (
+                   /* Growth Pro Desbloqueado */
+                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-brand-linen mt-2">
+                     {/* Origem Principal */}
+                     <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 text-center">
+                       <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Origem Principal</p>
+                       <p className="text-xs font-serif text-brand-ink">{growthMetrics.mainOrigin}</p>
+                     </div>
+                     {/* Serviço Campeão */}
+                     <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 text-center">
+                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Serviço Campeão</p>
+                        <p className="text-xs font-serif text-brand-ink truncate px-2">{growthMetrics.topService}</p>
+                     </div>
+                     {/* Horário + Vendido */}
+                     <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 text-center">
+                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Melhor Horário</p>
+                        <p className="text-xs font-serif text-brand-ink">{growthMetrics.bestTime}</p>
+                     </div>
+                   </div>
+                )}
+                
+                {/* AI Insights - Apenas se for Pro e não tiver fechado */}
+                <AnimatePresence>
+                  {features.advancedDashboard && !insightDismissed && (
+                    <motion.div 
+                      key="growth-insight"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="bg-brand-linen/40 p-4 rounded-2xl border border-brand-mist/30 flex items-start gap-3 overflow-hidden relative mt-2"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm border border-brand-mist/20">
+                        <Zap size={16} />
+                      </div>
+                      <div className="flex-1 pr-6">
+                        <h4 className="text-[10px] font-bold text-brand-ink uppercase tracking-widest mb-1">Dica de Performance</h4>
+                        <p className="text-[11px] text-brand-stone font-light leading-relaxed italic">
+                          {growthMetrics.growthInsight}
+                        </p>
+                      </div>
+                      <button 
+                        onClick={() => setInsightDismissed(true)}
+                        className="absolute top-4 right-4 p-1 text-brand-stone hover:text-brand-ink"
+                      >
+                        <X size={12} />
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+              </section>
+            )}
           </div>
         )}
 
-        {activeTab === "divulgacao" && profile && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <SharingPreviewSection profile={profile} />
-          </motion.div>
-        )}
+
 
         {/* HOJE SIMPLE VIEW */}
         {activeTab === "hoje" && (
@@ -1583,866 +1411,6 @@ setWaitlist(docs);
           </div>
         )}
 
-        {/* GERAL CONTENT (Resumo do Mês + Blocos Estratégicos) */}
-        {activeTab === "geral" && (
-          <div className="flex flex-col gap-8">
-            {/* Financial Shortcut Card */}
-            <section className="px-6 mt-4">
-              <div className="bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-brand-terracotta/20 transition-colors" />
-                
-                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 bg-brand-white/10 text-brand-linen rounded-2xl flex items-center justify-center shrink-0">
-                      <DollarSign size={28} />
-                    </div>
-                    <div>
-                      <h4 className="text-xl font-serif">Financeiro</h4>
-                      <p className="text-xs text-white/60 font-light italic mt-1 leading-relaxed">
-                        Ver receita, histórico mensal e exportar CSV.
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <Link to="/financeiro" className="md:w-auto w-full">
-                    <button className="w-full px-8 py-4 bg-brand-terracotta text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-lg flex items-center justify-center gap-2">
-                      Abrir financeiro
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            </section>
-            {/* Indicadores do Mês (Sem receita duplicada) */}
-            <section className="px-6 mt-4">
-              <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Agendamentos</p>
-                    <p className="text-xl font-serif text-brand-ink">{monthlyStats.count || 0}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Clientes</p>
-                    <p className="text-xl font-serif text-brand-ink">{monthlyStats.clientsCount || 0}</p>
-                  </div>
-                  <Link to="/avaliacoes" className="text-center hover:bg-brand-linen transition-colors rounded-xl py-1 block">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1 flex justify-center items-center gap-1 group">Avaliações <span className="opacity-0 group-hover:opacity-100 transition-opacity">&rarr;</span></p>
-                    <p className="text-xl font-serif text-brand-ink">{profile?.totalReviews || 0}</p>
-                  </Link>
-                </div>
-              </div>
-            </section>
-
-            {/* Próximas Ações */}
-            <section className="px-6">
-              <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => setIsDashboardBlockOpen(true)}
-                  className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col items-start gap-2 text-left"
-                >
-                  <Clock size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Bloquear horário</span>
-                </button>
-                <Link to="/clients" className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2">
-                  <Users size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Novo cliente</span>
-                </Link>
-                <Link to="/services" className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2">
-                  <Plus size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Novo serviço</span>
-                </Link>
-                <a 
-                  href={buildWhatsappLink(profile?.whatsapp || '')} 
-                  target="_blank" 
-                  rel="noreferrer"
-                  className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2"
-                >
-                  <MessageCircle size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">WhatsApp</span>
-                </a>
-              </div>
-            </section>
-
-            {/* Faturamento Semanal */}
-            <section className="px-6">
-              <div className="flex flex-col gap-4">
-                {user && (
-                  <WeeklyRevenueSummary 
-                    appointments={appointments || []} 
-                    profile={profile}
-                    userId={user.uid}
-                    hideTodayFlow={true}
-                  />
-                )}
-              </div>
-            </section>
-
-            {/* Status do Negócio (Compacto) */}
-            <section className="px-6">
-              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
-                      <Zap size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
-                        Status do negócio
-                      </h3>
-                      <p className="text-sm font-serif text-brand-ink italic">Fluxo e operação</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-6">
-                  {/* Waitlist Status */}
-                  {features.waitlist && (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest flex items-center">
-                          Lista de Espera
-                          <HelpTooltip content="Clientes que pediram vaga quando sua agenda estava cheia. Avise quando abrir um horário." />
-                        </span>
-                        {waitlist && waitlist.length > 0 ? (
-                          <button onClick={() => setIsWaitlistModalOpen(true)} className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver {waitlist.length}</button>
-                        ) : (
-                          <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-40">Vazia</span>
-                        )}
-                      </div>
-                      {waitlist && waitlist.length > 0 && (
-                        <div className="bg-brand-parchment/30 p-4 rounded-2xl border border-brand-mist/50">
-                          <p className="text-[10px] text-brand-ink leading-tight font-medium">
-                            {waitlist[0].clientName} aguarda por {waitlist[0].period === 'any' ? 'um horário' : waitlist[0].period}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Blocked Status */}
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center justify-between border-t border-brand-linen pt-6">
-                      <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Bloqueios</span>
-                      {blockedSchedules && blockedSchedules.length > 0 ? (
-                        <button onClick={() => setIsDashboardBlockOpen(true)} className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Gerenciar</button>
-                      ) : (
-                        <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-40">Nenhum</span>
-                      )}
-                    </div>
-                    {blockedSchedules && blockedSchedules.length > 0 && (
-                      <div className="bg-brand-parchment/30 p-4 rounded-2xl border border-brand-mist/50">
-                        <p className="text-[10px] text-brand-ink leading-tight font-medium">
-                          Indisponível {blockedSchedules[0].date === getTodayLocale() ? 'hoje' : safeFormatDateKey(blockedSchedules[0].date, 'Recorrente')} às {blockedSchedules[0].startTime}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Retention Status */}
-                  <div className="flex flex-col gap-4 border-t border-brand-linen pt-6">
-                    {(() => {
-                      // Calculate the qualified insight
-                      let insight = null;
-                      
-                      const qualifiedClient = inactiveClients.find(c => {
-                        if ((c.confirmedAppointments || 0) < 3) return false;
-                        if (!c.firstAppointmentDate || !c.lastAppointmentDate || !c.clientName) return false;
-                        
-                        const first = new Date(c.firstAppointmentDate);
-                        const last = new Date(c.lastAppointmentDate);
-                        if (isNaN(first.getTime()) || isNaN(last.getTime())) return false;
-                        
-                        const diffTime = Math.abs(last.getTime() - first.getTime());
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        if (diffDays <= 0) return false;
-                        
-                        const avgFreq = Math.round(diffDays / ((c.confirmedAppointments || 3) - 1));
-                        return avgFreq >= 5 && avgFreq <= 90;
-                      });
-
-                      if (qualifiedClient) {
-                        const first = new Date(qualifiedClient.firstAppointmentDate);
-                        const last = new Date(qualifiedClient.lastAppointmentDate);
-                        const diffTime = Math.abs(last.getTime() - first.getTime());
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        const avgFreq = Math.round(diffDays / ((qualifiedClient.confirmedAppointments || 3) - 1));
-                        
-                        const today = new Date();
-                        const timeSinceLast = Math.abs(today.getTime() - last.getTime());
-                        const daysSinceLast = Math.ceil(timeSinceLast / (1000 * 60 * 60 * 24));
-                        
-                        const firstName = safeString(qualifiedClient.clientName, 'Cliente').split(' ')[0];
-                        const whatsappInfo = qualifiedClient.clientWhatsapp || qualifiedClient.clientPhone || '';
-                        
-                        insight = {
-                          firstName,
-                          avgFreq,
-                          daysSinceLast,
-                          whatsappInfo
-                        };
-                      }
-
-                      if (insight) {
-                        return (
-                          <div className="bg-brand-parchment/30 rounded-3xl border border-brand-mist/50 p-6 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-4 opacity-10">
-                              <Heart size={48} className="text-brand-terracotta" />
-                            </div>
-                            
-                            <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest mb-4">Cuidado com a sua clientela</p>
-                            
-                            <blockquote className="text-sm font-serif text-brand-stone italic leading-relaxed mb-6">
-                              "{insight.firstName} costumava voltar aproximadamente a cada {insight.avgFreq} dias. 
-                              Já faz {insight.daysSinceLast} dias desde sua última visita. 
-                              Talvez seja um ótimo momento para retomar esse contato."
-                            </blockquote>
-
-                            {insight.whatsappInfo && (
-                              <button 
-                                onClick={() => {
-                                  // Abre explicitamente sem mensagem automática, apenas o número
-                                  window.open(buildWhatsappLink(insight.whatsappInfo, ''), '_blank');
-                                }}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-white border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors shadow-sm"
-                              >
-                                <MessageCircle size={14} className="text-brand-terracotta" />
-                                Abrir WhatsApp
-                              </button>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      if (inactiveClientsCount > 0) {
-                        return (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Clientes há +30 dias sem voltar</p>
-                                <p className="text-[11px] text-brand-stone italic">{inactiveClientsCount} {inactiveClientsCount === 1 ? 'pronta' : 'prontas'} para retorno</p>
-                              </div>
-                              <Link to="/clients" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">Ver todas</Link>
-                            </div>
-                            
-                            <div className="space-y-2">
-                              {inactiveClients.slice(0, 2).map((client, idx) => (
-                                <div key={idx} className="bg-brand-parchment/10 p-4 rounded-2xl border border-brand-mist flex items-center justify-between gap-4">
-                                  <div className="flex-1">
-                                    <p className="text-[11px] font-bold text-brand-ink">{client.clientName || client.name}</p>
-                                    <p className="text-[9px] text-brand-stone italic">Não volta desde {safeDateLabel(client.lastDate || client.lastAppointmentDate)}</p>
-                                  </div>
-                                  {idx === 0 && (client.clientWhatsapp || client.whatsapp || client.clientPhone) && (
-                                    <button 
-                                      onClick={() => {
-                                        window.open(buildWhatsappLink(client.clientWhatsapp || client.whatsapp || client.clientPhone || '', ''), '_blank');
-                                      }}
-                                      className="bg-brand-white border border-brand-mist text-brand-ink p-2.5 rounded-full hover:bg-brand-linen transition-colors shadow-sm"
-                                      title="Abrir WhatsApp"
-                                    >
-                                      <MessageCircle size={14} className="text-brand-terracotta" />
-                                    </button>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Retenção: ok</span>
-                          <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  {!(waitlist && waitlist.length > 0) && !(blockedSchedules && blockedSchedules.length > 0) && inactiveClientsCount === 0 && (
-                    <div className="pt-6 border-t border-brand-linen text-center space-y-3">
-                      <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta mx-auto mb-2 opacity-80">
-                        <Check size={18} />
-                      </div>
-                      <p className="text-sm font-serif text-brand-ink">A operação rodando suavemente.</p>
-                      <p className="text-[10px] text-brand-stone font-light px-4 leading-relaxed max-w-[250px] mx-auto">
-                        Sem clientes para resgatar ou pendências. Quando a operação precisar da sua atenção, os alertas estratégicos aparecerão aqui.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-
-            {/* WhatsApp Section */}
-            <section className="px-6">
-              <div className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative overflow-hidden">
-                {!features.whatsappNotifications && (
-                  <div className="absolute inset-0 z-20 bg-brand-white/40 backdrop-blur-[2px] flex items-center justify-center p-8 text-center">
-                    <div className="bg-brand-white p-8 rounded-[32px] shadow-2xl border border-brand-mist max-w-sm">
-                      <div className="w-12 h-12 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <Star size={24} />
-                      </div>
-                      <h4 className="text-xl font-serif text-brand-ink mb-2">WhatsApp Pro</h4>
-                      <p className="text-[10px] text-brand-stone uppercase tracking-widest font-bold mb-6">Recurso Exclusivo</p>
-                      <Link to="/planos">
-                        <PremiumButton variant="terracotta" className="w-full">Fazer Upgrade</PremiumButton>
-                      </Link>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between mb-8">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-[#25D366]/10 text-[#25D366] rounded-xl relative">
-                      <MessageCircle size={20} />
-                      {profile?.whatsappNotificationsEnabled && (
-                        <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
-                        WhatsApp Inteligente
-                        <HelpTooltip content="Automações de confirmação, lembrete e reativação de clientes pelo WhatsApp." />
-                      </h3>
-                      <p className="text-sm font-serif text-brand-ink italic">Automação de mensagens</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className={cn(
-                      "text-[9px] font-bold uppercase tracking-widest px-3 py-1 rounded-full",
-                      profile?.whatsappNotificationsEnabled ? "bg-green-50 text-green-600 border border-green-100" : "bg-gray-50 text-gray-400 border border-gray-100"
-                    )}>
-                      {profile?.whatsappNotificationsEnabled ? '● Ativo' : '● Inativo'}
-                    </span>
-                    <Link 
-                      to="/perfil" 
-                      className="p-2 hover:bg-brand-mist rounded-full transition-colors"
-                    >
-                      <Settings size={16} className="text-brand-stone" />
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <p className="text-xs text-brand-stone italic leading-relaxed">
-                    O Nera confirma e lembra suas clientes automaticamente, reduzindo faltas e seu trabalho manual.
-                  </p>
-
-                  <div className="bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
-                        Enviados recentemente
-                      </h4>
-                      <Link to="/whatsapp-history" className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
-                        Ver histórico →
-                      </Link>
-                    </div>
-
-                    <div className="space-y-3">
-                      {whatsappLogs.length > 0 ? (
-                        whatsappLogs.map((log) => (
-                          <div key={log.id} className="flex items-center justify-between gap-3 bg-white/50 p-3 rounded-xl border border-brand-mist/30">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                              <div className={cn(
-                                "w-1.5 h-1.5 rounded-full shrink-0",
-                                log.status === 'sent' ? 'bg-green-500' : log.status === 'failed' ? 'bg-red-500' : 'bg-gray-300'
-                              )} />
-                              <div className="overflow-hidden">
-                                <p className="text-[11px] font-bold text-brand-ink truncate">
-                                  {log.clientName || 'Cliente'}
-                                </p>
-                                <p className="text-[9px] text-brand-stone truncate italic">
-                                  {log.messagePreview || log.message.substring(0, 30)}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-[9px] text-brand-stone font-medium text-right shrink-0">
-                              {log.status === 'sent' ? 'Enviado' : log.status === 'failed' ? 'Falha' : 'Pendente'}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="py-8 text-center flex flex-col items-center border-t border-brand-linen">
-                          <div className="w-8 h-8 bg-brand-linen rounded-full flex items-center justify-center text-brand-stone mb-2 opacity-60">
-                            <MessageCircle size={14} />
-                          </div>
-                          <p className="text-xs font-serif text-brand-ink">Nenhuma mensagem disparada</p>
-                          <p className="text-[10px] text-brand-stone font-light max-w-[200px] mx-auto mt-1 leading-relaxed">
-                            Lembretes, confirmações e retornos automáticos aparecerão aqui quando a sua agenda começar a fluir.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {!profile?.whatsapp && (
-                    <div className="text-center py-6 px-6 bg-brand-linen/30 rounded-3xl border border-dashed border-brand-terracotta/30">
-                      <p className="text-[11px] text-brand-ink italic mb-3">Sincronize seu WhatsApp para ativar as automações.</p>
-                      <Link to="/perfil">
-                        <button className="text-[9px] font-bold uppercase tracking-widest bg-brand-terracotta text-white px-6 py-2.5 rounded-full hover:scale-105 transition-transform shadow-sm">
-                          Conectar WhatsApp
-                        </button>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-
-
-          </div>
-        )}
-
-        {/* GERAL CONTENT (Temporarily Deactivated) */}
-        {false && activeTab === "geral" && (
-          <>
-            <div className="flex flex-col gap-8">
-
-        {/* HOJE CONTENT */}
-            {/* 1. Hoje Financeiro (Simple Card) */}
-            {user && (
-              <WeeklyRevenueSummary 
-                appointments={appointments}
-                profile={profile}
-                userId={user.uid}
-                showOnlyToday={true}
-              />
-            )}
-
-            {/* 2. Alerta Anti No-Show (Prioridade Máxima) */}
-            <AnimatePresence>
-              {unconfirmedTomorrow.length > 0 && (
-                <motion.section 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-amber-50 p-6 rounded-[32px] border border-amber-200 border-dashed"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
-                        <ShieldCheck size={18} />
-                      </div>
-                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-amber-900 flex items-center">
-                        Anti No-Show: Clientes de Amanhã
-                        <HelpTooltip content="Clientes com horário próximo que ainda não confirmaram. Envie lembretes para reduzir faltas." />
-                      </h3>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    {unconfirmedTomorrow.slice(0, 2).map(app => (
-                      <div key={app.id} className="bg-white/80 p-4 rounded-2xl flex items-center justify-between shadow-sm border border-amber-100">
-                        <div>
-                          <p className="text-[10px] font-bold text-amber-900 uppercase tracking-widest">{app.clientName}</p>
-                          <p className="text-xs text-amber-700 italic">{app.time} — {app.serviceName}</p>
-                        </div>
-                        <a 
-                          href={buildWhatsappLink(app.clientWhatsapp || '', `Olá ${safeString(app.clientName, 'Cliente').split(' ')[0]} ✨ Vi que ainda não confirmou sua presença para amanhã às ${app.time}. Confirmado?`)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700"
-                        >
-                          <MessageCircle size={18} />
-                        </a>
-                      </div>
-                    ))}
-                    {unconfirmedTomorrow.length > 2 && (
-                      <Link to="/agenda" className="block text-center text-[9px] font-bold uppercase text-amber-600">
-                        + {unconfirmedTomorrow.length - 2} clientes pendentes
-                      </Link>
-                    )}
-                  </div>
-                </motion.section>
-              )}
-            </AnimatePresence>
-
-            {/* 3. Agenda de Hoje Detalhada */}
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-serif text-brand-ink italic">Sua Agenda de Hoje</h3>
-                <span className="text-[10px] text-brand-stone font-bold uppercase tracking-widest px-3 py-1 bg-brand-linen rounded-full">
-                  {displayedConfirmedToday.length} Atendimentos
-                </span>
-              </div>
-
-              <div className="space-y-4">
-                {displayedConfirmedToday.length > 0 ? (
-                  displayedConfirmedToday.map((appt) => (
-                    <div 
-                      key={appt.id} 
-                      className={cn(
-                        "bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex items-center justify-between group transition-all hover:border-brand-terracotta",
-                        isCompletedStatus(appt.status) && "opacity-60 bg-brand-parchment/30"
-                      )}
-                    >
-                      <div className="flex items-center gap-5">
-                        <div className="text-center min-w-[50px]">
-                          <p className="text-lg font-serif font-bold text-brand-ink leading-none">{appt.time}</p>
-                          <p className="text-[8px] text-brand-stone uppercase font-bold mt-1">Check-in</p>
-                        </div>
-                        <div className="h-10 w-px bg-brand-linen" />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-bold text-brand-ink">{appt.clientName}</h4>
-                            {isCompletedStatus(appt.status) && <Check size={12} className="text-green-600" />}
-                          </div>
-                          <p className="text-xs text-brand-stone italic">{appt.serviceName}</p>
-                          <div className="flex items-center gap-3 mt-1.5">
-                            <span className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta">
-                              {formatCurrency(appt.price || 0)}
-                            </span>
-                            {appt.duration && (
-                              <span className="text-[9px] text-brand-stone font-medium capitalize">
-                                • {appt.duration} min
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <a 
-                          href={buildWhatsappLink(appt.clientWhatsapp || '', `Oi ${safeString(appt.clientName, 'Cliente').split(' ')[0]} ✨ tudo bem?`)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-3 text-brand-stone hover:text-[#25D366] hover:bg-green-50 rounded-2xl transition-all"
-                        >
-                          <MessageCircle size={18} />
-                        </a>
-                        <Link 
-                          to="/agenda" 
-                          className="p-3 text-brand-stone hover:text-brand-terracotta hover:bg-brand-linen rounded-2xl transition-all"
-                        >
-                          <ChevronRight size={18} />
-                        </Link>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="bg-brand-white p-12 rounded-[40px] border border-brand-mist border-dashed text-center">
-                    <p className="text-brand-stone italic text-sm mb-6">Agenda livre para hoje. Que tal divulgar seu link agora?</p>
-                    <button 
-                      onClick={() => setIsShareModalOpen(true)}
-                      className="px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-md"
-                    >
-                      Divulgar Vitrine Profissional
-                    </button>
-                  </div>
-                )}
-              </div>
-            </section>
-
-            {/* Quick Blocks Access */}
-            <button 
-              onClick={() => setIsQuickBlockOpen(true)}
-              className="w-full p-6 bg-brand-parchment/50 border border-brand-mist border-dashed rounded-[32px] text-brand-stone hover:text-brand-ink flex items-center justify-center gap-2 transition-all"
-            >
-              <Lock size={16} />
-              <span className="text-[10px] font-bold uppercase tracking-widest">Precisou dar uma saidinha? Bloqueie um horário</span>
-            </button>
-            
-            <div className="h-4" /> {/* Spacer */}
-
-            <WeeklyRevenueSummary 
-              appointments={appointments}
-              profile={profile}
-              userId={user.uid}
-            />
-            
-            {/* Reports Section */}
-            <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-5">
-                <div className="w-14 h-14 bg-brand-linen text-brand-terracotta rounded-2xl flex items-center justify-center shrink-0">
-                  <List size={28} />
-                </div>
-                <div>
-                  <h4 className="text-base font-serif text-brand-ink">Relatório Mensal de Performance</h4>
-                  <p className="text-xs text-brand-stone font-light italic mt-1 leading-relaxed">
-                    Analise seu faturamento, top serviços e fidelidade das clientes em um PDF elegante.
-                  </p>
-                </div>
-              </div>
-              
-              <PremiumButton
-                onClick={handleDownloadReport}
-                loading={isReportLoading}
-                variant="terracotta"
-                feature="reports"
-                className="md:w-auto w-full"
-              >
-                Baixar Relatório de {new Date().toLocaleDateString('pt-BR', { month: 'long' })}
-              </PremiumButton>
-            </section>
-
-            <InstallPrompt />
-            
-            {/* 3. PEDIDOS PENDENTES (CONDICIONAL) */}
-        <AnimatePresence>
-          {pendingCount > 0 && (
-            <motion.section 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-brand-white p-6 rounded-[32px] border-2 border-brand-terracotta shadow-md flex items-center justify-between"
-            >
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-4">
-                  <div className="w-2 h-2 rounded-full bg-brand-terracotta animate-pulse" />
-                  <p className="text-xs font-serif text-brand-ink">
-                    {pendingCount} {pendingCount === 1 ? 'pedido aguardando confirmação' : 'pedidos aguardando confirmação'}
-                  </p>
-                </div>
-                <p className="text-[9px] text-brand-stone font-light ml-6">
-                  Pedidos ainda não aprovados.
-                </p>
-              </div>
-              <Link 
-                to="/pedidos" 
-                className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
-              >
-                Ver pedidos
-              </Link>
-            </motion.section>
-          )}
-        </AnimatePresence>
-
-        {/* Anti No-Show: Clientes que não confirmaram para amanhã */}
-        <AnimatePresence>
-          {unconfirmedTomorrow.length > 0 && (
-            <motion.section 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-amber-50 p-8 rounded-[40px] border border-amber-200 border-dashed shadow-sm flex flex-col gap-6"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
-                    <ShieldCheck size={20} />
-                  </div>
-                  <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-amber-900 flex items-center">
-                    Alerta Anti No-Show
-                    <HelpTooltip content="Clientes com horário próximo que ainda não confirmaram. Envie lembretes para reduzir faltas." />
-                  </h3>
-                </div>
-                <span className="bg-amber-600 text-white text-[8px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">
-                  Confirmar Amanhã
-                </span>
-              </div>
-              
-              <div className="space-y-3">
-                <p className="text-sm text-amber-900 font-serif">
-                  {unconfirmedTomorrow.length} cliente{unconfirmedTomorrow.length > 1 ? 's' : ''} ainda não confirmou presença para amanhã.
-                </p>
-                <div className="grid grid-cols-1 gap-2">
-                  {unconfirmedTomorrow.slice(0, 3).map(app => (
-                    <div key={app.id} className="bg-white/80 p-4 rounded-2xl border border-amber-100 flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold text-amber-900 uppercase tracking-widest">{app.clientName}</p>
-                        <p className="text-xs text-amber-700 font-medium italic">{app.time} - {app.serviceName}</p>
-                      </div>
-                      <a 
-                        href={buildWhatsappLink(app.clientWhatsapp || '', `Olá ${safeString(app.clientName, 'Cliente').split(' ')[0]} ✨ Vi que ainda não confirmou sua presença para amanhã às ${app.time}. Podemos contar com você?`)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-3 bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition-colors shadow-sm"
-                      >
-                        <MessageCircle size={18} />
-                      </a>
-                    </div>
-                  ))}
-                  {unconfirmedTomorrow.length > 3 && (
-                    <Link to="/agenda" className="text-center text-[8px] font-bold uppercase tracking-widest text-amber-600 mt-2 hover:underline">
-                      + ver outros {unconfirmedTomorrow.length - 3} na agenda
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </motion.section>
-          )}
-        </AnimatePresence>
-
-        {/* 5. BLOQUEIOS ATIVOS (CONDICIONAL) */}
-        <AnimatePresence>
-          {blockedSchedules.length > 0 && (
-            <motion.section 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-brand-parchment/30 p-8 rounded-[40px] border border-brand-mist shadow-sm flex flex-col gap-6"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-brand-stone/10 text-brand-stone rounded-xl">
-                    <Lock size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1">
-                      Bloqueios Ativos
-                    </h3>
-                    <p className="text-sm font-serif text-brand-ink italic">Sua agenda fechada</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setIsDashboardBlockOpen(true)}
-                  className="text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
-                >
-                  Gerenciar
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {blockedSchedules.slice(0, 4).map(block => (
-                  <div key={block.id} className="bg-white/80 p-4 rounded-2xl border border-brand-mist flex items-center justify-between group hover:border-brand-terracotta transition-colors">
-                    <div>
-                      <p className="text-[10px] font-bold text-brand-ink uppercase tracking-widest leading-none mb-1">
-                        {block.reason || 'Bloqueado'}
-                      </p>
-                      <p className="text-[10px] text-brand-stone font-medium italic">
-                        {block.date === getTodayLocale() ? 'Hoje' : safeFormatDateKey(block.date, 'Recorrente')} às {block.startTime}
-                      </p>
-                    </div>
-                    <button 
-                      onClick={async () => {
-                        try {
-                          await deleteDoc(doc(db, 'blocked_schedules', block.id));
-                          notify.success('Agenda liberada com sucesso.');
-                        } catch {
-                          notify.error('Erro ao liberar agenda.');
-                        }
-                      }}
-                      className="p-2.5 text-brand-stone/40 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </motion.section>
-          )}
-        </AnimatePresence>
-
-        {/* 4. PRÓXIMOS AGENDAMENTOS */}
-        <section>
-          <div className="flex items-center gap-4 mb-6">
-            <h2 className="text-[10px] font-bold text-brand-stone uppercase tracking-[0.3em]">Próximos horários</h2>
-            <div className="h-px flex-1 bg-brand-mist" />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {confirmedAppointments.length > 0 ? (
-              confirmedAppointments.slice(0, 4).map((appt) => (
-                <div key={appt.id} className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm flex items-center justify-between group hover:border-brand-terracotta transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="text-center min-w-[45px]">
-                      <p className="text-sm font-serif font-bold text-brand-ink leading-tight">{appt.time}</p>
-                      <p className="text-[8px] text-brand-stone uppercase font-bold">{safeDateLabel(appt.date).split('/').slice(0, 2).join('/')}</p>
-                    </div>
-                    <div className="h-8 w-px bg-brand-linen" />
-                    <div>
-                      <h4 className="text-xs font-bold text-brand-ink">{appt.clientName}</h4>
-                      <p className="text-[10px] text-brand-stone italic">{appt.serviceName}</p>
-                    </div>
-                  </div>
-                  <Link to="/agenda" className="p-2 text-brand-stone hover:text-brand-terracotta transition-colors">
-                    <ChevronRight size={16} />
-                  </Link>
-                </div>
-              ))
-            ) : (
-              <div className="col-span-full py-12 text-center bg-brand-parchment/30 rounded-[32px] border border-brand-mist border-dashed">
-                <p className="text-xs text-brand-stone italic font-serif">Nenhum agendamento confirmado nos próximos dias.</p>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* 5. AÇÕES RÁPIDAS (Grid 2x2) */}
-        <section>
-          <div className="grid grid-cols-2 gap-4">
-            <button 
-              onClick={() => setIsDashboardBlockOpen(true)}
-              className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col items-start gap-2 text-left"
-            >
-              <Clock size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Bloquear horário</span>
-            </button>
-            <Link to="/clients" className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2">
-              <Users size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Novo cliente</span>
-            </Link>
-            <Link to="/services" className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2">
-              <Plus size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Novo serviço</span>
-            </Link>
-            <a 
-              href={buildWhatsappLink(profile?.whatsapp || '')} 
-              target="_blank" 
-              rel="noreferrer"
-              className="p-5 bg-brand-white border border-brand-mist rounded-[32px] hover:bg-brand-linen transition-all group flex flex-col gap-2"
-            >
-              <MessageCircle size={16} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-              <span className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">WhatsApp</span>
-            </a>
-          </div>
-        </section>
-
-        {/* 6. FATURAMENTO */}
-        <section className="bg-brand-parchment rounded-[40px] p-8 border border-brand-mist shadow-sm">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest block mb-2">Este mês</span>
-              <h4 className="text-3xl font-serif text-brand-ink">{formatCurrency(monthlyRevenue)}</h4>
-            </div>
-            {monthlyRevenue > 0 && prevMonthlyRevenue > 0 && (
-              <div className={cn(
-                "px-3 py-1.5 rounded-full text-[10px] font-bold tracking-widest flex items-center gap-1",
-                monthlyRevenue >= prevMonthlyRevenue ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-              )}>
-                <TrendingUp size={12} className={monthlyRevenue < prevMonthlyRevenue ? "rotate-180" : ""} />
-                {Math.abs(Math.round(((monthlyRevenue - prevMonthlyRevenue) / prevMonthlyRevenue) * 100))}%
-              </div>
-            )}
-          </div>
-          <Link to="/financeiro" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
-            Ver detalhes financeiros
-          </Link>
-        </section>
-
-        {/* 7. CLIENTES */}
-        <section className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
-            <div>
-              <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-1">{totalClientsCount} clientes cadastradas</p>
-              <p className="text-sm font-serif text-brand-ink">{returningThisWeek} retornando esta semana</p>
-            </div>
-          </div>
-        </section>
-
-        {/* 8. INDICAÇÃO */}
-        <section className="mb-12">
-          <div className="flex items-center gap-4 mb-6">
-            <h2 className="text-[10px] font-medium text-brand-stone uppercase tracking-[0.3em]">
-              Indique o Nera
-            </h2>
-            <div className="h-px flex-1 bg-brand-mist" />
-          </div>
-          <div className="bg-brand-white border border-brand-mist rounded-[24px] p-8">
-            <p className="text-sm font-light text-brand-stone mb-6 leading-relaxed">
-              Indique uma colega profissional. Quando ela se cadastrar com seu link e usar por 15 dias, <strong className="text-brand-ink">você ganha 1 mês grátis</strong>.
-            </p>
-            <div className="flex items-center gap-3 bg-brand-parchment border border-brand-mist rounded-2xl p-4">
-              <span className="text-[11px] text-brand-stone font-mono truncate flex-1">{referralLink}</span>
-              <button
-                onClick={() => { navigator.clipboard.writeText(referralLink); notify.success('Link copiado!'); }}
-                className="flex items-center gap-2 px-5 py-2.5 bg-brand-ink text-brand-white rounded-2xl text-[9px] font-bold uppercase tracking-widest shrink-0 hover:bg-brand-espresso transition-all"
-              >
-                <Copy size={12} /> Copiar
-              </button>
-            </div>
-            <p className="text-[10px] text-brand-stone/50 uppercase tracking-widest mt-4">
-              Compartilhe no WhatsApp, Instagram ou diretamente com colegas
-            </p>
-          </div>
-        </section>
-      </div>
-    </>
-  )}
       </div>
 
       {/* --- SHARE VITRINE MODAL --- */}
