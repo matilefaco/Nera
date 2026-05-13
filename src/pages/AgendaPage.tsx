@@ -385,6 +385,17 @@ export default function AgendaPage() {
     }
   };
 
+  const handleBlockClick = (block: any) => {
+    const isRecurring = block.isRecurring;
+    const msg = isRecurring 
+      ? 'Este é um bloqueio recorrente. Deseja remover esta regra?'
+      : 'Desbloquear este horário?';
+      
+    if (window.confirm(msg)) {
+      handleUnblockSchedule(block.id);
+    }
+  };
+
   // Smart Suggestions
   const recommendedSlots = React.useMemo(() => {
     if (!manualService || !manualDate || !profile?.workingHours) return { bestSlot: null, otherSlots: [], intelligentFits: [] };
@@ -836,6 +847,7 @@ export default function AgendaPage() {
                 setIsManualModalOpen(true);
               }}
               onSelectDay={(date) => setSelectedDate(formatDateKey(date))}
+              onBlockClick={handleBlockClick}
             />
           )}
 
@@ -849,6 +861,7 @@ export default function AgendaPage() {
                 setManualTime(time);
                 setIsManualModalOpen(true);
               }}
+              onBlockClick={handleBlockClick}
             />
           )}
 

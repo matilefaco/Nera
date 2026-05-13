@@ -14,6 +14,7 @@ interface WeekViewProps {
   onSelectAppointment: (appt: Appointment) => void;
   onSelectSlot: (date: string, time: string) => void;
   onSelectDay: (date: Date) => void;
+  onBlockClick?: (block: any) => void;
 }
 
 export default function WeekView({
@@ -24,7 +25,8 @@ export default function WeekView({
   selectedDate,
   onSelectAppointment,
   onSelectSlot,
-  onSelectDay
+  onSelectDay,
+  onBlockClick
 }: WeekViewProps) {
   
   // Create array of 7 days
@@ -97,6 +99,7 @@ export default function WeekView({
           date={selectedDateKey}
           onSelectAppointment={onSelectAppointment}
           onSelectSlot={(time) => onSelectSlot(selectedDateKey, time)}
+          onBlockClick={onBlockClick}
           hideHeader={true}
         />
       </div>

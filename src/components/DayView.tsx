@@ -11,6 +11,7 @@ interface DayViewProps {
   date: string;
   onSelectAppointment: (appt: Appointment) => void;
   onSelectSlot: (time: string) => void;
+  onBlockClick?: (block: any) => void;
   hideHeader?: boolean;
 }
 
@@ -20,6 +21,7 @@ export default function DayView({
   date,
   onSelectAppointment,
   onSelectSlot,
+  onBlockClick,
   hideHeader = false
 }: DayViewProps) {
   
@@ -188,9 +190,15 @@ export default function DayView({
                   )}
 
                   {block && (
-                    <div className="absolute inset-x-1 inset-y-1.5 rounded-xl bg-brand-stone/5 border border-brand-stone/10 flex items-center px-4 gap-3">
-                      <Lock size={12} className="text-brand-stone/20" />
-                      <span className="text-[10px] font-bold text-brand-stone/40 uppercase tracking-widest truncate">Bloqueado: {block.reason || 'Pausa'}</span>
+                    <div 
+                      className="absolute inset-x-1 inset-y-1.5 rounded-xl bg-brand-stone/5 border border-brand-stone/10 flex items-center px-4 gap-3 cursor-pointer hover:bg-brand-stone/10 transition-colors z-20"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onBlockClick?.(block);
+                      }}
+                    >
+                      <Lock size={12} className="text-brand-stone/40" />
+                      <span className="text-[10px] font-bold text-brand-stone/60 uppercase tracking-widest truncate group-hover:text-brand-stone/80 transition-colors">Bloqueado: {block.reason || 'Pausa'}</span>
                     </div>
                   )}
 
