@@ -122,6 +122,7 @@ export default function ClientsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
+  const [visibleLimit, setVisibleLimit] = useState(30);
   const [isMigrating, setIsMigrating] = useState(false);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
 
@@ -382,6 +383,10 @@ export default function ClientsPage() {
     };
   }, [fetchClients]);
 
+  useEffect(() => {
+    setVisibleLimit(30);
+  }, [searchTerm, filterService, filterStatus]);
+
   const handleMigrate = async () => {
     if (!user) return;
     setIsMigrating(true);
@@ -587,6 +592,12 @@ export default function ClientsPage() {
       });
   }, [enrichedClients, searchTerm, filterService, filterStatus]);
 
+  const visibleClients = useMemo(() => {
+    return filteredClients.slice(0, visibleLimit);
+  }, [filteredClients, visibleLimit]);
+
+  const hasMoreVisual = filteredClients.length > visibleLimit;
+
       if (loading && clients.length === 0) {
         return (
           <AppLayout activeRoute="clients">
@@ -706,21 +717,29 @@ export default function ClientsPage() {
               />
             </div>
             
-            {(filterService || filterStatus !== 'all' || searchTerm) && (
+            {(filterService || filterStatus !== 'all' || searchTerm || hasMoreVisual) ? (
               <div className="flex items-center justify-between px-2">
                 <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
-                  {filteredClients.length} de {clients.length} clientes
+                  Exibindo {visibleClients.length} de {filteredClients.length} clientes
                 </span>
-                <button 
-                  onClick={() => {
-                    setFilterService(null);
-                    setFilterStatus('all');
-                    setSearchTerm('');
-                  }}
-                  className="flex items-center gap-1 text-[10px] font-bold text-brand-terracotta uppercase tracking-widest hover:underline ml-4"
-                >
-                  <X size={12} /> Limpar filtros
-                </button>
+                {(filterService || filterStatus !== 'all' || searchTerm) && (
+                  <button 
+                    onClick={() => {
+                      setFilterService(null);
+                      setFilterStatus('all');
+                      setSearchTerm('');
+                    }}
+                    className="flex items-center gap-1 text-[10px] font-bold text-brand-terracotta uppercase tracking-widest hover:underline ml-4"
+                  >
+                    <X size={12} /> Limpar filtros
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-2">
+                <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
+                  {filteredClients.length} clientes
+                </span>
               </div>
             )}
 
@@ -825,7 +844,7 @@ export default function ClientsPage() {
         <div className="space-y-4">
           {filteredClients.length > 0 ? (
             <>
-              {filteredClients.map((client, idx) => (
+              {visibleClients.map((client, idx) => (
                 <motion.div 
                   key={client.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -933,15 +952,14 @@ export default function ClientsPage() {
                 </motion.div>
               ))}
               
-              {hasMore && (
+              {hasMoreVisual && (
                 <div className="pt-8 text-center">
                   <PremiumButton 
-                    onClick={() => fetchClients()} 
-                    disabled={loadingMore}
+                    onClick={() => setVisibleLimit(prev => prev + 30)} 
                     variant="linen" 
                     className="text-[10px] py-4 px-10 flex items-center gap-2 mx-auto"
                   >
-                    {loadingMore ? <RefreshCw size={14} className="animate-spin" /> : <ChevronDown size={14} />}
+                    <ChevronDown size={14} />
                     Carregar mais clientes
                   </PremiumButton>
                 </div>
