@@ -32,6 +32,14 @@ interface MonthlyGroup {
   appointments: Appointment[];
 }
 
+interface FinancialAppointmentsCacheEntry {
+  data: Appointment[];
+  fetchedAt: number;
+}
+
+const FINANCIAL_CACHE_TTL_MS = 5 * 60 * 1000;
+const financialAppointmentsCache = new Map<string, FinancialAppointmentsCacheEntry>();
+
 export default function FinancialPage() {
   const { user, profile } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -52,6 +60,15 @@ export default function FinancialPage() {
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const endDateStr = formatDateKey(end);
 
+        const financialCacheKey = `${user.uid}:${startDateStr}:${endDateStr}`;
+        const cached = financialAppointmentsCache.get(financialCacheKey);
+        
+        if (cached && Date.now() - cached.fetchedAt < FINANCIAL_CACHE_TTL_MS) {
+          setAppointments(cached.data);
+          if (isMounted) setLoading(false);
+          return;
+        }
+
         const q = query(
           collection(db, 'appointments'),
           where('professionalId', '==', user.uid),
@@ -67,6 +84,7 @@ export default function FinancialPage() {
         // Order in memory
         docs.sort((a, b) => b.date.localeCompare(a.date));
         
+        financialAppointmentsCache.set(financialCacheKey, { data: docs, fetchedAt: Date.now() });
         setAppointments(docs);
       } catch (err: any) {
         if (!isMounted) return;
