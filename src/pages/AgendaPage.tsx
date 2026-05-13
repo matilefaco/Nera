@@ -699,7 +699,7 @@ export default function AgendaPage() {
       )}>
         
         {/* 1. HEADER LIMPO */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 mt-2">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 mt-1">
           <div className="flex items-center gap-4">
             <div className="flex flex-col">
               <h1 className="text-lg font-serif text-brand-ink leading-tight">
@@ -711,7 +711,7 @@ export default function AgendaPage() {
                 }
               </h1>
               {view === 'day' && isSelectedDateToday && (
-                <span className="text-[10px] text-brand-terracotta font-bold uppercase tracking-[0.2em] mt-0.5">Hoje</span>
+                <span className="text-[10px] text-brand-terracotta font-bold uppercase tracking-[0.2em] mt-0.5 inline-block">Hoje</span>
               )}
             </div>
 
@@ -788,14 +788,14 @@ export default function AgendaPage() {
         )}
 
         {/* 1.5 FIND RESERVATION BAR (Discrete) */}
-        <div className="bg-brand-linen/30 border border-brand-mist/30 rounded-[28px] p-2 mb-10 flex items-center gap-2 pr-4 pl-4 focus-within:ring-1 focus-within:ring-brand-terracotta/20 transition-all">
-          <Search size={16} className="text-brand-stone ml-1" />
+        <div className="bg-brand-linen/30 border border-brand-mist/30 rounded-2xl p-1.5 mb-6 flex items-center gap-3 pr-4 pl-4 focus-within:ring-1 focus-within:ring-brand-terracotta/20 transition-all">
+          <Search size={14} className="text-brand-stone ml-1" />
           <input
             type="text"
             value={searchCode}
             onChange={(e) => setSearchCode(e.target.value)}
             placeholder="Buscar reserva por código..."
-            className="flex-1 bg-transparent py-2 text-[11px] font-bold text-brand-ink focus:outline-none placeholder:text-brand-stone/40 uppercase tracking-widest"
+            className="flex-1 bg-transparent py-1.5 text-[10px] font-bold text-brand-ink focus:outline-none placeholder:text-brand-stone/40 uppercase tracking-widest"
           />
           <button 
             onClick={handleCodeSearch}
@@ -933,30 +933,31 @@ export default function AgendaPage() {
       </div>
 
       {/* 6. BOTÃO FLUTUANTE FIXO (FAB) */}
-      <div className="fixed bottom-28 right-6 z-[100] md:bottom-12">
+      <div className="fixed bottom-28 right-6 z-[100] md:bottom-12 md:right-12">
         <AnimatePresence>
           {isFabOpen && (
             <motion.div 
-              initial={{ opacity: 0, y: 10, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.9 }}
-              className="absolute bottom-16 right-0 w-56 bg-brand-white border border-brand-mist p-3 rounded-[28px] shadow-2xl space-y-1"
+              initial={{ opacity: 0, y: 15, scale: 0.95, filter: "blur(4px)" }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: 10, scale: 0.95, filter: "blur(2px)" }}
+              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+              className="absolute bottom-20 right-0 w-[14rem] bg-white/85 backdrop-blur-2xl border border-brand-mist/40 p-2 rounded-[28px] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.12),0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-0.5"
             >
-              <button onClick={() => { setIsBlockModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <Lock size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Bloquear horário</span>
+              <button onClick={() => { setIsBlockModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+                <Lock size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
+                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Bloquear</span>
               </button>
-              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <Sparkles size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Novo encaixe</span>
+              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+                <Sparkles size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
+                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Encaixe</span>
               </button>
-              <button onClick={() => { setIsWaitlistOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <Users size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Lista de Espera</span>
+              <button onClick={() => { setIsWaitlistOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+                <Users size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
+                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Espera</span>
               </button>
-              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[56px] hover:bg-brand-parchment rounded-2xl flex items-center gap-3 transition-colors group">
-                <CalendarCheck2 size={16} className="text-brand-stone group-hover:text-brand-ink shrink-0" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-wider">Reserva manual</span>
+              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+                <CalendarCheck2 size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
+                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Reserva</span>
               </button>
             </motion.div>
           )}
@@ -964,11 +965,11 @@ export default function AgendaPage() {
         <button 
           onClick={() => setIsFabOpen(!isFabOpen)}
           className={cn(
-            "w-16 h-16 rounded-full bg-brand-ink text-brand-white shadow-2xl flex items-center justify-center transition-all active:scale-90",
-            isFabOpen ? "rotate-45 bg-brand-terracotta" : ""
+            "w-[3.75rem] h-[3.75rem] rounded-full bg-brand-ink/95 backdrop-blur-lg text-brand-white shadow-[0_8px_30px_rgb(0,0,0,0.16)] flex items-center justify-center transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] hover:scale-105 active:scale-95 group",
+            isFabOpen ? "rotate-[135deg] bg-brand-terracotta/95 shadow-[0_12px_40px_rgba(202,106,86,0.3)]" : "hover:shadow-[0_16px_40px_rgb(0,0,0,0.2)]"
           )}
         >
-          <Plus size={32} />
+          <Plus size={26} strokeWidth={1.5} className="transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)]" />
         </button>
       </div>
 

@@ -161,8 +161,8 @@ export default function DayView({
               <div 
                 key={time} 
                 className={cn(
-                  "group flex items-start gap-4 transition-all pr-4",
-                  hasActivity ? "h-[6rem]" : "h-20"
+                  "group flex items-start gap-3 transition-all pr-4",
+                  hasActivity ? "h-[5.25rem]" : "h-[4.5rem]"
                 )}
               >
                 <div className="w-12 text-right -ml-16 bg-brand-white pr-4 pt-1 z-10">
@@ -213,18 +213,18 @@ export default function DayView({
                         onSelectAppointment(app);
                       }}
                       className={cn(
-                        "absolute inset-x-1 inset-y-1.5 rounded-2xl p-4 cursor-pointer shadow-sm border flex items-center gap-4 transition-all hover:scale-[1.01] active:scale-[0.98]",
+                        "absolute inset-x-0 inset-y-1 rounded-[20px] p-3 cursor-pointer shadow-sm border flex items-center gap-3 transition-all hover:scale-[1.01] active:scale-[0.98]",
                         isConfirmedOrCompleted
                           ? "bg-brand-ink text-white border-brand-ink shadow-brand-ink/10"
-                          : "bg-white text-brand-ink border-brand-mist hover:border-brand-terracotta",
-                        appIdx > 0 && "translate-x-3 translate-y-3 shadow-2xl z-10"
+                          : "bg-white text-brand-ink border-brand-mist/60 hover:border-brand-terracotta/50",
+                        appIdx > 0 && "translate-x-2 translate-y-2 shadow-xl z-10"
                       )}
                     >
                       <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                        isConfirmedOrCompleted ? "bg-white/10" : "bg-brand-linen/40"
+                        "w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0",
+                        isConfirmedOrCompleted ? "bg-white/10" : "bg-brand-linen/50"
                       )}>
-                        <Clock size={16} className={isConfirmedOrCompleted ? "text-white" : "text-brand-terracotta"} />
+                        <Clock size={14} className={isConfirmedOrCompleted ? "text-white" : "text-brand-terracotta"} />
                       </div>
                       
                       <div className="flex-1 min-w-0">
