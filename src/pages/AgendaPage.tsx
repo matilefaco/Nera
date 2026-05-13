@@ -788,21 +788,21 @@ export default function AgendaPage() {
         )}
 
         {/* 1.5 FIND RESERVATION BAR (Discrete) */}
-        <div className="bg-brand-linen/30 border border-brand-mist/30 rounded-2xl p-1.5 mb-6 flex items-center gap-3 pr-4 pl-4 focus-within:ring-1 focus-within:ring-brand-terracotta/20 transition-all">
-          <Search size={14} className="text-brand-stone ml-1" />
+        <div className="bg-white/60 backdrop-blur-md border border-brand-mist/60 rounded-[14px] p-1.5 mb-6 flex items-center gap-2.5 px-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06)] focus-within:border-brand-mist/80 transition-all duration-300">
+          <Search size={13} strokeWidth={1.5} className="text-brand-stone/60 shrink-0" />
           <input
             type="text"
             value={searchCode}
             onChange={(e) => setSearchCode(e.target.value)}
             placeholder="Buscar reserva por código..."
-            className="flex-1 bg-transparent py-1.5 text-[10px] font-bold text-brand-ink focus:outline-none placeholder:text-brand-stone/40 uppercase tracking-widest"
+            className="flex-1 bg-transparent py-1 text-[11px] font-medium text-brand-ink focus:outline-none placeholder:text-brand-stone/50 placeholder:font-normal tracking-wide transition-colors"
           />
           <button 
             onClick={handleCodeSearch}
             disabled={isSearchingCode || !searchCode.trim()}
-            className="text-[9px] font-black uppercase tracking-widest text-brand-terracotta disabled:opacity-20"
+            className="text-[9px] flex items-center justify-center font-bold uppercase tracking-widest text-brand-terracotta/90 disabled:opacity-30 hover:text-brand-terracotta px-3 py-1.5 rounded-[10px] hover:bg-brand-terracotta/5 transition-colors"
           >
-            {isSearchingCode ? <RefreshCw size={12} className="animate-spin" /> : 'Ir'}
+            {isSearchingCode ? <RefreshCw size={12} strokeWidth={1.5} className="animate-spin" /> : 'Ir'}
           </button>
         </div>
 
