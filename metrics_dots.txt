@@ -1,3 +1,0 @@
-2:import { Appointment, AnalyticsEvent } from '../types';
-3:import { isRevenueStatus } from '../constants/appointmentStatus';
-4:import { getTodayLocale } from '../lib/utils';
