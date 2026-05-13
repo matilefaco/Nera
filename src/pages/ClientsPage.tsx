@@ -255,107 +255,17 @@ export default function ClientsPage() {
       clientsPageCache.set(clientsCacheKey, { data: docs, fetchedAt: Date.now() });
       setHasMore(false);
 
-      // If no clients found or index error, we'll try to fallback
-      if (snapshot.empty) {
-        throw new Error('empty_summaries');
-      }
+      // Removido throw new Error('empty_summaries') que acionava fallback caro
     } catch (err: any) {
-      if (err.message && (err.message.includes('index') || err.message.includes('empty_summaries'))) {
-        if (err.message.includes('index')) {
-          console.warn('[ClientsPage] Composite index required for client_summaries: professionalId ASC, lastAppointmentDate DESC. Falling back to appointments derivation.');
-        }
-        
-        // Fallback: derive clients from appointments collection safely
-        try {
-          const apptQuery = query(
-            collection(db, 'appointments'),
-            where('professionalId', '==', user.uid)
-          );
-          const apptSnap = await getDocs(apptQuery);
-          
-          if (!apptSnap.empty) {
-            const derivedClients = new Map<string, ClientSummary>();
-            
-            apptSnap.docs.forEach(doc => {
-              const appt = doc.data() as Appointment & { clientPhone?: string; customerPhone?: string; customerEmail?: string };
-              if (!appt.clientName || !appt.date) return;
-              
-              const phone = appt.clientWhatsapp || appt.clientPhone || appt.customerPhone || '';
-              const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
-              
-              const existing = derivedClients.get(key) || {
-                id: `derived_${key}`,
-                professionalId: user.uid,
-                clientKey: key,
-                clientName: appt.clientName || 'Cliente',
-                clientPhone: phone,
-                clientEmail: appt.clientEmail || appt.customerEmail || '',
-                totalAppointments: 0,
-                confirmedAppointments: 0,
-                cancelledAppointments: 0,
-                noShowCount: 0,
-                totalSpent: 0,
-                firstAppointmentDate: appt.date,
-                lastAppointmentDate: appt.date,
-                lastServiceId: appt.serviceId || '',
-                lastServiceName: appt.serviceName || '',
-                segment: 'new',
-                notes: '',
-                services: []
-              } as unknown as ClientSummary;
-              
-              const isConfirmed = isRevenueStatus(appt.status);
-              const isCancelled = isCancelledStatus(appt.status);
-              const isNoShow = appt.status === APPOINTMENT_STATUS.NO_SHOW;
-              
-              if (isConfirmed || isCancelled || isNoShow) {
-                existing.totalAppointments += 1;
-              }
-
-              if (isConfirmed) {
-                existing.confirmedAppointments += 1;
-                existing.totalSpent += (Number(appt.price) || 0);
-              }
-              if (isNoShow) existing.noShowCount += 1;
-              if (isCancelled) existing.cancelledAppointments += 1;
-              
-              if (!existing.services) existing.services = [];
-              if (!existing.services.includes(appt.serviceName || '') && appt.serviceName) {
-                existing.services.push(appt.serviceName);
-              }
-              
-              if (appt.date > existing.lastAppointmentDate) {
-                existing.lastAppointmentDate = appt.date;
-                existing.lastServiceName = appt.serviceName || '';
-              }
-              if (appt.date < existing.firstAppointmentDate) {
-                existing.firstAppointmentDate = appt.date;
-              }
-              
-              derivedClients.set(key, existing);
-            });
-            
-            let docs = Array.from(derivedClients.values()).sort((a, b) => 
-              new Date(b.lastAppointmentDate).getTime() - new Date(a.lastAppointmentDate).getTime()
-            );
-            
-            docs = await mergeNotes(docs);
-            
-            setClients(docs);
-            clientsPageCache.set(clientsCacheKey, { data: docs, fetchedAt: Date.now() });
-            setHasMore(false);
-          } else {
-            setClients([]);
-            clientsPageCache.set(clientsCacheKey, { data: [], fetchedAt: Date.now() });
-          }
-        } catch (fallbackErr) {
-          console.error('[ClientsPage] Fallback also failed', fallbackErr);
-          notify.error('Erro ao carregar clientes. Tente novamente mais tarde.');
-        }
+      console.error('[ClientsPage] Failed to load clients', err);
+      if (err.message && err.message.includes('index')) {
+        console.warn('[ClientsPage] Composite index required for client_summaries: professionalId ASC, lastAppointmentDate DESC.');
+        // We no longer fallback automatically to avoid expensive queries on large databases.
       } else {
-        console.error('[ClientsPage] Failed to load clients', err);
         notify.error('Erro ao carregar clientes. Tente novamente mais tarde.');
       }
+      setClients([]);
+      setHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
