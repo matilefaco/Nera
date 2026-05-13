@@ -183,8 +183,11 @@ export default function ClientsPage() {
 
   // Helper to calculate days since last visit
   const getDaysSinceLastVisit = (dateStr: string) => {
+    if (!dateStr) return 999;
     const today = new Date();
-    const last = new Date(dateStr + 'T12:00:00');
+    const parseString = dateStr.length === 10 ? dateStr + 'T12:00:00' : dateStr;
+    const last = new Date(parseString);
+    if (isNaN(last.getTime())) return 999;
     const diffTime = Math.abs(today.getTime() - last.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
@@ -533,12 +536,12 @@ export default function ClientsPage() {
       
       if (c.totalSpent >= segmentationThresholds.threshold20 || c.totalSpent >= (segmentationThresholds.avgTicket * 3)) {
         segment = 'vip';
-      } else if (c.confirmedAppointments >= 3) {
-        segment = 'recurring';
       } else if (daysSince > 60) {
         segment = 'inactive';
       } else if (daysSince >= 30) {
         segment = 'at_risk';
+      } else if (c.confirmedAppointments >= 3) {
+        segment = 'recurring';
       } else if (c.confirmedAppointments > 1) {
         segment = 'active';
       } else {
@@ -759,7 +762,7 @@ export default function ClientsPage() {
               {[
                 { id: 'all', label: 'Todas' },
                 { id: 'vip', label: 'VIP' },
-                { id: 'recurring', label: 'Recorrentes' },
+                { id: 'recurring', label: 'Frequentes' },
                 { id: 'at_risk', label: 'Esfriando' },
                 { id: 'inactive', label: 'Ausentes' },
                 { id: 'new', label: 'Novas' }
@@ -850,7 +853,7 @@ export default function ClientsPage() {
                         )}
                         {client.segment === 'recurring' && (
                           <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 text-[8px] font-bold">
-                            RECORRENTE
+                            FREQUENTE
                           </div>
                         )}
                         {client.segment === 'new' && (
@@ -879,7 +882,7 @@ export default function ClientsPage() {
                         <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} valor total</span>
                         {client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
                         <span className="italic text-brand-stone/60 truncate max-w-[200px]">
-                          último atendimento: {client.lastServiceName} ({new Date(client.lastAppointmentDate + 'T12:00:00').toLocaleDateString('pt-BR')})
+                          último atendimento: {client.lastServiceName} ({new Date(client.lastAppointmentDate.length === 10 ? client.lastAppointmentDate + 'T12:00:00' : client.lastAppointmentDate).toLocaleDateString('pt-BR')})
                         </span>
                       </div>
                     </div>
