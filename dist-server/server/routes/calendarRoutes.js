@@ -9,13 +9,17 @@ function getOAuthClient(redirectUri) {
     return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, redirectUri);
 }
 // 1. Get Auth URL
-router.get("/auth-url", (req, res) => {
-    const professionalId = req.query.professionalId;
-    const origin = (req.headers.origin || process.env.APP_URL || "").replace(/\/+$/, "");
+router.get("/auth-url", requireFirebaseAuth, (req, res) => {
+    const uid = req.uid;
+    const professionalIdQuery = req.query.professionalId;
+    if (professionalIdQuery && professionalIdQuery !== uid) {
+        return res.status(403).json({ error: "Permissão negada" });
+    }
+    const professionalId = uid;
     if (!professionalId) {
         return res.status(400).json({ error: "Missing professionalId" });
     }
-    const redirectUri = `${origin}/api/calendar/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${(process.env.APP_URL || "https://usenera.com").replace(/\/+$/, "")}/api/calendar/callback`;
     const oauth2Client = getOAuthClient(redirectUri);
     const url = oauth2Client.generateAuthUrl({
         access_type: "offline", // Required to get refresh_token
@@ -30,8 +34,7 @@ router.get("/callback", async (req, res) => {
     const db = getDb();
     const { code, state } = req.query;
     const professionalId = state;
-    const origin = `${req.protocol}://${req.get("host")}`.replace(/\/+$/, "");
-    const redirectUri = `${origin}/api/calendar/callback`;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${(process.env.APP_URL || "https://usenera.com").replace(/\/+$/, "")}/api/calendar/callback`;
     const appUrl = process.env.APP_URL || "https://usenera.com";
     if (!code || !professionalId) {
         const safeError = JSON.stringify("Missing code or state");
@@ -85,9 +88,14 @@ router.get("/callback", async (req, res) => {
     }
 });
 // 3. Status and Toggle
-router.get("/status", async (req, res) => {
+router.get("/status", requireFirebaseAuth, async (req, res) => {
     const db = getDb();
-    const professionalId = req.query.professionalId;
+    const uid = req.uid;
+    const professionalIdQuery = req.query.professionalId;
+    if (professionalIdQuery && professionalIdQuery !== uid) {
+        return res.status(403).json({ error: "Permissão negada" });
+    }
+    const professionalId = uid;
     if (!professionalId) {
         return res.status(400).json({ error: "Missing professionalId" });
     }

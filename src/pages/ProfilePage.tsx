@@ -260,7 +260,12 @@ export default function ProfilePage() {
   const fetchCalendarStatus = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`/api/calendar/status?professionalId=${user.uid}`);
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/calendar/status?professionalId=${user.uid}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await res.json();
       setGoogleCalendarConnected(data.connected);
       setGoogleCalendarEnabled(data.enabled);
@@ -273,7 +278,12 @@ export default function ProfilePage() {
     if (!user) return;
     setCalendarLoading(true);
     try {
-      const res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`);
+      const token = await user.getIdToken();
+      const res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       const data = await res.json();
       if (data.url) {
         window.open(data.url, 'google_auth', 'width=600,height=700');
