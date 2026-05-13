@@ -31,7 +31,7 @@ export default function BlockAvailabilityModal({
   selectedDate,
   professionalId,
   appointments,
-  workingHours = { startTime: '09:00', endTime: '18:00' },
+  workingHours = { startTime: '09:00', endTime: '18:00', workingDays: [1,2,3,4,5] },
   initialStartTime,
   initialEndTime
 }: BlockAvailabilityModalProps) {

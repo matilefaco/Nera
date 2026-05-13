@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Copy, MessageCircle, Instagram, QrCode, Download, Check, Share2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import { Copy, MessageCircle, Instagram, QrCode, Download, Check, Share2, Sparkles, ChevronDown } from 'lucide-react';
 import { UserProfile } from '../types';
 import { notify } from '../lib/notify';
 import { cn } from '../lib/utils';
@@ -13,19 +14,81 @@ interface SharingPreviewSectionProps {
 export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
   const profileUrl = `https://usenera.com/p/${profile.slug}`;
   const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null);
-  const [copiedStory, setCopiedStory] = useState<number | null>(null);
+  const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
+  const storyCardRef = useRef<HTMLDivElement>(null);
 
-  const handleCopyText = (text: string, type: 'template' | 'story', index: number) => {
+  const safeInitial = (profile?.name || 'N').trim().charAt(0).toUpperCase();
+  const professionalPhotoUrl = profile?.avatar;
+
+  const handleDownloadStoryCard = useCallback(async () => {
+    if (!storyCardRef.current) return;
+    
+    try {
+      setIsGeneratingStory(true);
+
+      if (typeof document !== 'undefined' && 'fonts' in document) {
+        try {
+          // Wait for fonts to be ready with a timeout to prevent hanging
+          await Promise.race([
+            (document as any).fonts.ready,
+            new Promise(resolve => setTimeout(resolve, 1500))
+          ]);
+        } catch (e) {
+          console.warn('Font loading wait failed or timed out', e);
+        }
+      }
+
+      console.log('[story-export] imgs inside capture:', storyCardRef.current.querySelectorAll('img').length);
+      
+      let dataUrl: string;
+      const exportOptions = {
+        cacheBust: true,
+        pixelRatio: 3,
+        backgroundColor: '#F9F5F0',
+        style: {
+          borderRadius: '20px',
+          margin: '0',
+          transform: 'none',
+        }
+      };
+
+      try {
+        dataUrl = await toPng(storyCardRef.current, exportOptions);
+      } catch (firstErr) {
+        console.warn('html-to-image failed with photo, trying fallback...', firstErr);
+        // Fallback: hide the photo and retry
+        setPhotoError(true);
+        await new Promise(resolve => setTimeout(resolve, 200)); // wait for React to re-render
+        
+        if (!storyCardRef.current) throw new Error("Card unmounted during fallback");
+        
+        dataUrl = await toPng(storyCardRef.current, exportOptions);
+        
+        // Restore photo for the UI
+        setPhotoError(false);
+      }
+
+      const link = document.createElement('a');
+      link.download = `nera-story-${profile.slug || 'art'}.png`;
+      link.href = dataUrl;
+      link.click();
+      
+    } catch (err) {
+      console.error('Error generating image:', err);
+      notify.error('Não foi possível baixar a imagem. Tente novamente.');
+      setPhotoError(false);
+    } finally {
+      setIsGeneratingStory(false);
+    }
+  }, [profile.slug]);
+
+  const handleCopyText = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     notify.success('Copiado!');
-    if (type === 'template') {
-      setCopiedTemplate(index);
-      setTimeout(() => setCopiedTemplate(null), 2000);
-    } else {
-      setCopiedStory(index);
-      setTimeout(() => setCopiedStory(null), 2000);
-    }
+    setCopiedTemplate(index);
+    setTimeout(() => setCopiedTemplate(null), 2000);
   };
 
   const handleDownloadQR = () => {
@@ -62,13 +125,6 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
     `Pra ficar mais fácil pra vocês, meus horários agora ficam disponíveis online ✨\nAgende pelo link:\n${profileUrl}`
   ];
 
-  const storyIdeas = [
-    "Agenda aberta da semana ✨",
-    "Agora dá pra agendar online 🤎",
-    "Escolha seu horário direto pelo link",
-    "Minha agenda online já está no ar"
-  ];
-
   const defaultWhatsappShare = encodeURIComponent(`Minha agenda online já está disponível! Agende seu horário comigo pelo link: ${profileUrl}`);
 
   return (
@@ -95,7 +151,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
 
           <div className="flex flex-col sm:flex-row gap-2 mt-4">
             <button 
-              onClick={() => handleCopyText(whatsappTemplates[0], 'template', 0)}
+              onClick={() => handleCopyText(whatsappTemplates[0], 0)}
               className="flex-1 py-3 bg-brand-linen text-brand-ink rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 hover:bg-brand-parchment"
             >
               {copiedTemplate === 0 ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
@@ -116,47 +172,131 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
         {/* 3. STORIES E QR CODE */}
         <div className="space-y-6 flex flex-col">
           {/* STORIES */}
-          <div className="bg-white rounded-[24px] p-5 sm:p-6 border border-brand-mist shadow-sm">
+          <div className="bg-white rounded-[24px] p-5 sm:p-6 border border-brand-mist shadow-sm flex flex-col justify-between">
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-8 h-8 bg-gradient-to-tr from-[#FEDA75] via-[#D62976] to-[#962FBF] rounded-full flex items-center justify-center text-white">
+              <div className="w-8 h-8 bg-gradient-to-tr from-[#FEDA75] via-[#D62976] to-[#962FBF] rounded-full flex items-center justify-center text-white shrink-0">
                 <Instagram size={16} />
               </div>
               <div>
-                <h3 className="text-base font-serif text-brand-ink">Stories prontos</h3>
-                <p className="text-[10px] text-brand-stone font-light italic">Use no Instagram com o adesivo de link.</p>
+                <h3 className="text-base font-serif text-brand-ink">Card para Stories</h3>
+                <p className="text-[10px] text-brand-stone font-light italic truncate">Arte pronta para divulgar sua agenda.</p>
               </div>
             </div>
 
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-6 items-center">
               {/* MOCKUP DO STORY */}
-              <div className="w-[90px] h-[160px] bg-brand-linen/40 rounded-2xl border border-brand-mist/50 p-2 relative flex flex-col items-center justify-center overflow-hidden shrink-0">
-                <div className="w-full h-full bg-white rounded-lg shadow-sm border border-brand-mist/30 flex flex-col items-center p-2 relative">
-                   <div className="w-6 h-6 bg-brand-linen rounded-full mb-1"></div>
-                   <div className="w-10 h-1.5 bg-brand-mist/50 rounded-full mb-1"></div>
-                   <div className="w-14 h-1 bg-brand-mist/30 rounded-full mb-3"></div>
+              <div className="relative shrink-0 flex items-center justify-center shadow-md rounded-[16px] border border-brand-mist/30">
+                {/* The card container to be exported */}
+                <div 
+                  ref={storyCardRef}
+                  className="w-[180px] h-[320px] rounded-[16px] overflow-hidden bg-[#F8F6F2] relative flex flex-col items-center justify-between py-6 px-4"
+                >
+                  {/* CSS Grain */}
+                  <div className="absolute inset-0 opacity-[0.035] mix-blend-multiply pointer-events-none" style={{ backgroundImage: 'radial-gradient(#896758 1px, transparent 1px)', backgroundSize: '4px 4px' }}></div>
 
-                   {/* Fake Link Sticker */}
-                   <div className="mt-auto bg-blue-50 text-blue-600 px-1.5 py-1 rounded flex items-center gap-1 w-full max-w-full overflow-hidden justify-center shadow-sm border border-blue-100">
-                     <Share2 size={6} className="shrink-0" />
-                     <span className="text-[5px] font-medium truncate">{profileUrl.replace('https://','').replace('http://','')}</span>
-                   </div>
+                  {/* Editorial Inner Border */}
+                  <div className="absolute inset-2 border-[0.5px] border-brand-terracotta/20 rounded-[10px] pointer-events-none"></div>
+
+                  {/* Watermark Fallback */}
+                  {!(professionalPhotoUrl && !photoError) && (
+                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-[0.02]">
+                      <span className="text-[320px] font-serif text-brand-ink leading-none mt-10">{safeInitial}</span>
+                    </div>
+                  )}
+
+                  {/* 1. Header */}
+                  <div className="relative z-10 flex flex-col items-center mt-2">
+                    <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.3em]">Agenda Online</span>
+                    <div className="w-8 h-[0.5px] bg-brand-terracotta/40 mt-2"></div>
+                  </div>
+
+                  {/* 2. Middle Visual content */}
+                  <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full my-4">
+                    {professionalPhotoUrl && !photoError ? (
+                      <div className="relative p-[3px] bg-white/40 backdrop-blur-sm rounded-t-[50px] rounded-b-[4px] border border-brand-mist shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
+                        <div 
+                          className="w-[90px] h-[110px] rounded-t-[47px] rounded-b-[2px] overflow-hidden bg-brand-parchment"
+                          style={{
+                            backgroundImage: `url(${professionalPhotoUrl})`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center'
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-[90px] h-[110px] flex items-center justify-center relative">
+                         {/* Decorative arch frame */}
+                         <div className="absolute inset-0 border-[0.5px] border-brand-terracotta/40 rounded-t-[45px] rounded-b-[4px]"></div>
+                         <div className="absolute inset-[3px] border-[0.5px] border-brand-terracotta/15 rounded-t-[42px] rounded-b-[2px]"></div>
+                         <span className="text-[56px] font-serif font-light text-brand-terracotta leading-none translate-y-[-2px] mix-blend-multiply">
+                            {safeInitial}
+                         </span>
+                      </div>
+                    )}
+                    
+                    {/* 3. Name and Speciality */}
+                    <div className="mt-5 flex flex-col items-center w-full">
+                      <h4 className="text-[15px] font-serif text-brand-ink leading-tight text-center text-balance max-w-[150px] px-2 shadow-white">
+                         {profile.name}
+                      </h4>
+                      {profile.category && (
+                        <div className="mt-2.5 pt-2 border-t border-brand-mist/60 px-4">
+                          <span className="text-[5.5px] font-semibold text-brand-stone uppercase tracking-[0.2em] relative top-[-1px]">
+                             {profile.category}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4. CTA and Sticker */}
+                  <div className="relative z-10 flex flex-col items-center w-full gap-3 mb-3">
+                    <p className="text-[12px] font-serif text-brand-terracotta italic leading-snug tracking-wider">
+                       Reserve seu horário
+                    </p>
+
+                    {/* Sticker/Link style */}
+                    <div className="bg-white/95 px-3 py-1.5 rounded-full flex items-center justify-center gap-1.5 w-[90%] shadow-[0_2px_8px_-4px_rgba(0,0,0,0.12)] border border-[#EFECE8] shrink-0">
+                      <div className="bg-brand-ink rounded-full w-[14px] h-[14px] flex items-center justify-center shrink-0">
+                         <Share2 size={7} className="text-white" strokeWidth={2.5} />
+                      </div>
+                      <span className="text-[8px] font-medium text-brand-ink truncate tracking-[0.03em]">
+                        {profileUrl.replace('https://', '').replace('http://', '').replace('www.', '')}
+                      </span>
+                    </div>
+
+                    {/* 5. Footer Signature */}
+                    <div className="mt-1.5 items-center justify-center flex opacity-40">
+                       <span className="text-[4px] font-bold text-brand-stone tracking-[0.3em] uppercase">Nera • Agendamento Online</span>
+                    </div>
+                  </div>
+
                 </div>
               </div>
 
-              {/* LEGENDS */}
-              <div className="flex-1 flex flex-col justify-center gap-2 min-w-0">
-                <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest pl-1 mb-1">Legendas sugeridas</p>
-                {storyIdeas.slice(0, 3).map((idea, index) => (
-                  <div key={index} className="flex items-center justify-between px-3 py-2 bg-brand-linen/30 rounded-xl border border-brand-mist/50 gap-2">
-                    <span className="text-[10px] text-brand-ink font-medium leading-tight truncate">{idea}</span>
-                    <button
-                      onClick={() => handleCopyText(idea, 'story', index)}
-                      className="w-6 h-6 flex items-center justify-center text-brand-stone hover:text-brand-ink transition-colors bg-white rounded-full shadow-sm shrink-0"
-                    >
-                      {copiedStory === index ? <Check size={12} className="text-green-500" /> : <Copy size={12} />}
-                    </button>
-                  </div>
-                ))}
+              {/* ACTION */}
+              <div className="flex-1 flex flex-col justify-center gap-4 w-full text-center sm:text-left">
+                <div className="space-y-1.5 max-w-[280px] mx-auto sm:max-w-none sm:mx-0">
+                  <p className="text-sm font-medium text-brand-ink">Sua vitrine pronta para circular.</p>
+                  <p className="text-[12px] text-brand-stone leading-relaxed px-2 sm:px-0">
+                    Baixe e publique nos Stories para levar clientes direto ao seu agendamento.
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleDownloadStoryCard}
+                  disabled={isGeneratingStory}
+                  className="w-full mt-2 py-2.5 bg-brand-ink text-white rounded-[12px] text-[11px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:shadow-none"
+                >
+                  {isGeneratingStory ? (
+                    <span className="flex items-center gap-2">Gerando imagem...</span>
+                  ) : (
+                    <>
+                      <Download size={14} />
+                      Baixar Imagem
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>

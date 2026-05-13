@@ -447,7 +447,7 @@ export default function ClientsPage() {
       const daysSince = c.lastAppointmentDate ? getDaysSinceLastVisit(c.lastAppointmentDate) : 999;
       
       // Segmentation Logic
-      let segment = 'new';
+      let segment: any = 'new';
       
       if (c.totalSpent >= segmentationThresholds.threshold20 || c.totalSpent >= (segmentationThresholds.avgTicket * 3)) {
         segment = 'vip';
