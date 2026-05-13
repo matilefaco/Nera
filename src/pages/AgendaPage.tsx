@@ -127,6 +127,7 @@ export default function AgendaPage() {
   const [services, setServices] = useState<any[]>([]);
   // Intelligent Fit State
   const [isCreating, setIsCreating] = useState(false);
+  const [blockToDelete, setBlockToDelete] = useState<any | null>(null);
   
   // Reserva Search
   const [searchCode, setSearchCode] = useState('');
@@ -386,14 +387,7 @@ export default function AgendaPage() {
   };
 
   const handleBlockClick = (block: any) => {
-    const isRecurring = block.isRecurring;
-    const msg = isRecurring 
-      ? 'Este é um bloqueio recorrente. Deseja remover esta regra?'
-      : 'Desbloquear este horário?';
-      
-    if (window.confirm(msg)) {
-      handleUnblockSchedule(block.id);
-    }
+    setBlockToDelete(block);
   };
 
   // Smart Suggestions
@@ -1534,6 +1528,59 @@ export default function AgendaPage() {
                     );
                   })()}
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {blockToDelete && (
+          <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 sm:p-0">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setBlockToDelete(null)}
+              className="absolute inset-0 bg-brand-ink/40 backdrop-blur-sm"
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              className="relative w-full max-w-sm bg-brand-white rounded-[32px] p-8 shadow-2xl overflow-hidden"
+            >
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="w-12 h-12 bg-rose-50 text-brand-terracotta rounded-full flex items-center justify-center">
+                  <Trash2 size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-serif text-brand-ink mb-2">
+                    {blockToDelete.isRecurring ? 'Remover regra recorrente' : 'Desbloquear horário'}
+                  </h3>
+                  <p className="text-sm font-sans text-brand-stone">
+                    {blockToDelete.isRecurring 
+                      ? 'Esse bloqueio se repete automaticamente. Deseja remover a regra inteira?'
+                      : 'Esse horário voltará a ficar disponível para agendamentos.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-8">
+                <button
+                  onClick={() => setBlockToDelete(null)}
+                  className="flex-1 py-3.5 text-xs font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink bg-brand-linen hover:bg-brand-mist rounded-2xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    handleUnblockSchedule(blockToDelete.id);
+                    setBlockToDelete(null);
+                  }}
+                  className="flex-1 py-3.5 text-xs font-bold uppercase tracking-widest text-white bg-brand-terracotta hover:bg-[#A94A3D] rounded-2xl transition-colors shadow-sm"
+                >
+                  {blockToDelete.isRecurring ? 'Remover regra' : 'Remover bloqueio'}
+                </button>
               </div>
             </motion.div>
           </div>
