@@ -197,7 +197,10 @@ export default function ClientsPage() {
   });
 
   const fetchClients = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     const clientsCacheKey = user.uid;
@@ -356,8 +359,25 @@ export default function ClientsPage() {
   }, [user]);
 
   useEffect(() => {
-    fetchClients();
-  }, [user]);
+    let isMounted = true;
+    
+    // Fallback de segurança para garantir que a tela não fique presa no skeleton
+    // se o Firebase demorar para responder (falta de índice ou lentidão extrema)
+    const timeout = setTimeout(() => {
+      if (isMounted) setLoading(false);
+    }, 5000);
+
+    fetchClients().finally(() => {
+      if (isMounted) {
+        clearTimeout(timeout);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+    };
+  }, [fetchClients]);
 
   const handleMigrate = async () => {
     if (!user) return;
@@ -595,8 +615,8 @@ export default function ClientsPage() {
       <div className="p-6 md:p-12 max-w-5xl mx-auto w-full">
         <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Relacionamentos</h1>
-            <p className="text-brand-stone font-light text-sm">Base inteligente de clientes com histórico e LTV.</p>
+            <h1 className="text-4xl font-serif font-normal text-brand-ink mb-2">Clientes</h1>
+            <p className="text-brand-stone font-light text-sm">Veja quem voltou, quem sumiu e quem vale chamar de novo.</p>
           </div>
           
           <div className="flex flex-col md:flex-row gap-4">
@@ -642,29 +662,30 @@ export default function ClientsPage() {
                 onClick={() => setFilterStatus('inactive')}
                 className="px-8 py-4 bg-brand-terracotta text-white rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg whitespace-nowrap"
               >
-                Reativar agora
+                Chamar cliente
               </button>
             </div>
           </motion.div>
         )}
 
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
-          <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-            <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-1">Total</p>
-            <p className="text-3xl font-serif text-brand-ink">{clients.length}{hasMore ? '+' : ''}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 mb-10">
+          <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Clientes</p>
+            <p className="text-2xl sm:text-3xl font-serif text-brand-ink leading-none">{clients.length}{hasMore ? '+' : ''}</p>
           </div>
-          <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-            <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-1">Recuperável</p>
-            <p className="text-3xl font-serif text-brand-terracotta">{formatCurrency(clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).reduce((acc, curr) => acc + (curr.totalSpent / curr.confirmedAppointments || 0), 0))}</p>
+          <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Retorno Estimado</p>
+            <p className="text-xl sm:text-2xl lg:text-3xl font-serif text-brand-terracotta leading-none truncate">{formatCurrency(clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).reduce((acc, curr) => acc + (curr.totalSpent / curr.confirmedAppointments || 0), 0))}</p>
+            <p className="text-[8px] text-brand-stone/60 mt-1 truncate">clientes ausentes</p>
           </div>
-          <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-            <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-1">Inativos (30d+)</p>
-            <p className="text-3xl font-serif text-brand-ink">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length}</p>
+          <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Sumidas há 30D</p>
+            <p className="text-2xl sm:text-3xl font-serif text-brand-ink leading-none">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length}</p>
           </div>
-          <div className="bg-brand-white p-6 rounded-[32px] border border-brand-mist shadow-sm">
-            <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-1">Ativos (Recent)</p>
-            <p className="text-3xl font-serif text-green-600">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) < 30).length}</p>
+          <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Atendidas recentemente</p>
+            <p className="text-2xl sm:text-3xl font-serif text-green-600/90 leading-none">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) < 30).length}</p>
           </div>
         </div>
 
@@ -675,7 +696,7 @@ export default function ClientsPage() {
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
               <input 
                 type="text" 
-                placeholder="Buscar cliente..." 
+                placeholder="Buscar por nome, serviço ou telefone..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-16 pr-6 py-6 bg-brand-white rounded-[28px] border border-brand-mist outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light shadow-sm text-sm"
@@ -739,18 +760,18 @@ export default function ClientsPage() {
                 { id: 'all', label: 'Todas' },
                 { id: 'vip', label: 'VIP' },
                 { id: 'recurring', label: 'Recorrentes' },
-                { id: 'at_risk', label: 'Em Risco' },
-                { id: 'inactive', label: 'Inativas' },
+                { id: 'at_risk', label: 'Esfriando' },
+                { id: 'inactive', label: 'Ausentes' },
                 { id: 'new', label: 'Novas' }
               ].map(f => (
                 <button
                   key={f.id}
                   onClick={() => setFilterStatus(f.id as typeof filterStatus)}
                   className={cn(
-                    "px-6 py-3 rounded-2xl text-[9px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap",
+                    "px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap",
                     filterStatus === f.id
                       ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
-                      : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink shadow-sm"
+                      : "bg-brand-white text-brand-stone/80 border-brand-mist/60 hover:border-brand-stone/50 hover:text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]"
                   )}
                 >
                   {f.label}
@@ -765,14 +786,14 @@ export default function ClientsPage() {
                 </span>
               </div>
               {uniqueServices.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+                <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-2">
                   <button
                     onClick={() => setFilterService(null)}
                     className={cn(
-                      "px-5 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap transition-all",
+                      "px-4 py-2 rounded-full text-[9px] font-semibold uppercase tracking-wider border whitespace-nowrap transition-all",
                       !filterService
-                        ? "bg-brand-terracotta text-white border-brand-terracotta"
-                        : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink shadow-sm"
+                        ? "bg-brand-terracotta text-white border-brand-terracotta shadow-sm"
+                        : "bg-brand-white text-brand-stone/70 border-brand-mist/50 hover:border-brand-mist hover:text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]"
                     )}
                   >
                     Todos os Serviços
@@ -782,10 +803,10 @@ export default function ClientsPage() {
                       key={service}
                       onClick={() => setFilterService(service === filterService ? null : service)}
                       className={cn(
-                        "px-5 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border whitespace-nowrap transition-all",
+                        "px-4 py-2 rounded-full text-[9px] font-semibold uppercase tracking-wider border whitespace-nowrap transition-all",
                         filterService === service
-                          ? "bg-brand-terracotta text-white border-brand-terracotta"
-                          : "bg-brand-white text-brand-stone border-brand-mist hover:border-brand-ink shadow-sm"
+                          ? "bg-brand-terracotta text-white border-brand-terracotta shadow-sm"
+                          : "bg-brand-white text-brand-stone/70 border-brand-mist/50 hover:border-brand-mist hover:text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]"
                       )}
                     >
                       {service}
@@ -839,12 +860,12 @@ export default function ClientsPage() {
                         )}
                         {client.segment === 'at_risk' && (
                           <div className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold">
-                            EM RISCO
+                            ESFRIANDO
                           </div>
                         )}
                         {(client.segment === 'inactive' || getDaysSinceLastVisit(client.lastAppointmentDate) >= 30) && (
                           <div className="bg-brand-linen/50 text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold flex items-center gap-1">
-                            INATIVA ({getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS)
+                            AUSENTE ({getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS)
                           </div>
                         )}
                         {client.noShowCount > 0 && (
@@ -854,11 +875,11 @@ export default function ClientsPage() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] md:text-[10px] text-brand-stone font-medium uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.confirmedAppointments} visitas</span>
-                        <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} LTV</span>
+                        <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.confirmedAppointments} atendimentos</span>
+                        <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} valor total</span>
                         {client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
                         <span className="italic text-brand-stone/60 truncate max-w-[200px]">
-                          Último: {client.lastServiceName} ({new Date(client.lastAppointmentDate + 'T12:00:00').toLocaleDateString('pt-BR')})
+                          último atendimento: {client.lastServiceName} ({new Date(client.lastAppointmentDate + 'T12:00:00').toLocaleDateString('pt-BR')})
                         </span>
                       </div>
                     </div>
@@ -895,7 +916,7 @@ export default function ClientsPage() {
                         >
                           <MessageCircle size={20} />
                           {isInactive && (
-                            <span className="text-[8px] font-bold uppercase tracking-widest hidden md:inline">Reativar</span>
+                            <span className="text-[8px] font-bold uppercase tracking-widest hidden md:inline">Chamar cliente</span>
                           )}
                         </a>
                       );
