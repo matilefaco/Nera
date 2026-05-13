@@ -222,17 +222,36 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
     const proData = proDoc.exists ? proDoc.data() : null;
 
     // Return sanitized data for client
+    const safeAppointmentData = {
+      id: appointmentId,
+      manageSlug: appointmentData.manageSlug,
+      token: appointmentData.token,
+      date: appointmentData.date,
+      time: appointmentData.time,
+      duration: appointmentData.duration,
+      status: appointmentData.status,
+      professionalId: appointmentData.professionalId,
+      serviceName: appointmentData.serviceName,
+      reservationCode: appointmentData.reservationCode,
+      totalPrice: appointmentData.totalPrice,
+      price: appointmentData.price,
+      locationType: appointmentData.locationType,
+      address: appointmentData.address,
+      clientConfirmed24h: appointmentData.clientConfirmed24h,
+      clientConfirmedAt: appointmentData.clientConfirmedAt,
+      rescheduledAt: appointmentData.rescheduledAt,
+      previousDate: appointmentData.previousDate,
+      previousTime: appointmentData.previousTime,
+      professional: proData ? {
+        name: proData.name,
+        slug: proData.slug,
+        whatsapp: proData.whatsapp
+      } : null
+    };
+
     res.json({
       found: true,
-      appointment: {
-        id: appointmentId,
-        ...appointmentData,
-        professional: proData ? {
-          name: proData.name,
-          slug: proData.slug,
-          whatsapp: proData.whatsapp
-        } : null
-      }
+      appointment: safeAppointmentData
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
