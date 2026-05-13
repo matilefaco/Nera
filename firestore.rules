@@ -117,6 +117,10 @@ service cloud.firestore {
       match /client_notes/{noteId} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+      
+      match /portfolio/{docId} {
+        allow read: if true;
+      }
     }
 
     match /services/{serviceId} {

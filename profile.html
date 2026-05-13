@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <script>
+      // 1. Aggressive ServiceWorker Wipe (Force refresh for everyone)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister().then(() => {
+              console.log('[DEBUG] SW Unregistered');
+              // Optional: location.reload() might be too aggressive if not handled carefully
+            });
+          }
+        });
+        
+        // Also try to skip waiting and take control if a new one is trying to install
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('[DEBUG] SW Controller changed');
+        });
+      }
+
+      // 2. Global Diagnostic Logging
+      window.onerror = function(msg, url, line, col, error) {
+        const errorText = `[JS_ERROR] ${msg} | ${url}:${line}:${col}`;
+        console.error(errorText, error);
+      };
+    </script>
+  
+        <title>Jajajsje | Nera</title>
+        <meta name="description" content="Testeeeee" />
+        <link rel="canonical" href="https://usenera.com/p/jajajsje" />
+        <meta property="og:title" content="Jajajsje | Agende online" />
+        <meta property="og:description" content="Testeeeee" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://usenera.com/p/jajajsje" />
+        <meta property="og:site_name" content="Nera" />
+        <meta property="og:locale" content="pt_BR" />
+        <meta property="og:image" content="https://firebasestorage.googleapis.com/v0/b/ai-studio-applet-webapp-bb725.firebasestorage.app/o/avatars%2FxMQjX4rXONfEasZ0cwSyOT4mkUu2%2F1777234111875_image.jpg?alt=media&amp;token=fcebe963-00fd-481c-bbe0-75b1c9f4c899" />
+        <meta property="og:image:alt" content="Perfil de Jajajsje na Nera" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Jajajsje | Agende online" />
+        <meta name="twitter:description" content="Testeeeee" />
+        <meta name="twitter:image" content="https://firebasestorage.googleapis.com/v0/b/ai-studio-applet-webapp-bb725.firebasestorage.app/o/avatars%2FxMQjX4rXONfEasZ0cwSyOT4mkUu2%2F1777234111875_image.jpg?alt=media&amp;token=fcebe963-00fd-481c-bbe0-75b1c9f4c899" />
+      
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
