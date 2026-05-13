@@ -808,20 +808,20 @@ export default function AgendaPage() {
 
         {/* 2. RESUMO RÁPIDO (3 KPIs) */}
         <div className="grid grid-cols-3 gap-2 mb-8">
-          <div className="bg-white/40 backdrop-blur-md p-3.5 rounded-[20px] border border-brand-mist/30 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.05)] cursor-default">
-            <p className="text-[9px] font-medium text-brand-stone/70 uppercase tracking-[0.15em] mb-1.5">Confirmados</p>
-            <p className="text-[22px] font-serif text-brand-ink/90 leading-none">{confirmedAppts.length}</p>
+          <div className="bg-white/30 backdrop-blur-md p-3.5 rounded-[20px] border border-brand-mist/20 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.03)] cursor-default">
+            <p className="text-[9px] font-medium text-brand-stone/70 uppercase tracking-[0.2em] mb-1.5">Confirmados</p>
+            <p className="text-[24px] font-serif text-brand-ink/85 leading-none">{confirmedAppts.length}</p>
           </div>
-          <div className="bg-white/90 backdrop-blur-xl p-3.5 rounded-[20px] border border-brand-mist/60 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08)] text-center relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5 cursor-default">
-            <p className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-[0.15em] mb-1.5">Pedidos</p>
-            <p className="text-[22px] font-serif text-brand-ink leading-none flex items-center justify-center gap-1.5">
+          <div className="bg-white/70 backdrop-blur-xl p-3.5 rounded-[20px] border border-brand-mist/40 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.05)] text-center relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_32px_-6px_rgba(0,0,0,0.08)] cursor-default">
+            <p className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-[0.2em] mb-1.5">Pedidos</p>
+            <p className="text-[24px] font-serif text-brand-ink/95 leading-none flex items-center justify-center gap-1.5">
               {pendingRequests.length}
-              {pendingRequests.length > 0 && <span className="w-1 h-1 shadow-[0_0_8px_2px_rgba(202,106,86,0.4)] bg-brand-terracotta rounded-full animate-pulse" />}
+              {pendingRequests.length > 0 && <span className="w-1 h-1 shadow-[0_0_8px_2px_rgba(202,106,86,0.2)] bg-brand-terracotta/90 rounded-full animate-pulse" />}
             </p>
           </div>
-          <div className="bg-white/40 backdrop-blur-md p-3.5 rounded-[20px] border border-brand-mist/30 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.05)] cursor-default">
-            <p className="text-[9px] font-medium text-brand-stone/70 uppercase tracking-[0.15em] mb-1.5">Vagas</p>
-            <p className="text-[22px] font-serif text-brand-ink/90 leading-none">{openSlots.length}</p>
+          <div className="bg-white/30 backdrop-blur-md p-3.5 rounded-[20px] border border-brand-mist/20 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.03)] cursor-default">
+            <p className="text-[9px] font-medium text-brand-stone/70 uppercase tracking-[0.2em] mb-1.5">Vagas</p>
+            <p className="text-[24px] font-serif text-brand-ink/85 leading-none">{openSlots.length}</p>
           </div>
         </div>
 
@@ -891,28 +891,31 @@ export default function AgendaPage() {
           )}
 
           {openSlots.length > 0 && (
-            <div className="bg-brand-linen p-6 rounded-[32px] border border-brand-terracotta/10">
-              <div className="mb-4">
-                <h4 className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">{openSlots.length} horários livres hoje</h4>
-                <div className="flex flex-wrap gap-x-2 gap-y-1 mt-2">
+            <div className="bg-white/40 backdrop-blur-md p-6 rounded-[28px] border border-brand-mist/40 shadow-[0_4px_24px_-8px_rgba(0,0,0,0.03)] cursor-default">
+              <div className="mb-6 flex flex-col items-center text-center">
+                <h4 className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/80 mb-3">{openSlots.length} horários livres hoje</h4>
+                <div className="flex flex-wrap justify-center items-center gap-x-3 gap-y-2 max-w-[220px]">
                   {openSlots.slice(0, 6).map((s, i) => (
-                    <span key={i} className="text-xs text-brand-ink font-serif">{s}{i < Math.min(openSlots.length, 6) - 1 ? ' · ' : ''}</span>
+                    <div key={i} className="flex items-center">
+                      <span className="text-[14px] text-brand-ink/90 font-serif tracking-wide">{s}</span>
+                      {i < Math.min(openSlots.length, 6) - 1 && <span className="ml-3 w-1 h-1 rounded-full bg-brand-stone/20"></span>}
+                    </div>
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2.5">
                 <button 
                    onClick={() => setIsFabOpen(true)}
-                   className="flex-1 py-3 bg-brand-ink text-brand-white rounded-xl text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                   className="flex-1 py-3.5 bg-brand-ink/95 backdrop-blur-sm text-brand-white rounded-[18px] text-[10px] font-semibold uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-all duration-300 hover:bg-brand-terracotta hover:shadow-[0_8px_16px_-4px_rgba(202,106,86,0.3)] active:scale-[0.98]"
                 >
-                  <Share2 size={12} /> Divulgar agenda
+                  <Share2 size={13} strokeWidth={1.5} className="text-white/80 transition-colors" /> Divulgar agenda
                 </button>
                 {features.waitlist && (
                   <button 
                      onClick={() => setIsWaitlistOpen(true)}
-                     className="flex-1 py-3 bg-brand-white border border-brand-mist text-brand-stone rounded-xl text-[9px] font-bold uppercase tracking-widest flex items-center justify-center gap-2"
+                     className="flex-1 py-3.5 bg-white/60 hover:bg-white backdrop-blur-sm border border-brand-mist/80 text-brand-ink rounded-[18px] text-[10px] font-medium uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)] active:scale-[0.98]"
                   >
-                    <Users size={12} /> Ver espera
+                    <Users size={13} strokeWidth={1.5} className="text-brand-stone/80 transition-colors" /> Ver espera
                   </button>
                 )}
               </div>
@@ -921,12 +924,18 @@ export default function AgendaPage() {
         </div>
 
         {/* UX INTELIGENTE FEEDBACK */}
-        <div className="mt-12 text-center">
+        <div className="mt-14 mb-6 relative">
           {isSelectedDateToday && (
             confirmedAppts.length >= 5 ? (
-              <p className="text-sm font-serif text-brand-stone italic">Agenda cheia hoje ✨ {confirmedAppts.length} atendimentos confirmados.</p>
+              <div className="text-center space-y-1 relative z-10 before:absolute before:inset-0 before:-z-10 before:bg-gradient-to-b before:from-brand-linen/40 before:to-transparent before:opacity-0 before:transition-opacity">
+                <p className="text-[17px] font-serif text-brand-ink/90 italic tracking-tight">Agenda cheia hoje ✨</p>
+                <p className="text-[10px] font-medium text-brand-stone/60 uppercase tracking-[0.15em]">{confirmedAppts.length} atendimentos confirmados</p>
+              </div>
             ) : (
-              <p className="text-sm font-serif text-brand-stone italic">Hoje está leve. {openSlots.length} horários disponíveis.</p>
+              <div className="text-center space-y-1">
+                <p className="text-[17px] font-serif text-brand-ink/90 italic tracking-tight">Hoje está leve.</p>
+                <p className="text-[10px] font-medium text-brand-stone/60 uppercase tracking-[0.15em]">{openSlots.length} {openSlots.length === 1 ? 'horário disponível' : 'horários disponíveis'}</p>
+              </div>
             )
           )}
         </div>
@@ -1275,7 +1284,7 @@ export default function AgendaPage() {
 
       <AnimatePresence>
         {isDetailsOpen && selectedAppointment && (
-          <div className="fixed inset-0 z-[250] flex items-end md:items-center justify-center p-0 md:p-6 overflow-hidden">
+          <div className="fixed inset-0 z-[250] flex items-end md:items-center justify-center p-0 md:p-6 pt-12 overflow-hidden">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsDetailsOpen(false)}
@@ -1283,22 +1292,25 @@ export default function AgendaPage() {
             />
             <motion.div 
               initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="relative w-full max-w-md bg-brand-white rounded-t-[40px] md:rounded-[40px] px-6 py-8 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] overflow-y-auto max-h-[90vh] pb-[calc(2rem+env(safe-area-inset-bottom))]"
+              className="relative w-full max-w-md bg-brand-white rounded-t-[32px] md:rounded-[40px] px-5 sm:px-6 pt-10 sm:pt-10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] overflow-y-auto max-h-[calc(100dvh-3rem)] sm:max-h-[85vh] pb-[calc(2rem+env(safe-area-inset-bottom))]"
             >
               <button 
                 onClick={() => setIsDetailsOpen(false)}
-                className="absolute top-6 right-6 p-3 bg-brand-linen rounded-full text-brand-stone hover:text-brand-ink transition-colors"
+                className="absolute top-5 right-5 sm:right-6 p-2 bg-brand-mist/40 rounded-full text-brand-stone/80 hover:text-brand-ink hover:bg-brand-mist/80 transition-colors z-20"
                 title="Fechar"
               >
-                <X size={20} />
+                <X size={20} strokeWidth={2} />
               </button>
 
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta">Detalhes da Reserva</span>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest",
+              <div className="mb-5 sm:mb-6 pr-12 relative">
+                <span className="block text-[9px] font-bold uppercase tracking-[0.2em] text-brand-terracotta mb-2">Detalhes da Reserva</span>
+                
+                <h3 className="text-2xl sm:text-3xl font-serif text-brand-ink leading-tight mb-1">{selectedAppointment.clientName}</h3>
+                <p className="text-sm text-brand-stone font-light italic mb-3">{selectedAppointment.serviceName}</p>
+                
+                <div className="flex items-center flex-wrap gap-2">
+                  <span className={cn(
+                    "px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest max-w-[140px] truncate leading-none",
                       isConfirmedLikeStatus(selectedAppointment.status) ? "bg-green-100 text-green-700" :
                       isPendingStatus(selectedAppointment.status) ? "bg-orange-100 text-orange-700 animate-pulse" :
                       isCompletedStatus(selectedAppointment.status) ? "bg-brand-linen text-brand-ink" :
@@ -1311,77 +1323,74 @@ export default function AgendaPage() {
                        selectedAppointment.status}
                     </span>
                     {selectedAppointment.clientConfirmed24h && (
-                      <span className="bg-brand-ink text-white px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest flex items-center gap-1">
-                        <Check size={10} /> Confirmado 24h
+                      <span className="bg-brand-ink text-white px-2.5 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest flex items-center gap-1 leading-none">
+                        <Check size={10} /> Conf. 24h
                       </span>
+                    )}
+                    {selectedAppointment.reservationCode && (
+                      <div className="inline-flex items-center gap-1.5 bg-brand-linen/60 px-2.5 py-1 rounded-full border border-brand-mist/30 leading-none">
+                        <span className="text-[8px] text-brand-stone uppercase tracking-widest font-bold">Cód:</span>
+                        <span className="text-[9px] font-mono font-bold text-brand-terracotta">{selectedAppointment.reservationCode}</span>
+                      </div>
                     )}
                   </div>
                 </div>
-                <h3 className="text-3xl font-serif text-brand-ink">{selectedAppointment.clientName}</h3>
-                <p className="text-sm text-brand-stone font-light italic">{selectedAppointment.serviceName}</p>
-                {selectedAppointment.reservationCode && (
-                  <div className="mt-4 inline-flex items-center gap-2 bg-brand-linen/60 px-3 py-1.5 rounded-full border border-brand-mist/30">
-                    <span className="text-[8px] text-brand-stone uppercase tracking-widest font-bold">Código:</span>
-                    <span className="text-[10px] font-mono font-bold text-brand-terracotta">{selectedAppointment.reservationCode}</span>
-                  </div>
-                )}
-              </div>
 
-              <div className="space-y-6">
-                <div className="p-6 bg-brand-parchment rounded-[32px] border border-brand-mist space-y-4">
+              <div className="space-y-4 sm:space-y-5">
+                <div className="p-5 sm:p-6 bg-brand-parchment/60 rounded-[24px] sm:rounded-[32px] border border-brand-mist/50 space-y-4 sm:space-y-5">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta border border-brand-mist">
-                      <Calendar size={20} />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
+                      <Calendar size={18} />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Data</p>
-                      <p className="text-lg font-serif text-brand-ink">{formatLocalDate(selectedAppointment.date, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Data</p>
+                      <p className="text-base sm:text-lg font-serif text-brand-ink">{formatLocalDate(selectedAppointment.date, { day: 'numeric', month: 'long', year: 'numeric' })}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta border border-brand-mist">
-                      <Clock size={20} />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
+                      <Clock size={18} />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Horário</p>
-                      <p className="text-lg font-serif text-brand-ink">{selectedAppointment.time} • {selectedAppointment.duration} min</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Horário</p>
+                      <p className="text-base sm:text-lg font-serif text-brand-ink">{selectedAppointment.time} • {selectedAppointment.duration} min</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta border border-brand-mist">
-                      <TrendingUp size={20} />
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
+                      <TrendingUp size={18} />
                     </div>
                     <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Valor Total</p>
-                      <p className="text-lg font-serif text-brand-ink">{formatCurrency(selectedAppointment.totalPrice || selectedAppointment.price)}</p>
+                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Valor Total</p>
+                      <p className="text-base sm:text-lg font-serif text-brand-ink">{formatCurrency(selectedAppointment.totalPrice || selectedAppointment.price)}</p>
                     </div>
                   </div>
 
                   {selectedAppointment.clientEmail && (
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta border border-brand-mist">
-                        <List size={20} />
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
+                        <List size={18} />
                       </div>
                       <div className="overflow-hidden">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">E-mail</p>
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">E-mail</p>
                         <p className="text-sm text-brand-ink truncate">{selectedAppointment.clientEmail}</p>
                       </div>
                     </div>
                   )}
 
                   <div className="pt-2 border-t border-brand-mist/30">
-                    <p className="text-[8px] uppercase font-bold text-brand-stone tracking-widest flex items-center gap-1 opacity-50">
+                    <p className="text-[8px] sm:text-[9px] uppercase font-medium text-brand-stone tracking-widest flex items-center gap-1.5 opacity-60">
                       <Clock size={10} /> Criado em {selectedAppointment.createdAt?.toDate ? formatLocalDate(formatDateKey(selectedAppointment.createdAt.toDate()), { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
                     </p>
                   </div>
                 </div>
 
                 {selectedAppointment.locationType === 'home' && (
-                  <div className="p-6 bg-brand-parchment rounded-[32px] border border-brand-mist">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta border border-brand-mist">
+                  <div className="p-5 sm:p-6 bg-brand-parchment/60 rounded-[24px] sm:rounded-[32px] border border-brand-mist/50">
+                    <div className="flex items-start sm:items-center gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0 mt-1 sm:mt-0">
                         <MapPin size={20} />
                       </div>
                       <div>
@@ -1430,29 +1439,29 @@ export default function AgendaPage() {
                 )}
 
                 {selectedAppointment.notes && (
-                  <div className="p-6 bg-brand-linen/40 rounded-[32px] border border-brand-mist">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-3">Observações</p>
+                  <div className="p-5 sm:p-6 bg-brand-linen/30 rounded-[24px] sm:rounded-[32px] border border-brand-mist/40">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-2">Observações</p>
                     <p className="text-sm text-brand-ink font-light italic leading-relaxed">"{selectedAppointment.notes}"</p>
                   </div>
                 )}
 
-                <div className="pt-4 flex flex-col gap-3">
+                <div className="pt-2 flex flex-col gap-2">
                   {selectedAppointment.status === 'pending' && (
                     <PremiumButton 
                       variant="ink"
-                      className="w-full py-5 flex items-center justify-center gap-2"
+                      className="w-full py-3.5 flex items-center justify-center gap-2"
                       onClick={() => {
                         handleRespond(selectedAppointment.id, 'confirmed', selectedAppointment);
                         setIsDetailsOpen(false);
                       }}
                     >
-                      <Check size={18} /> Confirmar Reserva
+                      <Check size={16} /> Confirmar Reserva
                     </PremiumButton>
                   )}
 
                   <PremiumButton 
                     variant={selectedAppointment.status === 'pending' ? 'linen' : 'ink'}
-                    className="w-full py-5"
+                    className="w-full py-3.5 text-sm"
                     onClick={() => {
                         window.open(buildWhatsappLink(selectedAppointment.clientWhatsapp));
                     }}
@@ -1466,18 +1475,18 @@ export default function AgendaPage() {
                       await navigator.clipboard.writeText(url);
                       notify.success('Link de gerenciamento copiado!');
                     }}
-                    className="w-full py-4 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen rounded-2xl transition-all border border-brand-mist flex items-center justify-center gap-2"
+                    className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen hover:text-brand-ink rounded-xl transition-all border border-brand-mist/60 flex items-center justify-center gap-2"
                   >
                      Copiar Link da Cliente
                   </button>
 
                   {isConfirmedLikeStatus(selectedAppointment.status) && (
                     <PremiumButton 
-                      variant="primary"
-                      className="w-full py-4 mt-4"
-                      onClick={() => handleComplete(selectedAppointment)}
-                      disabled={loading === selectedAppointment.id}
-                    >
+                       variant="primary"
+                       className="w-full py-3 mt-1 text-[13px]"
+                       onClick={() => handleComplete(selectedAppointment)}
+                       disabled={loading === selectedAppointment.id}
+                     >
                       {loading === selectedAppointment.id ? 'Finalizando...' : 'Finalizar Atendimento'}
                     </PremiumButton>
                   )}
@@ -1488,7 +1497,7 @@ export default function AgendaPage() {
                         handleRespond(selectedAppointment.id, 'cancelled_by_professional', selectedAppointment);
                         setIsDetailsOpen(false);
                       }}
-                      className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-rose hover:bg-brand-rose/5 rounded-xl transition-all mt-3"
+                      className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-brand-rose/70 hover:text-brand-rose hover:bg-brand-rose/5 rounded-xl transition-all mt-1"
                     >
                       {selectedAppointment.status === 'pending' ? 'Recusar Pedido' : 'Cancelar Atendimento'}
                     </button>
@@ -1522,7 +1531,7 @@ export default function AgendaPage() {
                             setLoading(null);
                           }
                         }}
-                        className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-amber-600 hover:bg-amber-50 rounded-xl transition-all border border-amber-100 mt-2"
+                        className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-amber-600/80 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all border border-amber-100/50 mt-1"
                       >
                         Marcar Faltou (No-Show)
                       </button>

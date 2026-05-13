@@ -44,7 +44,7 @@ export default function WeekView({
   return (
     <div className="w-full flex flex-col">
       {/* 1. HORIZONTAL DAY PICKER (Stripe Style) */}
-      <div className="sticky top-0 z-40 bg-brand-white/95 backdrop-blur-md border-b border-brand-mist/30 mb-2">
+      <div className="sticky top-0 z-40 bg-brand-white/95 backdrop-blur-md border-b border-brand-mist/30 mb-4 sm:mb-6">
         <div className="flex items-center px-4 py-4 gap-2 overflow-x-auto no-scrollbar scroll-smooth">
           {days.map((day) => {
             const dateKey = formatDateKey(day);

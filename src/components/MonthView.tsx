@@ -103,22 +103,22 @@ export default function MonthView({
               </span>
 
               {/* Day Markers */}
-              <div className="flex flex-col gap-1 w-full max-w-[40px] mt-auto pb-1">
+              <div className="flex flex-col gap-[3px] w-full items-center mt-auto pb-1 md:pb-1.5 opacity-90 group-hover:opacity-100 transition-opacity">
                 {confirmed > 0 && (
                   <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-brand-ink" />
-                    <span className="text-[8px] font-bold text-brand-ink">{confirmed}</span>
+                    <div className="w-[3px] h-[3px] rounded-full bg-brand-ink/50" />
+                    <span className="text-[8.5px] font-medium text-brand-stone/80 leading-none">{confirmed}</span>
                   </div>
                 )}
                 {pending > 0 && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-[8px] font-bold text-red-500">{pending}</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-[3px] h-[3px] rounded-full bg-brand-terracotta/80 shadow-[0_0_4px_rgba(202,106,86,0.3)] animate-pulse" />
+                    <span className="text-[8.5px] font-medium text-brand-terracotta/90 leading-none">{pending}</span>
                   </div>
                 )}
                 {isBlocked && (
-                  <div className="flex justify-center">
-                    <div className="h-0.5 w-4 bg-brand-stone/20 rounded-full" />
+                  <div className="flex justify-center mt-0.5">
+                    <div className="h-[2px] w-3 bg-brand-mist/60 rounded-full" />
                   </div>
                 )}
               </div>
