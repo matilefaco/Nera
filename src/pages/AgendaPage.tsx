@@ -807,21 +807,21 @@ export default function AgendaPage() {
         </div>
 
         {/* 2. RESUMO RÁPIDO (3 KPIs) */}
-        <div className="grid grid-cols-3 gap-3 mb-10">
-          <div className="bg-brand-linen/40 p-4 rounded-3xl border border-brand-mist/50 text-center">
-            <p className="text-[8px] font-bold text-brand-stone uppercase tracking-widest mb-1">Confirmados</p>
-            <p className="text-xl font-serif text-brand-ink">{confirmedAppts.length}</p>
+        <div className="grid grid-cols-3 gap-2 mb-8">
+          <div className="bg-white/40 backdrop-blur-md p-3.5 rounded-[20px] border border-brand-mist/30 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.05)] cursor-default">
+            <p className="text-[9px] font-medium text-brand-stone/70 uppercase tracking-[0.15em] mb-1.5">Confirmados</p>
+            <p className="text-[22px] font-serif text-brand-ink/90 leading-none">{confirmedAppts.length}</p>
           </div>
-          <div className="bg-brand-white p-4 rounded-3xl border border-brand-mist shadow-sm text-center relative overflow-hidden">
-            <p className="text-[8px] font-bold text-brand-stone uppercase tracking-widest mb-1">Pedidos</p>
-            <p className="text-xl font-serif text-brand-ink flex items-center justify-center gap-1.5">
+          <div className="bg-white/90 backdrop-blur-xl p-3.5 rounded-[20px] border border-brand-mist/60 shadow-[0_8px_30px_-6px_rgba(0,0,0,0.08)] text-center relative overflow-hidden transition-all duration-300 hover:-translate-y-0.5 cursor-default">
+            <p className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-[0.15em] mb-1.5">Pedidos</p>
+            <p className="text-[22px] font-serif text-brand-ink leading-none flex items-center justify-center gap-1.5">
               {pendingRequests.length}
-              {pendingRequests.length > 0 && <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />}
+              {pendingRequests.length > 0 && <span className="w-1 h-1 shadow-[0_0_8px_2px_rgba(202,106,86,0.4)] bg-brand-terracotta rounded-full animate-pulse" />}
             </p>
           </div>
-          <div className="bg-brand-parchment p-4 rounded-3xl border border-brand-mist/30 text-center">
-            <p className="text-[8px] font-bold text-brand-stone uppercase tracking-widest mb-1">Vagas</p>
-            <p className="text-xl font-serif text-brand-ink">{openSlots.length}</p>
+          <div className="bg-white/40 backdrop-blur-md p-3.5 rounded-[20px] border border-brand-mist/30 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.05)] cursor-default">
+            <p className="text-[9px] font-medium text-brand-stone/70 uppercase tracking-[0.15em] mb-1.5">Vagas</p>
+            <p className="text-[22px] font-serif text-brand-ink/90 leading-none">{openSlots.length}</p>
           </div>
         </div>
 
