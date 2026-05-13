@@ -96,6 +96,14 @@ const ClientNotes = ({
   );
 };
 
+interface ClientsCacheEntry {
+  data: ClientSummary[];
+  fetchedAt: number;
+}
+
+const CLIENTS_CACHE_TTL_MS = 5 * 60 * 1000;
+const clientsPageCache = new Map<string, ClientsCacheEntry>();
+
 export default function ClientsPage() {
   const { user, profile } = useAuth();
   const { 
@@ -192,6 +200,14 @@ export default function ClientsPage() {
     if (!user) return;
     setLoading(true);
 
+    const clientsCacheKey = user.uid;
+    const cached = clientsPageCache.get(clientsCacheKey);
+    if (cached && Date.now() - cached.fetchedAt < CLIENTS_CACHE_TTL_MS) {
+      setClients(cached.data);
+      setLoading(false);
+      return;
+    }
+
     const mergeNotes = async (clientDocs: ClientSummary[]) => {
       try {
         const notesQ = query(collection(db, 'users', user.uid, 'client_notes'));
@@ -229,6 +245,7 @@ export default function ClientsPage() {
       docs = await mergeNotes(docs);
       
       setClients(docs);
+      clientsPageCache.set(clientsCacheKey, { data: docs, fetchedAt: Date.now() });
       setHasMore(false);
 
       // If no clients found or index error, we'll try to fallback
@@ -318,9 +335,11 @@ export default function ClientsPage() {
             docs = await mergeNotes(docs);
             
             setClients(docs);
+            clientsPageCache.set(clientsCacheKey, { data: docs, fetchedAt: Date.now() });
             setHasMore(false);
           } else {
             setClients([]);
+            clientsPageCache.set(clientsCacheKey, { data: [], fetchedAt: Date.now() });
           }
         } catch (fallbackErr) {
           console.error('[ClientsPage] Fallback also failed', fallbackErr);
