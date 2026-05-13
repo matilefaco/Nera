@@ -143,6 +143,28 @@ router.post("/webhook", async (req, res) => {
 
   logger.info("STRIPE", "Received webhook event", { requestId: req.requestId, meta: { eventType: event.type } });
 
+  const eventId = event.id;
+  if (!eventId) {
+    logger.warn("STRIPE", "Webhook event missing ID", { requestId: req.requestId });
+    return res.status(400).json({ error: "Missing event ID" });
+  }
+
+  try {
+    const eventRef = db.collection('stripe_webhook_events').doc(eventId);
+    
+    await eventRef.create({
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      type: event.type
+    });
+  } catch (err: any) {
+    if (err.code === 6 || (err.message && err.message.includes('ALREADY_EXISTS'))) {
+      logger.info("STRIPE", "Duplicate webhook event ignored", { requestId: req.requestId, meta: { eventId, eventType: event.type } });
+      return res.json({ received: true, duplicate: true });
+    }
+    logger.error("STRIPE", "Error checking webhook idempotency", { requestId: req.requestId, error: err, meta: { eventId } });
+    return res.status(500).json({ error: 'Internal idempotency error' });
+  }
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     const userId = session.client_reference_id;
