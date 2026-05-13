@@ -92,6 +92,22 @@ service cloud.firestore {
              data.status in ['pending', 'sent', 'failed'];
     }
 
+    function isValidAnalyticsEvent(data) {
+      return data.keys().hasAll(['professionalId', 'type', 'timestamp']) &&
+             data.diff({}).addedKeys().hasOnly(['professionalId', 'type', 'timestamp', 'referrer', 'origin', 'payload']) &&
+             data.professionalId is string && data.professionalId.size() > 0 && data.professionalId.size() <= 128 &&
+             data.type is string && data.type.size() > 0 && data.type.size() <= 64 &&
+             (!('origin' in data) || (data.origin is string && data.origin.size() <= 64)) &&
+             (!('referrer' in data) || (data.referrer is string && data.referrer.size() <= 2048)) &&
+             (!('payload' in data) || (
+               data.payload is map &&
+               (!('option' in data.payload) || (data.payload.option is string && data.payload.option.size() <= 64)) &&
+               (!('reason' in data.payload) || (data.payload.reason is string && data.payload.reason.size() <= 256)) &&
+               data.payload.diff({}).addedKeys().hasOnly(['option', 'reason'])
+             )) &&
+             data.timestamp == request.time;
+    }
+
     // Profile Rules
     match /users/{userId} {
       allow read: if true; 
@@ -201,7 +217,7 @@ service cloud.firestore {
 
     match /analytics_events/{eventId} {
       allow read: if isSignedIn() && resource.data.professionalId == request.auth.uid;
-      allow create: if true; // Público — log de visitas/cliques
+      allow create: if isValidAnalyticsEvent(incoming());
       allow delete: if isAdmin();
     }
 
