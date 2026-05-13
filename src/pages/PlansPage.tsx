@@ -24,7 +24,7 @@ export default function PlansPage() {
     }
   }, [searchParams]);
 
-  const referralLink = `${window.location.origin}/cadastro?ref=${profile?.referralCode || ''}`;
+  const referralLink = `${window.location.origin}/register?ref=${profile?.referralCode || ''}`;
 
   const copyReferral = () => {
     navigator.clipboard.writeText(referralLink);
