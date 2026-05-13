@@ -38,6 +38,8 @@ import UpgradeModal from '../components/UpgradeModal';
 import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { AgendaSkeleton } from '../components/ui/AgendaSkeleton';
 
+const blockedSchedulesCache = new Map<string, { data: any[], fetchedAt: number }>();
+
 export default function AgendaPage() {
   const { user, profile } = useAuth();
   const { 
@@ -281,21 +283,36 @@ export default function AgendaPage() {
       }
     });
 
-    const blockedRef = collection(db, 'blocked_schedules');
-    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', user.uid)), (snap) => {
-      try {
-        setAllBlockedSchedules(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => {
-      console.error('[AgendaPage] Subscription error (allBlockedSchedules):', error);
-    });
-
     return () => {
       unsubAll();
-      unsubBlocked();
     };
+  }, [user]);
+
+  const fetchBlockedSchedules = async (forceRefetch = false) => {
+    if (!user) return;
+    const CACHE_TTL = 5 * 60 * 1000;
+    const cached = blockedSchedulesCache.get(user.uid);
+    const now = Date.now();
+
+    if (!forceRefetch && cached && now - cached.fetchedAt < CACHE_TTL) {
+      setAllBlockedSchedules(cached.data);
+      return;
+    }
+
+    try {
+      const blockedRef = collection(db, 'blocked_schedules');
+      const qBlocked = query(blockedRef, where('professionalId', '==', user.uid));
+      const snap = await getDocs(qBlocked);
+      const data = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      blockedSchedulesCache.set(user.uid, { data, fetchedAt: now });
+      setAllBlockedSchedules(data);
+    } catch (err) {
+      console.error("Error fetching blocked schedules:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchBlockedSchedules();
   }, [user]);
 
   // Save view preference
@@ -352,6 +369,16 @@ export default function AgendaPage() {
     if (!user) return;
     try {
       await deleteDoc(doc(db, 'blocked_schedules', id));
+      
+      const cached = blockedSchedulesCache.get(user.uid);
+      if (cached) {
+        const newData = cached.data.filter(b => b.id !== id);
+        blockedSchedulesCache.set(user.uid, { ...cached, data: newData });
+        setAllBlockedSchedules(newData);
+      } else {
+        setAllBlockedSchedules(prev => prev.filter(b => b.id !== id));
+      }
+
       notify.success('Bloqueio removido.');
     } catch {
       notify.error('Não foi possível remover o bloqueio.');
@@ -958,7 +985,7 @@ export default function AgendaPage() {
 
       <QuickBlockModal 
         open={isQuickBlockOpen}
-        onClose={() => setIsQuickBlockOpen(false)}
+        onClose={() => { setIsQuickBlockOpen(false); fetchBlockedSchedules(true); }}
         date={selectedDate}
         time={quickBlockTime}
         professionalId={user?.uid || ''}
@@ -967,7 +994,7 @@ export default function AgendaPage() {
 
       <BlockAvailabilityModal 
         open={isBlockModalOpen}
-        onClose={() => setIsBlockModalOpen(false)}
+        onClose={() => { setIsBlockModalOpen(false); fetchBlockedSchedules(true); }}
         selectedDate={selectedDate}
         professionalId={user?.uid || ''}
         appointments={appointments}

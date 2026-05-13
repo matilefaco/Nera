@@ -151,6 +151,14 @@ export async function createServerApp() {
             .replace(/'/g, "&#039;");
     };
     let cachedIndexHtml = null;
+    let viteServer = null;
+    if (process.env.NODE_ENV !== "production") {
+        const { createServer } = await import("vite");
+        viteServer = await createServer({
+            server: { middlewareMode: true },
+            appType: "spa",
+        });
+    }
     function getCachedIndexHtml(indexPath) {
         if (process.env.NODE_ENV !== "production") {
             return fs.readFileSync(indexPath, "utf-8");
@@ -220,6 +228,9 @@ export async function createServerApp() {
                 html = html.replace(/<title>.*?<\/title>/i, "");
                 html = html.replace("</head>", `${metaTags}\n</head>`);
             }
+            if (viteServer) {
+                html = await viteServer.transformIndexHtml(req.originalUrl, html);
+            }
             res.setHeader("Content-Type", "text/html");
             return res.send(html);
         }
@@ -287,6 +298,9 @@ export async function createServerApp() {
                 html = html.replace(/<title>.*?<\/title>/i, "");
                 html = html.replace("</head>", `${metaTags}\n</head>`);
             }
+            if (viteServer) {
+                html = await viteServer.transformIndexHtml(req.originalUrl, html);
+            }
             res.setHeader("Content-Type", "text/html");
             return res.send(html);
         }
@@ -296,13 +310,8 @@ export async function createServerApp() {
         }
     });
     // 8. Vite/Static serving
-    if (process.env.NODE_ENV !== "production") {
-        const { createServer } = await import("vite");
-        const vite = await createServer({
-            server: { middlewareMode: true },
-            appType: "spa",
-        });
-        app.use(vite.middlewares);
+    if (viteServer) {
+        app.use(viteServer.middlewares);
     }
     else {
         const distPath = path.join(process.cwd(), 'dist');

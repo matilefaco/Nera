@@ -50,7 +50,13 @@ function logEmail(stage, event, details) {
         clientEmail: details.to ? maskEmail(details.to) : undefined
     };
     if (stage === 'ERROR') {
-        logger.error("EMAIL", `Email dispatch failed`, ctx);
+        const errorStr = (meta.error || '').toString();
+        if (errorStr.includes('testing emails') || errorStr.includes('verify a domain')) {
+            logger.warn("EMAIL", `Email dispatch skipped (Sandbox environment requires verified domain)`, ctx);
+        }
+        else {
+            logger.error("EMAIL", `Email dispatch failed`, ctx);
+        }
     }
     else if (stage === 'SUCCESS') {
         logger.info("EMAIL", `Email verified delivery`, ctx);
