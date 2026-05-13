@@ -65,18 +65,18 @@ export default function MonthView({
   const weekLabels = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
   return (
-    <div className="bg-brand-white rounded-[32px] border border-brand-mist shadow-sm overflow-hidden">
-      <div className="grid grid-cols-7 border-b border-brand-linen bg-brand-linen/10">
+    <div className="bg-white/80 backdrop-blur-xl rounded-[28px] border border-brand-mist/40 shadow-[0_8px_32px_-12px_rgba(0,0,0,0.06)] overflow-hidden">
+      <div className="grid grid-cols-7 border-b border-brand-mist/30 bg-brand-linen/5">
         {weekLabels.map(label => (
-          <div key={label} className="py-3 text-center">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-stone opacity-60">
+          <div key={label} className="py-2.5 text-center">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-brand-stone/60">
               {label}
             </span>
           </div>
         ))}
       </div>
       
-      <div className="grid grid-cols-7 divide-x divide-y divide-brand-linen">
+      <div className="grid grid-cols-7 divide-x divide-y divide-brand-mist/20">
         {daysInMonth.map(({ date, isCurrentMonth }, i) => {
           const dateKey = formatDateKey(date);
           const { confirmed, pending, isBlocked } = getDayStats(dateKey);
@@ -88,16 +88,16 @@ export default function MonthView({
               key={i}
               onClick={() => onSelectDay(dateKey)}
               className={cn(
-                "h-24 md:h-32 p-2 flex flex-col items-center gap-1 group transition-colors text-left",
-                !isCurrentMonth && "opacity-20",
-                isSelected ? "bg-brand-linen/30" : "hover:bg-brand-parchment/30",
-                isToday && "bg-brand-terracotta/[0.03]"
+                "h-[5.5rem] md:h-28 p-1.5 flex flex-col items-center gap-0.5 group transition-all duration-300 text-center",
+                !isCurrentMonth ? "opacity-30" : "opacity-100",
+                isSelected ? "bg-brand-terracotta/[0.04]" : "hover:bg-black/[0.02]",
+                isToday && "bg-brand-terracotta/[0.02]"
               )}
             >
               <span className={cn(
-                "text-sm font-serif mb-1 w-7 h-7 flex items-center justify-center rounded-full transition-colors",
-                isToday ? "bg-brand-terracotta text-white font-bold" : "text-brand-ink",
-                isSelected && !isToday && "bg-brand-ink text-white"
+                "text-[13px] font-serif mb-1 w-[1.65rem] h-[1.65rem] flex items-center justify-center rounded-full transition-all duration-300",
+                isToday ? "bg-brand-terracotta/90 text-white font-medium shadow-[0_2px_8px_rgba(202,106,86,0.3)]" : "text-brand-ink/85 font-normal",
+                isSelected && !isToday && "ring-1 ring-inset ring-brand-ink/10 bg-brand-ink/5 font-medium"
               )}>
                 {date.getDate()}
               </span>
