@@ -4,7 +4,7 @@ import {
   Plus, Tag, Calendar, Users, 
   Trash2, ToggleLeft, ToggleRight, 
   X, Check, AlertCircle, Info,
-  Percent, CircleSlash, ArrowLeft
+  Percent, CircleSlash, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { 
   collection, query, where, onSnapshot, 
@@ -195,13 +195,14 @@ setLoading(false);
             ))}
           </div>
         ) : coupons.length === 0 ? (
-          <div className="text-center py-20 bg-brand-white rounded-[40px] border border-brand-mist shadow-sm">
-            <div className="w-16 h-16 bg-brand-linen text-brand-stone/40 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Tag size={24} />
+          <div className="text-center py-24 bg-[#FCFBF9] rounded-[40px] border border-[#F2EFEA] shadow-[0_4px_20px_-10px_rgba(0,0,0,0.03)] relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-brand-terracotta/[0.03] rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
+            <div className="w-20 h-20 bg-brand-linen/60 text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-8 relative z-10">
+              <Tag size={28} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-serif text-brand-ink mb-2">Nenhum cupom ainda</h3>
-            <p className="text-sm text-brand-stone font-light max-w-xs mx-auto mb-8">
-              Cupons são ótimos para atrair novas clientes ou fidelizar as atuais.
+            <h3 className="text-2xl font-serif text-brand-ink mb-3 relative z-10">Nenhum cupom ativo</h3>
+            <p className="text-base text-brand-stone font-light max-w-sm mx-auto mb-10 relative z-10 leading-relaxed">
+              Incentive novas marcações ou recompense suas clientes mais fiéis com vantagens exclusivas.
             </p>
             <button 
               onClick={() => {
@@ -209,9 +210,9 @@ setLoading(false);
                   setIsModalOpen(true);
                 }
               }}
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-terracotta hover:scale-105 transition-transform"
+              className="relative z-10 text-[11px] font-bold uppercase tracking-[0.2em] text-brand-terracotta flex items-center justify-center gap-2 mx-auto group hover:scale-105 transition-transform"
             >
-              Criar meu primeiro cupom
+              Criar meu primeiro cupom <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
         ) : (
@@ -233,8 +234,10 @@ setLoading(false);
                     <div className="flex justify-between items-start mb-6">
                       <div className="flex items-center gap-2">
                         <div className={cn(
-                          "px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase",
-                          coupon.active ? "bg-green-100 text-green-700" : "bg-brand-linen text-brand-stone"
+                          "px-3 py-1 rounded-full text-[9px] font-bold tracking-[0.2em] uppercase transition-colors border",
+                          coupon.active 
+                            ? "bg-brand-linen/50 text-brand-ink border-brand-mist shadow-sm" 
+                            : "bg-brand-stone/5 text-brand-stone/50 border-brand-mist/50"
                         )}>
                           {coupon.active ? 'Ativo' : 'Inativo'}
                         </div>
@@ -242,57 +245,69 @@ setLoading(false);
                       <div className="flex items-center gap-1">
                         <button 
                           onClick={() => toggleCouponStatus(coupon)}
-                          className="p-2 text-brand-stone hover:text-brand-ink transition-colors"
+                          className="p-2 text-brand-stone/60 hover:text-brand-ink transition-colors"
                           title={coupon.active ? 'Desativar' : 'Ativar'}
                         >
-                          {coupon.active ? <ToggleRight size={24} className="text-brand-terracotta" /> : <ToggleLeft size={24} />}
+                          {coupon.active ? <ToggleRight size={26} strokeWidth={1.5} className="text-brand-terracotta" /> : <ToggleLeft size={26} strokeWidth={1.5} />}
                         </button>
                         <button 
                           onClick={() => setIsDeleting(coupon.id)}
-                          className="p-2 text-brand-stone hover:text-red-500 transition-colors"
+                          className="p-2 text-brand-stone/60 hover:text-brand-terracotta transition-colors"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={18} strokeWidth={1.5} />
                         </button>
                       </div>
                     </div>
 
                     <div className="space-y-4">
                       <div>
-                        <h4 className="text-2xl font-serif text-brand-ink tracking-tight mb-1">{coupon.code}</h4>
-                        <p className="text-[10px] text-brand-terracotta font-bold uppercase tracking-widest">
+                        <h4 className={cn(
+                          "text-2xl font-serif tracking-tight mb-1",
+                          coupon.active ? "text-brand-ink" : "text-brand-ink/50"
+                        )}>{coupon.code}</h4>
+                        <p className={cn(
+                          "text-[10px] font-bold uppercase tracking-[0.2em]",
+                          coupon.active ? "text-brand-terracotta" : "text-brand-stone/50"
+                        )}>
                           {coupon.type === 'percentage' ? `${coupon.value}% de desconto` : `${formatCurrency(coupon.value)} de desconto`}
                         </p>
                       </div>
 
-                      <div className="space-y-4 pt-4 border-t border-brand-mist/30">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Usos</span>
-                            <p className="text-xs font-medium text-brand-ink">
-                              {coupon.usedCount} {coupon.maxUses ? `/ ${coupon.maxUses}` : 'ilimitados'}
+                      <div className="space-y-4 pt-5 border-t border-brand-mist/50">
+                        <div className="grid grid-cols-2 gap-5">
+                          <div className="space-y-1.5">
+                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/60">Usos</span>
+                            <p className={cn(
+                              "text-xs font-medium font-mono tracking-tight",
+                              coupon.active ? "text-brand-ink" : "text-brand-stone"
+                            )}>
+                              {coupon.usedCount} <span className="text-brand-stone/40 font-sans mx-0.5">/</span> {coupon.maxUses ? coupon.maxUses : 'Ilimitado'}
                             </p>
                           </div>
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Validade</span>
-                            <p className="text-xs font-medium text-brand-ink">
+                          <div className="space-y-1.5">
+                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/60">Validade</span>
+                            <p className={cn(
+                              "text-xs font-medium",
+                              coupon.active ? "text-brand-ink" : "text-brand-stone"
+                            )}>
                               {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString('pt-BR') : 'Sem expiração'}
                             </p>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Serviços</span>
-                            <p className="text-[10px] text-brand-stone italic truncate">
+                        <div className="grid grid-cols-2 gap-5">
+                          <div className="space-y-1.5">
+                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/60">Serviços</span>
+                            <p className="text-[11px] text-brand-stone font-light truncate">
                               {coupon.applicableServiceIds && coupon.applicableServiceIds.length > 0 
                                 ? `Válido p/ ${coupon.applicableServiceIds.length} serviços` 
                                 : 'Todos os serviços'}
                             </p>
                           </div>
-                          <div className="space-y-1">
-                            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-stone/60">Limite por Cliente</span>
-                            <p className="text-[10px] text-brand-stone italic">
-                              {coupon.perClientLimit === 1 ? '1 vez por cliente' : 'Ilimitado'}
+                          <div className="space-y-1.5">
+                            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/60">Por Cliente</span>
+                            <p className="text-[11px] text-brand-stone font-light">
+                              {coupon.perClientLimit === 1 ? 'Apenas 1 vez' : 'Sem limite'}
                             </p>
                           </div>
                         </div>
@@ -314,25 +329,25 @@ setLoading(false);
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-brand-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-brand-mist text-center"
+              className="bg-brand-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl border border-[#F2EFEA] text-center"
             >
               <div className="w-14 h-14 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertCircle size={24} />
+                <Trash2 size={24} strokeWidth={1.5} />
               </div>
-              <h3 className="text-xl font-serif text-brand-ink mb-2">Excluir cupom?</h3>
-              <p className="text-xs text-brand-stone font-light mb-8 italic">
-                Esta ação não pode ser desfeita. Clientes que já têm este código salvo não poderão mais usá-lo.
+              <h3 className="text-2xl font-serif text-brand-ink mb-3">Excluir cupom?</h3>
+              <p className="text-sm text-brand-stone font-light mb-8 leading-relaxed">
+                Esta ação não pode ser desfeita. Clientes que já têm este código salvo <span className="font-semibold">não poderão mais usá-lo.</span>
               </p>
-              <div className="flex gap-4">
+              <div className="flex gap-3">
                 <button 
                   onClick={() => setIsDeleting(null)}
-                  className="flex-1 py-4 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
+                  className="flex-1 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:text-brand-ink hover:bg-brand-mist/20 rounded-[16px] transition-colors"
                 >
                   Cancelar
                 </button>
                 <button 
                   onClick={() => handleDeleteCoupon(isDeleting)}
-                  className="flex-1 py-4 bg-red-500 text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-red-600 transition-colors shadow-lg shadow-red-200"
+                  className="flex-1 py-3.5 bg-red-500 text-white rounded-[16px] text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-red-600 transition-colors shadow-sm"
                 >
                   Excluir
                 </button>
@@ -360,36 +375,42 @@ setLoading(false);
                   <X size={24} />
                 </button>
 
-                <div className="mb-10">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Tag className="text-brand-terracotta" size={24} />
-                    <h2 className="text-2xl font-serif text-brand-ink italic">Novo Cupom</h2>
+                <div className="mb-10 text-center md:text-left">
+                  <div className="flex flex-col md:flex-row md:items-center gap-4 mb-3">
+                    <div className="w-12 h-12 bg-brand-linen/50 text-brand-terracotta rounded-full flex items-center justify-center mx-auto md:mx-0">
+                      <Tag size={24} strokeWidth={1.5} />
+                    </div>
+                    <h2 className="text-3xl font-serif text-brand-ink">Novo Cupom</h2>
                   </div>
-                  <p className="text-xs text-brand-stone font-light italic">Defina as regras de desconto para suas clientes.</p>
+                  <p className="text-base text-brand-stone font-light">
+                    Defina as regras e condições para este desconto.
+                  </p>
                 </div>
 
                 <form onSubmit={handleCreateCoupon} className="space-y-8">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Código do Cupom</label>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone ml-1">Código Promocional</label>
                       <input 
                         type="text" 
                         value={code}
                         onChange={(e) => setCode(e.target.value.toUpperCase())}
                         placeholder="Ex: PRIMEIRA10"
-                        className="w-full px-6 py-4 bg-brand-white border border-brand-mist rounded-2xl text-xs outline-none focus:ring-1 focus:ring-brand-ink uppercase font-mono tracking-widest"
+                        className="w-full px-6 py-4 bg-brand-white border border-[#F2EFEA] shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)] rounded-[20px] text-sm outline-none focus:ring-1 focus:ring-brand-ink focus:border-brand-ink uppercase font-mono tracking-widest transition-all"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Tipo de Desconto</label>
-                      <div className="flex bg-brand-white p-1 rounded-2xl border border-brand-mist">
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone ml-1">Tipo de Desconto</label>
+                      <div className="flex bg-[#FCFBF9] p-1.5 rounded-[20px] border border-[#F2EFEA]">
                         <button 
                           type="button" 
                           onClick={() => setType('percentage')}
                           className={cn(
-                            "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                            type === 'percentage' ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                            "flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all",
+                            type === 'percentage' 
+                              ? "bg-white text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] border border-brand-mist/50" 
+                              : "text-brand-stone hover:text-brand-ink"
                           )}
                         >
                           Porcentagem (%)
@@ -398,8 +419,10 @@ setLoading(false);
                           type="button" 
                           onClick={() => setType('fixed')}
                           className={cn(
-                            "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                            type === 'fixed' ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                            "flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all",
+                            type === 'fixed' 
+                              ? "bg-white text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] border border-brand-mist/50" 
+                              : "text-brand-stone hover:text-brand-ink"
                           )}
                         >
                           Valor Fixo (R$)
@@ -407,62 +430,65 @@ setLoading(false);
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Valor do Desconto</label>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone ml-1">Valor do Desconto</label>
                       <div className="relative">
                         <input 
                           type="number" 
                           value={value}
                           onChange={(e) => setValue(e.target.value)}
                           placeholder={type === 'percentage' ? "Ex: 10" : "Ex: 15"}
-                          className="w-full px-6 py-4 bg-brand-white border border-brand-mist rounded-2xl text-xs outline-none focus:ring-1 focus:ring-brand-ink"
+                          className="w-full px-6 py-4 bg-brand-white border border-[#F2EFEA] shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)] rounded-[20px] text-sm outline-none focus:ring-1 focus:ring-brand-ink focus:border-brand-ink transition-all"
                         />
-                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-brand-stone/40 font-bold uppercase tracking-widest text-[10px]">
+                        <span className="absolute right-6 top-1/2 -translate-y-1/2 text-brand-stone/40 font-bold uppercase tracking-[0.2em] text-[10px]">
                           {type === 'percentage' ? '%' : 'Reais'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Limite de Usos (Opcional)</label>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone ml-1">Limite de Usos (Opcional)</label>
                       <input 
                         type="number" 
                         value={maxUses}
                         onChange={(e) => setMaxUses(e.target.value)}
                         placeholder="Vazio para ilimitado"
-                        className="w-full px-6 py-4 bg-brand-white border border-brand-mist rounded-2xl text-xs outline-none focus:ring-1 focus:ring-brand-ink"
+                        className="w-full px-6 py-4 bg-brand-white border border-[#F2EFEA] shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)] rounded-[20px] text-sm outline-none focus:ring-1 focus:ring-brand-ink focus:border-brand-ink transition-all"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Data de Expiração (Opcional)</label>
+                    <div className="space-y-3">
+                      <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone ml-1">Data de Expiração (Opcional)</label>
                       <input 
                         type="date" 
                         value={expiresAt}
                         onChange={(e) => setExpiresAt(e.target.value)}
-                        className="w-full px-6 py-4 bg-brand-white border border-brand-mist rounded-2xl text-xs outline-none focus:ring-1 focus:ring-brand-ink"
+                        className="w-full px-6 py-4 bg-brand-white border border-[#F2EFEA] shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)] rounded-[20px] text-sm text-brand-ink outline-none focus:ring-1 focus:ring-brand-ink focus:border-brand-ink transition-all"
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Limite por Cliente</label>
-                      <div className="flex bg-brand-white p-1 rounded-2xl border border-brand-mist">
+                    <div className="space-y-3">
+                      <div className="ml-1 flex flex-col mb-1.5">
+                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone">Limite por Cliente</label>
+                        <span className="text-[9px] text-brand-stone/60 font-medium">Previne usos abusivos do mesmo cupom</span>
+                      </div>
+                      <div className="flex bg-[#FCFBF9] p-1.5 rounded-[20px] border border-[#F2EFEA]">
                         <button 
                           type="button" 
                           onClick={() => setPerClientLimit(null)}
                           className={cn(
-                            "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                            perClientLimit === null ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                            "flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all",
+                            perClientLimit === null ? "bg-white text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] border border-brand-mist/50" : "text-brand-stone hover:text-brand-ink"
                           )}
                         >
-                          Ilimitado
+                          Sem limite
                         </button>
                         <button 
                           type="button" 
                           onClick={() => setPerClientLimit(1)}
                           className={cn(
-                            "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                            perClientLimit === 1 ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                            "flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all",
+                            perClientLimit === 1 ? "bg-white text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] border border-brand-mist/50" : "text-brand-stone hover:text-brand-ink"
                           )}
                         >
                           1 por cliente
@@ -471,16 +497,16 @@ setLoading(false);
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-1">Serviços Aplicáveis</label>
+                  <div className="space-y-4 pt-2">
+                    <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone ml-1">Serviços Aplicáveis</label>
                     
-                    <div className="flex bg-brand-white p-1 rounded-2xl border border-brand-mist mb-4">
+                    <div className="flex bg-[#FCFBF9] p-1.5 rounded-[20px] border border-[#F2EFEA]">
                       <button 
                         type="button" 
                         onClick={() => setServiceRestriction('all')}
                         className={cn(
-                          "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                          serviceRestriction === 'all' ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                          "flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all",
+                          serviceRestriction === 'all' ? "bg-white text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] border border-brand-mist/50" : "text-brand-stone hover:text-brand-ink"
                         )}
                       >
                         Todos os Serviços
@@ -489,8 +515,8 @@ setLoading(false);
                         type="button" 
                         onClick={() => setServiceRestriction('specific')}
                         className={cn(
-                          "flex-1 py-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                          serviceRestriction === 'specific' ? "bg-brand-ink text-brand-white shadow-md" : "text-brand-stone hover:bg-brand-parchment"
+                          "flex-1 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all",
+                          serviceRestriction === 'specific' ? "bg-white text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)] border border-brand-mist/50" : "text-brand-stone hover:text-brand-ink"
                         )}
                       >
                         Serviços Específicos
@@ -498,16 +524,16 @@ setLoading(false);
                     </div>
 
                     {serviceRestriction === 'specific' && (
-                    <div className="p-6 bg-brand-white border border-brand-mist rounded-3xl space-y-4">
-                      <div className="flex items-center justify-between pb-4 border-b border-brand-mist/50">
-                        <p className="text-[10px] text-brand-stone font-light italic">
-                          Selecione os serviços que podem usar este cupom.
+                    <div className="p-6 bg-[#FCFBF9] border border-[#F2EFEA] rounded-[24px] space-y-4 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-brand-mist/50 gap-4">
+                        <p className="text-[11px] text-brand-stone font-light leading-relaxed max-w-sm">
+                          Selecione em quais serviços este cupom poderá ser aplicado.
                         </p>
                         {selectedServices.length > 0 && (
                           <button 
                             type="button" 
                             onClick={() => setSelectedServices([])}
-                            className="text-[9px] font-bold text-brand-terracotta uppercase tracking-widest"
+                            className="text-[9px] font-bold text-brand-terracotta uppercase tracking-[0.2em] whitespace-nowrap self-start md:self-auto hover:text-brand-terracotta/80 transition-colors"
                           >
                             Limpar seleção
                           </button>
@@ -528,19 +554,19 @@ setLoading(false);
                                 }
                               }}
                               className={cn(
-                                "flex items-center gap-3 p-3 rounded-xl border transition-all text-left",
-                                isSelected ? "bg-brand-linen border-brand-terracotta/30" : "bg-brand-parchment border-brand-mist/50 hover:border-brand-mist"
+                                "flex items-center gap-4 p-4 rounded-[16px] border transition-all text-left",
+                                isSelected ? "bg-brand-linen/50 border-brand-terracotta/40 shadow-sm" : "bg-white border-brand-mist/60 hover:border-brand-mist hover:shadow-[0_2px_8px_-4px_rgba(0,0,0,0.04)]"
                               )}
                             >
                               <div className={cn(
-                                "w-4 h-4 rounded-full border flex items-center justify-center transition-all",
+                                "w-5 h-5 rounded-full border flex items-center justify-center transition-all shrink-0",
                                 isSelected ? "bg-brand-terracotta border-brand-terracotta" : "bg-white border-brand-mist"
                               )}>
-                                {isSelected && <Check size={10} className="text-white" />}
+                                {isSelected && <Check size={12} strokeWidth={3} className="text-white" />}
                               </div>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-[11px] font-medium text-brand-ink truncate">{service.name}</span>
-                                <span className="text-[9px] text-brand-stone font-bold">{formatCurrency(service.price)}</span>
+                                <span className="text-sm font-medium text-brand-ink truncate">{service.name}</span>
+                                <span className="text-[10px] text-brand-stone/80 font-medium">{formatCurrency(service.price)}</span>
                               </div>
                             </button>
                           );
@@ -552,12 +578,13 @@ setLoading(false);
 
                   <div className="pt-6">
                     <PremiumButton 
+                      type="submit"
                       variant="terracotta" 
-                      className="w-full py-6"
+                      className="w-full py-5 text-sm"
                       loading={isCreating}
                       loadingText="Criando cupom..."
                     >
-                      Criar Cupom de Desconto
+                      Criar Cupom Promocional
                     </PremiumButton>
                   </div>
                 </form>

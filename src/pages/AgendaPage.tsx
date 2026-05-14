@@ -1358,15 +1358,25 @@ export default function AgendaPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
-                      <TrendingUp size={18} />
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
+                        <TrendingUp size={18} />
+                      </div>
+                      <div>
+                        <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Valor Total</p>
+                        <p className="text-base sm:text-lg font-serif text-brand-ink">{formatCurrency(selectedAppointment.finalPrice ?? selectedAppointment.price)}</p>
+                        {selectedAppointment.couponCode && selectedAppointment.discountAmount > 0 && (
+                          <div className="flex flex-col mt-0.5">
+                            <span className="text-[10px] text-brand-terracotta border border-brand-terracotta/20 bg-brand-terracotta/5 px-2 py-0.5 rounded-full inline-block w-fit">
+                              Cupom {selectedAppointment.couponCode} aplicado
+                            </span>
+                            <span className="text-[10px] text-brand-stone font-medium mt-1">
+                              De <span className="line-through">{formatCurrency(selectedAppointment.originalPrice || 0)}</span> (Desconto: {formatCurrency(selectedAppointment.discountAmount)})
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">Valor Total</p>
-                      <p className="text-base sm:text-lg font-serif text-brand-ink">{formatCurrency(selectedAppointment.totalPrice || selectedAppointment.price)}</p>
-                    </div>
-                  </div>
 
                   {selectedAppointment.clientEmail && (
                     <div className="flex items-center gap-4">

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { toPng } from 'html-to-image';
-import { Copy, MessageCircle, Instagram, QrCode, Download, Check, Share2, Sparkles, ChevronDown } from 'lucide-react';
+import { Copy, MessageCircle, Instagram, QrCode, Download, Check, Share2, ChevronDown } from 'lucide-react';
 import { UserProfile } from '../types';
 import { notify } from '../lib/notify';
 import { cn } from '../lib/utils';
@@ -15,12 +15,10 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
   const profileUrl = `https://usenera.com/p/${profile.slug}`;
   const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null);
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
-  const [photoError, setPhotoError] = useState(false);
   const qrRef = useRef<HTMLDivElement>(null);
   const storyCardRef = useRef<HTMLDivElement>(null);
 
   const safeInitial = (profile?.name || 'N').trim().charAt(0).toUpperCase();
-  const professionalPhotoUrl = profile?.avatar;
 
   const handleDownloadStoryCard = useCallback(async () => {
     if (!storyCardRef.current) return;
@@ -40,9 +38,6 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
         }
       }
 
-      console.log('[story-export] imgs inside capture:', storyCardRef.current.querySelectorAll('img').length);
-      
-      let dataUrl: string;
       const exportOptions = {
         cacheBust: true,
         pixelRatio: 3,
@@ -54,21 +49,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
         }
       };
 
-      try {
-        dataUrl = await toPng(storyCardRef.current, exportOptions);
-      } catch (firstErr) {
-        console.warn('html-to-image failed with photo, trying fallback...', firstErr);
-        // Fallback: hide the photo and retry
-        setPhotoError(true);
-        await new Promise(resolve => setTimeout(resolve, 200)); // wait for React to re-render
-        
-        if (!storyCardRef.current) throw new Error("Card unmounted during fallback");
-        
-        dataUrl = await toPng(storyCardRef.current, exportOptions);
-        
-        // Restore photo for the UI
-        setPhotoError(false);
-      }
+      const dataUrl = await toPng(storyCardRef.current, exportOptions);
 
       const link = document.createElement('a');
       link.download = `nera-story-${profile.slug || 'art'}.png`;
@@ -78,7 +59,6 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
     } catch (err) {
       console.error('Error generating image:', err);
       notify.error('Não foi possível baixar a imagem. Tente novamente.');
-      setPhotoError(false);
     } finally {
       setIsGeneratingStory(false);
     }
@@ -189,88 +169,67 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                 {/* The card container to be exported */}
                 <div 
                   ref={storyCardRef}
-                  className="w-[180px] h-[320px] rounded-[16px] overflow-hidden bg-[#F8F6F2] relative flex flex-col items-center justify-between py-6 px-4"
+                  className="w-[180px] h-[320px] rounded-[16px] overflow-hidden bg-[#F8F6F2] relative flex flex-col items-center justify-between py-6 px-4 shadow-[inset_0_0_40px_rgba(137,103,88,0.05)]"
                 >
                   {/* CSS Grain */}
                   <div className="absolute inset-0 opacity-[0.035] mix-blend-multiply pointer-events-none" style={{ backgroundImage: 'radial-gradient(#896758 1px, transparent 1px)', backgroundSize: '4px 4px' }}></div>
 
                   {/* Editorial Inner Border */}
-                  <div className="absolute inset-2 border-[0.5px] border-brand-terracotta/20 rounded-[10px] pointer-events-none"></div>
+                  <div className="absolute inset-2 border-[0.5px] border-brand-terracotta/20 rounded-[10px] pointer-events-none z-10"></div>
 
-                  {/* Watermark Fallback */}
-                  {!(professionalPhotoUrl && !photoError) && (
-                    <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-[0.02]">
-                      <span className="text-[320px] font-serif text-brand-ink leading-none mt-10">{safeInitial}</span>
-                    </div>
-                  )}
-
-                  {/* 1. Header */}
-                  <div className="relative z-10 flex flex-col items-center mt-2">
-                    <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.3em]">Agenda Online</span>
-                    <div className="w-8 h-[0.5px] bg-brand-terracotta/40 mt-2"></div>
+                  {/* Giant Abstract Initial Monogram Background */}
+                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-[0.03] select-none">
+                     <span className="text-[400px] font-serif text-brand-ink leading-none mt-10 mix-blend-multiply">{safeInitial}</span>
                   </div>
 
-                  {/* 2. Middle Visual content */}
-                  <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full my-4">
-                    {professionalPhotoUrl && !photoError ? (
-                      <div className="relative p-[3px] bg-white/40 backdrop-blur-sm rounded-t-[50px] rounded-b-[4px] border border-brand-mist shadow-[0_4px_12px_rgba(0,0,0,0.03)]">
-                        <div 
-                          className="w-[90px] h-[110px] rounded-t-[47px] rounded-b-[2px] overflow-hidden bg-brand-parchment"
-                          style={{
-                            backgroundImage: `url(${professionalPhotoUrl})`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center'
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-[90px] h-[110px] flex items-center justify-center relative">
-                         {/* Decorative arch frame */}
-                         <div className="absolute inset-0 border-[0.5px] border-brand-terracotta/40 rounded-t-[45px] rounded-b-[4px]"></div>
-                         <div className="absolute inset-[3px] border-[0.5px] border-brand-terracotta/15 rounded-t-[42px] rounded-b-[2px]"></div>
-                         <span className="text-[56px] font-serif font-light text-brand-terracotta leading-none translate-y-[-2px] mix-blend-multiply">
-                            {safeInitial}
-                         </span>
+                  {/* 1. Header label */}
+                  <div className="relative z-10 flex flex-col items-center mt-2">
+                    <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.35em] mb-1.5">Agenda Online</span>
+                    <div className="w-8 h-[0.5px] bg-brand-terracotta/40"></div>
+                  </div>
+
+                  {/* 2. Middle Content (Name & Speciality) */}
+                  <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full px-2 text-center -mt-2">
+                    <h4 className="text-[18px] sm:text-[20px] font-serif text-brand-ink leading-[1.1] text-balance max-w-[150px]">
+                       {profile.name}
+                    </h4>
+                    
+                    {profile.category && (
+                      <div className="mt-3 pt-2.5 border-t border-brand-mist/60 px-4">
+                        <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.25em] relative top-[-1px]">
+                           {profile.category}
+                        </span>
                       </div>
                     )}
-                    
-                    {/* 3. Name and Speciality */}
-                    <div className="mt-5 flex flex-col items-center w-full">
-                      <h4 className="text-[15px] font-serif text-brand-ink leading-tight text-center text-balance max-w-[150px] px-2 shadow-white">
-                         {profile.name}
-                      </h4>
-                      {profile.category && (
-                        <div className="mt-2.5 pt-2 border-t border-brand-mist/60 px-4">
-                          <span className="text-[5.5px] font-semibold text-brand-stone uppercase tracking-[0.2em] relative top-[-1px]">
-                             {profile.category}
-                          </span>
-                        </div>
-                      )}
+
+                    <div className="mt-6 flex flex-col items-center">
+                       <span className="w-1 h-1 rounded-full bg-brand-terracotta/60 mb-3"></span>
+                       <p className="text-[15px] font-serif text-brand-terracotta italic leading-snug tracking-wide">
+                         Reserve seu horário
+                       </p>
+                       <p className="text-[7px] text-brand-stone uppercase tracking-[0.15em] mt-1.5">
+                         Agendamento disponível
+                       </p>
                     </div>
                   </div>
 
-                  {/* 4. CTA and Sticker */}
-                  <div className="relative z-10 flex flex-col items-center w-full gap-3 mb-3">
-                    <p className="text-[12px] font-serif text-brand-terracotta italic leading-snug tracking-wider">
-                       Reserve seu horário
-                    </p>
-
-                    {/* Sticker/Link style */}
-                    <div className="bg-white/95 px-3 py-1.5 rounded-full flex items-center justify-center gap-1.5 w-[90%] shadow-[0_2px_8px_-4px_rgba(0,0,0,0.12)] border border-[#EFECE8] shrink-0">
-                      <div className="bg-brand-ink rounded-full w-[14px] h-[14px] flex items-center justify-center shrink-0">
-                         <Share2 size={7} className="text-white" strokeWidth={2.5} />
+                  {/* 3. Link Sticker & Footer */}
+                  <div className="relative z-10 flex flex-col items-center w-full gap-3 mt-auto mb-2">
+                    {/* Link Sticker */}
+                    <div className="bg-white/95 px-2.5 py-1.5 rounded-full flex items-center justify-center gap-1.5 w-[94%] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)] border border-[#EFECE8] shrink-0">
+                      <div className="bg-brand-ink rounded-full w-[12px] h-[12px] flex items-center justify-center shrink-0">
+                         <Share2 size={6} className="text-white" strokeWidth={2.5} />
                       </div>
-                      <span className="text-[8px] font-medium text-brand-ink truncate tracking-[0.03em]">
+                      <span className="text-[7.5px] font-medium text-brand-ink truncate tracking-normal">
                         {profileUrl.replace('https://', '').replace('http://', '').replace('www.', '')}
                       </span>
                     </div>
 
-                    {/* 5. Footer Signature */}
-                    <div className="mt-1.5 items-center justify-center flex opacity-40">
+                    {/* Footer Signature */}
+                    <div className="mt-1 items-center justify-center flex opacity-40">
                        <span className="text-[4px] font-bold text-brand-stone tracking-[0.3em] uppercase">Nera • Agendamento Online</span>
                     </div>
                   </div>
-
                 </div>
               </div>
 
@@ -284,7 +243,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                 </div>
 
                 <button
-                  onClick={handleDownloadStoryCard}
+                  onClick={() => handleDownloadStoryCard()}
                   disabled={isGeneratingStory}
                   className="w-full mt-2 py-2.5 bg-brand-ink text-white rounded-[12px] text-[11px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:shadow-none"
                 >

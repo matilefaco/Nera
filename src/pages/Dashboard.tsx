@@ -1551,10 +1551,19 @@ setWaitlist(docs);
                     <div className="space-y-1">
                       <p className="text-[10px] text-brand-stone uppercase tracking-widest">Financeiro</p>
                       <div className="flex flex-col">
-                        <span className="text-brand-ink font-bold text-lg">{formatCurrency((selectedRequest.price || 0) + (selectedRequest.travelFee || 0))}</span>
-                        <div className="flex flex-col text-[10px] text-brand-stone opacity-80">
-                          <span>Base: {formatCurrency(selectedRequest.price || 0)}</span>
-                          {selectedRequest.travelFee > 0 && <span>Taxa Extra: {formatCurrency(selectedRequest.travelFee)}</span>}
+                        <span className="text-brand-ink font-bold text-lg">{formatCurrency((selectedRequest.finalPrice ?? (selectedRequest.price || 0)) + (selectedRequest.travelFee || 0))}</span>
+                        <div className="flex flex-col text-[10px] text-brand-stone mt-1">
+                          {selectedRequest.couponCode && selectedRequest.discountAmount > 0 ? (
+                            <>
+                              <span className="text-brand-terracotta bg-brand-terracotta/5 border border-brand-terracotta/20 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider w-fit mb-1">
+                                Cupom {selectedRequest.couponCode} aplicado
+                              </span>
+                              <span className="opacity-80">Base: De <span className="line-through">{formatCurrency(selectedRequest.originalPrice || 0)}</span> por {formatCurrency(selectedRequest.finalPrice ?? (selectedRequest.price || 0))}</span>
+                            </>
+                          ) : (
+                            <span className="opacity-80">Base: {formatCurrency(selectedRequest.price || 0)}</span>
+                          )}
+                          {selectedRequest.travelFee > 0 && <span className="opacity-80">Taxa Extra: {formatCurrency(selectedRequest.travelFee)}</span>}
                         </div>
                       </div>
                     </div>

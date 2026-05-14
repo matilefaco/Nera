@@ -407,9 +407,20 @@ export default function PendingRequestsPage() {
                           {request.serviceName}
                         </span>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xl md:text-2xl font-bold text-brand-ink">{formatCurrency((request.price || 0) + (request.travelFee || 0))}</p>
-                        <p className="text-[8px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Valor</p>
+                      <div className="text-right flex flex-col items-end">
+                        <p className="text-xl md:text-2xl font-bold text-brand-ink">{formatCurrency((request.finalPrice ?? (request.price || 0)) + (request.travelFee || 0))}</p>
+                        {request.couponCode && request.discountAmount > 0 ? (
+                          <div className="flex flex-col items-end mt-0.5">
+                            <span className="text-[9px] text-brand-terracotta bg-brand-terracotta/5 border border-brand-terracotta/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest">
+                              Cupom {request.couponCode}
+                            </span>
+                            <span className="text-[9px] text-brand-stone opacity-60 line-through mt-0.5">
+                              De {formatCurrency(request.originalPrice || 0)}
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-[8px] text-brand-stone uppercase tracking-widest font-bold opacity-60">Valor</p>
+                        )}
                       </div>
                     </div>
                     
@@ -606,7 +617,19 @@ export default function PendingRequestsPage() {
                         <p className="text-xl font-serif text-brand-ink mb-1">{selectedRequest.serviceName}</p>
                         <div className="flex items-center justify-between mt-6">
                           <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest bg-brand-white px-3 py-1 rounded-full border border-brand-mist/50">{selectedRequest.duration} min</span>
-                          <span className="text-2xl font-bold text-brand-terracotta">{formatCurrency((selectedRequest.price || 0) + (selectedRequest.travelFee || 0))}</span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-2xl font-bold text-brand-terracotta">{formatCurrency((selectedRequest.finalPrice ?? (selectedRequest.price || 0)) + (selectedRequest.travelFee || 0))}</span>
+                            {selectedRequest.couponCode && selectedRequest.discountAmount > 0 && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="text-[10px] text-brand-stone line-through">
+                                  De {formatCurrency(selectedRequest.originalPrice || 0)}
+                                </span>
+                                <span className="text-[9px] text-brand-terracotta bg-brand-terracotta/5 border border-brand-terracotta/20 px-1.5 py-0.5 rounded font-bold uppercase tracking-widest">
+                                  Cupom {selectedRequest.couponCode}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

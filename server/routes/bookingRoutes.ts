@@ -469,6 +469,31 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
           throw new Error('Este cupom atingiu o limite de usos.');
         }
+
+        // --- ADDED COUPON CALCULATION ---
+        let originalPrice = Number(finalData.price) || 0;
+        let discountAmount = 0;
+
+        if (coupon.type === 'percentage') {
+          discountAmount = (originalPrice * (Number(coupon.value) || 0)) / 100;
+        } else if (coupon.type === 'fixed') {
+          discountAmount = Number(coupon.value) || 0;
+        }
+
+        const calculatedFinalPrice = Math.max(0, originalPrice - discountAmount);
+
+        // Update appointment finalData to persist coupon values
+        finalData.originalPrice = originalPrice;
+        finalData.discountAmount = discountAmount;
+        finalData.finalPrice = calculatedFinalPrice;
+        finalData.couponCode = coupon.code || '';
+        finalData.couponType = coupon.type || '';
+        finalData.couponValue = coupon.value || 0;
+        
+        // Temporarily override price for compatibility, but it will be the discounted value
+        finalData.price = calculatedFinalPrice;
+        // --- END CALCULATION ---
+
         transaction.update(couponRef!, {
           usedCount: admin.firestore.FieldValue.increment(1)
         });
