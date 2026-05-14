@@ -17,24 +17,62 @@ interface ReferralRecord {
 }
 
 export default function ReferralsPage() {
-  const { profile } = useAuth();
+  const { profile, isAuthReady } = useAuth();
   const [referrals, setReferrals] = useState<ReferralRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  const [copyAnim, setCopyAnim] = useState(false);
 
   useEffect(() => {
+    console.log('[Referrals] start');
+    if (!isAuthReady) {
+      console.log('[Referrals] auth not ready, waiting');
+      return;
+    }
+
     if (!profile?.referralCode) {
+      console.log('[Referrals] no referral code initially, loading=false');
       setLoading(false);
       return;
     }
 
-    const q = query(
-      collection(db, 'users'),
-      where('referredBy', '==', profile.referralCode)
-    );
+    console.log(`[Referrals] query start for code: ${profile.referralCode}`);
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    let isMounted = true;
+    let isCancelled = false;
+
+    async function fetchReferrals() {
       try {
-        const docs = snapshot.docs.map(doc => {
+        setLoading(true);
+        setError(false);
+        const { getDocs } = await import('firebase/firestore');
+        const q = query(
+          collection(db, 'users'),
+          where('referredBy', '==', profile?.referralCode)
+        );
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 8000)
+        );
+
+        const snapshot = await Promise.race([
+          getDocs(q),
+          timeoutPromise
+        ]) as any;
+        
+        if (!isMounted || isCancelled) return;
+
+        console.log(`[Referrals] query success count=${snapshot.docs.length}`);
+
+        if (snapshot.empty) {
+          console.log('[Referrals] empty state');
+          setReferrals([]);
+          return;
+        }
+
+        const docs = snapshot.docs.map((doc: any) => {
             const data = doc.data();
             return {
               id: doc.id,
@@ -43,28 +81,53 @@ export default function ReferralsPage() {
               createdAt: data.createdAt || new Date().toISOString(),
               plan: data.plan || 'free'
             } as ReferralRecord;
-          });
-setReferrals(docs);
-setLoading(false);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => { console.error("Firestore onSnapshot error:", error); });
+        });
 
-    return () => unsubscribe();
-  }, [profile?.referralCode]);
+        setReferrals(docs);
+      } catch (err: any) {
+        if (!isMounted || isCancelled) return;
+        
+        if (err.message === 'timeout') {
+            console.log('[Referrals] timeout');
+        } else {
+            console.error("[Referrals] error:", err);
+        }
+        setError(true);
+        setReferrals([]);
+      } finally {
+        if (isMounted && !isCancelled) {
+          console.log('[Referrals] finally loading=false');
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchReferrals();
+
+    return () => {
+      isMounted = false;
+      isCancelled = true;
+    };
+  }, [profile?.referralCode, isAuthReady, retryCount]);
 
   const totalCredits = (referrals.filter(r => r.plan !== 'free').length) * 10;
+  const referralLink = `${window.location.origin}/register?ref=${profile?.referralCode || ''}`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(referralLink);
+    setCopyAnim(true);
+    setTimeout(() => setCopyAnim(false), 2000);
+  };
 
   return (
-    <AppLayout activeRoute="plans">
+    <AppLayout activeRoute="dashboard">
       <div className="max-w-4xl mx-auto py-12 px-6">
         <header className="mb-12">
           <Link 
-            to="/planos" 
+            to="/dashboard" 
             className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors mb-8"
           >
-            <ArrowLeft size={14} /> Voltar aos Planos
+            <ArrowLeft size={14} /> Voltar ao Painel
           </Link>
           
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -82,35 +145,84 @@ setLoading(false);
 
             <div className="bg-brand-ink text-white p-6 rounded-3xl min-w-[200px]">
               <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 block mb-1">Total Ganho</span>
-              <span className="text-3xl font-serif text-brand-terracotta">{formatCurrency(totalCredits)}</span>
+              <span className="text-3xl font-serif text-brand-terracotta">{formatCurrency(profile?.credits || 0)}</span>
+              {(profile?.credits || 0) > 0 && (
+                <div className="mt-2 text-[9px] text-brand-linen/80 uppercase tracking-widest font-medium border-t border-white/10 pt-2">
+                  aplicados no próximo upgrade
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-4">
-            <motion.div 
-              animate={{ rotate: 360 }} 
-              transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-              className="w-8 h-8 border-2 border-brand-terracotta border-t-transparent rounded-full"
-            />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-stone">Carregando indicações...</span>
+        {/* Link Section */}
+        <section className="mb-12 bg-brand-white p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col md:flex-row items-center gap-6 justify-between">
+          <div className="max-w-md w-full">
+            <h3 className="text-base font-serif text-brand-ink mb-1">Seu Código de Indicação</h3>
+            <p className="text-[11px] text-brand-stone font-light">Envie este link para outras profissionais ganharem vantagens exclusivas pelo seu convite.</p>
+          </div>
+          
+          <div className="flex w-full md:w-auto items-stretch md:items-center gap-2 flex-col md:flex-row">
+            <div className="bg-[#FAF9F8] px-4 py-3 rounded-2xl border border-brand-mist/60 font-mono text-sm tracking-widest text-brand-ink flex-1 text-center md:text-left min-w-[200px]">
+              {profile?.referralCode || '------'}
+            </div>
+            <button 
+              onClick={handleCopy}
+              className="bg-brand-ink text-brand-white px-6 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-espresso transition-all whitespace-nowrap"
+            >
+              {copyAnim ? <CheckCircle2 size={14} className="text-green-400" /> : <Gift size={14} />} 
+              {copyAnim ? 'Copiado!' : 'Copiar Link'}
+            </button>
+          </div>
+        </section>
+
+        {error ? (
+          <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-16 text-center">
+            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist shadow-sm">
+               <Clock size={32} />
+            </div>
+            <h3 className="text-xl font-serif text-brand-ink mb-2 italic">Carregamento Lento</h3>
+            <p className="text-xs text-brand-stone font-light max-w-xs mx-auto mb-8">
+              A conexão está lenta. Nossos servidores demoraram mais que o esperado.
+            </p>
+            <button 
+              onClick={() => setRetryCount(c => c + 1)}
+              className="inline-flex items-center justify-center bg-brand-ink text-brand-white px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : loading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="animate-pulse bg-brand-white p-6 rounded-3xl border border-brand-mist shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                   <div className="w-12 h-12 bg-brand-linen rounded-full shrink-0"></div>
+                   <div className="space-y-2">
+                     <div className="h-4 bg-brand-linen rounded w-32"></div>
+                     <div className="h-3 bg-brand-linen rounded w-24"></div>
+                   </div>
+                </div>
+                <div className="h-8 bg-brand-linen rounded-2xl w-24"></div>
+              </div>
+            ))}
           </div>
         ) : referrals.length === 0 ? (
           <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-16 text-center">
-            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist">
+            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist shadow-sm">
               <Users size={32} />
             </div>
             <h3 className="text-xl font-serif text-brand-ink mb-2 italic">Nenhuma indicação ainda</h3>
             <p className="text-xs text-brand-stone font-light max-w-xs mx-auto mb-8">
               Compartilhe seu código com outras profissionais e comece a ganhar créditos hoje mesmo!
             </p>
-            <Link 
-              to="/planos" 
-              className="inline-block bg-brand-ink text-brand-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all"
+            <button 
+              onClick={handleCopy}
+              className="inline-flex items-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all"
             >
-              Pegar meu código
-            </Link>
+              {copyAnim ? <CheckCircle2 size={14} className="text-green-400" /> : <Gift size={14} />}
+              {copyAnim ? 'Copiado!' : 'Copiar meu código'}
+            </button>
           </div>
         ) : (
           <div className="space-y-4">

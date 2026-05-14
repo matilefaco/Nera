@@ -67,8 +67,8 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   };
 
   const navItems = [
-    { title: 'Painel', icon: TrendingUp, path: '/dashboard', id: 'dashboard' },
-    { title: 'Agenda', icon: Calendar, path: '/agenda', id: 'agenda', hasBadge: true },
+    { title: 'Painel', icon: TrendingUp, path: '/dashboard', id: 'dashboard', hasBadge: true },
+    { title: 'Agenda', icon: Calendar, path: '/agenda', id: 'agenda' },
     { title: 'Clientes', icon: Users, path: '/clients', id: 'clients' },
     { title: 'Financeiro', icon: DollarSign, path: '/financeiro', id: 'financial' },
     { title: 'Serviços', icon: List, path: '/services', id: 'services' },

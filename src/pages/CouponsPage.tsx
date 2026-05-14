@@ -36,6 +36,8 @@ export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
 
@@ -51,14 +53,28 @@ export default function CouponsPage() {
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    let loadingTimeout: NodeJS.Timeout;
+
     if (!isAuthReady) return; // Aguardar o AuthContext carregar primeiro
     
     if (!user?.uid) {
-      setLoading(false);
+      if (isMounted) setLoading(false);
       return;
     }
 
-    let isMounted = true;
+    if (isMounted) {
+      setLoading(true);
+      setError(false);
+    }
+
+    loadingTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.log('[Coupons] timeout! forcing loading false');
+        setError(true);
+        setLoading(false);
+      }
+    }, 8000);
 
     const q = query(
       collection(db, 'coupons'),
@@ -69,11 +85,12 @@ export default function CouponsPage() {
       if (!isMounted) return;
 
       try {
-        // Se vier do cache e estiver vazio, ainda não sabemos se o servidor também está vazio.
-        // Pular a atualização de estado (manter em loading) até que os dados reais do servidor retornem
         if (snapshot.metadata.fromCache && snapshot.empty) {
+          console.log('[Coupons] from cache and empty, waiting for server');
           return;
         }
+
+        console.log(`[Coupons] success count=${snapshot.docs.length}`);
 
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
         
@@ -93,13 +110,20 @@ export default function CouponsPage() {
         
         setCoupons(sortedData);
         setLoading(false);
+        clearTimeout(loadingTimeout);
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          clearTimeout(loadingTimeout);
+        }
       }
     }, (error) => { 
       console.error("Firestore onSnapshot error:", error); 
-      if (isMounted) setLoading(false);
+      if (isMounted) {
+        setLoading(false);
+        clearTimeout(loadingTimeout);
+      }
     });
 
     const fetchServices = async () => {
@@ -118,9 +142,10 @@ export default function CouponsPage() {
 
     return () => {
       isMounted = false;
+      clearTimeout(loadingTimeout);
       unsubscribe();
     };
-  }, [user?.uid, isAuthReady]);
+  }, [user?.uid, isAuthReady, retryCount]);
 
   const handleCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,7 +257,23 @@ export default function CouponsPage() {
           </PremiumButton>
         </header>
 
-        {loading ? (
+        {error ? (
+          <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-16 text-center">
+            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist shadow-sm">
+               <AlertCircle size={32} />
+            </div>
+            <h3 className="text-xl font-serif text-brand-ink mb-2 italic">Carregamento Lento</h3>
+            <p className="text-xs text-brand-stone font-light max-w-xs mx-auto mb-8">
+              A conexão está lenta. Nossos servidores demoraram mais que o esperado.
+            </p>
+            <button 
+              onClick={() => setRetryCount(c => c + 1)}
+              className="inline-flex items-center justify-center bg-brand-ink text-brand-white px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        ) : loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map(i => (
               <div key={i} className="h-48 bg-brand-linen/20 rounded-[32px] animate-pulse" />

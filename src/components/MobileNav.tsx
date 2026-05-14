@@ -37,8 +37,8 @@ export default function MobileNav() {
           >
             <div className={`p-2 rounded-2xl relative ${isActive ? 'bg-brand-linen' : ''}`}>
               <Icon size={20} />
-              {item.id === 'agenda' && pendingCount > 0 && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-brand-white rounded-full" />
+              {item.id === 'dashboard' && pendingCount > 0 && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-brand-terracotta border-2 border-brand-white rounded-full" />
               )}
             </div>
             <span className="text-[9px] font-medium uppercase tracking-widest">{item.label}</span>

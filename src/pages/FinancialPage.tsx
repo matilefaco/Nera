@@ -41,18 +41,27 @@ const FINANCIAL_CACHE_TTL_MS = 5 * 60 * 1000;
 const financialAppointmentsCache = new Map<string, FinancialAppointmentsCacheEntry>();
 
 export default function FinancialPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, isAuthReady } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
-    
     let isMounted = true;
+    let isCancelled = false;
 
+    if (!isAuthReady) return;
+
+    if (!user?.uid) {
+      if (isMounted) setLoading(false);
+      return;
+    }
+    
     const fetchFinancialData = async () => {
       setLoading(true);
+      setError(false);
       try {
         const now = new Date();
         const past = new Date(now.getFullYear() - 1, now.getMonth(), 1);
@@ -64,8 +73,11 @@ export default function FinancialPage() {
         const cached = financialAppointmentsCache.get(financialCacheKey);
         
         if (cached && Date.now() - cached.fetchedAt < FINANCIAL_CACHE_TTL_MS) {
-          setAppointments(cached.data);
-          if (isMounted) setLoading(false);
+          console.log('[Financial] loaded from cache');
+          if (isMounted && !isCancelled) {
+            setAppointments(cached.data);
+            setLoading(false);
+          }
           return;
         }
 
@@ -76,10 +88,24 @@ export default function FinancialPage() {
           where('date', '<=', endDateStr)
         );
 
-        const snapshot = await getDocs(q);
-        if (!isMounted) return;
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 8000)
+        );
+
+        console.log('[Financial] fetch start');
+        const snapshot = await Promise.race([
+          getDocs(q),
+          timeoutPromise
+        ]) as any;
+
+        if (!isMounted || isCancelled) return;
         
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+        console.log(`[Financial] fetch success count=${snapshot.docs.length}`);
+        if (snapshot.empty) {
+          console.log('[Financial] empty records');
+        }
+
+        const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
         
         // Order in memory
         docs.sort((a, b) => b.date.localeCompare(a.date));
@@ -87,14 +113,19 @@ export default function FinancialPage() {
         financialAppointmentsCache.set(financialCacheKey, { data: docs, fetchedAt: Date.now() });
         setAppointments(docs);
       } catch (err: any) {
-        if (!isMounted) return;
-        if (err.message && err.message.includes('index')) {
-          console.warn('[FinancialPage] Firestore index required: appointments professionalId ASC, date ASC');
+        if (!isMounted || isCancelled) return;
+        
+        if (err.message === 'timeout') {
+          console.log('[Financial] timeout');
+        } else if (err.message && err.message.includes('index')) {
+          console.warn('[Financial] Firestore index required: appointments professionalId ASC, date ASC');
         } else {
-          console.error('[FinancialPage] Failed to load financial appointments', err);
+          console.error('[Financial] Failed to load financial appointments', err);
         }
+        setError(true);
       } finally {
-        if (isMounted) {
+        if (isMounted && !isCancelled) {
+          console.log('[Financial] finally loading=false');
           setLoading(false);
         }
       }
@@ -104,8 +135,9 @@ export default function FinancialPage() {
     
     return () => {
       isMounted = false;
+      isCancelled = true;
     };
-  }, [user]);
+  }, [user?.uid, isAuthReady, retryCount]);
 
   const monthlyGroups = useMemo(() => {
     const rawGroups: Record<string, Appointment[]> = {};
@@ -205,6 +237,30 @@ export default function FinancialPage() {
       notify.error('Erro ao exportar relatório.');
     }
   };
+
+  if (error) {
+    return (
+      <AppLayout activeRoute="financial">
+        <div className="p-6 md:p-12 pb-40 max-w-5xl mx-auto w-full">
+          <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-16 text-center mt-12">
+            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist shadow-sm">
+               <DollarSign size={32} />
+            </div>
+            <h3 className="text-xl font-serif text-brand-ink mb-2 italic">Carregamento Lento</h3>
+            <p className="text-xs text-brand-stone font-light max-w-xs mx-auto mb-8">
+              A conexão está lenta. Nossos servidores demoraram mais que o esperado.
+            </p>
+            <button 
+              onClick={() => setRetryCount(c => c + 1)}
+              className="inline-flex items-center justify-center bg-brand-ink text-brand-white px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (loading) {
     return <FinancialSkeleton />;

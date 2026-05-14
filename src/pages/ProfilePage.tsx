@@ -673,56 +673,6 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* MENU RÁPIDO (Gestão do Negócio) - Apenas Mobile */}
-        <div className="md:hidden max-w-4xl mx-auto mb-10 space-y-3">
-          <div className="flex items-center gap-2 mb-4 px-2">
-            <h2 className="text-xl font-serif text-brand-ink border-b border-brand-mist/50 pb-2 w-full">Gestão do negócio</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 gap-3 px-2">
-            <Link to="/financeiro" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98]">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm">
-                  <DollarSign size={18} className="text-brand-terracotta" />
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-bold text-brand-ink">Financeiro</h3>
-                  <p className="text-[11px] text-brand-stone font-light mt-0.5">Receita, histórico e exportações.</p>
-                </div>
-              </div>
-              <ChevronRight size={16} className="text-brand-stone/50" />
-            </Link>
-
-            <Link to="/cupons" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98]">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm">
-                  <Ticket size={18} className="text-brand-terracotta" />
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-bold text-brand-ink">Cupons</h3>
-                  <p className="text-[11px] text-brand-stone font-light mt-0.5">Crie incentivos para suas clientes.</p>
-                </div>
-              </div>
-              <ChevronRight size={16} className="text-brand-stone/50" />
-            </Link>
-
-            <Link to="/indicacoes" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98]">
-              <div className="flex items-center gap-3.5">
-                <div className="w-10 h-10 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm">
-                  <Gift size={18} className="text-brand-terracotta" />
-                </div>
-                <div>
-                  <h3 className="text-[13px] font-bold text-brand-ink">Indicações</h3>
-                  <p className="text-[11px] text-brand-stone font-light mt-0.5">Acompanhe convites e recompensas.</p>
-                </div>
-              </div>
-              <ChevronRight size={16} className="text-brand-stone/50" />
-            </Link>
-          </div>
-          
-          <hr className="border-brand-mist/40 my-8 mx-2" />
-        </div>
-
         <form 
           onSubmit={handleSave} 
           className="max-w-4xl mx-auto space-y-8 pb-32 md:pb-24"

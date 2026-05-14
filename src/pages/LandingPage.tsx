@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import './LandingPage.css';
+import PricingGrid from '../components/PricingGrid';
 
 export default function LandingPage() {
   const navRef = useRef<HTMLElement>(null);
@@ -326,59 +327,7 @@ export default function LandingPage() {
           <h2 className="pricing-h2 reveal">O investimento<br/><em>certo para você.</em></h2>
           <p className="pricing-sub reveal">Sem contrato de fidelidade. Cancele quando quiser.</p>
         </div>
-        <div className="plans-grid reveal" style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 48px' }}>
-
-          {/* FREE */}
-          <div className="plan-card free">
-            <div className="plan-tier">Gratuito</div>
-            <div className="plan-price">R$&nbsp;0</div>
-            <div className="plan-period">para sempre</div>
-            <p className="plan-tagline">Para começar, sentir a diferença e nunca mais voltar atrás.</p>
-            <ul className="plan-features">
-              <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium (foto, bio e serviços)</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Até 15 agendamentos por mês</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Aprovação manual (seu filtro)</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Link direto para bio</li>
-            </ul>
-            <Link to="/register" className="btn-plan outline">Criar conta grátis</Link>
-          </div>
-
-          {/* ESSENTIAL */}
-          <div className="plan-card essential">
-            <div className="plan-tier">Essencial</div>
-            <div className="plan-price">R$&nbsp;49</div>
-            <div className="plan-period">por mês · cancele quando quiser</div>
-            <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)' }}>&nbsp;</p>
-            <ul className="plan-features">
-              <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos ilimitados</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Notificações WhatsApp</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio de horários</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Lembrete automático 24h para reduzir faltas</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Histórico de clientes</li>
-            </ul>
-            <Link to="/register?plan=essencial" className="btn-plan white-solid">Testar Essencial por 15 dias</Link>
-          </div>
-
-          {/* PRO */}
-          <div className="plan-card pro">
-            <div className="plan-badge">Recomendado para quem quer crescer</div>
-            <div className="plan-tier">Plano Pro</div>
-            <div className="plan-price">R$&nbsp;89</div>
-            <div className="plan-period">por mês · ferramentas completas para crescer mais rápido</div>
-            <p className="plan-tagline">&nbsp;</p>
-            <ul className="plan-features">
-              <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial, com recursos para crescer mais rápido</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente para preencher horários vagos automaticamente</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Cupons de desconto</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Relatório mensal em PDF</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Link de indicação premiado</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Badge Pro Nera na vitrine</li>
-              <li className="plan-feat"><span className="feat-bullet"></span>Suporte prioritário</li>
-            </ul>
-            <Link to="/register?plan=pro" className="btn-plan terra-solid">Começar como Pro</Link>
-          </div>
-
-        </div>
+        <PricingGrid isLanding={true} />
       </section>
 
       {/* FINAL CTA */}
@@ -438,7 +387,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span className="footer-copy">© 2026 nera · Feito com intenção no Brasil 🇧🇷</span>
+          <span className="footer-copy">© 2026 Nera · Feita com intenção no Brasil 🇧🇷</span>
           <span className="footer-copy">Para profissionais que valorizam excelência</span>
         </div>
       </footer>

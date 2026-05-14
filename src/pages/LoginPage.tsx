@@ -18,23 +18,21 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    console.log('[LOGIN FLOW] Starting Google login');
-    console.log('[LOGIN FLOW] Domain:', window.location.hostname);
-    console.log('[LOGIN FLOW] Origin:', window.location.origin);
+    console.log('[Login] submit start (Google)');
+    console.log('[Login] firebase auth start');
     
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      console.log('[LOGIN FLOW] Google success for user:', result.user.email);
+      console.log('[Login] firebase auth success');
       notify.success('Que bom ter você de volta!');
+      console.log('[Login] redirect start');
       navigate('/dashboard');
     } catch (error: any) {
-      console.error('[LOGIN FLOW] Google login error:', error);
-      console.error('[LOGIN FLOW] Error Code:', error.code);
-      console.error('[LOGIN FLOW] Error Message:', error.message);
-      
-            notify.error(error);
+      console.log('[Login] error:', error);
+      notify.error(getHumanError(error.code));
     } finally {
+      console.log('[Login] finally isSubmitting=false');
       setLoading(false);
     }
   };
@@ -44,19 +42,25 @@ export default function LoginPage() {
     if (loading) return;
     
     setLoading(true);
-    console.log('[LOGIN FLOW] Starting manual login for:', email);
+    console.log('[Login] submit start');
+    console.log('[Login] firebase auth start');
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
-      console.log('[LOGIN FLOW] Manual success for user:', result.user.email);
+      await signInWithEmailAndPassword(auth, email, password);
+      console.log('[Login] firebase auth success');
       notify.success('Que bom ter você de volta!');
+      console.log('[Login] redirect start');
       navigate('/dashboard');
     } catch (error: any) {
-      console.error('[LOGIN FLOW] Manual login error:', error);
-      console.error('[LOGIN FLOW] Error Code:', error.code);
-      console.error('[LOGIN FLOW] Error Message:', error.message);
-
-            notify.error(error);
+      console.log('[Login] auth error:', error.code, error.message);
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+         notify.error('E-mail ou senha incorretos.');
+      } else if (error.code === 'auth/network-request-failed') {
+         notify.error('Conexão instável. Tente novamente.');
+      } else {
+         notify.error(getHumanError(error.code));
+      }
     } finally {
+      console.log('[Login] finally isSubmitting=false');
       setLoading(false);
     }
   };
@@ -174,6 +178,12 @@ export default function LoginPage() {
         <p className="text-center mt-10 text-sm text-brand-stone font-light">
           Ainda não tem seu perfil? <Link to="/register" className="text-brand-terracotta font-medium hover:underline">Criar agora</Link>
         </p>
+        
+        <div className="mt-8 text-center border-t border-brand-mist/50 pt-8">
+          <Link to="/" className="text-[10px] text-brand-stone hover:text-brand-terracotta uppercase tracking-[0.2em] font-medium transition-colors">
+            Voltar para a página inicial
+          </Link>
+        </div>
       </motion.div>
     </div>
   );

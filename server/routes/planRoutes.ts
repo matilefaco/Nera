@@ -75,14 +75,6 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       mode: "subscription",
       customer_email: email,
       client_reference_id: uid,
-      subscription_data: {
-        trial_period_days: 15,
-        trial_settings: {
-          end_behavior: {
-            missing_payment_method: "cancel"
-          }
-        }
-      },
       payment_method_collection: "if_required",
       success_url: `${process.env.APP_URL}/checkout/success`,
       cancel_url: `${process.env.APP_URL}/checkout/canceled`,
@@ -92,6 +84,17 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
         creditsUsed: credits >= 10 ? 'true' : 'false'
       },
     };
+
+    if (plan === 'essencial') {
+      sessionParams.subscription_data = {
+        trial_period_days: 15,
+        trial_settings: {
+          end_behavior: {
+            missing_payment_method: "cancel"
+          }
+        }
+      };
+    }
 
     if (credits >= 10) {
       const coupon = await stripe.coupons.create({

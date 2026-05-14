@@ -241,6 +241,10 @@ export interface Appointment {
 
   couponId?: string;
   appliedCouponCode?: string;
+  couponCode?: string;
+  originalPrice?: number;
+  finalPrice?: number;
+  discountAmount?: number;
 
   createdAt: Timestamp | Date | string | FieldValue;
   updatedAt?: Timestamp | Date | string | FieldValue;

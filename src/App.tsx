@@ -168,6 +168,7 @@ export default function App() {
                   <WhatsAppHistoryPage />
                 </PrivateRoute>
               } />
+              <Route path="/plans" element={<Navigate to="/planos" replace />} />
               
               {/* Fallback for unmatched routes */}
               <Route path="*" element={

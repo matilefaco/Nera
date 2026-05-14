@@ -11,7 +11,7 @@ import {
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp, Heart,
   ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
-  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info
+  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info, Ticket, Gift
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { notify } from '../lib/notify';
@@ -87,7 +87,7 @@ function safeLocaleCompare(a?: string | null, b?: string | null): number {
 const isDev = import.meta.env.DEV;
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
-type DashboardTab = "hoje" | "crescimento";
+type DashboardTab = "hoje" | "crescimento" | "gestao";
 
 interface AnalyticsCacheEntry {
   data: AnalyticsEvent[];
@@ -111,7 +111,7 @@ export default function Dashboard() {
   
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
     const saved = localStorage.getItem("nera_dashboard_tab");
-    return saved === "hoje" || saved === "crescimento" ? saved : "hoje";
+    return saved === "hoje" || saved === "crescimento" || saved === "gestao" ? saved : "hoje";
   });
 
   useEffect(() => {
@@ -378,6 +378,11 @@ setUnconfirmedTomorrow(docs);
     const appointmentsCacheKey = `${user.uid}:${startDateStr}:${endDateStr}`;
     const cachedAppointments = appointmentsHistoryCache.get(appointmentsCacheKey);
 
+    let fetchValid = true;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 8000)
+    );
+
     if (cachedAppointments && Date.now() - cachedAppointments.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
       setAppointments(cachedAppointments.data);
       if (isMounted) {
@@ -393,10 +398,11 @@ setUnconfirmedTomorrow(docs);
         orderBy('date', 'desc')
       );
 
-      getDocs(qAll).then((snapshot) => {
+      Promise.race([getDocs(qAll), timeoutPromise]).then((result) => {
+        const snapshot = result as any;
         if (!isMounted) return;
         try {
-          const appointmentsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
+          const appointmentsData = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
           appointmentsHistoryCache.set(appointmentsCacheKey, { data: appointmentsData, fetchedAt: Date.now() });
           setAppointments(appointmentsData);
           // Metrics calculation moved to hook
@@ -404,7 +410,9 @@ setUnconfirmedTomorrow(docs);
           console.error("Error processing getDocs callback:", err);
         }
       }).catch((error) => { 
+        if (!isMounted) return;
         console.error("Firestore getDocs error:", error); 
+        fetchValid = false;
       }).finally(() => {
         if (isMounted) {
           setIsInitialLoading(false);
@@ -990,17 +998,17 @@ setUnconfirmedTomorrow(docs);
         </header>
 
         {/* DASHBOARD TABS */}
-        <div className="flex bg-[#FAF9F8] p-1.5 rounded-xl border border-brand-mist/30 text-[10px] font-bold uppercase tracking-widest w-full md:w-fit overflow-x-auto hide-scrollbar">
+        <div className="grid grid-cols-3 bg-[#FAF9F8] p-1.5 rounded-xl border border-brand-mist/30 text-[9px] md:text-[10px] font-bold uppercase tracking-widest w-full">
           <button 
             onClick={() => setActiveTab("hoje")}
             className={cn(
-              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 relative whitespace-nowrap",
-              activeTab === "hoje" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
+              "py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap outline-none",
+              activeTab === "hoje" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink border border-transparent hover:border-transparent focus:border-transparent focus:ring-0"
             )}
           >
             Hoje
             {pendingCount > 0 && (
-              <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 bg-red-500 text-white rounded-full text-[8px] font-bold animate-pulse">
+              <span className="flex items-center justify-center min-w-[14px] h-[14px] px-1 bg-brand-terracotta text-white rounded-full text-[8px] font-bold animate-pulse">
                 {pendingCount}
               </span>
             )}
@@ -1008,14 +1016,23 @@ setUnconfirmedTomorrow(docs);
           <button 
             onClick={() => setActiveTab("crescimento")}
             className={cn(
-              "px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 relative whitespace-nowrap",
-              activeTab === "crescimento" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink"
+              "py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap outline-none",
+              activeTab === "crescimento" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink border border-transparent hover:border-transparent focus:border-transparent focus:ring-0"
             )}
           >
             Crescimento
             {inactiveClientsCount > 0 && (
-              <span className="w-1.5 h-1.5 bg-brand-terracotta rounded-full" />
+              <span className="w-1.5 h-1.5 bg-brand-terracotta rounded-full shrink-0" />
             )}
+          </button>
+          <button 
+            onClick={() => setActiveTab("gestao")}
+            className={cn(
+              "py-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 relative whitespace-nowrap outline-none",
+              activeTab === "gestao" ? "bg-white shadow-sm text-brand-ink border border-brand-mist/40" : "text-brand-stone/80 hover:text-brand-ink border border-transparent hover:border-transparent focus:border-transparent focus:ring-0"
+            )}
+          >
+            Gestão
           </button>
         </div>
 
@@ -1153,6 +1170,63 @@ setUnconfirmedTomorrow(docs);
         )}
 
 
+
+        {/* GESTÃO CONTENT */}
+        {activeTab === "gestao" && (
+          <div className="flex flex-col gap-8">
+            <section className="bg-brand-white p-6 md:p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col gap-6 relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-brand-linen pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                    <Settings size={16} />
+                  </div>
+                  <h3 className="text-xl font-serif text-brand-ink">Gestão do negócio</h3>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <Link to="/financeiro" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98] group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm group-hover:scale-105 transition-transform">
+                      <DollarSign size={20} className="text-brand-terracotta" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-brand-ink">Financeiro</h3>
+                      <p className="text-[11px] text-brand-stone font-light mt-0.5">Receita, histórico e exportações.</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-brand-stone/50 group-hover:text-brand-terracotta transition-colors" />
+                </Link>
+
+                <Link to="/cupons" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98] group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm group-hover:scale-105 transition-transform">
+                      <Ticket size={20} className="text-brand-terracotta" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-brand-ink">Cupons</h3>
+                      <p className="text-[11px] text-brand-stone font-light mt-0.5">Crie incentivos para suas clientes.</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-brand-stone/50 group-hover:text-brand-terracotta transition-colors" />
+                </Link>
+
+                <Link to="/indicacoes" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98] group">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm group-hover:scale-105 transition-transform">
+                      <Gift size={20} className="text-brand-terracotta" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-brand-ink">Indicações</h3>
+                      <p className="text-[11px] text-brand-stone font-light mt-0.5">Acompanhe convites e recompensas.</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-brand-stone/50 group-hover:text-brand-terracotta transition-colors" />
+                </Link>
+              </div>
+            </section>
+          </div>
+        )}
 
         {/* HOJE SIMPLE VIEW */}
         {activeTab === "hoje" && (
@@ -1415,98 +1489,108 @@ setUnconfirmedTomorrow(docs);
       {/* --- SHARE VITRINE MODAL --- */}
       <AnimatePresence>
         {isShareModalOpen && (
-          <div className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[200] flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-6">
             <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-brand-white w-full max-w-md rounded-[40px] p-8 shadow-2xl border border-brand-mist relative"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsShareModalOpen(false)}
+              className="absolute inset-0 bg-brand-ink/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 25, stiffness: 200 }}
+              className="relative w-full max-w-md bg-brand-white rounded-t-[32px] sm:rounded-[32px] shadow-2xl border-t border-brand-mist/50 flex flex-col max-h-[88dvh]"
             >
-              <button 
-                onClick={() => setIsShareModalOpen(false)}
-                className="absolute top-6 right-6 p-2 hover:bg-brand-parchment rounded-full text-brand-stone transition-colors"
-              >
-                <X size={20} />
-              </button>
-
-              <div className="text-center mb-10">
-                <div className="w-16 h-16 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Share2 size={32} />
+              <div className="flex items-center justify-between p-6 pb-4 border-b border-brand-mist/30 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center">
+                    <Share2 size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-serif text-brand-ink">Minha Vitrine</h3>
+                  </div>
                 </div>
-                <h3 className="text-2xl font-serif text-brand-ink mb-2">Compartilhar minha Vitrine</h3>
-                <p className="text-sm text-brand-stone font-light">Transforme cada acesso em um possível agendamento.</p>
-              </div>
-
-              <div className="space-y-4">
                 <button 
-                  onClick={() => {
-                    const url = getPublicProfileUrl(profile?.slug);
-                    const text = `Acabei de abrir novos horários ✨ Reserve online comigo: ${url}`;
-                    window.open(buildWhatsappLink('', text), '_blank');
-                    setIsShareModalOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
+                  onClick={() => setIsShareModalOpen(false)}
+                  className="p-2 hover:bg-brand-parchment rounded-full text-brand-stone transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta group-hover:scale-110 transition-transform">
-                      <MessageCircle size={20} />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-semibold text-brand-ink uppercase tracking-widest">WhatsApp</p>
-                      <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Enviar para meus contatos</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={18} className="text-brand-mist" />
-                </button>
-
-                <button 
-                  onClick={() => {
-                    const url = getPublicProfileUrl(profile?.slug);
-                    navigator.clipboard.writeText(url);
-                    notify.success('Link copiado. Abra o Instagram e cole nos seus Stories!');
-                    setIsShareModalOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-terracotta group-hover:scale-110 transition-transform">
-                      <Instagram size={20} />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-semibold text-brand-ink uppercase tracking-widest">Instagram Stories</p>
-                      <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Copiar link para o sticker</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={18} className="text-brand-mist" />
-                </button>
-
-                <button 
-                  onClick={() => {
-                    const url = getPublicProfileUrl(profile?.slug);
-                    navigator.clipboard.writeText(url);
-                    notify.success('Link copiado para a área de transferência.');
-                    setIsShareModalOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between p-5 bg-brand-parchment rounded-[24px] hover:bg-brand-white border border-transparent hover:border-brand-mist transition-all group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-white rounded-xl flex items-center justify-center text-brand-stone group-hover:scale-110 transition-transform">
-                      <Copy size={20} />
-                    </div>
-                    <div className="text-left">
-                      <p className="text-xs font-semibold text-brand-ink uppercase tracking-widest">Copiar Link</p>
-                      <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Link direto da vitrine</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={18} className="text-brand-mist" />
+                  <X size={20} />
                 </button>
               </div>
 
-              <div className="mt-8 p-5 bg-brand-linen/30 rounded-[24px] border border-brand-mist/50">
-                <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.2em] mb-2">Sugestão de texto:</p>
-                <p className="text-xs text-brand-ink font-light italic">
-                  "Acabei de abrir novos horários ✨ Reserve online comigo: {getPublicProfileUrl(profile?.slug)}"
+              <div className="p-6 overflow-y-auto no-scrollbar pb-8">
+                <p className="text-sm text-brand-stone mb-6 font-light">
+                  Transforme cada acesso em um possível agendamento.
                 </p>
+
+                <div className="space-y-3">
+                  {/* Primary CTA: Copiar Link */}
+                  <PremiumButton 
+                    onClick={() => {
+                      const url = getPublicProfileUrl(profile?.slug);
+                      navigator.clipboard.writeText(url);
+                      notify.success('Link copiado para a área de transferência.');
+                      setIsShareModalOpen(false);
+                    }}
+                    className="w-full py-4 !text-[11px] gap-2 shadow-sm"
+                  >
+                    <Copy size={16} />
+                    Copiar link da vitrine
+                  </PremiumButton>
+
+                  {/* Secondary/Tertiary Actions: Horizontally dense or smaller items */}
+                  <div className="grid grid-cols-1 gap-3 pt-2">
+                    <button 
+                      onClick={() => {
+                        const url = getPublicProfileUrl(profile?.slug);
+                        navigator.clipboard.writeText(url);
+                        notify.success('Link copiado. Abra o Instagram e cole nos seus Stories!');
+                        setIsShareModalOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between p-4 bg-brand-white border border-brand-mist rounded-2xl hover:border-brand-stone transition-all outline-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Instagram size={18} className="text-brand-terracotta" />
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-brand-ink">Instagram Stories</p>
+                          <p className="text-[10px] text-brand-stone">Copiar link para sticker</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-brand-mist" />
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const url = getPublicProfileUrl(profile?.slug);
+                        const text = `Acabei de abrir novos horários ✨ Reserve online comigo: ${url}`;
+                        window.open(buildWhatsappLink('', text), '_blank');
+                        setIsShareModalOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between p-4 bg-brand-white border border-brand-mist rounded-2xl hover:border-brand-stone transition-all outline-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <MessageCircle size={18} className="text-brand-terracotta" />
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-brand-ink">WhatsApp</p>
+                          <p className="text-[10px] text-brand-stone">Enviar para contatos</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-brand-mist" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-8 p-4 bg-[#FAF9F8] rounded-2xl border border-brand-mist/50">
+                  <p className="text-[9px] font-bold text-brand-terracotta uppercase tracking-[0.2em] mb-1.5 flex items-center gap-1.5">
+                    <Zap size={10} /> Sugestão de texto
+                  </p>
+                  <p className="text-xs text-brand-ink font-light italic leading-relaxed">
+                    "Acabei de abrir novos horários ✨ Reserve online comigo: <span className="font-medium text-brand-terracotta">{getPublicProfileUrl(profile?.slug)}</span>"
+                  </p>
+                </div>
               </div>
             </motion.div>
           </div>

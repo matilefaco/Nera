@@ -163,7 +163,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-6 items-center">
+            <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-center sm:items-stretch">
               {/* MOCKUP DO STORY */}
               <div className="relative shrink-0 flex items-center justify-center shadow-md rounded-[16px] border border-brand-mist/30">
                 {/* The card container to be exported */}
@@ -194,59 +194,62 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                        {profile.name}
                     </h4>
                     
-                    {profile.category && (
+                    {(profile.specialty || profile.category) && (
                       <div className="mt-3 pt-2.5 border-t border-brand-mist/60 px-4">
                         <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.25em] relative top-[-1px]">
-                           {profile.category}
+                           {profile.specialty || profile.category}
                         </span>
                       </div>
                     )}
 
                     <div className="mt-6 flex flex-col items-center">
                        <span className="w-1 h-1 rounded-full bg-brand-terracotta/60 mb-3"></span>
-                       <p className="text-[15px] font-serif text-brand-terracotta italic leading-snug tracking-wide">
-                         Reserve seu horário
+                       <p className="text-[14px] font-serif text-brand-terracotta italic leading-snug tracking-wide max-w-[140px]">
+                         {profile.headline || "Reserve seu horário"}
                        </p>
-                       <p className="text-[7px] text-brand-stone uppercase tracking-[0.15em] mt-1.5">
+                       <p className="text-[7px] text-brand-stone uppercase tracking-[0.15em] mt-1.5 font-bold">
                          Agendamento disponível
                        </p>
                     </div>
                   </div>
 
                   {/* 3. Link Sticker & Footer */}
-                  <div className="relative z-10 flex flex-col items-center w-full gap-3 mt-auto mb-2">
+                  <div className="relative z-10 flex flex-col items-center w-full gap-2.5 mt-auto mb-1">
                     {/* Link Sticker */}
-                    <div className="bg-white/95 px-2.5 py-1.5 rounded-full flex items-center justify-center gap-1.5 w-[94%] shadow-[0_4px_16px_-4px_rgba(0,0,0,0.08)] border border-[#EFECE8] shrink-0">
-                      <div className="bg-brand-ink rounded-full w-[12px] h-[12px] flex items-center justify-center shrink-0">
-                         <Share2 size={6} className="text-white" strokeWidth={2.5} />
+                    <div className="bg-white/95 px-3 py-2 rounded-full flex items-center justify-center gap-1.5 w-[92%] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] border border-[#EFECE8] shrink-0 transform hover:scale-[1.02] transition-transform">
+                      <div className="bg-brand-ink rounded-full w-[14px] h-[14px] flex items-center justify-center shrink-0">
+                         <Share2 size={7} className="text-white" strokeWidth={3} />
                       </div>
-                      <span className="text-[7.5px] font-medium text-brand-ink truncate tracking-normal">
+                      <span className="text-[8px] font-bold text-brand-ink truncate tracking-tight">
                         {profileUrl.replace('https://', '').replace('http://', '').replace('www.', '')}
                       </span>
                     </div>
 
                     {/* Footer Signature */}
-                    <div className="mt-1 items-center justify-center flex opacity-40">
-                       <span className="text-[4px] font-bold text-brand-stone tracking-[0.3em] uppercase">Nera • Agendamento Online</span>
+                    <div className="mt-0.5 items-center justify-center flex opacity-30">
+                       <span className="text-[3.5px] font-bold text-brand-stone tracking-[0.4em] uppercase">Nera • Agendamento Online</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* ACTION */}
-              <div className="flex-1 flex flex-col justify-center gap-4 w-full text-center sm:text-left">
-                <div className="space-y-1.5 max-w-[280px] mx-auto sm:max-w-none sm:mx-0">
-                  <p className="text-sm font-medium text-brand-ink">Sua vitrine pronta para circular.</p>
-                  <p className="text-[12px] text-brand-stone leading-relaxed px-2 sm:px-0">
+              <div className="flex-1 min-w-0 flex flex-col justify-between w-full text-center sm:text-left py-2 sm:py-4">
+                <div className="space-y-2.5 max-w-[280px] mx-auto sm:max-w-none sm:mx-0">
+                  <p className="text-sm sm:text-base font-serif font-medium text-brand-ink leading-snug">
+                    Sua vitrine pronta para circular.
+                  </p>
+                  <p className="text-[12px] sm:text-[13px] text-brand-stone leading-relaxed px-2 sm:px-0">
                     Baixe e publique nos Stories para levar clientes direto ao seu agendamento.
                   </p>
                 </div>
 
-                <button
-                  onClick={() => handleDownloadStoryCard()}
-                  disabled={isGeneratingStory}
-                  className="w-full mt-2 py-2.5 bg-brand-ink text-white rounded-[12px] text-[11px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:shadow-none"
-                >
+                <div className="mt-6 sm:mt-auto pt-4">
+                  <button
+                    onClick={() => handleDownloadStoryCard()}
+                    disabled={isGeneratingStory}
+                    className="w-full py-2.5 sm:py-3 bg-brand-ink text-white rounded-[12px] text-[11px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 hover:shadow-md active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 disabled:hover:shadow-none"
+                  >
                   {isGeneratingStory ? (
                     <span className="flex items-center gap-2">Gerando imagem...</span>
                   ) : (
@@ -255,7 +258,8 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                       Baixar Imagem
                     </>
                   )}
-                </button>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
