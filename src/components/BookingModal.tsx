@@ -258,16 +258,24 @@ export default function BookingModal({ profile, services, onClose, open, initial
   };
 
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [slotsLoadError, setSlotsLoadError] = useState<'timeout' | null>(null);
+  const [retrySlotsCount, setRetrySlotsCount] = useState(0);
 
   const availableSlots = useMemo(() => {
-    if (!profile?.workingHours || !selectedDate) return [];
-    return getAvailableSlots({
+    if (!profile?.workingHours || !selectedDate) {
+      console.log(`[Slots] Missing requirements for slot generation: workingHours=${!!profile?.workingHours}, selectedDate=${!!selectedDate}`);
+      return [];
+    }
+    const duration = Number(selectedService?.duration) || 60;
+    const result = getAvailableSlots({
       selectedDate,
-      serviceDuration: Number(selectedService?.duration) || 60,
+      serviceDuration: duration,
       workingHours: profile.workingHours,
       appointments: dayAppointments,
       blockedSchedules
     });
+    console.log(`[Slots] generatedSlots count=${result.length} (after internal blocks/appts filtering)`);
+    return result;
   }, [selectedDate, selectedService, profile, dayAppointments, blockedSchedules]);
 
   const [wasRestored, setWasRestored] = useState(false);
@@ -368,14 +376,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
         const q = query(
           appointmentsRef,
           where('professionalId', '==', profile.uid),
-          where('appliedCouponCode', '==', coupon.code),
-          where('status', 'in', ['pending', 'confirmed', 'completed'])
+          where('appliedCouponCode', '==', coupon.code)
         );
         
         const snap = await getDocs(q);
         const alreadyUsed = snap.docs.some(doc => {
           const data = doc.data();
-          return data.clientWhatsapp === cleanPhone || data.clientEmail === cleanEmail;
+          return ['pending', 'confirmed', 'completed'].includes(data.status) && (data.clientWhatsapp === cleanPhone || data.clientEmail === cleanEmail);
         });
 
         if (alreadyUsed) {
@@ -418,51 +425,88 @@ export default function BookingModal({ profile, services, onClose, open, initial
   }, [selectedDate, availableSlots]);
 
   useEffect(() => {
-    if (!profile?.uid || !open) return;
-
-    // Listener de bloqueios novos (blocked_schedules)
-    const blockedRef = collection(db, 'blocked_schedules');
-
-    const unsubBlocked = onSnapshot(
-      query(blockedRef, where('professionalId', '==', profile.uid)),
-      (snap) => {
-        try {
-          const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-          setBlockedSchedules(allBlocked);
-        } catch (err) {
-          console.error("Error in onSnapshot callback:", err);
-        }
-      }, (error) => { console.error("Firestore onSnapshot error:", error); }
-    );
-
-    return () => unsubBlocked();
-  }, [profile?.uid, open]);
-
-  useEffect(() => {
     if (!selectedDate || !profile?.uid || !open) return;
 
+    let isMounted = true;
     setIsLoadingSlots(true);
+    setSlotsLoadError(null);
+    console.log(`[Slots] start - Date: ${selectedDate}, Pro: ${profile?.uid}`);
+    console.log(`[Slots] selectedService ID:`, selectedService?.id);
+    console.log(`[Slots] serviceDuration:`, Number(selectedService?.duration));
+    console.log(`[Slots] businessHours/professional availability:`, profile?.workingHours);
 
-    // Listener de agendamentos para excluir slots ocupados
-    const apptsRef = collection(db, 'appointments');
-    const apptsQ = query(
-      apptsRef, 
-      where('professionalId', '==', profile.uid), 
-      where('date', '==', selectedDate), 
-      where('status', 'in', ['pending', 'confirmed', 'completed'])
-    );
-    
-    const unsubAppts = onSnapshot(apptsQ, (snapshot) => {
+    const fetchAvailabilityData = async () => {
       try {
-        setDayAppointments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment)));
-        setIsLoadingSlots(false);
-      } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => { console.error("Firestore onSnapshot error:", error); });
+        let currentBlocked: any[] = [];
+        let currentAppts: any[] = [];
 
-    return () => unsubAppts();
-  }, [selectedDate, profile?.uid, open]);
+        // 1. Fetch Blocked Schedules (we fetch this every time the date changes to ensure we have the latest, though it fetches all for the pro)
+        try {
+          console.log(`[Slots] blockedTimes query start`);
+          const blockedRef = collection(db, 'blocked_schedules');
+          const blockedSnap = await getDocs(query(blockedRef, where('professionalId', '==', profile.uid)));
+          currentBlocked = blockedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+          console.log(`[Slots] blockedTimes query success count=${currentBlocked.length}`);
+        } catch (err) {
+          console.error("[Slots] error actual= blockedTimes query:", err);
+        }
+
+        // 2. Fetch Appointments
+        try {
+          console.log(`[Slots] appointments query start`);
+          const apptsRef = collection(db, 'appointments');
+          const apptsQ = query(
+            apptsRef, 
+            where('professionalId', '==', profile.uid), 
+            where('date', '==', selectedDate)
+          );
+          
+          let getDocsTimeoutId: any;
+          const getDocsTimeoutPromise = new Promise<never>((_, reject) => {
+            getDocsTimeoutId = setTimeout(() => reject(new Error("FIRESTORE_TIMEOUT")), 8000);
+          });
+          getDocsTimeoutPromise.catch(() => {});
+
+          const snapshot = await Promise.race([
+            getDocs(apptsQ),
+            getDocsTimeoutPromise
+          ]);
+          clearTimeout(getDocsTimeoutId);
+
+          const allAppts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
+          currentAppts = allAppts.filter(a => ['pending', 'confirmed', 'completed'].includes(a.status));
+          
+          console.log(`[Slots] appointments query success count=${currentAppts.length}`);
+        } catch (error) {
+          console.error(`[Slots] error actual= appointments query:`, error);
+          if (error instanceof Error && error.message === 'FIRESTORE_TIMEOUT') {
+             console.log(`[Slots] timeout`);
+          }
+          // Do not throw or block the UI, just fall back to base schedule without checking conflicts
+          // so the user can at least see general availability
+        }
+
+        if (!isMounted) return;
+
+        setBlockedSchedules(currentBlocked);
+        setDayAppointments(currentAppts);
+        console.log(`[Slots] arrays set. currentAppts: ${currentAppts.length}, currentBlocked: ${currentBlocked.length}`);
+      } catch (error) {
+        console.error(`[Slots] error actual= general fetch error:`, error);
+      } finally {
+        if (isMounted) {
+          setIsLoadingSlots(false);
+          console.log(`[Slots] finally setIsLoadingSlots(false)`);
+        }
+      }
+    };
+
+    fetchAvailabilityData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedDate, profile?.uid, open, retrySlotsCount]);
 
   const calculateTotalPrice = () => {
     if (!selectedService) return 0;
@@ -691,7 +735,20 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
                       <div className="grid grid-cols-3 gap-2 sm:gap-3">
                         {selectedDate ? (
-                          isLoadingSlots ? (
+                          !profile?.workingHours ? (
+                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                              <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">Sem expediente</p>
+                              <p className="text-[9px] text-brand-stone/60">Esta profissional ainda não configurou horários de atendimento.</p>
+                            </div>
+                          ) : slotsLoadError ? (
+                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                              <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">Não conseguimos carregar os horários agora.</p>
+                              <p className="text-[9px] text-brand-stone/60 mb-4">Verifique sua conexão ou tente novamente.</p>
+                              <button onClick={() => setRetrySlotsCount(c => c + 1)} className="px-4 py-2 border border-brand-sand text-brand-navy rounded-full text-[10px] hover:bg-brand-sand/20 transition-colors mx-auto block">
+                                Tentar novamente
+                              </button>
+                            </div>
+                          ) : isLoadingSlots ? (
                             <>
                               {[1, 2, 3, 4, 5, 6].map(i => (
                                 <div key={i} className="py-3.5 rounded-xl border border-brand-mist bg-brand-mist/10 animate-pulse h-[42px] flex items-center justify-center">

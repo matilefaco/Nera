@@ -163,13 +163,13 @@ export default function ManageBookingPage() {
     const qAppts = query(
       collection(db, 'appointments'),
       where('professionalId', '==', professional.uid),
-      where('date', '==', selectedDate),
-      where('status', 'in', ['pending', 'confirmed'])
+      where('date', '==', selectedDate)
     );
 
     const unsubAppts = onSnapshot(qAppts, (snap) => {
       try {
-        setDayAppointments(snap.docs.map(d => d.data() as Appointment));
+        const allAppts = snap.docs.map(d => d.data() as Appointment);
+        setDayAppointments(allAppts.filter(a => ['pending', 'confirmed'].includes(a.status)));
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
       }

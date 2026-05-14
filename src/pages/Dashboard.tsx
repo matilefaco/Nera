@@ -418,14 +418,13 @@ setUnconfirmedTomorrow(docs);
     const qWaitlist = query(
       collection(db, 'waitlist'),
       where('professionalId', '==', user.uid),
-      where('status', 'in', ['waiting', 'invited']),
       orderBy('createdAt', 'desc')
     );
 
     const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
-setWaitlist(docs);
+        setWaitlist(docs.filter(doc => ['waiting', 'invited'].includes(doc.status)));
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
       }

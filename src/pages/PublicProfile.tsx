@@ -250,6 +250,8 @@ function PublicProfileContent() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<'timeout' | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const servicesRef = useRef<HTMLDivElement>(null);
   const finalCtaRef = useRef<HTMLDivElement>(null);
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
@@ -316,14 +318,19 @@ function PublicProfileContent() {
   }, [showInterestPopup, interestPopupDismissed, isBookingModalOpen]);
 
   useEffect(() => {
+    let isMounted = true;
+    console.log(`[PublicProfile] effect started for slug: ${slug}`);
+    
     const fetchData = async () => {
       if (!slug) {
-        setLoading(false);
+        console.log(`[PublicProfile] No slug, setting loading to false`);
+        if (isMounted) setLoading(false);
         return;
       }
 
       if (slug === "helena-prado" || slug === "exemplo") {
         setTimeout(() => {
+          if (!isMounted) return;
           setProfile(MOCK_PROFILE);
           setServices(MOCK_SERVICES);
           setReviews(MOCK_REVIEWS);
@@ -334,172 +341,153 @@ function PublicProfileContent() {
       }
 
       try {
+        console.log(`[PublicProfile] starting getDocs for slug: ${slug}`);
+        
         const q = query(collection(db, "users"), where("slug", "==", slug));
-        const snapshot = await getDocs(q);
+        
+        // Fix for Safari iOS infinite getDocs hang (WebSocket/Auth lock): 
+        // Force a timeout after 8 seconds so the UI never gets permanently stuck.
+        let timeoutId: any;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("FIRESTORE_TIMEOUT")), 8000);
+        });
+        timeoutPromise.catch(() => {}); // Prevent unhandled promise rejection
+        
+        const snapshot = await Promise.race([
+          getDocs(q),
+          timeoutPromise
+        ]);
+        clearTimeout(timeoutId);
+
+        console.log(`[PublicProfile] getDocs resolved. empty: ${snapshot.empty}`);
+
+        if (!isMounted) {
+          console.log(`[PublicProfile] component unmounted before getting snapshot result`);
+          return;
+        }
 
         if (!snapshot.empty) {
           const userData = snapshot.docs[0].data();
           const professionalId = snapshot.docs[0].id;
-          setProfile({ ...userData, uid: professionalId } as UserProfile);
+          
+          if (isMounted) {
+            console.log(`[PublicProfile] found user, setting profile and loading to false eagerly`);
+            setProfile({ ...userData, uid: professionalId } as UserProfile);
+            setLoading(false); // Eagerly unblock UI to prevent infinite skeleton
+          }
 
           // Growth Analytics: Log Visit
           if (slug !== "helena-prado" && slug !== "exemplo") {
-            logAnalyticsEvent(professionalId, "visit");
+            logAnalyticsEvent(professionalId, "visit").catch((err) => {
+              console.log("[PublicProfile] Analytics error:", err);
+            });
           }
 
-          // Secondary fetches should be silent and independent
-          // 1. Services
-          try {
-            const servicesQ = query(
-              collection(db, "services"),
-              where("professionalId", "==", professionalId),
-              where("active", "==", true),
-            );
-            const servicesSnapshot = await getDocs(servicesQ);
-            const rawServices = servicesSnapshot.docs.map(
-              (doc) => ({ id: doc.id, ...doc.data() }) as Service,
-            );
-
-            // Filter: active, name, price > 0, duration > 0, professionalId valid
-            const validServices = rawServices
-              .filter(
-                (s) =>
-                  s.active !== false &&
-                  s.name?.trim() &&
-                  (s.price ?? 0) > 0 &&
-                  s.professionalId,
-              )
-              .map((s) => {
-                let parsedDuration = Number(s.duration) || 0;
-                if (parsedDuration < 15 || parsedDuration > 480)
-                  parsedDuration = 60;
-                return {
-                  ...s,
-                  duration: parsedDuration,
-                };
+          console.log(`[PublicProfile] Starting secondary background parallel fetches`);
+          // Secondary fetches should be silent, independent, and parallel
+          Promise.allSettled([
+            // 1. Services
+            (async () => {
+              const servicesQ = query(
+                collection(db, "services"),
+                where("professionalId", "==", professionalId),
+                where("active", "==", true),
+              );
+              const servicesSnapshot = await getDocs(servicesQ);
+              if (!isMounted) return;
+              const rawServices = servicesSnapshot.docs.map(
+                (doc) => ({ id: doc.id, ...doc.data() }) as Service,
+              );
+              const validServices = rawServices
+                .filter((s) => s.active !== false && s.name?.trim() && (s.price ?? 0) > 0 && s.professionalId)
+                .map((s) => ({ ...s, duration: Number(s.duration) >= 15 && Number(s.duration) <= 480 ? Number(s.duration) : 60 }));
+              
+              const normalizedGroups = new Map<string, Service[]>();
+              validServices.forEach((s) => {
+                const normName = s.name.toLowerCase().trim();
+                if (!normalizedGroups.has(normName)) normalizedGroups.set(normName, []);
+                normalizedGroups.get(normName)!.push(s);
               });
 
-            // Deduplicate: Group by professionalId + normalized name
-            const normalizedGroups = new Map<string, Service[]>();
-            validServices.forEach((s) => {
-              const normName = s.name.toLowerCase().trim();
-              if (!normalizedGroups.has(normName))
-                normalizedGroups.set(normName, []);
-              normalizedGroups.get(normName)!.push(s);
-            });
-
-            const dedupedServices = Array.from(normalizedGroups.values()).map(
-              (group) => {
+              const dedupedServices = Array.from(normalizedGroups.values()).map(group => {
                 if (group.length === 1) return group[0];
-                // Sort criteria:
-                // 1. Has description
-                // 2. Most recent (updatedAt or createdAt)
                 return group.sort((a, b) => {
                   const aHasDesc = !!a.description?.trim();
                   const bHasDesc = !!b.description?.trim();
                   if (aHasDesc !== bHasDesc) return aHasDesc ? -1 : 1;
-
-                  const aTime = new Date(
-                    a.updatedAt || a.createdAt || 0,
-                  ).getTime();
-                  const bTime = new Date(
-                    b.updatedAt || b.createdAt || 0,
-                  ).getTime();
-                  return bTime - aTime;
+                  return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
                 })[0];
-              },
-            );
+              });
+              if (isMounted) setServices(dedupedServices);
+            })(),
 
-            if (isDev) {
-              console.log(
-                `[PublicProfile] Services Filtered: ${rawServices.length} -> ${dedupedServices.length}`,
-              );
-              console.log(
-                `[PublicProfile] Services List:`,
-                dedupedServices.map((s) => `${s.name} (${s.id})`),
-              );
-            }
+            // 2. Stats
+            (async () => {
+              const statsDoc = await getDocs(query(collection(db, "review_stats"), where("professionalId", "==", professionalId)));
+              if (!isMounted) return;
+              if (!statsDoc.empty) setStats(statsDoc.docs[0].data());
+            })(),
 
-            setServices(dedupedServices);
-          } catch (e) {
-            devLog("[PublicProfile] Failed to fetch services silently:", e);
-          }
-
-          // 2. Stats
-          try {
-            const statsDoc = await getDocs(
-              query(
-                collection(db, "review_stats"),
+            // 3. Reviews
+            (async () => {
+              const reviewsQ = query(
+                collection(db, "reviews"),
                 where("professionalId", "==", professionalId),
-              ),
-            );
-            if (!statsDoc.empty) {
-              setStats(statsDoc.docs[0].data());
-            }
-          } catch (e) {
-            devLog("[PublicProfile] Failed to fetch stats silently:", e);
-          }
-
-          // 3. Reviews
-          try {
-            const reviewsQ = query(
-              collection(db, "reviews"),
-              where("professionalId", "==", professionalId),
-              where("publicApproved", "==", true),
-              where("publicDisplayMode", "in", ["named", "anonymous"]),
-              limit(15)
-            );
-            const reviewsSnapshot = await getDocs(reviewsQ);
-            setReviews(
-              reviewsSnapshot.docs.map(
-                (doc) => ({ id: doc.id, ...doc.data() }) as Review,
-              ),
-            );
-          } catch (e) {
-            devLog("[PublicProfile] Failed to fetch reviews silently:", e);
-          }
-
-          // 4. Portfolio (Legacy subcollection fallback)
-          if (!userData.portfolio || userData.portfolio.length === 0) {
-            try {
-              const portfolioQ = query(
-                collection(db, "users", professionalId, "portfolio"),
-                orderBy("createdAt", "desc"),
-                limit(12)
+                where("publicApproved", "==", true),
+                where("publicDisplayMode", "in", ["named", "anonymous"]),
+                limit(15)
               );
-              const portfolioSnapshot = await getDocs(portfolioQ);
-              if (!portfolioSnapshot.empty) {
-                const portfolioItems = portfolioSnapshot.docs.map((doc) => ({
-                  id: doc.id,
-                  url: doc.data().url || doc.data().imageUrl,
-                  category: doc.data().category,
-                  createdAt: doc.data().createdAt || new Date().toISOString(),
-                }));
-                setProfile((prev) =>
-                  prev ? { ...prev, portfolio: portfolioItems } : null,
+              const reviewsSnapshot = await getDocs(reviewsQ);
+              if (!isMounted) return;
+              setReviews(reviewsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Review));
+            })(),
+
+            // 4. Portfolio (Legacy)
+            (async () => {
+              if (!userData.portfolio || userData.portfolio.length === 0) {
+                const portfolioQ = query(
+                  collection(db, "users", professionalId, "portfolio"),
+                  orderBy("createdAt", "desc"),
+                  limit(12)
                 );
+                const portfolioSnapshot = await getDocs(portfolioQ);
+                if (!isMounted) return;
+                if (!portfolioSnapshot.empty) {
+                  const portfolioItems = portfolioSnapshot.docs.map((doc) => ({
+                    id: doc.id,
+                    url: doc.data().url || doc.data().imageUrl,
+                    category: doc.data().category,
+                    createdAt: doc.data().createdAt || new Date().toISOString(),
+                  }));
+                  setProfile((prev) => prev ? { ...prev, portfolio: portfolioItems } : null);
+                }
               }
-            } catch (e) {
-              devLog(
-                "[PublicProfile] Failed to fetch legacy portfolio silently:",
-                e,
-              );
-            }
-          }
+            })()
+          ]);
         } else {
-          setProfile(null);
+          console.log(`[PublicProfile] snapshot is empty. Setting profile to null.`);
+          if (isMounted) setProfile(null);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Critical error fetching public profile:", error);
-        // Only show error for critical failure (user not found or total DB failure)
-        notify.error("Não foi possível carregar as informações do perfil.");
+        if (error.message === "FIRESTORE_TIMEOUT") {
+          if (isMounted) setLoadError('timeout');
+        } else {
+          notify.error("Não foi possível carregar as informações do perfil.");
+        }
       } finally {
-        setLoading(false);
+        console.log(`[PublicProfile] finally block executed. isMounted: ${isMounted}`);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchData();
-  }, [slug]);
+
+    return () => {
+      console.log(`[PublicProfile] unmount cleanup executed for slug: ${slug}`);
+      isMounted = false;
+    };
+  }, [slug, retryCount]);
 
   // Handle Waitlist Invitation
   useEffect(() => {
@@ -567,11 +555,12 @@ function PublicProfileContent() {
           collection(db, "appointments"),
           where("professionalId", "==", profile.uid),
           where("date", ">=", todayStr),
-          where("date", "<=", endGameStr),
-          where("status", "in", ["pending", "confirmed", "completed"]),
+          where("date", "<=", endGameStr)
         );
         const snapshot = await getDocs(apptsQ);
-        const allAppts = snapshot.docs.map((doc) => doc.data() as Appointment);
+        const allAppts = snapshot.docs
+          .map((doc) => doc.data() as Appointment)
+          .filter(a => ["pending", "confirmed", "completed"].includes(a.status));
 
         const result = getNextAvailableSlot({
           workingHours: profile.workingHours,
@@ -688,6 +677,48 @@ function PublicProfileContent() {
   }, [profile, services, totalWeeklySlots]);
 
   if (loading) return <PublicProfileSkeleton />;
+
+  if (loadError === 'timeout') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
+        <motion.div
+           initial={{ opacity: 0, scale: 0.95 }}
+           animate={{ opacity: 1, scale: 1 }}
+           className="bg-brand-white p-8 md:p-10 rounded-[40px] shadow-2xl max-w-md w-full border border-brand-sand/30"
+        >
+          <div className="w-20 h-20 bg-brand-terracotta/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-brand-terracotta" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h1 className="font-playfair text-2xl md:text-3xl text-brand-navy mb-4">
+            Não conseguimos carregar esta vitrine agora
+          </h1>
+          <p className="font-outfit text-brand-brown/80 mb-8 max-w-[280px] mx-auto text-sm md:text-base">
+            A conexão demorou mais que o esperado. Tente novamente ou abra no navegador.
+          </p>
+          <div className="flex flex-col gap-4">
+            <button
+               onClick={() => {
+                 setLoading(true);
+                 setLoadError(null);
+                 setRetryCount(c => c + 1);
+               }}
+               className="w-full py-4 px-6 bg-brand-terracotta text-white rounded-2xl font-outfit font-medium hover:bg-brand-navy transition-colors shadow-lg shadow-brand-terracotta/30"
+            >
+              Tentar novamente
+            </button>
+            <button
+               onClick={() => window.open(window.location.href, '_blank')}
+               className="w-full py-4 px-6 bg-transparent border border-brand-sand text-brand-navy rounded-2xl font-outfit font-medium hover:bg-brand-sand/30 transition-colors"
+            >
+              Abrir no navegador
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (!profile)
     return (

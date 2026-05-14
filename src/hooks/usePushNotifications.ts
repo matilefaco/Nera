@@ -35,12 +35,12 @@ export function usePushNotifications() {
   };
 
   async function withTimeout<T>(promise: Promise<T>, ms: number, errorMessage: string): Promise<T> {
-    return Promise.race([
-      promise,
-      new Promise<T>((_, reject) =>
-        setTimeout(() => reject(new Error(errorMessage)), ms)
-      )
-    ]);
+    let timeoutId: any;
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(errorMessage)), ms);
+    });
+    timeoutPromise.catch(() => {});
+    return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
   }
 
   async function requestPermission() {
