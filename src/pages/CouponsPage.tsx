@@ -24,7 +24,7 @@ import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
 
 export default function CouponsPage() {
-  const { user } = useAuth();
+  const { user, isAuthReady } = useAuth();
   const { 
     isUpgradeModalOpen, 
     upgradeFeature, 
@@ -51,32 +51,76 @@ export default function CouponsPage() {
   const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!isAuthReady) return; // Aguardar o AuthContext carregar primeiro
+    
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
 
     const q = query(
       collection(db, 'coupons'),
       where('professionalId', '==', user.uid)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      if (!isMounted) return;
+
       try {
+        // Se vier do cache e estiver vazio, ainda não sabemos se o servidor também está vazio.
+        // Pular a atualização de estado (manter em loading) até que os dados reais do servidor retornem
+        if (snapshot.metadata.fromCache && snapshot.empty) {
+          return;
+        }
+
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
-setCoupons(data.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
-setLoading(false);
+        
+        const getSortTime = (timestamp: any) => {
+          if (!timestamp) return 0;
+          if (typeof timestamp.toDate === 'function') return timestamp.toDate().getTime();
+          if (typeof timestamp.toMillis === 'function') return timestamp.toMillis();
+          if (timestamp.seconds) return timestamp.seconds * 1000;
+          if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+            const time = new Date(timestamp).getTime();
+            return isNaN(time) ? 0 : time;
+          }
+          return 0;
+        };
+
+        const sortedData = data.sort((a, b) => getSortTime(b.createdAt) - getSortTime(a.createdAt));
+        
+        setCoupons(sortedData);
+        setLoading(false);
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
+        if (isMounted) setLoading(false);
       }
-    }, (error) => { console.error("Firestore onSnapshot error:", error); });
+    }, (error) => { 
+      console.error("Firestore onSnapshot error:", error); 
+      if (isMounted) setLoading(false);
+    });
 
     const fetchServices = async () => {
-      const sQuery = query(collection(db, 'services'), where('professionalId', '==', user.uid));
-      const sSnap = await getDocs(sQuery);
-      setServices(sSnap.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
+      try {
+        const sQuery = query(collection(db, 'services'), where('professionalId', '==', user.uid));
+        const sSnap = await getDocs(sQuery);
+        if (isMounted) {
+          setServices(sSnap.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
+        }
+      } catch (err) {
+        console.error("Error fetching services:", err);
+      }
     };
 
     fetchServices();
-    return () => unsubscribe();
-  }, [user]);
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [user?.uid, isAuthReady]);
 
   const handleCreateCoupon = async (e: React.FormEvent) => {
     e.preventDefault();

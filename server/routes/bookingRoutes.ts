@@ -470,25 +470,80 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           throw new Error('Este cupom atingiu o limite de usos.');
         }
 
+        // Check perClientLimit
+        if (coupon.perClientLimit === 1) {
+          const cleanPhone = (appointmentData.clientWhatsapp || appointmentData.clientPhone || '').replace(/\D/g, '');
+          const cleanEmail = (appointmentData.clientEmail || '').trim().toLowerCase();
+          
+          if (!cleanPhone && !cleanEmail) {
+            throw new Error('Preencha seu nome, WhatsApp ou e-mail antes de aplicar o cupom.');
+          }
+
+          let usedCountByClient = 0;
+          
+          if (cleanPhone) {
+            const phoneSnap = await transaction.get(
+              db.collection('appointments')
+                .where('professionalId', '==', finalData.professionalId)
+                .where('clientWhatsapp', '==', cleanPhone)
+                .limit(50)
+            );
+            for (const doc of phoneSnap.docs) {
+              const d = doc.data();
+              if ((d.couponCode === coupon.code || d.appliedCouponCode === coupon.code) && 
+                  ['pending', 'confirmed', 'completed'].includes(d.status)) {
+                usedCountByClient++;
+                break;
+              }
+            }
+          }
+          
+          if (usedCountByClient === 0 && cleanEmail) {
+            const emailSnap = await transaction.get(
+              db.collection('appointments')
+                .where('professionalId', '==', finalData.professionalId)
+                .where('clientEmail', '==', cleanEmail)
+                .limit(50)
+            );
+            for (const doc of emailSnap.docs) {
+              const d = doc.data();
+              if ((d.couponCode === coupon.code || d.appliedCouponCode === coupon.code) && 
+                  ['pending', 'confirmed', 'completed'].includes(d.status)) {
+                usedCountByClient++;
+                break;
+              }
+            }
+          }
+          
+          if (usedCountByClient > 0) {
+            throw new Error('Você já utilizou este cupom em outro agendamento.');
+          }
+        }
+
         // --- ADDED COUPON CALCULATION ---
-        let originalPrice = Number(finalData.price) || 0;
+        let originalPrice = Number(finalData.price) || 0; // price from service
+        let travelFee = Number(finalData.travelFee) || 0; // extracted from payload
+        let subtotalBeforeDiscount = originalPrice + travelFee;
         let discountAmount = 0;
 
         if (coupon.type === 'percentage') {
-          discountAmount = (originalPrice * (Number(coupon.value) || 0)) / 100;
+          discountAmount = (subtotalBeforeDiscount * (Number(coupon.value) || 0)) / 100;
         } else if (coupon.type === 'fixed') {
           discountAmount = Number(coupon.value) || 0;
         }
 
-        const calculatedFinalPrice = Math.max(0, originalPrice - discountAmount);
+        const calculatedFinalPrice = Math.max(0, subtotalBeforeDiscount - discountAmount);
 
         // Update appointment finalData to persist coupon values
         finalData.originalPrice = originalPrice;
+        finalData.travelFee = travelFee;
+        finalData.subtotalBeforeDiscount = subtotalBeforeDiscount;
         finalData.discountAmount = discountAmount;
         finalData.finalPrice = calculatedFinalPrice;
         finalData.couponCode = coupon.code || '';
+        finalData.appliedCouponCode = coupon.code || ''; // Fallback for legacy frontend queries
         finalData.couponType = coupon.type || '';
-        finalData.couponValue = coupon.value || 0;
+        finalData.couponValue = coupon.value || '';
         
         // Temporarily override price for compatibility, but it will be the discounted value
         finalData.price = calculatedFinalPrice;
