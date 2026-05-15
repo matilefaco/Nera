@@ -66,6 +66,7 @@ const THEME_MOODS: Record<string, { label: string, subtitle: string }> = {
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
 
   const profileCompleteness = useMemo(() => {
     if (!profile) return 0;
@@ -338,15 +339,6 @@ export default function ProfilePage() {
     return <AppLoadingScreen message="Carregando seu perfil..." />;
   }
 
-  const uploadImage = async (file: File, path: string): Promise<string> => {
-    console.log(`[ProfileSave] Uploading image to ${path}...`);
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    console.log(`[ProfileSave] Upload successful: ${url}`);
-    return url;
-  };
-
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -609,8 +601,30 @@ export default function ProfilePage() {
         ));
 
         notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
+        setDiagnosticInfo(null);
       } catch (err: any) {
         console.error('[Portfolio] upload failed:', err);
+        
+        // Fetch all possible diagnostic info
+        const storageAny = storage as any;
+        const diag = {
+            authUid: auth.currentUser?.uid,
+            authProjectId: auth.app.options.projectId,
+            authStorageBucket: auth.app.options.storageBucket,
+            storageProjectId: storage.app.options.projectId,
+            storageBucket: storage.app.options.storageBucket,
+            storageCustomBucket: storageAny._location?.bucket || storageAny._bucket?.bucket || storageAny.customBucket || 'N/A',
+            fileRefPath: err.__diag_fileRefPath || `portfolio/${user?.uid}/${uniqueFilename}`,
+            fileRefBucket: err.__diag_fileRefBucket || 'N/A',
+            fileRefFullUrl: err.__diag_fullUrl || 'N/A',
+            errorCode: err.code,
+            errorMessage: err.message,
+            appsCount: (globalThis as any).firebaseAppsCount || ((window as any)?.firebaseAppsCount) || 1,
+            authEqualsStorageApp: auth.app === storage.app
+        };
+        
+        console.error('[DIAGNÓSTICO OBRIGATÓRIO]', diag);
+        setDiagnosticInfo(diag);
         
         let errorMessage = 'Não conseguimos enviar essa imagem. Tente novamente.';
         if (err.code === 'storage/unauthorized') {
@@ -884,6 +898,37 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+            
+            {/* DIAGNÓSTICO OBRIGATÓRIO (TELA) */}
+            {diagnosticInfo && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 my-6 text-left break-all text-sm font-mono text-red-900 shadow-sm relative">
+                <button 
+                  onClick={() => setDiagnosticInfo(null)}
+                  className="absolute top-2 right-2 p-1 text-red-400 hover:text-red-600 bg-red-100 rounded-lg transition-colors"
+                >
+                  <X size={16} />
+                </button>
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-red-200 font-bold text-red-800">
+                  <AlertCircle size={18} />
+                  Diagnóstico de Storage (Erros)
+                </div>
+                <div className="space-y-1">
+                  <p><strong>Auth UID:</strong> {diagnosticInfo.authUid || 'null'}</p>
+                  <p><strong>Auth App ProjectId:</strong> {diagnosticInfo.authProjectId}</p>
+                  <p><strong>Auth App StorageBucket:</strong> {diagnosticInfo.authStorageBucket}</p>
+                  <p><strong>Storage App ProjectId:</strong> {diagnosticInfo.storageProjectId}</p>
+                  <p><strong>Storage App StorageBucket:</strong> {diagnosticInfo.storageBucket}</p>
+                  <p><strong>Storage Custom Bucket:</strong> {diagnosticInfo.storageCustomBucket}</p>
+                  <p><strong>FileRef Bucket:</strong> {diagnosticInfo.fileRefBucket}</p>
+                  <p><strong>FileRef Path:</strong> {diagnosticInfo.fileRefPath}</p>
+                  <p><strong>FileRef URL:</strong> {diagnosticInfo.fileRefFullUrl}</p>
+                  <p><strong>Error Code:</strong> {diagnosticInfo.errorCode}</p>
+                  <p><strong>Error Message:</strong> {diagnosticInfo.errorMessage}</p>
+                  <p><strong>Apps count:</strong> {diagnosticInfo.appsCount}</p>
+                  <p><strong>Auth === Storage App:</strong> {String(diagnosticInfo.authEqualsStorageApp)}</p>
+                </div>
+              </div>
+            )}
 
             {/* Diferenciais, Instagram, Slug */}
             <div className="space-y-6 px-2">

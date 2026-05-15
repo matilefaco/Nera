@@ -84,6 +84,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [isSavingStep, setIsSavingStep] = useState(false);
+  const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
 
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const portfolioInputRef = useRef<HTMLInputElement>(null);
@@ -337,13 +338,6 @@ export default function OnboardingPage() {
     } catch (error) {
       console.error('[Onboarding] Error saving progress:', error);
     }
-  };
-
-  const uploadImage = async (file: File, path: string): Promise<string> => {
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    return url;
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -781,8 +775,30 @@ export default function OnboardingPage() {
         ));
 
         notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
+        setDiagnosticInfo(null);
       } catch (error: any) {
         console.error('[Portfolio] upload failed:', error);
+        
+        // Fetch diagnostic info
+        const storageAny = storage as any;
+        const diag = {
+            authUid: auth.currentUser?.uid,
+            authProjectId: auth.app.options.projectId,
+            authStorageBucket: auth.app.options.storageBucket,
+            storageProjectId: storage.app.options.projectId,
+            storageBucket: storage.app.options.storageBucket,
+            storageCustomBucket: storageAny._location?.bucket || storageAny._bucket?.bucket || storageAny.customBucket || 'N/A',
+            fileRefPath: error.__diag_fileRefPath || `portfolio/${user.uid}/${uniqueFilename}`,
+            fileRefBucket: error.__diag_fileRefBucket || 'N/A',
+            fileRefFullUrl: error.__diag_fullUrl || 'N/A',
+            errorCode: error.code,
+            errorMessage: error.message,
+            appsCount: (globalThis as any).firebaseAppsCount || ((window as any)?.firebaseAppsCount) || 1,
+            authEqualsStorageApp: auth.app === storage.app
+        };
+        
+        console.error('[DIAGNÓSTICO OBRIGATÓRIO]', diag);
+        setDiagnosticInfo(diag);
         
         let errorMessage = 'Não conseguimos enviar essa imagem. Tente novamente.';
         if (error.code === 'storage/unauthorized') {

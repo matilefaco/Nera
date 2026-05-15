@@ -103,7 +103,7 @@ export async function createServerApp() {
     if (req.originalUrl.includes("/api/plans/webhook") || req.path.includes("/api/plans/webhook")) {
       express.raw({ type: "application/json" })(req, res, next);
     } else {
-      express.json()(req, res, next);
+      express.json({ limit: '10mb' })(req, res, next);
     }
   });
 

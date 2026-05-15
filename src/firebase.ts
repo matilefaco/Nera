@@ -11,16 +11,14 @@ const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDO2OcFecgXEfATajxcY0piPP8VfCoQGWU",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "ai-studio-applet-webapp-bb725.firebaseapp.com",
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "ai-studio-applet-webapp-bb725",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "ai-studio-applet-webapp-bb725.firebasestorage.app",
+  storageBucket: "ai-studio-applet-webapp-bb725.firebasestorage.app",
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "768951224787",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:768951224787:web:9165a57c367a649f1e8726",
 };
 
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-export const db = getFirestore(app);
-export const storage = getStorage(app);
 
-// Initialize Auth securely to prevent ALREADY_INITIALIZED errors in HMR
+// Initialize Auth BEFORE anything else
 export const auth = (() => {
   try {
     return getAuth(app);
@@ -31,6 +29,9 @@ export const auth = (() => {
     });
   }
 })();
+
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 export async function notify(type: string, payload: any) {
   try {
@@ -135,17 +136,25 @@ export const sanitizeAppointment = (data: any, isUpdate = false): any => {
 };
 
 export async function uploadImageToStorage(file: File, path: string): Promise<string> {
-  try {
-    const bytes = await file.arrayBuffer();
-    const fileRef = ref(storage, path);
-    await uploadBytes(fileRef, bytes, { contentType: file.type });
-    return await getDownloadURL(fileRef);
-  } catch (error: any) {
-    if (error.code) {
-       console.error(`[Storage] Firebase Error Code:`, error.code, error.message);
-    }
-    throw error;
+  if (!auth.currentUser) {
+    throw new Error('Usuário não autenticado');
   }
+
+  // Convert File to Base64 to bypass iOS Safari File/Blob issues in iFrames
+  const base64DataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
+  });
+
+  const { uploadString, getDownloadURL, ref } = await import('firebase/storage');
+  const storageRef = ref(storage, path);
+  
+  await uploadString(storageRef, base64DataUrl, 'data_url');
+  const publicUrl = await getDownloadURL(storageRef);
+  
+  return publicUrl;
 }
 
 export async function saveProfilePartial(uid: string, data: Partial<UserProfile>) {

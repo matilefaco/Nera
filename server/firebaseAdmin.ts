@@ -3,6 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 
 export let db: admin.firestore.Firestore;
 export let defaultDb: admin.firestore.Firestore;
+export let storageBucket: ReturnType<admin.storage.Storage['bucket']>;
 
 /**
  * Returns the initialized Firestore instance.
@@ -16,19 +17,28 @@ export const getDb = () => {
   return db;
 };
 
+export const getStorageBucket = () => {
+  if (!storageBucket) {
+    storageBucket = admin.storage().bucket();
+  }
+  return storageBucket;
+};
+
 export const initFirebase = async () => {
   try {
     if (!admin.apps.length) {
       const projectId = process.env.VITE_FIREBASE_PROJECT_ID || "ai-studio-applet-webapp-bb725";
       admin.initializeApp({
-        projectId
+        projectId,
+        storageBucket: "ai-studio-applet-webapp-bb725.firebasestorage.app"
       });
-      console.log(`[FIREBASE ADMIN] Initialized with projectId: ${projectId}`);
+      console.log(`[FIREBASE ADMIN] Initialized with projectId: ${projectId} and storageBucket`);
     }
 
     // Using the (default) database instance
     db = getFirestore();
     defaultDb = db;
+    storageBucket = admin.storage().bucket();
     console.log(`[NERA FIRESTORE] Initialized with database: (default)`);
   } catch (err: any) {
     console.error("[FIREBASE ADMIN] Critical Initialization Error:", err.message);
