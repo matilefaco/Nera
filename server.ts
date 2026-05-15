@@ -119,6 +119,7 @@ export async function createServerApp() {
   const apiRouter = express.Router();
 
   // Specific routers
+  apiRouter.use("/ai", (await import("./server/routes/aiRoutes.js")).default);
   apiRouter.use("/slug", (await import("./server/routes/slugRoutes.js")).default);
   apiRouter.use("/health", (await import("./server/routes/healthRoutes.js")).default);
   apiRouter.use("/profile", (await import("./server/routes/profileRoutes.js")).default);

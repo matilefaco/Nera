@@ -20,7 +20,7 @@ import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { Skeleton } from '../components/ui/Skeleton';
 
 export default function ServicesPage() {
-  const { user, profile } = useAuth();
+  const { user, profile, isAuthReady } = useAuth();
   const [services, setServices] = useState<any[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -59,10 +59,22 @@ export default function ServicesPage() {
   };
 
   useEffect(() => {
-    if (!user) return;
+    let isMounted = true;
+    
+    if (!isAuthReady) return;
+    if (!user) {
+      if (isMounted) setIsInitialLoading(false);
+      return;
+    }
+
+    const fallbackTimeout = setTimeout(() => {
+      if (isMounted) setIsInitialLoading(false);
+    }, 4000);
 
     const q = query(collection(db, 'services'), where('professionalId', '==', user.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+      if (!isMounted) return;
+
       try {
         const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[];
         const filtered = rawServices.filter(s => 
@@ -77,13 +89,13 @@ export default function ServicesPage() {
               duration: parsedDuration
             };
           });
-const grouped = new Map<string, any[]>();
-filtered.forEach((s: any) => {
+        const grouped = new Map<string, any[]>();
+        filtered.forEach((s: any) => {
             const key = s.name.trim().toLowerCase().replace(/\s+/g, ' ');
             if (!grouped.has(key)) grouped.set(key, []);
             grouped.get(key)!.push(s);
           });
-const uniqueServices = Array.from(grouped.values()).map(list => {
+        const uniqueServices = Array.from(grouped.values()).map(list => {
             if (list.length === 1) return list[0];
             
             // Critérios de desempate se houver duplicados:
@@ -100,18 +112,29 @@ const uniqueServices = Array.from(grouped.values()).map(list => {
               return bTime - aTime;
             })[0];
           });
-setServices(uniqueServices);
-setIsInitialLoading(false);
+        setServices(uniqueServices);
+
+        if (snapshot.empty && snapshot.metadata.fromCache) {
+          // just wait
+        } else {
+          setIsInitialLoading(false);
+          clearTimeout(fallbackTimeout);
+        }
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
         setIsInitialLoading(false);
       }
     }, (error) => { 
         console.error("Firestore onSnapshot error:", error); 
-        setIsInitialLoading(false);
+        if (isMounted) setIsInitialLoading(false);
     });
-    return () => unsubscribe();
-  }, [user]);
+    
+    return () => {
+      isMounted = false;
+      clearTimeout(fallbackTimeout);
+      unsubscribe();
+    };
+  }, [user, isAuthReady]);
 
   const generateAIDescription = async () => {
     if (!name) {
@@ -138,18 +161,25 @@ setIsInitialLoading(false);
         setDescription(sanitized.slice(0, 160));
         
         if (result.source === 'fallback') {
-          notify.success('Geramos uma sugestão básica. Você pode editar antes de salvar.', {
-            icon: '⚠️',
-            style: { border: '1px solid #EAB308', color: '#854D0E', fontSize: '12px' }
-          });
+          notify.error(`Sua API NVIDIA retornou erro: ${result.error || 'Erro interno'}`);
         } else {
           notify.success('Descrição gerada com IA! ✨');
         }
       } else {
-        notify.error('Não foi possível gerar no momento.');
+        notify.error(`Erro exato: ${result.error || 'Desconhecido'}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('[AI Generation] Error:', error);
+      fetch('/api/health/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error_name: error.name,
+          error_message: error.message,
+          error_stack: error.stack,
+          source: 'ServicesPage generateAIDescription catch block',
+        })
+      }).catch(e => console.error(e));
       notify.error('Não foi possível gerar a descrição agora.');
     } finally {
       setIsGeneratingAI(false);
@@ -310,31 +340,31 @@ setIsInitialLoading(false);
                 layout 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-sm group relative overflow-hidden"
+                className="bg-brand-white p-6 sm:p-8 rounded-[32px] border border-brand-mist shadow-sm group relative overflow-hidden flex flex-col justify-between"
               >
-                <div className="absolute top-0 right-0 w-40 h-40 bg-brand-linen/50 rounded-full -mr-20 -mt-20 transition-transform group-hover:scale-110" />
+                <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 bg-brand-linen/50 rounded-full -mr-12 -mt-12 sm:-mr-16 sm:-mt-16 transition-transform group-hover:scale-110" />
                 
-                <div className="flex justify-between items-start mb-8 relative z-10">
-                  <div className="flex-1 pr-6">
-                    <h3 className="text-2xl font-serif font-normal text-brand-ink mb-3 group-hover:text-brand-terracotta transition-colors">{service.name}</h3>
-                    <p className="text-brand-stone text-sm font-light leading-relaxed line-clamp-2">{service.description || 'Nenhuma descrição adicionada.'}</p>
+                <div className="flex justify-between items-start mb-6 sm:mb-8 relative z-10 gap-3 sm:gap-4">
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h3 className="text-lg sm:text-xl font-serif text-brand-ink mb-1.5 sm:mb-2 group-hover:text-brand-terracotta transition-colors leading-snug">{service.name}</h3>
+                    <p className="text-brand-stone text-xs sm:text-sm font-light leading-relaxed line-clamp-2">{service.description || 'Nenhuma descrição adicionada.'}</p>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => openEdit(service)} className="p-3 hover:bg-brand-parchment rounded-2xl text-brand-mist hover:text-brand-ink transition-all">
-                      <Edit2 size={20} />
+                  <div className="flex flex-col sm:flex-row gap-1 shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-2xl border border-brand-mist/30">
+                    <button onClick={() => openEdit(service)} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all">
+                      <Edit2 size={16} className="sm:w-[18px] sm:h-[18px]" />
                     </button>
-                    <button onClick={() => confirmDelete(service.id)} className="p-3 hover:bg-brand-linen rounded-2xl text-brand-mist hover:text-brand-terracotta transition-all">
-                      <Trash2 size={20} />
+                    <button onClick={() => confirmDelete(service.id)} className="p-2 hover:bg-brand-linen rounded-xl text-brand-stone/60 hover:text-brand-terracotta transition-all">
+                      <Trash2 size={16} className="sm:w-[18px] sm:h-[18px]" />
                     </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-8 pt-8 border-t border-brand-mist relative z-10">
-                  <div className="flex items-center gap-2 text-[10px] font-medium text-brand-stone uppercase tracking-widest">
-                    <Clock size={16} className="text-brand-terracotta" /> {service.duration} min
+                <div className="flex items-center gap-5 sm:gap-6 pt-5 sm:pt-6 border-t border-brand-mist/50 relative z-10">
+                  <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] font-medium text-brand-stone uppercase tracking-widest">
+                    <Clock size={12} className="text-brand-terracotta sm:w-3.5 sm:h-3.5" /> {service.duration} min
                   </div>
-                  <div className="flex items-center gap-2 text-lg font-serif italic text-brand-terracotta">
-                    <Sparkles size={16} /> {formatCurrency(service.price)}
+                  <div className="flex items-center gap-1.5 text-[15px] sm:text-lg font-serif italic text-brand-terracotta">
+                    <DollarSign size={14} className="sm:w-4 sm:h-4 opacity-70" /> {formatCurrency(service.price).replace('R$', '').trim()}
                   </div>
                 </div>
               </motion.div>
