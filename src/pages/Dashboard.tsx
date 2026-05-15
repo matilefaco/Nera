@@ -230,14 +230,17 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
+    let isMounted = true;
     const qAlerts = query(
       collection(db, 'alerts'),
       where('professionalId', '==', user.uid),
       where('read', '==', false),
-      orderBy('createdAt', 'desc')
+      orderBy('createdAt', 'desc'),
+      limit(50)
     );
 
     const unsubAlerts = onSnapshot(qAlerts, (snap) => {
+      if (!isMounted) return;
       try {
         const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 setAlerts(docs);
@@ -248,7 +251,10 @@ setAlerts(docs);
       console.error('[Dashboard] Subscription error on qAlerts:', error);
     });
 
-    return () => unsubAlerts();
+    return () => {
+      isMounted = false;
+      unsubAlerts();
+    };
   }, [user]);
 
   const handleMarkAlertRead = async (alertId: string) => {
@@ -332,6 +338,7 @@ setAlerts(docs);
     );
 
     const unsubToday = onSnapshot(qToday, (snapshot) => {
+      if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
 const relevantToday = docs.filter(a => isRevenueStatus(a.status));
@@ -357,6 +364,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
     );
 
     const unsubUnconfirmed = onSnapshot(qUnconfirmed, (snapshot) => {
+      if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
 setUnconfirmedTomorrow(docs);
@@ -429,6 +437,7 @@ setUnconfirmedTomorrow(docs);
     );
 
     const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
+      if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
         const filteredDocs = docs.filter(doc => ['waiting', 'invited'].includes(doc.status));
@@ -953,8 +962,8 @@ setUnconfirmedTomorrow(docs);
                 Olá, {safeString(profile?.name).split(' ')[0]} ✨
               </h1>
               <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <span className={cn(
-                  "text-[9px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded flex items-center",
+                <Link to="/planos" className={cn(
+                  "text-[9px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded flex items-center hover:opacity-80 transition-opacity",
                   plan === 'pro' || plan === 'essencial' 
                     ? "text-brand-ink bg-brand-linen border border-brand-mist/50" 
                     : "text-brand-stone bg-brand-mist/10 border border-brand-mist/30"
@@ -964,7 +973,7 @@ setUnconfirmedTomorrow(docs);
                     plan === 'essencial' ? 'Essencial' : 
                     'Gratuito'
                   }
-                </span>
+                </Link>
                 {(plan === 'free') && (
                   <Link to="/planos" className="text-[10px] text-brand-terracotta hover:text-brand-sienna transition-colors font-medium relative top-[-1px]">
                     Upgrade
@@ -1060,112 +1069,117 @@ setUnconfirmedTomorrow(docs);
                     </div>
                     <div>
                       <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
-                        Performance
+                        Crescimento e Inteligência
                       </h3>
-                      <p className="text-xs font-serif text-brand-ink italic">Resultados da vitrine</p>
+                      <p className="text-xs font-serif text-brand-ink italic">Visão estratégica da sua vitrine</p>
                     </div>
                   </div>
-                  <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest">
+                  <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest hidden sm:flex">
                     <span className="px-3 py-1 bg-brand-white rounded-full shadow-sm text-brand-ink">Últimos 30 dias</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-6">
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas na vitrine</p>
-                    <div className="flex items-baseline gap-2">
-                      <p className="text-xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
-                      <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
+                {!features.advancedDashboard ? (
+                  // Essencial / Free View
+                  <>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-6">
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas na vitrine</p>
+                        <div className="flex items-baseline gap-2">
+                          <p className="text-xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
+                          <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
+                        <p className="text-xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
-                    <p className="text-xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Taxa de Conversão</p>
-                    {features.advancedDashboard ? (
-                      <p className="text-xl font-serif text-brand-ink">{growthMetrics.convRate.toFixed(1)}%</p>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <p className="text-xl font-serif text-brand-mist">---</p>
-                        <Lock size={10} className="text-brand-mist" />
+
+                    <div className="mt-2 bg-brand-linen/40 p-5 rounded-[24px] border border-brand-mist/50 flex flex-col items-start gap-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-brand-mist/20 text-brand-terracotta">
+                        <Sparkles size={18} />
+                      </div>
+                      <div>
+                         <h4 className="text-sm font-serif text-brand-ink mb-1">Evolua para o Nera Pro</h4>
+                         <p className="text-[11px] text-brand-stone font-light italic leading-relaxed mb-4">
+                           Desbloqueie insights inteligentes, saiba o que as clientes estão procurando, seu serviço campeão e horários mais desejados para faturar ainda mais.
+                         </p>
+                         <Link to="/planos" className="inline-block">
+                           <PremiumButton variant="terracotta" className="text-[9px] py-2 px-5 flex items-center justify-center gap-2">
+                             Ver planos Nera Pro <ChevronRight size={12} />
+                           </PremiumButton>
+                         </Link>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  // Pro View
+                  <div className="flex flex-col gap-6">
+                    {/* Hero Insight */}
+                    {growthMetrics.growthInsightsList && growthMetrics.growthInsightsList.length > 0 && (
+                      <div className="bg-brand-linen p-5 rounded-[24px] border border-brand-mist/40 flex items-start gap-4 shadow-sm relative overflow-hidden">
+                        <div className="absolute -top-4 -right-4 p-4 opacity-5 pointer-events-none text-brand-terracotta">
+                          <Sparkles size={80} />
+                        </div>
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-brand-mist/20 text-brand-terracotta z-10">
+                          <Zap size={18} />
+                        </div>
+                        <div className="flex-1 z-10">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <h4 className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">{growthMetrics.growthInsightsList[0].title}</h4>
+                            <span className="text-[7px] font-bold text-brand-terracotta bg-brand-terracotta/10 px-1.5 py-0.5 rounded uppercase tracking-widest">Nera AI</span>
+                          </div>
+                          <p className="text-[13px] text-brand-ink font-serif leading-relaxed italic pr-4">
+                            "{growthMetrics.growthInsightsList[0].description}"
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pro Metrics Grid */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                         <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Visitas na vitrine (30d)</p>
+                         <div className="flex items-baseline gap-2">
+                           <p className="text-xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
+                           {growthMetrics.visits7d > 0 && <span className="text-[9px] font-serif italic text-brand-terracotta">+{growthMetrics.visits7d} na semana</span>}
+                         </div>
+                       </div>
+                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                         <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Conversão média</p>
+                         <p className="text-xl font-serif text-brand-ink">{growthMetrics.convRate.toFixed(1)}%</p>
+                       </div>
+                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Serviço Campeão</p>
+                          <p className="text-sm font-serif text-brand-ink truncate font-medium">{growthMetrics.topService}</p>
+                       </div>
+                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Melhor Horário</p>
+                          <p className="text-sm font-serif text-brand-ink font-medium">{growthMetrics.bestTime}</p>
+                       </div>
+                    </div>
+
+                    {/* Secondary Insights */}
+                    {growthMetrics.growthInsightsList && growthMetrics.growthInsightsList.length > 1 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+                        {growthMetrics.growthInsightsList.slice(1).map((insight: any, idx: number) => (
+                          <div key={idx} className="p-4 rounded-2xl border border-brand-mist/30 flex items-start gap-3 bg-brand-white">
+                            <div className="w-8 h-8 rounded-xl bg-brand-linen/50 flex items-center justify-center text-brand-stone shrink-0">
+                               {insight.icon === 'Star' ? <Star size={14} /> : insight.icon === 'Clock' ? <Clock size={14} /> : <Sparkles size={14} />}
+                            </div>
+                            <div>
+                              <h4 className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">{insight.title}</h4>
+                              <p className="text-[11px] text-brand-ink font-light leading-relaxed">
+                                {insight.description}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-                </div>
-
-                {/* BLOCO ÚNICO "Growth Pro" */}
-                {!features.advancedDashboard ? (
-                  <div className="mt-2 bg-brand-parchment/60 p-5 rounded-[20px] border border-brand-mist/50 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm">
-                        <Sparkles size={18} className="text-brand-terracotta" />
-                      </div>
-                      <div>
-                         <h4 className="text-sm font-serif text-brand-ink mb-0.5">Growth Pro</h4>
-                         <p className="text-[10px] text-brand-stone font-light italic max-w-[280px]">
-                           Descubra origem das clientes, serviço campeão e melhores horários.
-                         </p>
-                      </div>
-                    </div>
-                    <Link to="/planos" className="w-full sm:w-auto mt-2 sm:mt-0">
-                      <PremiumButton variant="terracotta" className="w-full text-[9px] py-3 px-6 flex items-center justify-center gap-2">
-                        Ver planos <ChevronRight size={12} />
-                      </PremiumButton>
-                    </Link>
-                  </div>
-                ) : (
-                   /* Growth Pro Desbloqueado */
-                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-brand-linen mt-2">
-                     {/* Origem Principal */}
-                     <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 text-center">
-                       <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Origem Principal</p>
-                       <p className="text-xs font-serif text-brand-ink">{growthMetrics.mainOrigin}</p>
-                     </div>
-                     {/* Serviço Campeão */}
-                     <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 text-center">
-                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Serviço Campeão</p>
-                        <p className="text-xs font-serif text-brand-ink truncate px-2">{growthMetrics.topService}</p>
-                     </div>
-                     {/* Horário + Vendido */}
-                     <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 text-center">
-                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Melhor Horário</p>
-                        <p className="text-xs font-serif text-brand-ink">{growthMetrics.bestTime}</p>
-                     </div>
-                   </div>
                 )}
-                
-                {/* AI Insights - Apenas se for Pro e não tiver fechado */}
-                <AnimatePresence>
-                  {features.advancedDashboard && !insightDismissed && (
-                    <motion.div 
-                      key="growth-insight"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="bg-brand-linen/40 p-4 rounded-2xl border border-brand-mist/30 flex items-start gap-3 overflow-hidden relative mt-2"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-white flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm border border-brand-mist/20">
-                        <Zap size={16} />
-                      </div>
-                      <div className="flex-1 pr-6">
-                        <h4 className="text-[10px] font-bold text-brand-ink uppercase tracking-widest mb-1">Dica de Performance</h4>
-                        <p className="text-[11px] text-brand-stone font-light leading-relaxed italic">
-                          {growthMetrics.growthInsight}
-                        </p>
-                      </div>
-                      <button 
-                        onClick={() => setInsightDismissed(true)}
-                        className="absolute top-4 right-4 p-1 text-brand-stone hover:text-brand-ink"
-                      >
-                        <X size={12} />
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-                
               </section>
             )}
           </div>
@@ -1953,7 +1967,7 @@ setUnconfirmedTomorrow(docs);
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl opacity-50" />
                 <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] mb-3 relative z-10">Eficiência Automática</p>
                 <p className="text-[11px] text-white/70 leading-relaxed italic relative z-10">
-                  No modo <strong>Automático</strong>, o Nera envia um convite por WhatsApp assim que uma vaga compatível surge. A primeira a aceitar fica com o horário — sem você precisar mover um dedo.
+                  No modo <strong>Automático</strong>, a Nera envia um convite por WhatsApp assim que uma vaga compatível surge. A primeira a aceitar fica com o horário — sem você precisar mover um dedo.
                 </p>
               </div>
             </motion.div>

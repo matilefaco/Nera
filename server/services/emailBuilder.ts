@@ -219,8 +219,8 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                       <tr>
                         <td align="center">
                           <p style="margin: 0; color: ${COLORS.stone}; font-size: 11px; font-family: ${FONTS.sans}; line-height: 1.5;">
-                            NERA &copy; 2026 &bull; Agendamento Premium.<br>
-                            Enviado com carinho pelo Nera • Agendamento para profissionais autônomas
+                            Nera &copy; 2026 &bull; Feito com intenção no Brasil 🇧🇷<br>
+                            Para profissionais que valorizam excelência.
                           </p>
                           ${showUnsubscribe && unsubscribeUrl ? `
                             <div style="margin-top: 15px;">

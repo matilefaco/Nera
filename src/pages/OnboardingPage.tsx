@@ -350,6 +350,18 @@ export default function OnboardingPage() {
     const file = e.target.files?.[0];
 
     if (file && user) {
+      if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+        notify.warning('Sua sessão expirou. Entre novamente para atualizar sua foto.', { id: 'auth_expire_avatar' });
+        return;
+      }
+      
+      try {
+         await auth.currentUser.getIdToken(true);
+      } catch (err) {
+         notify.warning('Sua sessão expirou. Entre novamente para atualizar sua foto.', { id: 'auth_expire_avatar' });
+         return;
+      }
+
       setUploadingImage(true);
       
       // 1. Immediate Local Preview
@@ -710,6 +722,18 @@ export default function OnboardingPage() {
     const files = e.target.files;
 
     if (files && files.length > 0 && user) {
+      if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+        notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.', { id: 'auth_expire_portfolio' });
+        return;
+      }
+      
+      try {
+         await auth.currentUser.getIdToken(true);
+      } catch (err) {
+         notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.', { id: 'auth_expire_portfolio' });
+         return;
+      }
+
       setUploadingImage(true);
       const file = files[0];
       const tempId = 'temp-' + Date.now();
@@ -722,6 +746,7 @@ export default function OnboardingPage() {
         console.error('[Portfolio] error creating preview:', previewErr);
       }
 
+      let uniqueFilename = '';
       try {
         // 2. Compression
         const options = {
@@ -730,20 +755,25 @@ export default function OnboardingPage() {
           useWebWorker: false
         };
         const compressedFile = await imageCompression(file, options);
+        console.log(`[Portfolio Onboarding] Compression done. Original: ${file.size}, Compressed: ${compressedFile.size}`);
         
         // 3. Upload
-        const downloadUrl = await uploadImageToStorage(compressedFile, `portfolio/${user.uid}`);
+        uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+        const downloadUrl = await uploadImageToStorage(compressedFile, `portfolio/${user.uid}/${uniqueFilename}`);
+        console.log('[Portfolio Onboarding] upload finished:', downloadUrl);
         
         // 3b. AI Categorization
         let autoCategory = '';
         try {
           autoCategory = await analyzePortfolio({ imageUrl: downloadUrl, specialty });
-        } catch {
+        } catch (catErr) {
+          console.warn('[Portfolio Onboarding] AI Categorization failed:', catErr);
           // silencioso — categoria fica vazia se falhar
         }
 
         // 4. Persistence
         const docId = await savePortfolioItem(user.uid, downloadUrl, autoCategory || specialty || 'Geral');
+        console.log('[Portfolio Onboarding] saved successfully with ID:', docId);
         
         // Update local state with real ID
         setPortfolio(prev => prev.map(item => 
@@ -753,7 +783,18 @@ export default function OnboardingPage() {
         notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
       } catch (error: any) {
         console.error('[Portfolio] upload failed:', error);
-        notify.error('Não foi possível carregar a imagem.');
+        
+        let errorMessage = 'Não conseguimos enviar essa imagem. Tente novamente.';
+        if (error.code === 'storage/unauthorized') {
+           errorMessage = 'Permissão negada. Verifique se você está logada corretamente.';
+        } else if (error.code === 'storage/canceled') {
+           errorMessage = 'O upload foi cancelado.';
+        } else if (error.message && error.message.includes('corrupted')) {
+           errorMessage = 'A imagem parece estar corrompida. Tente selecionar outra foto.';
+        } else if (error.message && error.message.includes('format')) {
+           errorMessage = 'Esse formato ainda não é suportado.';
+        }
+        notify.error(errorMessage);
         setPortfolio(prev => prev.filter(item => item.id !== tempId));
       } finally {
         setUploadingImage(false);

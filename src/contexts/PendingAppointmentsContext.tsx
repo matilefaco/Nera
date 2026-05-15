@@ -28,6 +28,7 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
     if (!user?.uid) {
       setPendingAppointments([]);
       setLoading(false);
@@ -46,6 +47,7 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
     const unsubscribe = onSnapshot(
       qPending,
       (snapshot) => {
+        if (!isMounted) return;
         try {
           const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
           setPendingAppointments(docs); 
@@ -58,13 +60,17 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
         }
       },
       (error) => {
+        if (!isMounted) return;
         console.error('[PendingAppointmentsProvider] Firestore onSnapshot error:', error);
         setError(error);
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [user?.uid]);
 
   const value = {

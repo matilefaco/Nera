@@ -34,7 +34,7 @@ export default function CheckoutCanceledPage() {
 
         <div className="mt-10 pt-8 border-top border-brand-stone/5">
           <p className="text-[10px] text-brand-stone/50 font-bold uppercase tracking-widest">
-            Dúvidas? Entre em contato com nosso suporte.
+            Dúvidas? <a href="mailto:suporte@usenera.com" className="text-brand-terracotta hover:underline">Entre em contato com nosso suporte</a>.
           </p>
         </div>
       </motion.div>

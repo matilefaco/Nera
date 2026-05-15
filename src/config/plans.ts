@@ -58,7 +58,7 @@ export const PLANS: Plan[] = [
     price: 89,
     priceDescriptor: '/mês',
     subtitle: 'Recursos avançados para crescer e recuperar oportunidades.',
-    trialDays: 15,
+    trialDays: 0,
     popular: true,
     tagline: 'Crescimento e Autoridade',
     features: [

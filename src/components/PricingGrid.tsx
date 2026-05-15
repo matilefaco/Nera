@@ -5,11 +5,12 @@ import '../pages/LandingPage.css'; // Make sure styles are available
 interface PricingGridProps {
   currentPlan?: string;
   onUpgrade?: (planId: 'essencial' | 'pro') => void;
+  onManageSubscription?: () => void;
   loadingPlan?: string | null;
   isLanding?: boolean;
 }
 
-export default function PricingGrid({ currentPlan, onUpgrade, loadingPlan, isLanding }: PricingGridProps) {
+export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscription, loadingPlan, isLanding }: PricingGridProps) {
   return (
     <div className="landing-page" style={{ background: 'transparent', minHeight: 'auto', padding: 0 }}>
       <div className={`plans-grid ${isLanding ? 'reveal' : ''}`} style={{ maxWidth: '1200px', margin: '0 auto', padding: isLanding ? '0 48px' : '0' }}>
@@ -84,12 +85,20 @@ export default function PricingGrid({ currentPlan, onUpgrade, loadingPlan, isLan
             <Link to="/register?plan=pro" className="btn-plan terra-solid">Começar como Pro</Link>
           ) : (
             <button 
-              onClick={() => onUpgrade?.('pro')}
+              onClick={(e) => {
+                e.preventDefault();
+                const planType = currentPlan?.toLowerCase();
+                if (planType === 'essencial' && onUpgrade) {
+                  onUpgrade('pro');
+                } else if (onUpgrade) {
+                  onUpgrade('pro');
+                }
+              }}
               disabled={currentPlan === 'pro' || loadingPlan === 'pro'}
               className="btn-plan terra-solid"
-              style={{ opacity: currentPlan === 'pro' ? 0.5 : 1 }}
+              style={{ opacity: (currentPlan === 'pro') ? 0.5 : 1 }}
             >
-              {loadingPlan === 'pro' ? 'Processando...' : currentPlan === 'pro' ? 'Plano Ativado' : 'Assinar Pro'}
+              {loadingPlan === 'pro' ? 'Processando...' : currentPlan === 'pro' ? 'Plano Ativado' : currentPlan === 'essencial' ? 'Evoluir para Pro' : 'Assinar Pro'}
             </button>
           )}
         </div>

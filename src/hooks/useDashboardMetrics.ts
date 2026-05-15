@@ -186,11 +186,50 @@ export function useDashboardMetrics(
         weakestDay = dayNames[weakestDayIdx];
     }
 
-    // Growth Metrics
+    // Growth Metrics Insights Generation (More Premium and Human)
     const convRate = visits30d > 0 ? (appointments30d / visits30d) * 100 : 0;
-    const growthInsight = convRate > 5 
-      ? "Sua conversão está acima da média! Tente aumentar sua vitrine com mais fotos para converter ainda mais."
-      : "Seu volume de visitas é bom, mas a conversão pode melhorar. Ajuste os nomes dos seus serviços para torná-los mais atraentes.";
+    
+    let growthInsightTitle = "Oportunidade identificada";
+    let growthInsight = "";
+    
+    if (convRate > 5) {
+      growthInsightTitle = "Excelente Conversão";
+      growthInsight = "Seu perfil está convertendo acima da média. Adicionar novas fotos pode aumentar ainda mais o seu faturamento.";
+    } else if (visits30d > 15) {
+       growthInsightTitle = "Atenção ao Perfil";
+       growthInsight = "Sua vitrine está atraindo bastante gente, mas a conversão pode melhorar. Ajuste os nomes e descrições dos serviços para atraí-las.";
+    } else if (visits7d > 0) {
+       growthInsightTitle = "Movimento detectado";
+       growthInsight = `Sua vitrine atraiu novas pessoas nos últimos 7 dias. Continue divulgando seu link para crescer.`;
+    } else {
+       growthInsightTitle = "Aumente sua Visibilidade";
+       growthInsight = "Compartilhe seu link exclusivo nas suas redes sociais para atrair novas clientes e preencher sua agenda.";
+    }
+    
+    // We will pass the title and the insight in a more structured array for the UI if needed, but for now we can pass an object or strings.
+    const growthInsightsList = [
+      {
+        title: growthInsightTitle,
+        description: growthInsight,
+        icon: 'Zap'
+      }
+    ];
+    
+    if (topService !== '-') {
+      growthInsightsList.push({
+        title: "Destaque Nera",
+        description: `Seu serviço de ${topService} está atraindo excelente interesse. Considere destacá-lo em suas redes sociais!`,
+        icon: 'Star'
+      });
+    }
+
+    if (bestTime !== '-') {
+      growthInsightsList.push({
+        title: "Padrão de Agenda",
+        description: `O horário das ${bestTime} está performando de forma superior. Que tal abrir vagas extras nesse período?`,
+        icon: 'Clock'
+      });
+    }
 
     // Assemble final output
     const isBothEmpty = appointments.length === 0 && analyticsEvents.length === 0;
@@ -216,7 +255,8 @@ export function useDashboardMetrics(
             topService,
             bestTime,
             weakestDay,
-            growthInsight,
+            growthInsight: growthInsight, // Keep for backward compatibility or simple use
+            growthInsightsList,
             mainOrigin
         }
     };

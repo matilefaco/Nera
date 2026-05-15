@@ -17,7 +17,7 @@ const variantA = { // Emotional
   title: "Você está crescendo 🚀",
   subtitle: "Sucesso à vista",
   tagline: "O mundo precisa do seu talento.",
-  featureTitle: "O Nera cresce com você",
+  featureTitle: "A Nera cresce com você",
   featureDesc: "Não deixe que limites técnicos freiem a sua paixão e o seu brilho.",
   cta: "Liberar agenda ilimitada"
 };

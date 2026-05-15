@@ -35,8 +35,8 @@ function getResendClient() {
   return _resendClient;
 }
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "Nera <agenda@usenera.com>";
-const FALLBACK_FROM_EMAIL = "Nera <noreply@usenera.com>";
+const FROM_EMAIL = process.env.EMAIL_FROM || "Nera <ola@usenera.com>";
+const FALLBACK_FROM_EMAIL = "Nera <ola@usenera.com>";
 const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://usenera.com";
 
 /**
@@ -161,7 +161,7 @@ export async function sendBookingPendingEmail(data: PendingEmailPayload) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "oi@usenera.com",
+      replyTo: "suporte@usenera.com",
       subject: `Seu pedido foi recebido ✨ | ${professionalName}`,
       html,
     });
@@ -256,7 +256,7 @@ export async function sendBookingConfirmedEmail(data: BookingEmailData) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "oi@usenera.com",
+      replyTo: "suporte@usenera.com",
       subject: `Reserva Confirmada: ${professionalName}`,
       html,
     });
@@ -299,8 +299,8 @@ export async function sendBookingCancelledEmail(data: BookingEmailData) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [professionalEmail],
-      replyTo: "oi@usenera.com",
-      subject: `Agendamento Cancelado: ${clientName}`,
+      replyTo: "suporte@usenera.com",
+      subject: `Aviso de cancelamento: ${clientName}`,
       html,
     });
 
@@ -342,7 +342,7 @@ export async function sendReviewRequestEmail(data: BookingEmailData) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "oi@usenera.com",
+      replyTo: "suporte@usenera.com",
       subject: `Como foi seu atendimento com ${professionalName || 'sua profissional'}?`,
       html,
     });
@@ -434,7 +434,7 @@ export async function sendBookingRescheduledEmail(data: any) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      subject: `Horário reagendado: ${professionalName}`,
+      subject: `Seu horário foi reagendado • ${professionalName}`,
       html,
     });
     if (error) {
@@ -607,7 +607,7 @@ export async function sendWelcomeEmail(data: { name: string, email: string, slug
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [data.email],
-      subject: `Bem-vinda ao Nera, ${data.name}!`,
+      subject: `Boas-vindas ao Nera, ${data.name} ✨`,
       html,
     });
     if (error) {
@@ -634,7 +634,7 @@ export async function sendPasswordResetEmail(data: { email: string, resetUrl: st
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [data.email],
-      subject: 'Redefinição de senha • Nera',
+      subject: 'Instruções para redefinir sua senha • Nera',
       html,
     });
     if (error) {
@@ -665,7 +665,7 @@ export async function sendReferralRewardEmail(data: { referrerEmail: string, ref
         <h2 style="font-size: 36px; color: #a67c52; margin: 0;">R$${amount.toFixed(2)} em créditos</h2>
       </div>
       <p style="font-size: 14px; color: #666; line-height: 1.6;">O valor foi adicionado à sua carteira e será descontado automaticamente na sua próxima mensalidade.</p>
-      <p style="margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #e9e5db; pt-20px;">Equipe Nera</p>
+      <p style="margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #e9e5db; padding-top: 20px;">Nera &copy; 2026 &bull; Feito com intenção no Brasil 🇧🇷</p>
     </div>
   `;
 
@@ -674,7 +674,7 @@ export async function sendReferralRewardEmail(data: { referrerEmail: string, ref
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [referrerEmail],
-      subject: `Sua indicação rendeu R$${amount} de crédito! 🎁`,
+      subject: `Sua indicação rendeu R$${amount} em créditos ✨`,
       html,
     });
     if (error) {
@@ -710,7 +710,7 @@ export async function sendTrialWillEndEmail(data: { email: string, name: string,
       </div>
       <p style="font-size: 14px; color: #666; line-height: 1.6;">Se você não cadastrou um método de pagamento ou deseja cancelar, pode fazer isso a qualquer momento no seu Painel.</p>
       <a href="${APP_URL}/dashboard" style="display: inline-block; background: #1a1a1a; color: #fff; padding: 15px 30px; border-radius: 50px; text-decoration: none; font-size: 14px; margin-top: 20px;">Ir para o Dashboard</a>
-      <p style="margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #e9e5db; pt-20px;">Equipe Nera</p>
+      <p style="margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #e9e5db; padding-top: 20px;">Nera &copy; 2026 &bull; Feito com intenção no Brasil 🇧🇷</p>
     </div>
   `;
 
@@ -719,7 +719,7 @@ export async function sendTrialWillEndEmail(data: { email: string, name: string,
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [email],
-      subject: `Seu teste gratuito está terminando • Nera`,
+      subject: `Aviso: seu período de teste está chegando ao fim • Nera`,
       html,
     });
     if (error) {
@@ -772,7 +772,7 @@ export async function sendDigitalReceiptEmail(data: any) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "oi@usenera.com",
+      replyTo: "suporte@usenera.com",
       subject: `Resumo do seu atendimento com ${professionalName || 'Sua profissional'} ✨`,
       html,
     });

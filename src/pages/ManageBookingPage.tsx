@@ -662,7 +662,7 @@ setBlockedSchedules(dayBlocked);
                     <Heart size={28} className="fill-brand-terracotta/10" />
                   </div>
                   <h4 className="text-xl font-serif text-brand-ink mb-2">
-                    {isCompleted ? 'Gostou do atendimento?' : 'Indique o Nera'}
+                    {isCompleted ? 'Gostou do atendimento?' : 'Indique a Nera'}
                   </h4>
                   <p className="text-[9px] text-brand-stone uppercase tracking-widest mb-8 leading-relaxed">
                     {isCompleted 

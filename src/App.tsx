@@ -26,6 +26,8 @@ function RouteLogger() {
   }, [location.pathname]);
   return null;
 }
+import TermsPage from './pages/TermsPage';
+import PrivacyPage from './pages/PrivacyPage';
 import Dashboard from './pages/Dashboard';
 import ServicesPage from './pages/ServicesPage';
 import ProfilePage from './pages/ProfilePage';
@@ -89,6 +91,8 @@ export default function App() {
                 <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
+              <Route path="/privacidade" element={<PrivacyPage />} />
+              <Route path="/termos" element={<TermsPage />} />
               <Route path="/p/:slug" element={<PublicProfile />} />
               <Route path="/reserva/:id/gerenciar" element={<ManageBookingPage />} />
               <Route path="/r/:token" element={<ManageBookingPage />} />

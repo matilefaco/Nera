@@ -43,6 +43,13 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       return res.status(404).json({ error: "User not found" });
     }
     const userData = userDoc.data();
+    
+    // Prevent double subscriptions
+    if (userData?.plan && userData.plan !== 'free') {
+      logger.warn("STRIPE", "Blocked attempt to create duplicate checkout session", { professionalId: maskUid(uid) });
+      return res.status(403).json({ error: "Você já possui uma assinatura ativa. Para alterar seu plano, entre em contato com o suporte." });
+    }
+
     const email = userData?.email;
 
     if (!email) {
@@ -54,7 +61,14 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       logger.info("STRIPE", "Initiating checkout session", { professionalId: maskUid(uid), meta: { plan } });
     }
     
-    const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
+    const OFFICIAL_PRICES: Record<string, string> = {
+      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
+      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
+    };
+    
+    const priceId = plan === 'pro' 
+      ? (process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro)
+      : (process.env.STRIPE_PRICE_ESSENCIAL || OFFICIAL_PRICES.essencial);
 
     if (!priceId) {
       logger.error("STRIPE", "Price ID not configured. Check environment variables.");
@@ -85,7 +99,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       },
     };
 
-    if (plan === 'essencial') {
+    if (plan === 'essencial' && !userData?.trialUsed) {
       sessionParams.subscription_data = {
         trial_period_days: 15,
         trial_settings: {
@@ -113,6 +127,161 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     logger.error("STRIPE", "Failed to create checkout session", { requestId: req.requestId, error: err });
     res.status(500).json({ 
       error: "Failed to create checkout session",
+      details: err.message
+    });
+  }
+});
+
+/**
+ * CREATE CUSTOMER PORTAL SESSION
+ */
+router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const uid = req.uid;
+
+  try {
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userData = userDoc.data();
+    
+    if (!userData?.stripeCustomerId) {
+      logger.warn("STRIPE", "User tried opening portal without stripeCustomerId", { uid });
+      return res.status(400).json({ error: "Você não possui uma assinatura ativa." });
+    }
+
+    const stripe = getStripe();
+    if (isDev) {
+      logger.info("STRIPE", "Initiating customer portal session", { professionalId: maskUid(uid) });
+    }
+
+    const OFFICIAL_PRICES: Record<string, string> = {
+      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
+      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
+    };
+
+    try {
+      const subscriptions = await stripe.subscriptions.list({ customer: userData.stripeCustomerId, status: 'active', limit: 1 });
+      if (subscriptions.data.length > 0) {
+        const sub = subscriptions.data[0];
+        const priceId = sub.items.data[0]?.price?.id;
+        logger.info("STRIPE", "Customer subscription verified", { uid, subId: sub.id, priceId });
+      } else {
+        logger.warn("STRIPE", "No active subscription found for customer", { uid, customer: userData.stripeCustomerId });
+      }
+    } catch (e: any) {
+      logger.error("STRIPE", "Error checking subscription price", { err: e.message });
+    }
+
+    const params: any = {
+      customer: userData.stripeCustomerId,
+      return_url: `${(process.env.APP_URL && process.env.APP_URL !== 'undefined') ? process.env.APP_URL : (req.headers.origin || 'https://usenera.com')}/planos`,
+    };
+
+    // Ignore STRIPE_PORTAL_CONFIGURATION_ID initially to use the Dashboard's default configuration
+    if (process.env.STRIPE_PORTAL_CONFIGURATION_ID && process.env.STRIPE_PORTAL_CONFIGURATION_ID !== 'undefined') {
+      logger.info("STRIPE", "Found STRIPE_PORTAL_CONFIGURATION_ID in env, but ignoring it to force Dashboard default configuration", { configurationId: process.env.STRIPE_PORTAL_CONFIGURATION_ID });
+    }
+
+    let session;
+    try {
+      session = await stripe.billingPortal.sessions.create(params);
+    } catch (err: any) {
+      if (err.message?.includes('configuration')) {
+        logger.warn("STRIPE", "Failed to create portal session with configuration, falling back", { uid, error: err.message });
+        delete params.configuration;
+        session = await stripe.billingPortal.sessions.create(params);
+      } else if (err.message?.includes('return_url')) {
+        logger.warn("STRIPE", "Failed to create portal session with return_url, falling back to default", { uid, error: err.message });
+        params.return_url = `https://usenera.com/planos`;
+        session = await stripe.billingPortal.sessions.create(params);
+      } else {
+        throw err;
+      }
+    }
+
+    res.json({ url: session.url });
+  } catch (err: any) {
+    logger.error("STRIPE", "Failed to create portal session", { requestId: req.requestId, error: err, errMessage: err.message });
+    res.status(500).json({ 
+      error: "Ocorreu um erro ao abrir o portal: " + err.message,
+      details: err.message
+    });
+  }
+});
+
+/**
+ * UPGRADE DIRECTLY TO PRO
+ */
+router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const uid = req.uid;
+
+  try {
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userData = userDoc.data();
+    
+    if (!userData?.stripeCustomerId) {
+      logger.warn("STRIPE", "User tried upgrading without stripeCustomerId", { uid });
+      return res.status(400).json({ error: "Você não possui uma assinatura ativa." });
+    }
+
+    if (userData.plan !== 'essencial') {
+      return res.status(400).json({ error: "Seu plano atual não permite este tipo de atualização." });
+    }
+
+    const stripe = getStripe();
+    if (isDev) {
+      logger.info("STRIPE", "Initiating direct upgrade to pro", { professionalId: maskUid(uid) });
+    }
+
+    const OFFICIAL_PRICES: Record<string, string> = {
+      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
+      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
+    };
+
+    const targetPriceId = process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro;
+
+    const subscriptions = await stripe.subscriptions.list({ 
+      customer: userData.stripeCustomerId, 
+      status: 'active', 
+      limit: 1 
+    });
+
+    if (subscriptions.data.length === 0) {
+      return res.status(400).json({ error: "Nenhuma assinatura ativa encontrada para atualizar." });
+    }
+
+    const sub = subscriptions.data[0];
+    const currentItem = sub.items.data[0];
+
+    // Update the subscription
+    await stripe.subscriptions.update(sub.id, {
+      items: [{
+        id: currentItem.id,
+        price: targetPriceId,
+      }],
+      proration_behavior: 'always_invoice', // Immediately invoice the difference
+    });
+
+    // We can confidently update the user document to reflect the change.
+    await db.collection("users").doc(uid).update({
+      plan: 'pro',
+      planRank: 2
+    });
+
+    logger.info("STRIPE", "Direct upgrade to pro completed", { professionalId: maskUid(uid), subId: sub.id, targetPriceId });
+    
+    res.json({ success: true, message: "Plano atualizado com sucesso!" });
+
+  } catch (err: any) {
+    logger.error("STRIPE", "Failed to upgrade to pro", { requestId: req.requestId, error: err, errMessage: err.message });
+    res.status(500).json({ 
+      error: "Ocorreu um erro ao tentar atualizar o plano: " + err.message,
       details: err.message
     });
   }
@@ -205,32 +374,7 @@ router.post("/webhook", async (req, res) => {
       }
 
       const userData = userDoc.data();
-      const referredBy = userData?.referredBy;
       const creditsUsed = session.metadata?.creditsUsed === 'true';
-
-      // Handle Referral Reward (10 BRL)
-      if (referredBy) {
-        const referrerQuery = await db.collection('users').where('referralCode', '==', referredBy).limit(1).get();
-        
-        if (!referrerQuery.empty) {
-          const referrerDoc = referrerQuery.docs[0];
-          const referrerData = referrerDoc.data();
-          const referrerId = referrerDoc.id;
-
-          await db.collection('users').doc(referrerId).update({
-            credits: admin.firestore.FieldValue.increment(10)
-          });
-
-          if (referrerData?.email) {
-            await sendReferralRewardEmail({
-              referrerEmail: referrerData.email,
-              referrerName: referrerData.name || 'Parceira Nera',
-              refereeName: userData?.name || 'Uma nova indicação',
-              amount: 10
-            });
-          }
-        }
-      }
 
       // Update User Plan
       const updateData: any = {
@@ -240,6 +384,7 @@ router.post("/webhook", async (req, res) => {
         stripeCustomerId: session.customer,
         stripeSubscriptionId: session.subscription,
         planExpiresAt: planExpiresAt,
+        trialUsed: true,
         updatedAt: new Date().toISOString()
       };
 
@@ -300,6 +445,7 @@ router.post("/webhook", async (req, res) => {
     const invoice = event.data.object as any;
     const customerId = invoice.customer;
     const subscriptionId = invoice.subscription;
+    const amountPaid = invoice.amount_paid || 0;
 
     logger.info("STRIPE", "Received invoice.paid", { requestId: req.requestId, meta: { customerId: maskToken(customerId) } });
 
@@ -315,11 +461,48 @@ router.post("/webhook", async (req, res) => {
       const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
       
       if (!usersSnap.empty) {
-        await usersSnap.docs[0].ref.update({
+        const userDoc = usersSnap.docs[0];
+        const userData = userDoc.data();
+        const userId = userDoc.id;
+
+        await userDoc.ref.update({
           planExpiresAt: newExpiry.toISOString(),
           updatedAt: new Date().toISOString()
         });
-        logger.info("STRIPE", "Plan successfully renewed", { professionalId: maskUid(usersSnap.docs[0].id) });
+        logger.info("STRIPE", "Plan successfully renewed", { professionalId: maskUid(userId) });
+
+        // Handle Referral Reward (10 BRL)
+        const referredBy = userData?.referredBy;
+        const referralRewarded = userData?.referralRewarded;
+
+        if (amountPaid > 0 && referredBy && !referralRewarded) {
+          const referrerQuery = await db.collection('users').where('referralCode', '==', referredBy).limit(1).get();
+          
+          if (!referrerQuery.empty) {
+            const referrerDoc = referrerQuery.docs[0];
+            const referrerData = referrerDoc.data();
+            const referrerId = referrerDoc.id;
+
+            await db.collection('users').doc(referrerId).update({
+              credits: admin.firestore.FieldValue.increment(10)
+            });
+
+            if (referrerData?.email) {
+              await sendReferralRewardEmail({
+                referrerEmail: referrerData.email,
+                referrerName: referrerData.name || 'Parceira Nera',
+                refereeName: userData?.name || 'Uma nova indicação',
+                amount: 10
+              });
+            }
+            
+            // Mark as rewarded to prevent duplicate rewards on subsequent invoices
+            await userDoc.ref.update({
+              referralRewarded: true
+            });
+            logger.info("STRIPE", "Referral rewarded on first real payment", { professionalId: maskUid(userId) });
+          }
+        }
       } else {
         logger.warn("STRIPE", "Customer for renewal not found in system", { meta: { customerId: maskToken(customerId) } });
       }
@@ -381,6 +564,27 @@ router.post("/webhook", async (req, res) => {
 
         if ((subscription as any).current_period_end) {
           updateData.currentPeriodEnd = new Date((subscription as any).current_period_end * 1000).toISOString();
+        }
+
+        // Handle Plan Change from Stripe Portal (Upgrade/Downgrade)
+        const priceId = subscription.items?.data?.[0]?.price?.id;
+        if (priceId) {
+          const OFFICIAL_PRICES: Record<string, string> = {
+            essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
+            pro: 'price_1TQhKALqzItSzLk0D1andoSs'
+          };
+          const envPro = process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro;
+          const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL || OFFICIAL_PRICES.essencial;
+
+          if (priceId === envPro) {
+            updateData.plan = 'pro';
+            updateData.planRank = 2;
+            updateData.indexable = true;
+          } else if (priceId === envEssencial) {
+            updateData.plan = 'essencial';
+            updateData.planRank = 1;
+            updateData.indexable = true;
+          }
         }
 
         await userQuery.docs[0].ref.update(updateData);

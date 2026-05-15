@@ -379,10 +379,10 @@ export default function LandingPage() {
           <div>
             <div className="footer-col-title">Legal</div>
             <div className="footer-links">
-              <a href="#" className="footer-link">Privacidade</a>
-              <a href="#" className="footer-link">Termos de uso</a>
-              <a href="#" className="footer-link">Suporte</a>
-              <a href="#" className="footer-link">Instagram</a>
+              <Link to="/privacidade" className="footer-link">Privacidade</Link>
+              <Link to="/termos" className="footer-link">Termos de uso</Link>
+              <a href="mailto:suporte@usenera.com" className="footer-link">Suporte</a>
+              <a href="https://instagram.com/nera.agenda" target="_blank" rel="noopener noreferrer" className="footer-link">Instagram</a>
             </div>
           </div>
         </div>

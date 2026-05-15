@@ -144,7 +144,7 @@ const debugOnly = (req: any, res: any, next: any) => {
 
 router.get("/debug-email", debugOnly, async (req, res) => {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "Nera <agenda@usenera.com>";
+  const from = process.env.EMAIL_FROM || "Nera <ola@usenera.com>";
   const appUrl = process.env.APP_URL;
   
   res.json({

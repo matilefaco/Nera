@@ -135,10 +135,17 @@ export const sanitizeAppointment = (data: any, isUpdate = false): any => {
 };
 
 export async function uploadImageToStorage(file: File, path: string): Promise<string> {
-  const bytes = await file.arrayBuffer();
-  const fileRef = ref(storage, path);
-  await uploadBytes(fileRef, bytes);
-  return await getDownloadURL(fileRef);
+  try {
+    const bytes = await file.arrayBuffer();
+    const fileRef = ref(storage, path);
+    await uploadBytes(fileRef, bytes, { contentType: file.type });
+    return await getDownloadURL(fileRef);
+  } catch (error: any) {
+    if (error.code) {
+       console.error(`[Storage] Firebase Error Code:`, error.code, error.message);
+    }
+    throw error;
+  }
 }
 
 export async function saveProfilePartial(uid: string, data: Partial<UserProfile>) {

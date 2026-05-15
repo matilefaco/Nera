@@ -499,6 +499,18 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     
     if (file && user) {
+      if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+        notify.warning('Sua sessão expirou. Entre novamente para atualizar sua foto.');
+        return;
+      }
+      
+      try {
+         await auth.currentUser.getIdToken(true);
+      } catch (err) {
+         notify.warning('Sua sessão expirou. Entre novamente para atualizar sua foto.');
+         return;
+      }
+
       setUploadingImage(true);
       
       // 1. Immediate Local Preview
@@ -540,6 +552,18 @@ export default function ProfilePage() {
     const files = e.target.files;
 
     if (files && files.length > 0 && user) {
+      if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+        notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.');
+        return;
+      }
+      
+      try {
+         await auth.currentUser.getIdToken(true);
+      } catch (err) {
+         notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.');
+         return;
+      }
+
       setUploadingImage(true);
       const file = files[0];
       const tempId = 'temp-' + Date.now();
@@ -552,27 +576,32 @@ export default function ProfilePage() {
         console.error('[Portfolio] error creating preview:', previewErr);
       }
 
+      let uniqueFilename = '';
       try {
+        console.log(`[Portfolio] Starting compression for ${file.name}`);
         // 2. Compression
         const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
         const compressed = await imageCompression(file, options);
+        console.log(`[Portfolio] Compression done. Original: ${file.size}, Compressed: ${compressed.size}`);
 
         // 3. Upload
-        const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}`);
+        uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+        const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
         console.log('[Portfolio] upload finished:', url);
 
         // 3b. AI Categorization
         let autoCategory = '';
         try {
           autoCategory = await analyzePortfolio({ imageUrl: url, specialty });
-        } catch {
+        } catch (catErr) {
+          console.warn('[Portfolio] AI Categorization failed:', catErr);
           // silencioso — categoria fica vazia se falhar
         }
         
         // 4. Persistence
         console.log('[Portfolio] saving to Firestore');
         const docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
-        console.log('[Portfolio] saved successfully');
+        console.log('[Portfolio] saved successfully with ID:', docId);
         
         // Replace temp item with final item
         setPortfolio(prev => prev.map(item => 
@@ -582,7 +611,19 @@ export default function ProfilePage() {
         notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
       } catch (err: any) {
         console.error('[Portfolio] upload failed:', err);
-        notify.error('Não foi possível carregar a imagem.');
+        
+        let errorMessage = 'Não conseguimos enviar essa imagem. Tente novamente.';
+        if (err.code === 'storage/unauthorized') {
+           errorMessage = 'Permissão negada. Verifique se você está logada corretamente.';
+        } else if (err.code === 'storage/canceled') {
+           errorMessage = 'O upload foi cancelado.';
+        } else if (err.message && err.message.includes('corrupted')) {
+           errorMessage = 'A imagem parece estar corrompida. Tente selecionar outra foto.';
+        } else if (err.message && err.message.includes('format')) {
+           errorMessage = 'Esse formato ainda não é suportado.';
+        }
+        
+        notify.error(errorMessage);
         // Remove temp item on error
         setPortfolio(prev => prev.filter(item => item.id !== tempId));
       } finally {
@@ -1332,7 +1373,7 @@ export default function ProfilePage() {
                 {!googleCalendarConnected ? (
                   <div className="space-y-3">
                     <p className="text-[11px] text-brand-stone font-light leading-relaxed">
-                      Sincronize sua agenda do Nera com seu Google Calendar pessoal. Novos agendamentos confirmados serão adicionados automaticamente.
+                      Sincronize sua agenda da Nera com seu Google Calendar pessoal. Novos agendamentos confirmados serão adicionados automaticamente.
                     </p>
                     <button
                       type="button"

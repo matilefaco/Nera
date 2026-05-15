@@ -238,7 +238,7 @@ export function generateBookingConfirmationMessage(
 ): string {
   const dateFormatted = formatLocalDate(date, { day: 'numeric', month: 'long' });
   
-  return `Oi! Acabei de realizar uma reserva para o serviço *${serviceName}* pelo seu perfil no Nera. ✨ 
+  return `Oi! Acabei de realizar uma reserva para o serviço *${serviceName}* pelo seu perfil na Nera. ✨ 
 
 🗓️ Data: ${dateFormatted}
 ⏰ Horário: ${time}

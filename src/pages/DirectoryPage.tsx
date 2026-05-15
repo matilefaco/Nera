@@ -109,7 +109,7 @@ export default function DirectoryPage() {
     : "Melhores Profissionais de Beleza | Nera";
   
   const seoDescription = cityFilter
-    ? `Encontre as melhores profissionais de beleza em ${cityFilter}. Agende unhas, cílios, cabelo e muito mais com profissionais verificadas pelo Nera.`
+    ? `Encontre as melhores profissionais de beleza em ${cityFilter}. Agende unhas, cílios, cabelo e muito mais com profissionais verificadas pela Nera.`
     : "O diretório oficial das melhores profissionais independentes de beleza. Agende online com segurança e praticidade.";
 
   const canonicalUrl = `${window.location.origin}/profissionais${cityFilter ? `?cidade=${encodeURIComponent(cityFilter)}` : ''}`;
@@ -205,7 +205,7 @@ export default function DirectoryPage() {
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="mb-12">
           <h1 className="text-4xl font-serif text-brand-ink mb-2 italic">Descubra Excelência</h1>
-          <p className="text-brand-stone text-sm font-light">As melhores profissionais da beleza, unidas pelo Nera.</p>
+          <p className="text-brand-stone text-sm font-light">As melhores profissionais da beleza, unidas pela Nera.</p>
         </div>
 
         {loading && page === 1 ? (
