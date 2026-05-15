@@ -42,7 +42,19 @@ class RuntimeDiagnostics {
   private save() {
     try {
       if (typeof sessionStorage !== 'undefined') {
-        sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(this.events));
+        const safeEvents = this.events.map(ev => {
+          let safeDetails = ev.details;
+          if (ev.details && typeof ev.details === 'object') {
+            try {
+              JSON.stringify(ev.details);
+            } catch (e) {
+              // Extract basic info if cyclic
+              safeDetails = { message: ev.details.message, name: ev.details.name, stringified: String(ev.details) };
+            }
+          }
+          return { ...ev, details: safeDetails };
+        });
+        sessionStorage.setItem(this.STORAGE_KEY, JSON.stringify(safeEvents));
       }
     } catch (e) {
       // Ignored

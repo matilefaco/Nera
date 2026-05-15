@@ -155,18 +155,21 @@ export default function ServicesPage() {
         tone: style
       });
 
-      if (result.description && result.description.trim().length > 0) {
-        // Sanitize: remove quotes at start/end and trim
-        const sanitized = result.description.trim().replace(/^["']|["']$/g, '').trim();
-        setDescription(sanitized.slice(0, 160));
-        
-        if (result.source === 'fallback') {
-          notify.error(`Sua API NVIDIA retornou erro: ${result.error || 'Erro interno'}`);
-        } else {
-          notify.success('Descrição gerada com IA! ✨');
-        }
+      let finalDescription = result.description?.trim() || '';
+      
+      // Se falhou completamente na rede ou retry, usar o fallback elegante local
+      if (!finalDescription) {
+        finalDescription = "Realça os cílios com leveza, mantendo um acabamento delicado e natural.";
+      }
+
+      // Sanitize: remove quotes at start/end and trim
+      const sanitized = finalDescription.replace(/^["']|["']$/g, '').trim();
+      setDescription(sanitized.slice(0, 160));
+      
+      if (result.source === 'fallback' || !result.description) {
+        notify.success('Sugestão padrão adicionada. ✨');
       } else {
-        notify.error(`Erro exato: ${result.error || 'Desconhecido'}`);
+        notify.success('Descrição gerada com IA! ✨');
       }
     } catch (error: any) {
       console.error('[AI Generation] Error:', error);
@@ -180,7 +183,7 @@ export default function ServicesPage() {
           source: 'ServicesPage generateAIDescription catch block',
         })
       }).catch(e => console.error(e));
-      notify.error('Não foi possível gerar a descrição agora.');
+      notify.error(`Erro IA: ${error.message}`);
     } finally {
       setIsGeneratingAI(false);
     }

@@ -11,52 +11,69 @@ export async function generateServiceDescription(params: {
   price?: string | number;
   tone?: string;
 }): Promise<{ description: string; source: 'nvidia' | 'fallback', error?: string }> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 22000); // Slightly longer than backend
+  let attempt = 0;
+  let lastError: any;
 
-  try {
-    const token = await auth.currentUser?.getIdToken(true);
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+  while (attempt < 2) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const token = await auth.currentUser?.getIdToken(true);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/ai/service-description', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(params),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      const text = await response.text();
+      console.log(`[AI SERVICE] generateServiceDescription attempt ${attempt+1} status:`, response.status);
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Parse da resposta backend falhou: ${text.substring(0, 100)}`);
+      }
+      
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Falha ao gerar descrição');
+      }
+
+      return { 
+        description: data.description || '', 
+        source: data.source || 'nvidia' 
+      };
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      console.warn(`[AI SERVICE] generateServiceDescription attempt ${attempt+1} failed:`, error.message);
+      lastError = error;
+      
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
+         break; // Não faz retry se for timeout, cai no fallback imediatamente
+      }
+
+      attempt++;
+      if (attempt < 2) {
+        // Wait briefly before retrying
+        await new Promise(r => setTimeout(r, 500));
+      }
     }
-
-    const response = await fetch('/api/ai/service-description', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(params),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    const data = await response.json();
-    
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || 'Failed to generate description');
-    }
-
-    return { 
-      description: data.description || '', 
-      source: data.source || 'nvidia' 
-    };
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    console.error('[AI SERVICE] generateServiceDescription failed:', error.message, error.stack, error);
-    fetch('/api/health/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        error_name: error?.name,
-        error_message: error?.message,
-        error_stack: error?.stack,
-        source: 'aiService.ts generateServiceDescription catch block',
-      })
-    }).catch(e => console.error(e));
-    return { description: '', source: 'fallback', error: `${error.name}: ${error.message}` }; 
   }
+
+  console.error('[AI SERVICE] generateServiceDescription failed completely:', lastError.message, lastError.stack, lastError);
+  
+  return { description: 'Realça os cílios com leveza, mantendo um acabamento delicado e natural.', source: 'fallback', error: `${lastError.name}: ${lastError.message}` }; 
 }
 
 export async function categorizeService(serviceName: string): Promise<string> {

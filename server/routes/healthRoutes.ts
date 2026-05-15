@@ -67,7 +67,7 @@ router.get("/integrations", (req: Request, res: Response) => {
   }
 });
 
-router.post("/log", express.json(), (req: Request, res: Response) => {
+router.post("/log", express.json(), (req: express.Request, res: express.Response) => {
   logger.error("CRITICAL FRONTEND LOG", req.body);
   res.status(200).json({ ok: true });
 });

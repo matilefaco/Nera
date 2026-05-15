@@ -91,6 +91,11 @@ export function getFriendlyErrorMessage(
     return fallbackMessage;
   }
 
+  // Bypasses for debugging AI
+  if (message && message.includes('Erro IA:')) {
+    return message.substring(0, 150); // allow slightly longer
+  }
+
   // 4. Mensagens locais limpas e amigáveis (exclusivo para mensagens customizadas da aplicação)
   if (
     message &&

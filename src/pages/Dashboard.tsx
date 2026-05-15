@@ -425,14 +425,16 @@ setUnconfirmedTomorrow(docs);
     // Query: Waitlist
     const qWaitlist = query(
       collection(db, 'waitlist'),
-      where('professionalId', '==', user.uid),
-      orderBy('createdAt', 'desc')
+      where('professionalId', '==', user.uid)
     );
 
     const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
-        setWaitlist(docs.filter(doc => ['waiting', 'invited'].includes(doc.status)));
+        const filteredDocs = docs.filter(doc => ['waiting', 'invited'].includes(doc.status));
+        // Sort manually to avoid requiring a composite index in Firestore
+        filteredDocs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setWaitlist(filteredDocs);
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
       }
