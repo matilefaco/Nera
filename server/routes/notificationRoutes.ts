@@ -9,6 +9,7 @@ import {
   sendBookingPendingEmail,
   sendBookingConfirmedEmail,
   sendBookingCancelledEmail,
+  sendBookingCancelledClientEmail,
   sendBookingRescheduledEmail,
   sendBookingReminder24hEmail,
   sendReviewRequestEmail,
@@ -623,10 +624,11 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
         }
 
         if (clientEmail && await shouldSendEmail(appointmentId, eventKeyClient)) {
-           const result = await sendBookingCancelledEmail({
+           const result = await sendBookingCancelledClientEmail({
               clientName, serviceName, date, time,
-              location: '', professionalEmail: clientEmail, 
-              professionalName: pro?.name || 'Sua Profissional', bookingId: appointmentId || ''
+              location: '', clientEmail, 
+              professionalName: pro?.name || 'Sua Profissional', bookingId: appointmentId || '',
+              profileUrl, cancellationReason: payload.reason
            });
            if (result.success) await markEmailSent(appointmentId, eventKeyClient);
         }

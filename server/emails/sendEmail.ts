@@ -6,6 +6,7 @@ import { buildConfirmationRequest24hEmail } from './templates/confirmationReques
 import { buildRetentionEmail } from './templates/retention.js';
 import { buildBookingConfirmedEmail } from './templates/bookingConfirmed.js';
 import { buildBookingCancelledEmail } from './templates/bookingCancelled.js';
+import { buildBookingCancelledClientEmail } from './templates/bookingCancelledClient.js';
 import { buildReviewRequestEmail } from './templates/reviewRequest.js';
 import { buildWelcomeEmail } from './templates/welcome.js';
 import { buildPasswordResetEmail } from './templates/passwordReset.js';
@@ -312,6 +313,55 @@ export async function sendBookingCancelledEmail(data: BookingEmailData) {
     return { success: true, id: resendData?.id };
   } catch (err: any) {
     logEmail('ERROR', 'booking_cancelled_professional', { error: err.message });
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * EVENT: booking_cancelled_client
+ */
+export async function sendBookingCancelledClientEmail(data: BookingEmailData) {
+  const { clientEmail, professionalName, bookingId } = data;
+
+  logEmail('START', 'booking_cancelled_client', { to: clientEmail, appointmentId: bookingId });
+
+  if (!isValidEmail(clientEmail)) {
+    logEmail('ERROR', 'booking_cancelled_client', { error: 'Missing client email' });
+    return { success: false, error: 'Email missing' };
+  }
+
+  const formattedDate = new Date(data.date + 'T00:00:00').toLocaleDateString('pt-BR', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  });
+
+  const html = buildBookingCancelledClientEmail({
+    professionalName: professionalName || 'Sua profissional',
+    clientName: data.clientName,
+    serviceName: data.serviceName,
+    formattedDate,
+    time: data.time,
+    profileUrl: data.profileUrl,
+    cancellationReason: data.cancellationReason
+  });
+
+  try {
+    const resend = getResendClient();
+    const { data: resendData, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [clientEmail!],
+      replyTo: "suporte@usenera.com",
+      subject: `Agendamento cancelado: ${professionalName || 'Nera'}`,
+      html,
+    });
+
+    if (error) {
+      logEmail('ERROR', 'booking_cancelled_client', { error });
+      return { success: false, error };
+    }
+    logEmail('SUCCESS', 'booking_cancelled_client', { resendId: resendData?.id });
+    return { success: true, id: resendData?.id };
+  } catch (err: any) {
+    logEmail('ERROR', 'booking_cancelled_client', { error: err.message });
     return { success: false, error: err.message };
   }
 }
