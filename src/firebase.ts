@@ -175,6 +175,7 @@ export async function uploadImageToStorage(file: File, path: string): Promise<st
 
   const encodedPath = encodeURIComponent(path);
   const endpoint = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?name=${encodedPath}`;
+  console.log('REST_UPLOAD_ACTIVE', { path, bucket, endpoint });
 
   const response = await fetch(endpoint, {
     method: 'POST',
@@ -187,6 +188,14 @@ export async function uploadImageToStorage(file: File, path: string): Promise<st
 
   const rawBody = await response.text();
   if (!response.ok) {
+    console.error('[REST_UPLOAD_RAW_ERROR]', {
+      status: response.status,
+      statusText: response.statusText,
+      rawBody,
+      path,
+      bucket,
+      endpoint
+    });
     throw new Error(
       [
         `Storage upload failed`,
