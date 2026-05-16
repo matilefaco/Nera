@@ -57,6 +57,8 @@ export default function VerifyEmailPage() {
       console.error('[VerifyEmailPage] Error resending verification:', error);
       if (error.code === 'auth/too-many-requests') {
         notify.error('Muitas solicitações. Aguarde um pouco antes de tentar novamente.');
+      } else if (error.code === 'auth/unauthorized-continue-uri') {
+        notify.error('Erro de configuração: o domínio atual não está autorizado no Firebase Console.');
       } else {
         notify.error('Erro ao reenviar e-mail.');
       }

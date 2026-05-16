@@ -171,19 +171,31 @@ export default function RegisterPage() {
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      notify.success('Perfil criado! Enviamos um e-mail de confirmação.', {
-        icon: <Sparkles className="text-brand-terracotta" size={18} />
-      });
-
       // Send verification email
+      let emailSent = false;
       try {
         const actionCodeSettings = {
           url: `${window.location.origin}/verificar-email?verified=1`,
           handleCodeInApp: false,
         };
         await sendEmailVerification(user, actionCodeSettings);
-      } catch (emailError) {
+        emailSent = true;
+      } catch (emailError: any) {
         console.error('[SIGNUP FLOW] Error sending verification email:', emailError);
+        // If it fails with a specific error like unauthorized domain, we should know
+        if (emailError.code === 'auth/unauthorized-continue-uri') {
+          console.error('[SIGNUP FLOW] The domain is not authorized in Firebase Console.');
+        }
+      }
+
+      if (emailSent) {
+        notify.success('Perfil criado! Enviamos um e-mail de confirmação.', {
+          icon: <Sparkles className="text-brand-terracotta" size={18} />
+        });
+      } else {
+        notify.info('Perfil criado, mas não conseguimos enviar o e-mail de confirmação automaticamente. Tente reenviar no próximo passo.', {
+          duration: 8000
+        });
       }
       
       // Instead of going to checkout or onboarding, go to check email

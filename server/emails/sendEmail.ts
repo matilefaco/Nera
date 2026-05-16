@@ -181,6 +181,7 @@ export async function sendBookingPendingEmail(data: PendingEmailPayload) {
 
   try {
     const resend = getResendClient();
+    logger.debug("EMAIL", `Sending email from: ${FROM_EMAIL}`, { to: maskEmail(clientEmail), event: 'booking_created_client' });
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
@@ -228,6 +229,7 @@ export async function sendProfessionalNewBookingEmail(data: ProfessionalNotifica
 
   try {
     const resend = getResendClient();
+    logger.debug("EMAIL", `Sending email from: ${FROM_EMAIL}`, { to: maskEmail(professionalEmail), event: 'booking_created_professional' });
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [professionalEmail],

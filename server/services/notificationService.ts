@@ -86,6 +86,11 @@ export const sendNewBookingRequestNotification = async (payload: NewBookingReque
       const cleanPhone = payload.clientWhatsapp ? payload.clientWhatsapp.replace(/\D/g, '') : '';
       const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}` : undefined;
 
+      logger.info("NOTIFICATION", `Dispatched professional email for booking ${payload.appointmentId}`, { 
+        recipient: maskEmail(proEmail), 
+        eventKey 
+      });
+
       const result = await sendProfessionalNewBookingEmail({
         professionalEmail: proEmail,
         professionalName: pro?.name || 'Profissional',
@@ -102,6 +107,11 @@ export const sendNewBookingRequestNotification = async (payload: NewBookingReque
         whatsappUrl: waUrl
       });
       if (result.success) await markEmailSent(payload.appointmentId, eventKey);
+    } else if (!proEmail) {
+      logger.warn("NOTIFICATION", "Skipped professional email: professional has no email in profile", { 
+        professionalId: payload.professionalId,
+        appointmentId: payload.appointmentId
+      });
     }
 
     if (proPhone) {
