@@ -16,21 +16,6 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:768951224787:web:9165a57c367a649f1e8726",
 };
 
-const missingFirebaseEnv = [
-  ['VITE_FIREBASE_API_KEY', firebaseConfig.apiKey],
-  ['VITE_FIREBASE_AUTH_DOMAIN', firebaseConfig.authDomain],
-  ['VITE_FIREBASE_PROJECT_ID', firebaseConfig.projectId],
-  ['VITE_FIREBASE_STORAGE_BUCKET', firebaseConfig.storageBucket],
-  ['VITE_FIREBASE_MESSAGING_SENDER_ID', firebaseConfig.messagingSenderId],
-  ['VITE_FIREBASE_APP_ID', firebaseConfig.appId],
-]
-  .filter(([, value]) => !value)
-  .map(([name]) => name);
-
-if (missingFirebaseEnv.length > 0) {
-  throw new Error(`Missing Firebase environment variables: ${missingFirebaseEnv.join(', ')}`);
-}
-
 export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Initialize Auth BEFORE anything else

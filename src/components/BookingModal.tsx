@@ -1246,7 +1246,24 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm"><Heart size={24} className="fill-brand-terracotta/10" /></div>
                 <h4 className="text-lg font-serif text-brand-ink mb-2">Gostou da experiência? Indique uma amiga.</h4>
                 <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">Compartilhe sua descoberta com quem você ama</p>
-                <PremiumButton variant="primary" className="w-full py-5 !text-[10px]" onClick={() => { const url = window.location.origin + '/p/' + (profile?.slug || ''); const text = `Te recomendo essa profissional ✨`; const fullText = `${text} Reserve online aqui: ${url}`; if (navigator.share) { navigator.share({ title: profile?.name, text: text, url: url }).catch(() => { navigator.clipboard.writeText(fullText); notify.success('Link de indicação copiado!'); }); } else { navigator.clipboard.writeText(fullText); notify.success('Link de indicação copiado!'); } }}>Compartilhar perfil <Share2 size={14} className="ml-1" /></PremiumButton>
+                <PremiumButton variant="primary" className="w-full py-5 !text-[10px]" onClick={async () => {
+                   const url = window.location.origin + '/p/' + (profile?.slug || ''); 
+                   const text = "Te recomendo essa profissional ✨"; 
+                   const fullText = `${text} Reserve online aqui: ${url}`;
+                   try {
+                     if (navigator.share) { 
+                       await navigator.share({ title: profile?.name, text: text, url: url }).catch(async () => { 
+                         await navigator.clipboard.writeText(fullText); 
+                         notify.success('Link de indicação copiado!'); 
+                       }); 
+                     } else { 
+                       await navigator.clipboard.writeText(fullText); 
+                       notify.success('Link de indicação copiado!'); 
+                     }
+                   } catch (err) {
+                     console.error('[Share] error:', err);
+                   }
+                }}>Compartilhar perfil <Share2 size={14} className="ml-1" /></PremiumButton>
               </div>
               <button onClick={() => { setStep(1); setSelectedService(null); setSelectedDate(''); setSelectedTime(''); setBookingSuccess(false); onClose(); }} className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors">Voltar para o perfil</button>
             </div>

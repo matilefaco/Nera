@@ -70,8 +70,13 @@ export default function LoginPage() {
   };
 
   const handleLogoutAndStay = async () => {
-    await signOut(auth);
-    notify.success('Até breve!');
+    try {
+      await signOut(auth);
+      notify.success('Até breve!');
+    } catch (err) {
+      console.error('[Logout] error:', err);
+      notify.error('Erro ao sair. Tente novamente.');
+    }
   };
 
   return (

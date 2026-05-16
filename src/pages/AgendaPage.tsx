@@ -1481,9 +1481,14 @@ export default function AgendaPage() {
                   
                   <button 
                     onClick={async () => {
-                      const url = `${window.location.origin}/r/${selectedAppointment.token || selectedAppointment.manageSlug}`;
-                      await navigator.clipboard.writeText(url);
-                      notify.success('Link de gerenciamento copiado!');
+                      try {
+                        const url = `${window.location.origin}/r/${selectedAppointment.token || selectedAppointment.manageSlug}`;
+                        await navigator.clipboard.writeText(url);
+                        notify.success('Link de gerenciamento copiado!');
+                      } catch (err) {
+                        console.error('[Clipboard] error:', err);
+                        notify.error('Erro ao copiar link.');
+                      }
                     }}
                     className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen hover:text-brand-ink rounded-xl transition-all border border-brand-mist/60 flex items-center justify-center gap-2"
                   >

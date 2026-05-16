@@ -28,13 +28,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshProfile = async () => {
     if (!auth.currentUser) return null;
-    const { getDoc } = await import('firebase/firestore');
-    const docRef = doc(db, 'users', auth.currentUser.uid);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data() as UserProfile;
-      setProfile(data);
-      return data;
+    try {
+      const { getDoc } = await import('firebase/firestore');
+      const docRef = doc(db, 'users', auth.currentUser.uid);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data() as UserProfile;
+        setProfile(data);
+        return data;
+      }
+    } catch (err) {
+      console.error('[AuthContext] Error refreshing profile:', err);
     }
     return null;
   };

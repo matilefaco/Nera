@@ -1539,8 +1539,13 @@ export default function ProfilePage() {
                 type="button"
                 onClick={async () => {
                    if (confirm('Tem certeza que deseja sair da sua conta?')) {
-                     await auth.signOut();
-                     window.location.href = '/login';
+                     try {
+                       await auth.signOut();
+                       window.location.href = '/login';
+                     } catch (err) {
+                       console.error('[Logout] Error during sign out:', err);
+                       window.location.href = '/login';
+                     }
                    }
                 }}
                 className="w-auto bg-transparent text-brand-stone/60 py-2 px-4 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:text-red-500 hover:bg-red-50 transition-all duration-300 ease-out flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
