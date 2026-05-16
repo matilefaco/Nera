@@ -161,7 +161,6 @@ export const sanitizeAppointment = (data: any, isUpdate = false): any => {
 };
 
 export async function uploadImageToStorage(file: File, path: string): Promise<string> {
-  throw new Error("REST_UPLOAD_RUNTIME_CONFIRMED");
   const currentUser = await ensureAuthenticatedUserForStorageUpload();
   await currentUser.reload();
   const token = await currentUser.getIdToken(true);
@@ -190,23 +189,38 @@ export async function uploadImageToStorage(file: File, path: string): Promise<st
   const rawBody = await response.text();
   if (!response.ok) {
     console.error('[REST_UPLOAD_RAW_ERROR]', {
+      marker: 'REST_UPLOAD_HTTP_FAILED',
       status: response.status,
       statusText: response.statusText,
       rawBody,
       path,
       bucket,
-      endpoint
+      tokenLength: token.length,
+      uploadUrl: endpoint
     });
-    throw new Error(
+    const error = new Error(
       [
-        `Storage upload failed`,
+        `REST_UPLOAD_HTTP_FAILED`,
         `status=${response.status}`,
+        `statusText=${response.statusText}`,
         `body=${rawBody}`,
         `bucket=${bucket}`,
         `path=${path}`,
         `tokenLength=${token.length}`,
+        `uploadUrl=${endpoint}`,
       ].join(' | ')
     );
+    Object.assign(error, {
+      __diag_fileRefPath: path,
+      __diag_fileRefBucket: bucket,
+      __diag_fullUrl: endpoint,
+      __diag_uploadUrl: endpoint,
+      __diag_rawBody: rawBody,
+      __diag_status: response.status,
+      __diag_statusText: response.statusText,
+      __diag_tokenLength: token.length,
+    });
+    throw error;
   }
 
   return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
