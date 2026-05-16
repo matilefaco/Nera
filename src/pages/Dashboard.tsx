@@ -881,7 +881,7 @@ setUnconfirmedTomorrow(docs);
         title="Sua central de operações"
         description="Aqui você vê todos os agendamentos, receita e ações rápidas. Tudo que você precisa para o dia a dia está nesta página."
       />
-      <div className="p-6 md:p-12 pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-16 max-w-2xl mx-auto w-full space-y-10">
+      <div className="p-6 md:p-12 pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-16 max-w-5xl mx-auto w-full space-y-10">
         
         {/* Avatar Skipped Reminder Banner */}
         {profile?.avatarSkipped && !profile?.avatar && (

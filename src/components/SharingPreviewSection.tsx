@@ -235,7 +235,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
 
               {/* ACTION */}
               <div className="flex-1 min-w-0 flex flex-col justify-between w-full text-center sm:text-left py-2 sm:py-4">
-                <div className="space-y-2.5 max-w-[280px] mx-auto sm:max-w-none sm:mx-0">
+                <div className="space-y-2.5 mx-auto sm:mx-0">
                   <p className="text-sm sm:text-base font-serif font-medium text-brand-ink leading-snug">
                     Sua vitrine pronta para circular.
                   </p>
