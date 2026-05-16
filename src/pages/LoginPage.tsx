@@ -45,14 +45,18 @@ export default function LoginPage() {
     console.log('[Login] submit start');
     console.log('[Login] firebase auth start');
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const authPromise = signInWithEmailAndPassword(auth, email, password);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_FIREBASE')), 10000));
+      await Promise.race([authPromise, timeoutPromise]);
       console.log('[Login] firebase auth success');
       notify.success('Que bom ter você de volta!');
       console.log('[Login] redirect start');
       navigate('/dashboard');
     } catch (error: any) {
       console.log('[Login] auth error:', error.code, error.message);
-      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+      if (error.message === 'TIMEOUT_FIREBASE') {
+         notify.error('O login demorou muito para responder. Por favor, recarregue a página e tente novamente.');
+      } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
          notify.error('E-mail ou senha incorretos.');
       } else if (error.code === 'auth/network-request-failed') {
          notify.error('Conexão instável. Tente novamente.');
