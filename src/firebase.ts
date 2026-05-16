@@ -33,10 +33,6 @@ export const auth = (() => {
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-export const storageBucket = storage.app.options.storageBucket;
-export const projectId = app.options.projectId;
-export const timestamp = new Date().toISOString();
-
 export async function notify(type: string, payload: any) {
   try {
     const res = await fetch('/api/notify', {

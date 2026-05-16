@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, storage, auth, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem, deletePortfolioItem, storageBucket, projectId, timestamp as buildTimestamp } from '../firebase';
+import { db, storage, auth, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem, deletePortfolioItem } from '../firebase';
 import { doc, updateDoc, collection, query, orderBy, getDocs, deleteDoc, setDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
@@ -686,15 +686,6 @@ export default function ProfilePage() {
 
   return (
     <AppLayout activeRoute="profile">
-      {/* DIAGNOSTIC MARKER */}
-      <div className="fixed top-24 left-4 z-[999] bg-black/90 text-[10px] text-green-400 p-2 rounded shadow-xl font-mono border border-green-500/30 whitespace-pre pointer-events-none md:max-w-[400px] max-w-[200px] break-all">
-        BUILD: {buildTimestamp}
-        VITE_FB_BUCKET: {import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || 'N/A'}
-        app.options.storageBucket: {storageBucket}
-        app.options.projectId: {projectId}
-        Uploader: firebase/storage (uploadString)
-      </div>
-
       <div className="p-6 md:p-12 pb-32 md:pb-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div className="space-y-3">
