@@ -17,20 +17,10 @@
       },
       {
         "source": "/p/**",
-        "function": {
-          "functionId": "api",
-          "region": "us-east1"
-        }
+        "destination": "/index.html"
       },
       {
         "source": "/og/**",
-        "function": {
-          "functionId": "api",
-          "region": "us-east1"
-        }
-      },
-      {
-        "source": "/assets/**",
         "function": {
           "functionId": "api",
           "region": "us-east1"
