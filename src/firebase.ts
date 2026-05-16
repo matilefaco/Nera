@@ -37,6 +37,27 @@ export const storageBucket = storage.app.options.storageBucket;
 export const projectId = app.options.projectId;
 export const timestamp = new Date().toISOString();
 
+async function ensureAuthenticatedUserForStorageUpload() {
+  if (auth.currentUser) return auth.currentUser;
+
+  await new Promise<void>((resolve) => {
+    const unsubscribe = auth.onAuthStateChanged(() => {
+      unsubscribe();
+      resolve();
+    });
+    setTimeout(() => {
+      unsubscribe();
+      resolve();
+    }, 3000);
+  });
+
+  if (!auth.currentUser) {
+    throw new Error('Auth token ausente antes do upload');
+  }
+
+  return auth.currentUser;
+}
+
 export async function notify(type: string, payload: any) {
   try {
     const res = await fetch('/api/notify', {
@@ -140,8 +161,11 @@ export const sanitizeAppointment = (data: any, isUpdate = false): any => {
 };
 
 export async function uploadImageToStorage(file: File, path: string): Promise<string> {
-  if (!auth.currentUser) {
-    throw new Error('Usuário não autenticado');
+  const currentUser = await ensureAuthenticatedUserForStorageUpload();
+  await currentUser.reload();
+  const token = await currentUser.getIdToken(true);
+  if (!token) {
+    throw new Error('Auth token ausente antes do upload');
   }
 
   // Convert File to Base64 to bypass iOS Safari File/Blob issues in iFrames
