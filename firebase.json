@@ -17,10 +17,7 @@
       },
       {
         "source": "/p/**",
-        "function": {
-          "functionId": "api",
-          "region": "us-east1"
-        }
+        "destination": "/index.html"
       },
       {
         "source": "/og/**",
