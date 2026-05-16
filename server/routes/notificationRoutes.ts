@@ -61,6 +61,7 @@ export async function sendPushToUser(professionalId: string, payload: any) {
  * Creates an internal alert for last-minute cancellations (less than 2 hours).
  */
 async function createLastMinuteAlert(payload: any) {
+  if (!payload) return;
   const db = getDb();
   const { professionalId, clientName, serviceName, date, time, appointmentId } = payload;
   const apptId = appointmentId || payload.id;
@@ -438,6 +439,11 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
 
   const db = getDb();
   const { type, payload } = req.body;
+
+  if (type && !payload) {
+    logger.warn("NOTIFICATION", "Request missing payload", { type, requestId: req.requestId });
+    return res.status(400).json({ error: "O corpo da requisição deve conter um objeto 'payload'." });
+  }
 
   if (payload && payload.professionalId && payload.professionalId !== uid) {
     return res.status(403).json({ error: 'Acesso negado' });
