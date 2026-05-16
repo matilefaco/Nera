@@ -12,6 +12,19 @@ const isDev = process.env.NODE_ENV !== "production";
 
 let stripeModule: Stripe | null = null;
 
+function requireEnv(name: string) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is missing in environment`);
+  }
+  return value;
+}
+
+const STRIPE_PRICE_IDS = {
+  essencial: requireEnv("STRIPE_PRICE_ESSENCIAL"),
+  pro: requireEnv("STRIPE_PRICE_PRO"),
+};
+
 function getStripe() {
   if (!stripeModule) {
     const key = process.env.STRIPE_SECRET_KEY;
@@ -60,15 +73,10 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     if (isDev) {
       logger.info("STRIPE", "Initiating checkout session", { professionalId: maskUid(uid), meta: { plan } });
     }
-    
-    const OFFICIAL_PRICES: Record<string, string> = {
-      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-    };
-    
+
     const priceId = plan === 'pro' 
-      ? (process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro)
-      : (process.env.STRIPE_PRICE_ESSENCIAL || OFFICIAL_PRICES.essencial);
+      ? STRIPE_PRICE_IDS.pro
+      : STRIPE_PRICE_IDS.essencial;
 
     if (!priceId) {
       logger.error("STRIPE", "Price ID not configured. Check environment variables.");
@@ -156,11 +164,6 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
       logger.info("STRIPE", "Initiating customer portal session", { professionalId: maskUid(uid) });
     }
 
-    const OFFICIAL_PRICES: Record<string, string> = {
-      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-    };
-
     try {
       const subscriptions = await stripe.subscriptions.list({ customer: userData.stripeCustomerId, status: 'active', limit: 1 });
       if (subscriptions.data.length > 0) {
@@ -239,12 +242,7 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
       logger.info("STRIPE", "Initiating direct upgrade to pro", { professionalId: maskUid(uid) });
     }
 
-    const OFFICIAL_PRICES: Record<string, string> = {
-      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-    };
-
-    const targetPriceId = process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro;
+    const targetPriceId = STRIPE_PRICE_IDS.pro;
 
     const subscriptions = await stripe.subscriptions.list({ 
       customer: userData.stripeCustomerId, 
@@ -569,12 +567,8 @@ router.post("/webhook", async (req, res) => {
         // Handle Plan Change from Stripe Portal (Upgrade/Downgrade)
         const priceId = subscription.items?.data?.[0]?.price?.id;
         if (priceId) {
-          const OFFICIAL_PRICES: Record<string, string> = {
-            essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-            pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-          };
-          const envPro = process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro;
-          const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL || OFFICIAL_PRICES.essencial;
+          const envPro = STRIPE_PRICE_IDS.pro;
+          const envEssencial = STRIPE_PRICE_IDS.essencial;
 
           if (priceId === envPro) {
             updateData.plan = 'pro';
