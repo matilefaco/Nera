@@ -39,7 +39,7 @@ function getResendClient() {
 }
 
 const FROM_EMAIL = process.env.EMAIL_FROM || "Nera <ola@usenera.com>";
-const FALLBACK_FROM_EMAIL = "Nera <ola@usenera.com>";
+const REPLY_TO = process.env.EMAIL_REPLY_TO || "contato@usenera.com";
 const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://usenera.com";
 
 /**
@@ -48,20 +48,21 @@ const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://usen
 function logEmail(stage: 'START' | 'SUCCESS' | 'ERROR' | 'SKIP_DUPLICATE', event: string, details: any) {
   const meta: any = { event };
   if (details.appointmentId) meta.appointmentId = details.appointmentId;
+  if (details.professionalId) meta.professionalId = details.professionalId;
   if (details.resendId) meta.resendId = maskToken(details.resendId);
-  if (details.error) meta.error = typeof details.error === 'string' ? details.error : details.error?.message;
+  if (details.error) meta.error = typeof details.error === 'string' ? details.error : details.error?.message || JSON.stringify(details.error);
   
   const ctx = {
     meta,
-    clientEmail: details.to ? maskEmail(details.to) : undefined
+    recipient: details.to ? maskEmail(details.to) : 'not_provided'
   };
 
   if (stage === 'ERROR') {
     const errorStr = (meta.error || '').toString();
     if (errorStr.includes('testing emails') || errorStr.includes('verify a domain')) {
-      logger.warn("EMAIL", `Email dispatch skipped (Sandbox environment requires verified domain)`, ctx);
+      logger.warn("EMAIL", `Email dispatch skipped (Sandbox restriction)`, ctx);
     } else {
-      logger.error("EMAIL", `Email dispatch failed`, ctx);
+      logger.error("EMAIL", `Email dispatch failed: ${meta.error}`, ctx);
     }
   } else if (stage === 'SUCCESS') {
     logger.info("EMAIL", `Email verified delivery`, ctx);
@@ -69,6 +70,23 @@ function logEmail(stage: 'START' | 'SUCCESS' | 'ERROR' | 'SKIP_DUPLICATE', event
     logger.info("EMAIL", `Email skipped duplicate`, ctx);
   } else {
     logger.info("EMAIL", `Email dispatch started`, ctx);
+  }
+}
+
+/**
+ * Date Formatter Guard
+ */
+function formatDateSafely(dateStr: string | undefined): string {
+  if (!dateStr || typeof dateStr !== 'string') return 'Data não informada';
+  try {
+    // Expected format YYYY-MM-DD
+    const dateObj = new Date(dateStr.includes('T') ? dateStr : dateStr + 'T12:00:00');
+    if (isNaN(dateObj.getTime())) return dateStr;
+    return dateObj.toLocaleDateString('pt-BR', {
+      day: '2-digit', month: 'long', year: 'numeric'
+    });
+  } catch (e) {
+    return dateStr;
   }
 }
 
@@ -144,19 +162,21 @@ export async function sendBookingPendingEmail(data: PendingEmailPayload) {
   logEmail('START', 'booking_created_client', { to: clientEmail, appointmentId });
 
   if (!isValidEmail(clientEmail)) {
-    logEmail('ERROR', 'booking_created_client', { error: 'Missing client email' });
-    return { success: false, error: 'Missing email' };
+    logEmail('ERROR', 'booking_created_client', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
   }
 
-  const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
+  if (!professionalName || !serviceName) {
+    logEmail('ERROR', 'booking_created_client', { error: 'Missing critical data (pro name or service)', appointmentId });
+    return { success: false, error: 'Missing critical data' };
+  }
 
+  const formattedDate = formatDateSafely(date);
   const whatsappMsg = encodeURIComponent(`Olá ${professionalName}, acabei de solicitar meu horário no Nera 💛`);
-  const whatsappUrl = `https://wa.me/${professionalWhatsapp.replace(/\D/g, '')}?text=${whatsappMsg}`;
+  const whatsappUrl = `https://wa.me/${(professionalWhatsapp || '').replace(/\D/g, '')}?text=${whatsappMsg}`;
 
   const html = buildBookingPendingEmail({
-    professionalName, serviceName, formattedDate, time, price, reservationCode, manageUrl, whatsappUrl, clientName, paymentMethods
+    professionalName, serviceName, formattedDate, time, price: price || 'A definir', reservationCode, manageUrl: manageUrl || APP_URL, whatsappUrl, clientName: clientName || 'Cliente', paymentMethods
   });
 
   try {
@@ -164,7 +184,7 @@ export async function sendBookingPendingEmail(data: PendingEmailPayload) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "suporte@usenera.com",
+      replyTo: REPLY_TO,
       subject: `Seu pedido foi recebido ✨ | ${professionalName}`,
       html,
     });
@@ -191,18 +211,18 @@ export async function sendProfessionalNewBookingEmail(data: ProfessionalNotifica
   logEmail('START', 'booking_created_professional', { to: professionalEmail, appointmentId });
 
   if (!isValidEmail(professionalEmail)) {
-    logEmail('ERROR', 'booking_created_professional', { error: 'Missing pro email' });
-    return { success: false, error: 'Missing email' };
+    logEmail('ERROR', 'booking_created_professional', { error: 'Invalid pro email', to: professionalEmail });
+    return { success: false, error: 'Invalid email' };
   }
 
-  const formattedDate = new Date(data.date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
-  });
+  const formattedDate = formatDateSafely(data.date);
 
   const html = buildProfessionalNewBookingEmail({
     ...data,
+    professionalName: professionalName || 'Profissional',
+    clientName: clientName || 'Cliente',
     formattedDate,
-    paymentMethods,
+    paymentMethods: paymentMethods || [],
     clientWhatsapp: clientWhatsapp || 'Não informado'
   });
 
@@ -211,6 +231,7 @@ export async function sendProfessionalNewBookingEmail(data: ProfessionalNotifica
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [professionalEmail],
+      replyTo: REPLY_TO,
       subject: `Nova reserva: ${clientName} quer ${data.serviceName}`,
       html,
     });
@@ -235,19 +256,17 @@ export async function sendBookingConfirmedEmail(data: BookingEmailData) {
   logEmail('START', 'booking_confirmed_client', { to: clientEmail, appointmentId: bookingId });
 
   if (!isValidEmail(clientEmail)) {
-    logEmail('ERROR', 'booking_confirmed_client', { error: 'Missing client email' });
-    return { success: false, error: 'Email missing' };
+    logEmail('ERROR', 'booking_confirmed_client', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
   }
 
-  const formattedDate = new Date(data.date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
-
+  const formattedDate = formatDateSafely(data.date);
   const calendarUrl = data.manageUrl || `${APP_URL}/manage/${bookingId}`;
   const manageUrl = data.manageUrl || `${APP_URL}/manage/${bookingId}`;
 
   const html = buildBookingConfirmedEmail({
     ...data,
+    clientName: data.clientName || 'Cliente',
     professionalName: professionalName || 'Sua profissional',
     formattedDate,
     calendarUrl,
@@ -259,7 +278,7 @@ export async function sendBookingConfirmedEmail(data: BookingEmailData) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "suporte@usenera.com",
+      replyTo: REPLY_TO,
       subject: `Reserva Confirmada: ${professionalName}`,
       html,
     });
@@ -284,14 +303,17 @@ export async function sendBookingCancelledEmail(data: BookingEmailData) {
 
   logEmail('START', 'booking_cancelled_professional', { to: professionalEmail, appointmentId: bookingId });
 
-  const formattedDate = new Date(data.date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
+  if (!isValidEmail(professionalEmail)) {
+    logEmail('ERROR', 'booking_cancelled_professional', { error: 'Invalid pro email', to: professionalEmail });
+    return { success: false, error: 'Invalid email' };
+  }
 
+  const formattedDate = formatDateSafely(data.date);
   const waitlistUrl = `${APP_URL}/agenda`;
 
   const html = buildBookingCancelledEmail({
     ...data,
+    clientName: clientName || 'Cliente',
     formattedDate,
     waitlistUrl,
     professionalName: data.professionalName || 'Profissional'
@@ -302,7 +324,7 @@ export async function sendBookingCancelledEmail(data: BookingEmailData) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [professionalEmail],
-      replyTo: "suporte@usenera.com",
+      replyTo: REPLY_TO,
       subject: `Aviso de cancelamento: ${clientName}`,
       html,
     });
@@ -328,21 +350,19 @@ export async function sendBookingCancelledClientEmail(data: BookingEmailData) {
   logEmail('START', 'booking_cancelled_client', { to: clientEmail, appointmentId: bookingId });
 
   if (!isValidEmail(clientEmail)) {
-    logEmail('ERROR', 'booking_cancelled_client', { error: 'Missing client email' });
-    return { success: false, error: 'Email missing' };
+    logEmail('ERROR', 'booking_cancelled_client', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
   }
 
-  const formattedDate = new Date(data.date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
+  const formattedDate = formatDateSafely(data.date);
 
   const html = buildBookingCancelledClientEmail({
     professionalName: professionalName || 'Sua profissional',
-    clientName: data.clientName,
-    serviceName: data.serviceName,
+    clientName: data.clientName || 'Cliente',
+    serviceName: data.serviceName || 'Serviço',
     formattedDate,
-    time: data.time,
-    profileUrl: data.profileUrl,
+    time: data.time || '',
+    profileUrl: data.profileUrl || APP_URL,
     cancellationReason: data.cancellationReason
   });
 
@@ -351,7 +371,7 @@ export async function sendBookingCancelledClientEmail(data: BookingEmailData) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail!],
-      replyTo: "suporte@usenera.com",
+      replyTo: REPLY_TO,
       subject: `Agendamento cancelado: ${professionalName || 'Nera'}`,
       html,
     });
@@ -394,7 +414,7 @@ export async function sendReviewRequestEmail(data: BookingEmailData) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "suporte@usenera.com",
+      replyTo: REPLY_TO,
       subject: `Como foi seu atendimento com ${professionalName || 'sua profissional'}?`,
       html,
     });
@@ -419,14 +439,17 @@ export async function sendBookingReminder24hEmail(data: any) {
 
   logEmail('START', 'booking_reminder_24h', { to: clientEmail, appointmentId });
 
-  if (!clientEmail) return { success: false, error: 'Missing email' };
+  if (!isValidEmail(clientEmail)) {
+    logEmail('ERROR', 'booking_reminder_24h', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
+  }
 
-  const formattedDate = new Date(data.date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
+  const formattedDate = formatDateSafely(data.date);
 
   const html = buildBookingReminder24hEmail({
     ...data,
+    clientName: clientName || 'Cliente',
+    professionalName: professionalName || 'Sua profissional',
     duration: data.duration || 60,
     confirmUrl: manageUrl || `${APP_URL}/manage/${appointmentId}`,
     formattedDate,
@@ -439,6 +462,7 @@ export async function sendBookingReminder24hEmail(data: any) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
+      replyTo: REPLY_TO,
       subject: `Lembrete: seu horário amanhã com ${professionalName} ⏰`,
       html,
     });
@@ -462,18 +486,18 @@ export async function sendBookingRescheduledEmail(data: any) {
 
   logEmail('START', 'booking_rescheduled_client', { to: clientEmail, appointmentId });
 
-  if (!clientEmail) return { success: false, error: 'Missing email' };
+  if (!isValidEmail(clientEmail)) {
+    logEmail('ERROR', 'booking_rescheduled_client', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
+  }
 
-  const oldDateFormatted = new Date(data.oldDate + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long'
-  });
-
-  const newDateFormatted = new Date(data.newDate + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long'
-  });
+  const oldDateFormatted = formatDateSafely(data.oldDate);
+  const newDateFormatted = formatDateSafely(data.newDate);
 
   const html = buildBookingRescheduledEmail({
     ...data,
+    clientName: clientName || 'Cliente',
+    professionalName: professionalName || 'Sua profissional',
     rescheduledBy: rescheduledBy || 'professional',
     cancelUrl: cancelUrl || `${APP_URL}/manage/${appointmentId}/cancel`,
     oldDate: oldDateFormatted,
@@ -486,6 +510,7 @@ export async function sendBookingRescheduledEmail(data: any) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
+      replyTo: REPLY_TO,
       subject: `Seu horário foi reagendado • ${professionalName}`,
       html,
     });
@@ -509,14 +534,17 @@ export async function sendConfirmationRequest24hEmail(data: any) {
 
   logEmail('START', 'confirmation_request_24h', { to: clientEmail, appointmentId });
 
-  if (!clientEmail) return { success: false, error: 'Missing email' };
+  if (!isValidEmail(clientEmail)) {
+    logEmail('ERROR', 'confirmation_request_24h', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
+  }
 
-  const formattedDate = new Date(data.date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
-  });
+  const formattedDate = formatDateSafely(data.date);
 
   const html = buildConfirmationRequest24hEmail({
     ...data,
+    clientName: clientName || 'Cliente',
+    professionalName: professionalName || 'Sua profissional',
     formattedDate
   });
 
@@ -525,6 +553,7 @@ export async function sendConfirmationRequest24hEmail(data: any) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
+      replyTo: REPLY_TO,
       subject: `Confirmar presença: seu horário amanhã com ${professionalName}`,
       html,
     });
@@ -548,15 +577,23 @@ export async function sendRetentionEmail(data: any) {
 
   logEmail('START', 'retention_30d', { to: clientEmail, appointmentId });
 
-  if (!clientEmail) return { success: false, error: 'Missing email' };
+  if (!isValidEmail(clientEmail)) {
+    logEmail('ERROR', 'retention_30d', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
+  }
 
-  const html = buildRetentionEmail(data);
+  const html = buildRetentionEmail({
+    ...data,
+    clientName: data.clientName || 'Cliente',
+    professionalName: professionalName || 'Sua profissional'
+  });
 
   try {
     const resend = getResendClient();
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
+      replyTo: REPLY_TO,
       subject: `Hora de renovar: seu horário com ${professionalName}`,
       html,
     });
@@ -604,18 +641,21 @@ export async function sendWaitlistInviteEmail(data: {
   
   logEmail('START', 'waitlist_invite', { to: clientEmail, appointmentId });
 
-  const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long'
-  });
+  if (!isValidEmail(clientEmail)) {
+    logEmail('ERROR', 'waitlist_invite', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
+  }
+
+  const formattedDate = formatDateSafely(date);
 
   const html = buildWaitlistInviteEmail({
-    clientName, 
-    professionalName, 
-    serviceName,
+    clientName: clientName || 'Cliente', 
+    professionalName: professionalName || 'Sua profissional', 
+    serviceName: serviceName || 'Atendimento',
     servicePrice,
     formattedDate, 
-    time, 
-    bookingUrl,
+    time: time || '', 
+    bookingUrl: bookingUrl || APP_URL,
     expiresInHours: expiresInHours || 2,
     isExclusive
   });
@@ -625,6 +665,7 @@ export async function sendWaitlistInviteEmail(data: {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
+      replyTo: REPLY_TO,
       subject: `Vaga liberada! Agende com ${professionalName}`,
       html,
     });
@@ -645,11 +686,17 @@ export async function sendWaitlistInviteEmail(data: {
  */
 export async function sendWelcomeEmail(data: { name: string, email: string, slug?: string }) {
   logEmail('START', 'welcome_professional', { to: data.email });
+
+  if (!isValidEmail(data.email)) {
+    logEmail('ERROR', 'welcome_professional', { error: 'Invalid email', to: data.email });
+    return { success: false, error: 'Invalid email' };
+  }
+
   const onboardingUrl = `${APP_URL}/onboarding`;
   const slug = data.slug || 'profissional';
   
   const html = buildWelcomeEmail({ 
-    name: data.name, 
+    name: data.name || 'Profissional', 
     slug, 
     onboardingUrl 
   });
@@ -659,6 +706,7 @@ export async function sendWelcomeEmail(data: { name: string, email: string, slug
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [data.email],
+      replyTo: REPLY_TO,
       subject: `Boas-vindas ao Nera, ${data.name} ✨`,
       html,
     });
@@ -679,6 +727,12 @@ export async function sendWelcomeEmail(data: { name: string, email: string, slug
  */
 export async function sendPasswordResetEmail(data: { email: string, resetUrl: string }) {
   logEmail('START', 'password_reset', { to: data.email });
+
+  if (!isValidEmail(data.email)) {
+    logEmail('ERROR', 'password_reset', { error: 'Invalid email', to: data.email });
+    return { success: false, error: 'Invalid email' };
+  }
+
   const html = buildPasswordResetEmail(data);
 
   try {
@@ -686,6 +740,7 @@ export async function sendPasswordResetEmail(data: { email: string, resetUrl: st
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [data.email],
+      replyTo: REPLY_TO,
       subject: 'Instruções para redefinir sua senha • Nera',
       html,
     });
@@ -708,10 +763,15 @@ export async function sendReferralRewardEmail(data: { referrerEmail: string, ref
   const { referrerEmail, referrerName, refereeName, amount } = data;
   logEmail('START', 'referral_reward', { to: referrerEmail });
 
+  if (!isValidEmail(referrerEmail)) {
+    logEmail('ERROR', 'referral_reward', { error: 'Invalid referrer email', to: referrerEmail });
+    return { success: false, error: 'Invalid email' };
+  }
+
   const html = buildReferralRewardEmail({
-    referrerName,
-    refereeName,
-    amount
+    referrerName: referrerName || 'Profissional',
+    refereeName: refereeName || 'Sua indicação',
+    amount: amount || 0
   });
 
   try {
@@ -719,6 +779,7 @@ export async function sendReferralRewardEmail(data: { referrerEmail: string, ref
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [referrerEmail],
+      replyTo: REPLY_TO,
       subject: `Sua indicação rendeu R$${amount} em créditos ✨`,
       html,
     });
@@ -741,12 +802,15 @@ export async function sendTrialWillEndEmail(data: { email: string, name: string,
   const { email, name, trialEndAt } = data;
   logEmail('START', 'trial_will_end', { to: email });
 
-  const formattedDate = new Date(trialEndAt).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
+  if (!isValidEmail(email)) {
+    logEmail('ERROR', 'trial_will_end', { error: 'Invalid user email', to: email });
+    return { success: false, error: 'Invalid email' };
+  }
+
+  const formattedDate = formatDateSafely(trialEndAt);
 
   const html = buildTrialWillEndEmail({
-    name,
+    name: name || 'Profissional',
     formattedDate,
     dashboardUrl: `${APP_URL}/dashboard`
   });
@@ -756,6 +820,7 @@ export async function sendTrialWillEndEmail(data: { email: string, name: string,
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [email],
+      replyTo: REPLY_TO,
       subject: `Aviso: seu período de teste está chegando ao fim • Nera`,
       html,
     });
@@ -780,26 +845,25 @@ export async function sendDigitalReceiptEmail(data: any) {
   logEmail('START', 'digital_receipt', { to: clientEmail, appointmentId });
 
   if (!isValidEmail(clientEmail)) {
-    logEmail('ERROR', 'digital_receipt', { error: 'Missing client email' });
-    return { success: false, error: 'Email missing' };
+    logEmail('ERROR', 'digital_receipt', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
   }
 
-  const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', {
-    day: '2-digit', month: 'long', year: 'numeric'
-  });
+  const formattedDate = formatDateSafely(date);
 
   const finalPrice = totalPrice || price || 0;
-  const formattedPrice = `R$ ${Number(finalPrice).toFixed(2).replace('.', ',')}`;
+  const numPrice = Number(finalPrice);
+  const formattedPrice = `R$ ${(isNaN(numPrice) ? 0 : numPrice).toFixed(2).replace('.', ',')}`;
   
   // Use slug to build bookingUrl if available and not explicitly provided
   const finalBookingUrl = bookingUrl || (data.slug ? `${APP_URL}/p/${data.slug}` : APP_URL);
 
   const html = buildDigitalReceiptEmail({
-    clientName,
+    clientName: clientName || 'Cliente',
     professionalName: professionalName || 'Sua profissional',
-    serviceName,
+    serviceName: serviceName || 'Atendimento',
     formattedDate,
-    time,
+    time: time || '',
     price: formattedPrice,
     bookingUrl: finalBookingUrl
   });
@@ -809,7 +873,7 @@ export async function sendDigitalReceiptEmail(data: any) {
     const { data: resendData, error } = await resend.emails.send({
       from: FROM_EMAIL,
       to: [clientEmail],
-      replyTo: "suporte@usenera.com",
+      replyTo: REPLY_TO,
       subject: `Resumo do seu atendimento com ${professionalName || 'Sua profissional'} ✨`,
       html,
     });
