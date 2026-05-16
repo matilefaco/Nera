@@ -156,6 +156,7 @@ export interface UserProfile {
     variant: "terracotta" | "rose" | "sage" | "navy" | "plum";
   };
   updatedAt: string;
+  role?: string;
 
   // --- LEGACY FIELDS FOR COMPATIBILITY ---
   /** @deprecated Use workingHours.startTime */

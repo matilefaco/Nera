@@ -78,6 +78,22 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AdminRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, profile, loading } = useAuth();
+
+  if (loading) return <AppLoadingScreen />;
+  
+  if (!user) {
+    return <Navigate to="/login" />;
+  }
+
+  if (profile?.role !== 'admin') {
+    return <Navigate to="/dashboard" />;
+  }
+
+  return <>{children}</>;
+};
+
 export default function App() {
   return (
     // @ts-ignore
@@ -168,9 +184,9 @@ export default function App() {
                 </PrivateRoute>
               } />
               <Route path="/admin/whatsapp-test" element={
-                <PrivateRoute>
+                <AdminRoute>
                   <WhatsAppSimulator />
-                </PrivateRoute>
+                </AdminRoute>
               } />
               <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
               <Route path="/checkout/canceled" element={<CheckoutCanceledPage />} />
