@@ -177,7 +177,11 @@ export default function RegisterPage() {
 
       // Send verification email
       try {
-        await sendEmailVerification(user);
+        const actionCodeSettings = {
+          url: `${window.location.origin}/verificar-email?verified=1`,
+          handleCodeInApp: false,
+        };
+        await sendEmailVerification(user, actionCodeSettings);
       } catch (emailError) {
         console.error('[SIGNUP FLOW] Error sending verification email:', emailError);
       }

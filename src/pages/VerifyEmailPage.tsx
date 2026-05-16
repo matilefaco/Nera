@@ -47,7 +47,11 @@ export default function VerifyEmailPage() {
     if (!user) return;
     setResending(true);
     try {
-      await sendEmailVerification(user);
+      const actionCodeSettings = {
+        url: `${window.location.origin}/verificar-email?verified=1`,
+        handleCodeInApp: false,
+      };
+      await sendEmailVerification(user, actionCodeSettings);
       notify.success('E-mail de verificação reenviado!');
     } catch (error: any) {
       console.error('[VerifyEmailPage] Error resending verification:', error);
