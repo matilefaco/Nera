@@ -28,6 +28,8 @@ function RouteLogger() {
 }
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
+import SettingsPage from './pages/SettingsPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import Dashboard from './pages/Dashboard';
 import ServicesPage from './pages/ServicesPage';
 import ProfilePage from './pages/ProfilePage';
@@ -153,6 +155,16 @@ export default function App() {
               <Route path="/profile" element={
                 <PrivateRoute>
                   <ProfilePage />
+                </PrivateRoute>
+              } />
+              <Route path="/configuracoes" element={
+                <PrivateRoute>
+                  <SettingsPage />
+                </PrivateRoute>
+              } />
+              <Route path="/trocar-senha" element={
+                <PrivateRoute>
+                  <ChangePasswordPage />
                 </PrivateRoute>
               } />
               <Route path="/admin/whatsapp-test" element={

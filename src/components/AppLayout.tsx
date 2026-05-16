@@ -157,24 +157,20 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
                       >
                         <User size={16} /> Editar Perfil
                       </Link>
-                      <button 
-                        onClick={() => {
-                          setIsAccountMenuOpen(false);
-                          // Future: Settings page or section
-                        }}
-                        className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-medium text-brand-stone hover:text-brand-ink hover:bg-brand-parchment rounded-xl transition-all w-full text-left"
+                      <Link 
+                        to="/configuracoes" 
+                        onClick={() => setIsAccountMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-medium text-brand-stone hover:text-brand-ink hover:bg-brand-parchment rounded-xl transition-all"
                       >
                         <Shield size={16} /> Configurações
-                      </button>
-                      <button 
-                        onClick={() => {
-                          setIsAccountMenuOpen(false);
-                          // Future: Password change flow
-                        }}
-                        className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-medium text-brand-stone hover:text-brand-ink hover:bg-brand-parchment rounded-xl transition-all w-full text-left"
+                      </Link>
+                      <Link 
+                        to="/trocar-senha" 
+                        onClick={() => setIsAccountMenuOpen(false)}
+                        className="flex items-center gap-3 px-3 py-2.5 text-[10px] font-medium text-brand-stone hover:text-brand-ink hover:bg-brand-parchment rounded-xl transition-all"
                       >
                         <Key size={16} /> Trocar Senha
-                      </button>
+                      </Link>
                       <div className="h-px bg-brand-mist mx-2 my-1" />
                       <button 
                         onClick={() => handleLogout()}

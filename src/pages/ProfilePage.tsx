@@ -7,7 +7,7 @@ import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } 
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
-  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight
+  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, Key
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { notify } from '../lib/notify';
@@ -569,56 +569,31 @@ export default function ProfilePage() {
       }
 
       let uniqueFilename = '';
-      let uploadStage: 'compression' | 'upload' | 'analyzePortfolio' | 'savePortfolioItem' = 'compression';
-      let uploadedUrlBeforeFailure = '';
       try {
-        let compressed: File;
-        try {
-          uploadStage = 'compression';
-          console.log(`[Portfolio] Starting compression for ${file.name}`);
-          // 2. Compression
-          const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
-          compressed = await imageCompression(file, options);
-          console.log(`[Portfolio] Compression done. Original: ${file.size}, Compressed: ${compressed.size}`);
-        } catch (compressionErr) {
-          uploadStage = 'compression';
-          throw compressionErr;
-        }
+        console.log(`[Portfolio] Starting compression for ${file.name}`);
+        // 2. Compression
+        const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
+        const compressed = await imageCompression(file, options);
+        console.log(`[Portfolio] Compression done. Original: ${file.size}, Compressed: ${compressed.size}`);
 
         // 3. Upload
-        let url: string;
-        try {
-          uploadStage = 'upload';
-          uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
-          url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
-          uploadedUrlBeforeFailure = url;
-          console.log('[Portfolio] upload finished:', url);
-        } catch (uploadErr) {
-          uploadStage = 'upload';
-          throw uploadErr;
-        }
+        uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+        const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
+        console.log('[Portfolio] upload finished:', url);
 
         // 3b. AI Categorization
         let autoCategory = '';
         try {
-          uploadStage = 'analyzePortfolio';
           autoCategory = await analyzePortfolio({ imageUrl: url, specialty });
-        } catch (analyzeErr) {
-          uploadStage = 'analyzePortfolio';
-          throw analyzeErr;
+        } catch (catErr) {
+          console.warn('[Portfolio] AI Categorization failed:', catErr);
+          // silencioso — categoria fica vazia se falhar
         }
         
         // 4. Persistence
-        let docId: string;
-        try {
-          uploadStage = 'savePortfolioItem';
-          console.log('[Portfolio] saving to Firestore');
-          docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
-          console.log('[Portfolio] saved successfully with ID:', docId);
-        } catch (saveErr) {
-          uploadStage = 'savePortfolioItem';
-          throw saveErr;
-        }
+        console.log('[Portfolio] saving to Firestore');
+        const docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
+        console.log('[Portfolio] saved successfully with ID:', docId);
         
         // Replace temp item with final item
         setPortfolio(prev => prev.map(item => 
@@ -632,23 +607,6 @@ export default function ProfilePage() {
         
         // Fetch all possible diagnostic info
         const storageAny = storage as any;
-        const rawErrorTarget = Object(err ?? {});
-        const rawErrorOwnProperties = Object.getOwnPropertyNames(rawErrorTarget).reduce<Record<string, unknown>>((acc, key) => {
-          try {
-            const value = rawErrorTarget[key];
-            acc[key] = typeof value === 'function' ? '[function]' : value;
-          } catch (propErr) {
-            acc[key] = `[unreadable: ${String(propErr)}]`;
-          }
-          return acc;
-        }, {});
-        const rawErrorOwnPropertiesJson = (() => {
-          try {
-            return JSON.stringify(rawErrorOwnProperties, null, 2);
-          } catch (stringifyErr) {
-            return `JSON.stringify failed: ${String(stringifyErr)}`;
-          }
-        })();
         const diag = {
             authUid: auth.currentUser?.uid,
             authProjectId: auth.app.options.projectId,
@@ -659,19 +617,8 @@ export default function ProfilePage() {
             fileRefPath: err.__diag_fileRefPath || `portfolio/${user?.uid}/${uniqueFilename}`,
             fileRefBucket: err.__diag_fileRefBucket || 'N/A',
             fileRefFullUrl: err.__diag_fullUrl || 'N/A',
-            uploadStage,
-            uploadedUrlBeforeFailure,
             errorCode: err.code,
             errorMessage: err.message,
-            errorName: err.name,
-            rawErrorMessage: err.message,
-            rawErrorString: String(err),
-            rawErrorOwnProperties: rawErrorOwnPropertiesJson,
-            diagStatus: err.__diag_status,
-            diagStatusText: err.__diag_statusText,
-            diagRawBody: err.__diag_rawBody,
-            diagUploadUrl: err.__diag_uploadUrl,
-            diagTokenLength: err.__diag_tokenLength,
             appsCount: (globalThis as any).firebaseAppsCount || ((window as any)?.firebaseAppsCount) || 1,
             authEqualsStorageApp: auth.app === storage.app
         };
@@ -984,19 +931,8 @@ export default function ProfilePage() {
                   <p><strong>FileRef Bucket:</strong> {diagnosticInfo.fileRefBucket}</p>
                   <p><strong>FileRef Path:</strong> {diagnosticInfo.fileRefPath}</p>
                   <p><strong>FileRef URL:</strong> {diagnosticInfo.fileRefFullUrl}</p>
-                  <p><strong>Upload Stage:</strong> {diagnosticInfo.uploadStage}</p>
-                  <p><strong>Uploaded URL Before Failure:</strong> {diagnosticInfo.uploadedUrlBeforeFailure}</p>
                   <p><strong>Error Code:</strong> {diagnosticInfo.errorCode}</p>
                   <p><strong>Error Message:</strong> {diagnosticInfo.errorMessage}</p>
-                  <p><strong>Error Name:</strong> {diagnosticInfo.errorName}</p>
-                  <p><strong>Raw Error Message:</strong> {diagnosticInfo.rawErrorMessage}</p>
-                  <p><strong>String(error):</strong> {diagnosticInfo.rawErrorString}</p>
-                  <p><strong>Error Own Properties:</strong> {diagnosticInfo.rawErrorOwnProperties}</p>
-                  <p><strong>__diag_status:</strong> {diagnosticInfo.diagStatus}</p>
-                  <p><strong>__diag_statusText:</strong> {diagnosticInfo.diagStatusText}</p>
-                  <p><strong>__diag_rawBody:</strong> {diagnosticInfo.diagRawBody}</p>
-                  <p><strong>__diag_uploadUrl:</strong> {diagnosticInfo.diagUploadUrl}</p>
-                  <p><strong>__diag_tokenLength:</strong> {diagnosticInfo.diagTokenLength}</p>
                   <p><strong>Apps count:</strong> {diagnosticInfo.appsCount}</p>
                   <p><strong>Auth === Storage App:</strong> {String(diagnosticInfo.authEqualsStorageApp)}</p>
                 </div>
@@ -1554,6 +1490,48 @@ export default function ProfilePage() {
               </div>
             </div>
 
+          </section>
+
+          {/* MOBILE/ACCOUNT SECURITY SECTION */}
+          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+            <div className="flex items-center gap-3 pb-2 px-2">
+              <ShieldCheck size={20} className="text-brand-terracotta" />
+              <h2 className="text-xl font-serif text-brand-ink">Acesso e Segurança</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
+              <Link 
+                to="/configuracoes"
+                className="flex items-center justify-between p-5 bg-brand-white border border-brand-mist rounded-2xl hover:border-brand-ink/30 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-terracotta/10">
+                    <Settings size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-brand-ink line-clamp-1">Configurações</h3>
+                    <p className="text-[10px] text-brand-stone font-light line-clamp-1">Preferências da sua conta</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-brand-mist group-hover:translate-x-1 transition-transform" />
+              </Link>
+
+              <Link 
+                to="/trocar-senha"
+                className="flex items-center justify-between p-5 bg-brand-white border border-brand-mist rounded-2xl hover:border-brand-ink/30 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-terracotta/10">
+                    <Key size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-brand-ink line-clamp-1">Trocar Senha</h3>
+                    <p className="text-[10px] text-brand-stone font-light line-clamp-1">Segurança do seu acesso</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-brand-mist group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
           </section>
 
           <div className="pt-8 pb-[calc(100px+env(safe-area-inset-bottom))] md:pb-8 flex flex-col items-center border-t border-brand-mist/30 mt-8">

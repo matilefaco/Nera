@@ -1,7 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, initializeAuth, browserLocalPersistence, browserPopupRedirectResolver } from 'firebase/auth';
 import { getFirestore, doc, updateDoc, collection, addDoc, serverTimestamp, runTransaction, getDoc, setDoc, deleteDoc, query, where, getDocs, arrayUnion, arrayRemove, orderBy, onSnapshot, limit, increment } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { UserProfile, Appointment, PortfolioItem, WaitlistEntry } from './types';
 import { removeUndefinedDeep, parseFirestoreDate } from './lib/utils';
 import { notify as appNotify } from './lib/notify';
@@ -36,27 +36,6 @@ export const storage = getStorage(app);
 export const storageBucket = storage.app.options.storageBucket;
 export const projectId = app.options.projectId;
 export const timestamp = new Date().toISOString();
-
-async function ensureAuthenticatedUserForStorageUpload() {
-  if (auth.currentUser) return auth.currentUser;
-
-  await new Promise<void>((resolve) => {
-    const unsubscribe = auth.onAuthStateChanged(() => {
-      unsubscribe();
-      resolve();
-    });
-    setTimeout(() => {
-      unsubscribe();
-      resolve();
-    }, 3000);
-  });
-
-  if (!auth.currentUser) {
-    throw new Error('Auth token ausente antes do upload');
-  }
-
-  return auth.currentUser;
-}
 
 export async function notify(type: string, payload: any) {
   try {
@@ -161,69 +140,25 @@ export const sanitizeAppointment = (data: any, isUpdate = false): any => {
 };
 
 export async function uploadImageToStorage(file: File, path: string): Promise<string> {
-  const currentUser = await ensureAuthenticatedUserForStorageUpload();
-  await currentUser.reload();
-  const token = await currentUser.getIdToken(true);
-  if (!token) {
-    throw new Error('Auth token ausente antes do upload');
+  if (!auth.currentUser) {
+    throw new Error('Usuário não autenticado');
   }
 
-  const bucket = storageBucket || firebaseConfig.storageBucket;
-  if (!bucket) {
-    throw new Error('Storage bucket ausente para upload');
-  }
-
-  const encodedPath = encodeURIComponent(path);
-  const endpoint = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o?name=${encodedPath}`;
-  console.log('REST_UPLOAD_ACTIVE', { path, bucket, endpoint });
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': file.type || 'application/octet-stream',
-    },
-    body: file,
+  // Convert File to Base64 to bypass iOS Safari File/Blob issues in iFrames
+  const base64DataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+    reader.readAsDataURL(file);
   });
 
-  const rawBody = await response.text();
-  if (!response.ok) {
-    console.error('[REST_UPLOAD_RAW_ERROR]', {
-      marker: 'REST_UPLOAD_HTTP_FAILED',
-      status: response.status,
-      statusText: response.statusText,
-      rawBody,
-      path,
-      bucket,
-      tokenLength: token.length,
-      uploadUrl: endpoint
-    });
-    const error = new Error(
-      [
-        `REST_UPLOAD_HTTP_FAILED`,
-        `status=${response.status}`,
-        `statusText=${response.statusText}`,
-        `body=${rawBody}`,
-        `bucket=${bucket}`,
-        `path=${path}`,
-        `tokenLength=${token.length}`,
-        `uploadUrl=${endpoint}`,
-      ].join(' | ')
-    );
-    Object.assign(error, {
-      __diag_fileRefPath: path,
-      __diag_fileRefBucket: bucket,
-      __diag_fullUrl: endpoint,
-      __diag_uploadUrl: endpoint,
-      __diag_rawBody: rawBody,
-      __diag_status: response.status,
-      __diag_statusText: response.statusText,
-      __diag_tokenLength: token.length,
-    });
-    throw error;
-  }
-
-  return `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedPath}?alt=media`;
+  const { uploadString, getDownloadURL, ref } = await import('firebase/storage');
+  const storageRef = ref(storage, path);
+  
+  await uploadString(storageRef, base64DataUrl, 'data_url');
+  const publicUrl = await getDownloadURL(storageRef);
+  
+  return publicUrl;
 }
 
 export async function saveProfilePartial(uid: string, data: Partial<UserProfile>) {
