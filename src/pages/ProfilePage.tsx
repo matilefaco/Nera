@@ -607,6 +607,23 @@ export default function ProfilePage() {
         
         // Fetch all possible diagnostic info
         const storageAny = storage as any;
+        const rawErrorTarget = Object(err ?? {});
+        const rawErrorOwnProperties = Object.getOwnPropertyNames(rawErrorTarget).reduce<Record<string, unknown>>((acc, key) => {
+          try {
+            const value = rawErrorTarget[key];
+            acc[key] = typeof value === 'function' ? '[function]' : value;
+          } catch (propErr) {
+            acc[key] = `[unreadable: ${String(propErr)}]`;
+          }
+          return acc;
+        }, {});
+        const rawErrorOwnPropertiesJson = (() => {
+          try {
+            return JSON.stringify(rawErrorOwnProperties, null, 2);
+          } catch (stringifyErr) {
+            return `JSON.stringify failed: ${String(stringifyErr)}`;
+          }
+        })();
         const diag = {
             authUid: auth.currentUser?.uid,
             authProjectId: auth.app.options.projectId,
@@ -619,6 +636,15 @@ export default function ProfilePage() {
             fileRefFullUrl: err.__diag_fullUrl || 'N/A',
             errorCode: err.code,
             errorMessage: err.message,
+            errorName: err.name,
+            rawErrorMessage: err.message,
+            rawErrorString: String(err),
+            rawErrorOwnProperties: rawErrorOwnPropertiesJson,
+            diagStatus: err.__diag_status,
+            diagStatusText: err.__diag_statusText,
+            diagRawBody: err.__diag_rawBody,
+            diagUploadUrl: err.__diag_uploadUrl,
+            diagTokenLength: err.__diag_tokenLength,
             appsCount: (globalThis as any).firebaseAppsCount || ((window as any)?.firebaseAppsCount) || 1,
             authEqualsStorageApp: auth.app === storage.app
         };
@@ -933,6 +959,15 @@ export default function ProfilePage() {
                   <p><strong>FileRef URL:</strong> {diagnosticInfo.fileRefFullUrl}</p>
                   <p><strong>Error Code:</strong> {diagnosticInfo.errorCode}</p>
                   <p><strong>Error Message:</strong> {diagnosticInfo.errorMessage}</p>
+                  <p><strong>Error Name:</strong> {diagnosticInfo.errorName}</p>
+                  <p><strong>Raw Error Message:</strong> {diagnosticInfo.rawErrorMessage}</p>
+                  <p><strong>String(error):</strong> {diagnosticInfo.rawErrorString}</p>
+                  <p><strong>Error Own Properties:</strong> {diagnosticInfo.rawErrorOwnProperties}</p>
+                  <p><strong>__diag_status:</strong> {diagnosticInfo.diagStatus}</p>
+                  <p><strong>__diag_statusText:</strong> {diagnosticInfo.diagStatusText}</p>
+                  <p><strong>__diag_rawBody:</strong> {diagnosticInfo.diagRawBody}</p>
+                  <p><strong>__diag_uploadUrl:</strong> {diagnosticInfo.diagUploadUrl}</p>
+                  <p><strong>__diag_tokenLength:</strong> {diagnosticInfo.diagTokenLength}</p>
                   <p><strong>Apps count:</strong> {diagnosticInfo.appsCount}</p>
                   <p><strong>Auth === Storage App:</strong> {String(diagnosticInfo.authEqualsStorageApp)}</p>
                 </div>
