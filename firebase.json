@@ -30,6 +30,13 @@
         }
       },
       {
+        "source": "/assets/**",
+        "function": {
+          "functionId": "api",
+          "region": "us-east1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
