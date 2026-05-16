@@ -161,6 +161,7 @@ export const sanitizeAppointment = (data: any, isUpdate = false): any => {
 };
 
 export async function uploadImageToStorage(file: File, path: string): Promise<string> {
+  throw new Error("REST_UPLOAD_RUNTIME_CONFIRMED");
   const currentUser = await ensureAuthenticatedUserForStorageUpload();
   await currentUser.reload();
   const token = await currentUser.getIdToken(true);
