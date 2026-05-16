@@ -48,7 +48,18 @@ export default function LoginPage() {
       const authPromise = signInWithEmailAndPassword(auth, email, password);
       const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_FIREBASE')), 10000));
       await Promise.race([authPromise, timeoutPromise]);
+      const user = auth.currentUser;
+      
       console.log('[Login] firebase auth success');
+      
+      // If user is not verified and logged in with password, redirect to verification
+      if (user && !user.emailVerified && user.providerData.some(p => p.providerId === 'password')) {
+        notify.info('Sua conta ainda não foi verificada. Verifique seu e-mail.');
+        navigate('/verificar-email');
+        setLoading(false);
+        return;
+      }
+
       notify.success('Que bom ter você de volta!');
       console.log('[Login] redirect start');
       navigate('/dashboard');

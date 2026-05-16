@@ -550,89 +550,75 @@
 .landing-page .prof-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--sienna); flex-shrink: 0; }
 .landing-page .prof-name { font-size: 14px; font-weight: 300; color: rgba(253,250,247,0.65); letter-spacing: 0.04em; }
 
-/* TESTIMONIALS */
-.landing-page #testimonials {
+/* VALUE PROOF */
+.landing-page #proof {
   background: var(--cream);
   padding: 140px 0;
 }
-.landing-page .test-eyebrow { color: var(--stone); margin-bottom: 24px; display: block; text-align: center; }
-.landing-page .test-h2 {
+.landing-page .proof-eyebrow { color: var(--stone); margin-bottom: 24px; display: block; text-align: center; }
+.landing-page .proof-h2 {
   font-family: 'Playfair Display', serif;
   font-weight: 400;
   font-size: clamp(36px, 4vw, 56px);
   line-height: 1.05;
   letter-spacing: -0.02em;
   color: var(--ink);
-  margin-bottom: 72px;
+  margin-bottom: 24px;
   text-align: center;
 }
-.landing-page .test-h2 em { font-style: italic; color: var(--terra); }
+.landing-page .proof-h2 em { font-style: italic; color: var(--terra); }
+.landing-page .proof-intro {
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1.7;
+  color: var(--stone);
+  max-width: 600px;
+  margin: 0 auto 72px;
+  text-align: center;
+}
 
-.landing-page .testimonials-grid {
+.landing-page .proof-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
 }
-@media (max-width: 768px) { .landing-page .testimonials-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .landing-page .proof-grid { grid-template-columns: 1fr; } }
 
-.landing-page .test-card {
-  padding: 48px;
+.landing-page .proof-card {
+  background: white;
+  padding: 48px 40px;
   border-radius: 4px;
-  transition: transform 0.25s;
-}
-.landing-page .test-card:hover { transform: translateY(-4px); }
-.landing-page .test-card.dark { background: var(--ink); }
-.landing-page .test-card.light { background: var(--linen); border: 1px solid var(--mist); }
-
-.landing-page .stars { display: flex; gap: 3px; margin-bottom: 28px; }
-.landing-page .star { color: var(--sienna); font-size: 12px; }
-
-.landing-page .test-quote {
-  font-family: 'Playfair Display', serif;
-  font-weight: 400;
-  font-style: italic;
-  font-size: 20px;
-  line-height: 1.6;
-  margin-bottom: 28px;
-}
-.landing-page .test-card.dark .test-quote { color: var(--cream); }
-.landing-page .test-card.light .test-quote { color: var(--ink); }
-
-.landing-page .test-author-block {
+  border: 1px solid var(--mist);
+  transition: transform 0.25s, box-shadow 0.25s;
+  text-align: center;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  margin-top: 8px;
 }
-.landing-page .test-avatar {
-  width: 40px; height: 40px;
+.landing-page .proof-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(24,18,14,0.06); }
+
+.landing-page .proof-icon {
+  width: 56px; height: 56px;
+  background: var(--linen);
+  color: var(--terra);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 14px;
-  font-weight: 500;
-  flex-shrink: 0;
+  margin-bottom: 28px;
 }
-.landing-page .test-card.dark .test-avatar { background: rgba(196,114,80,0.25); color: var(--sienna); }
-.landing-page .test-card.light .test-avatar { background: var(--blush); color: var(--terra); }
-
-.landing-page .test-author-info {}
-.landing-page .test-author-name {
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.03em;
+.landing-page .proof-title {
+  font-family: 'Playfair Display', serif;
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin-bottom: 16px;
 }
-.landing-page .test-card.dark .test-author-name { color: rgba(253,250,247,0.75); }
-.landing-page .test-card.light .test-author-name { color: var(--ink); }
-
-.landing-page .test-author-role {
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  margin-top: 2px;
+.landing-page .proof-desc {
+  font-size: 15px;
+  font-weight: 300;
+  line-height: 1.6;
+  color: var(--stone);
 }
-.landing-page .test-card.dark .test-author-role { color: rgba(253,250,247,0.25); }
-.landing-page .test-card.light .test-author-role { color: var(--stone); }
 
 /* PRICING */
 .landing-page #pricing {

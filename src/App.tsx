@@ -40,6 +40,7 @@ import PublicProfile from './pages/PublicProfile';
 import OnboardingPage from './pages/OnboardingPage';
 import ReviewPage from './pages/ReviewPage';
 import BookingResponsePage from './pages/BookingResponsePage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import PendingRequestsPage from './pages/PendingRequestsPage';
 import ManageBookingPage from './pages/ManageBookingPage';
 import CouponsPage from './pages/CouponsPage';
@@ -60,6 +61,12 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  // Verification Check
+  const isPasswordProvider = user.providerData.some(p => p.providerId === 'password');
+  if (isPasswordProvider && !user.emailVerified && location.pathname !== '/verificar-email') {
+    return <Navigate to="/verificar-email" />;
   }
 
   // CRITICAL: Single Source of Truth for Onboarding
@@ -112,6 +119,7 @@ export default function App() {
               <Route path="/privacidade" element={<PrivacyPage />} />
               <Route path="/termos" element={<TermsPage />} />
               <Route path="/p/:slug" element={<PublicProfile />} />
+              <Route path="/verificar-email" element={<VerifyEmailPage />} />
               <Route path="/reserva/:id/gerenciar" element={<ManageBookingPage />} />
               <Route path="/r/:token" element={<ManageBookingPage />} />
               <Route path="/profissionais" element={<DirectoryPage />} />

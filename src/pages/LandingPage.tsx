@@ -268,53 +268,38 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
-      <section id="testimonials">
+      {/* VALUE PROOF */}
+      <section id="proof">
         <div className="wrap">
-          <span className="label test-eyebrow reveal">O que dizem as profissionais</span>
-          <h2 className="test-h2 reveal">
-            Reputação que<br/>
-            <em>converte.</em>
+          <span className="label proof-eyebrow reveal">Presença que explica valor</span>
+          <h2 className="proof-h2 reveal">
+            O que sua cliente entende<br/>
+            <em>antes de te chamar.</em>
           </h2>
-          <div className="testimonials-grid reveal">
-            <div className="test-card dark">
-              <div className="stars">
-                <span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span>
+          <p className="proof-intro reveal">
+            Sua vitrine não é só bonita. Ela organiza a primeira impressão: mostra seu trabalho, explica seus serviços e transforma interesse em agendamento.
+          </p>
+          <div className="proof-grid reveal">
+            <div className="proof-card">
+              <div className="proof-icon">
+                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
               </div>
-              <p className="test-quote">"Minha página ficou com cara de marca grande. Minhas clientes amaram a facilidade de agendar sozinhas — e eu parei de perder tempo no WhatsApp."</p>
-              <div className="test-author-block">
-                <div className="test-avatar">K</div>
-                <div className="test-author-info">
-                  <div className="test-author-name">Karina M.</div>
-                  <div className="test-author-role">Nail Designer · São Paulo</div>
-                </div>
-              </div>
+              <h3 className="proof-title">Ela vê seu trabalho</h3>
+              <p className="proof-desc">Portfólio, especialidade e identidade visual em um link com cara de marca.</p>
             </div>
-            <div className="test-card light">
-              <div className="stars">
-                <span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span>
+            <div className="proof-card">
+              <div className="proof-icon">
+                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
               </div>
-              <p className="test-quote">"A nera me deu uma coisa que dinheiro não compra: tempo de qualidade com minha família. Meu negócio roda mesmo quando desligo o celular."</p>
-              <div className="test-author-block">
-                <div className="test-avatar">J</div>
-                <div className="test-author-info">
-                  <div className="test-author-name">Juliana F.</div>
-                  <div className="test-author-role">Esteticista · Belo Horizonte</div>
-                </div>
-              </div>
+              <h3 className="proof-title">Ela entende como agendar</h3>
+              <p className="proof-desc">Serviços, horários e informações essenciais sem troca infinita de mensagens.</p>
             </div>
-            <div className="test-card dark" style={{ gridColumn: '1 / -1' }}>
-              <div className="stars">
-                <span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span><span className="star">★</span>
+            <div className="proof-card">
+              <div className="proof-icon">
+                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
               </div>
-              <p className="test-quote" style={{ maxWidth: '680px' }}>"Parece que alguém está cuidando da minha agenda enquanto eu atendo. As clientes recebem as informações certas, os horários ficam claros e eu não termino o dia tentando lembrar o que esqueci."</p>
-              <div className="test-author-block">
-                <div className="test-avatar">B</div>
-                <div className="test-author-info">
-                  <div className="test-author-name">Bianca Rocha</div>
-                  <div className="test-author-role">Esteticista · Rio de Janeiro</div>
-                </div>
-              </div>
+              <h3 className="proof-title">Ela chega mais segura</h3>
+              <p className="proof-desc">Tudo fica claro antes do atendimento — e você atende com menos ruído.</p>
             </div>
           </div>
         </div>

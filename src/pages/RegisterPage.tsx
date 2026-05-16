@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup, GoogleAuthProvider, signOut, User } from 'firebase/auth';
+import { 
+  createUserWithEmailAndPassword, 
+  updateProfile, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut, 
+  User,
+  sendEmailVerification 
+} from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { User as UserIcon, Mail, Lock, ArrowRight, Sparkles, LogOut, Gift } from 'lucide-react';
@@ -15,6 +23,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -59,6 +68,10 @@ export default function RegisterPage() {
   };
 
   const handleGoogleRegister = async () => {
+    if (!acceptedTerms) {
+      notify.error("Para criar sua conta, é preciso aceitar os Termos de Uso e a Política de Privacidade.");
+      return;
+    }
     setLoading(true);
     try {
       if (auth.currentUser) {
@@ -111,6 +124,11 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+
+    if (!acceptedTerms) {
+      notify.error("Para criar sua conta, é preciso aceitar os Termos de Uso e a Política de Privacidade.");
+      return;
+    }
     
     setLoading(true);
     
@@ -153,11 +171,19 @@ export default function RegisterPage() {
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      notify.success('Perfil criado com sucesso. Vamos começar?', {
+      notify.success('Perfil criado! Enviamos um e-mail de confirmação.', {
         icon: <Sparkles className="text-brand-terracotta" size={18} />
       });
+
+      // Send verification email
+      try {
+        await sendEmailVerification(user);
+      } catch (emailError) {
+        console.error('[SIGNUP FLOW] Error sending verification email:', emailError);
+      }
       
-      await handlePostRegisterCheckout(user, email);
+      // Instead of going to checkout or onboarding, go to check email
+      navigate('/verificar-email');
 
     } catch (error: any) {
       console.error('[SIGNUP FLOW] Manual registration error:', error);
@@ -285,9 +311,22 @@ export default function RegisterPage() {
             </div>
           </div>
 
+          <div className="flex items-start gap-3 py-2">
+            <input 
+              type="checkbox" 
+              id="acceptedTerms"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-brand-mist text-brand-terracotta focus:ring-brand-terracotta cursor-pointer"
+            />
+            <label htmlFor="acceptedTerms" className="text-[11px] text-brand-stone leading-relaxed cursor-pointer select-none">
+              Li e aceito os <Link to="/termos" target="_blank" className="text-brand-terracotta font-medium hover:underline">Termos de Uso</Link> e a <Link to="/privacidade" target="_blank" className="text-brand-terracotta font-medium hover:underline">Política de Privacidade</Link> da Nera.
+            </label>
+          </div>
+          
           <button 
             type="submit"
-            disabled={loading}
+            disabled={loading || !acceptedTerms}
             className="w-full bg-brand-terracotta text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
           >
             {loading ? 'Preparando seu perfil...' : 'Criar meu perfil'} <ArrowRight size={18} />
@@ -305,7 +344,8 @@ export default function RegisterPage() {
 
         <button 
           onClick={handleGoogleRegister}
-          className="w-full bg-brand-white border border-brand-mist text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-4"
+          disabled={loading || !acceptedTerms}
+          className="w-full bg-brand-white border border-brand-mist text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-4 disabled:opacity-50"
         >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
           Continuar com Google
