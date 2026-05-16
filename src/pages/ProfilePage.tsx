@@ -569,31 +569,56 @@ export default function ProfilePage() {
       }
 
       let uniqueFilename = '';
+      let uploadStage: 'compression' | 'upload' | 'analyzePortfolio' | 'savePortfolioItem' = 'compression';
+      let uploadedUrlBeforeFailure = '';
       try {
-        console.log(`[Portfolio] Starting compression for ${file.name}`);
-        // 2. Compression
-        const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
-        const compressed = await imageCompression(file, options);
-        console.log(`[Portfolio] Compression done. Original: ${file.size}, Compressed: ${compressed.size}`);
+        let compressed: File;
+        try {
+          uploadStage = 'compression';
+          console.log(`[Portfolio] Starting compression for ${file.name}`);
+          // 2. Compression
+          const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
+          compressed = await imageCompression(file, options);
+          console.log(`[Portfolio] Compression done. Original: ${file.size}, Compressed: ${compressed.size}`);
+        } catch (compressionErr) {
+          uploadStage = 'compression';
+          throw compressionErr;
+        }
 
         // 3. Upload
-        uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
-        const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
-        console.log('[Portfolio] upload finished:', url);
+        let url: string;
+        try {
+          uploadStage = 'upload';
+          uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
+          url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
+          uploadedUrlBeforeFailure = url;
+          console.log('[Portfolio] upload finished:', url);
+        } catch (uploadErr) {
+          uploadStage = 'upload';
+          throw uploadErr;
+        }
 
         // 3b. AI Categorization
         let autoCategory = '';
         try {
+          uploadStage = 'analyzePortfolio';
           autoCategory = await analyzePortfolio({ imageUrl: url, specialty });
-        } catch (catErr) {
-          console.warn('[Portfolio] AI Categorization failed:', catErr);
-          // silencioso — categoria fica vazia se falhar
+        } catch (analyzeErr) {
+          uploadStage = 'analyzePortfolio';
+          throw analyzeErr;
         }
         
         // 4. Persistence
-        console.log('[Portfolio] saving to Firestore');
-        const docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
-        console.log('[Portfolio] saved successfully with ID:', docId);
+        let docId: string;
+        try {
+          uploadStage = 'savePortfolioItem';
+          console.log('[Portfolio] saving to Firestore');
+          docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
+          console.log('[Portfolio] saved successfully with ID:', docId);
+        } catch (saveErr) {
+          uploadStage = 'savePortfolioItem';
+          throw saveErr;
+        }
         
         // Replace temp item with final item
         setPortfolio(prev => prev.map(item => 
@@ -634,6 +659,8 @@ export default function ProfilePage() {
             fileRefPath: err.__diag_fileRefPath || `portfolio/${user?.uid}/${uniqueFilename}`,
             fileRefBucket: err.__diag_fileRefBucket || 'N/A',
             fileRefFullUrl: err.__diag_fullUrl || 'N/A',
+            uploadStage,
+            uploadedUrlBeforeFailure,
             errorCode: err.code,
             errorMessage: err.message,
             errorName: err.name,
@@ -957,6 +984,8 @@ export default function ProfilePage() {
                   <p><strong>FileRef Bucket:</strong> {diagnosticInfo.fileRefBucket}</p>
                   <p><strong>FileRef Path:</strong> {diagnosticInfo.fileRefPath}</p>
                   <p><strong>FileRef URL:</strong> {diagnosticInfo.fileRefFullUrl}</p>
+                  <p><strong>Upload Stage:</strong> {diagnosticInfo.uploadStage}</p>
+                  <p><strong>Uploaded URL Before Failure:</strong> {diagnosticInfo.uploadedUrlBeforeFailure}</p>
                   <p><strong>Error Code:</strong> {diagnosticInfo.errorCode}</p>
                   <p><strong>Error Message:</strong> {diagnosticInfo.errorMessage}</p>
                   <p><strong>Error Name:</strong> {diagnosticInfo.errorName}</p>
