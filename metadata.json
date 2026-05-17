@@ -2,5 +2,5 @@
   "name": "Nera Professional",
   "description": "Presença profissional e agendamento inteligente para especialistas da beleza.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

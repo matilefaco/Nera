@@ -1,2 +1,2 @@
-import { api } from './dist-server/server/api_entry.js';
+import { api } from './dist/api_entry.js';
 export { api };

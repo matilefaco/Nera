@@ -30,6 +30,7 @@ export const api = onRequest(
     timeoutSeconds: 60,
     minInstances: 0,
     cors: false,
+    secrets: ["RESEND_API_KEY", "EMAIL_FROM", "EMAIL_REPLY_TO"],
   },
   async (req: any, res: any) => {
     const isProdEnv = process.env.GCLOUD_PROJECT && process.env.FUNCTIONS_EMULATOR !== "true";
