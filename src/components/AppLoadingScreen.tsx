@@ -10,7 +10,7 @@ interface AppLoadingScreenProps {
 }
 
 export default function AppLoadingScreen({ 
-  message = "Preparando sua experiência...", 
+  message = "", // defaulting to no message for silence
   isExiting = false,
   fullScreen = true
 }: AppLoadingScreenProps) {
@@ -20,66 +20,40 @@ export default function AppLoadingScreen({
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          transition={{ duration: 0.6, ease: 'easeOut' }} // softer, slower transition
           className={cn(
-            "flex flex-col items-center justify-center bg-brand-parchment",
-            fullScreen ? "fixed inset-0 z-[9999]" : "w-full py-24 rounded-[40px] border border-brand-mist shadow-sm"
+            "flex flex-col items-center justify-center bg-[#FCFBF9]", // Use lighter #FCFBF9
+            fullScreen ? "fixed inset-0 z-[9999]" : "w-full py-24 rounded-[40px] border border-brand-mist/60 shadow-sm"
           )}
         >
-          <div className="relative flex flex-col items-center gap-8">
-            {/* Pulsing Logo Container */}
+          <div className="relative flex flex-col items-center gap-6">
+            {/* Soft Breathing Logo */}
             <motion.div
               animate={{ 
-                scale: [1, 1.05, 1],
-                opacity: [0.9, 1, 0.9]
+                opacity: [0.6, 1, 0.6]
               }}
               transition={{ 
-                duration: 2, 
+                duration: 3, 
                 repeat: Infinity, 
                 ease: "easeInOut" 
               }}
-              className="relative"
             >
-              <Logo className="w-12 h-12" variant="terracotta" />
-              
-              {/* Decorative rings */}
-              <motion.div 
-                animate={{ scale: [1, 2], opacity: [0.5, 0] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
-                className="absolute inset-0 rounded-[10px] border border-brand-terracotta/20"
-              />
+              <Logo className="w-10 h-10 opacity-80" variant="light" />
             </motion.div>
 
-            {/* Loading text with typewriter or fade-in effect */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.8 }}
-              className="flex flex-col items-center gap-2"
-            >
-              <p className="font-serif italic text-brand-ink text-xl text-center">
-                {message}
-              </p>
-              
-              {/* Minimal progress indicator */}
-              <div className="w-48 h-[1px] bg-brand-mist relative overflow-hidden mt-4">
-                <motion.div 
-                  animate={{ 
-                    x: ['-100%', '100%'] 
-                  }}
-                  transition={{ 
-                    duration: 1.5, 
-                    repeat: Infinity, 
-                    ease: "easeInOut" 
-                  }}
-                  className="absolute inset-0 bg-brand-terracotta w-1/3"
-                />
-              </div>
-            </motion.div>
+            {/* Optional Loading text */}
+            {message && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.8 }}
+              >
+                <p className="font-light text-[13px] text-brand-stone uppercase tracking-widest text-center mt-2">
+                  {message}
+                </p>
+              </motion.div>
+            )}
           </div>
-
-          {/* Background Texture Overlay (Subtle) */}
-          <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/natural-paper.png')]" />
         </motion.div>
       )}
     </AnimatePresence>

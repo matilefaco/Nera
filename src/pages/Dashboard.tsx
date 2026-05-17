@@ -631,7 +631,7 @@ setUnconfirmedTomorrow(docs);
         }
         
         setConfirmedId(id);
-        notify.success(`Reserva confirmada! ID: ${id}`);
+        notify.success('Horário confirmado.');
         await new Promise(resolve => setTimeout(resolve, 800));
       } else {
         const res = await fetch(`/api/appointments/${id}/decline`, {
@@ -647,7 +647,7 @@ setUnconfirmedTomorrow(docs);
            throw new Error(errData.error || `Erro ao recusar (${res.status})`);
         }
         
-        notify.success('Reserva marcada como indisponível.');
+        notify.success('Indisponibilidade registrada.');
         setIsConfirmRejectOpen(false);
         setRequestToReject(null);
       }
@@ -807,7 +807,7 @@ setUnconfirmedTomorrow(docs);
       if (import.meta.env.DEV) console.log("[PUSH BUTTON] requestPermission finished. Success:", success);
 
       if (success) {
-        notify.success('Notificações ativadas com sucesso!');
+      notify.success('Notificações ativadas.');
       } else if (Notification.permission === 'denied') {
         notify.error('Notificações bloqueadas no navegador. Ative as permissões nas configurações do site.');
       }
@@ -857,7 +857,7 @@ setUnconfirmedTomorrow(docs);
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      notify.success('Relatório gerado com sucesso!');
+      notify.success('Relatório gerado.');
     } catch (error: any) {
       console.error("[REPORT ERROR]", error);
       notify.error(error, 'Erro ao baixar relatório. Tente novamente.');
@@ -913,16 +913,16 @@ setUnconfirmedTomorrow(docs);
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-brand-linen/50 border border-brand-mist p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm"
+            className="bg-[#FCFBF9] border border-brand-mist/40 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm opacity-90"
           >
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-2">Sucesso na Agenda</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone/60 mb-2">Seu espaço está lotado</p>
               <h2 className="text-xl font-serif text-brand-ink mb-1">Você recebeu {usageCount} reservas este mês.</h2>
-              <p className="text-sm text-brand-stone/80">Profissionais em crescimento normalmente migram para o Essencial para continuar recebendo reservas ilimitadas.</p>
+              <p className="text-[13px] text-brand-stone font-light">Evolua para o Essencial e continue recebendo reservas ilimitadas.</p>
             </div>
             <Link 
               to="/planos" 
-              className="px-6 py-3 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-stone transition-all shrink-0 text-center"
+              className="px-6 py-3 bg-brand-white border border-brand-mist/60 text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all shrink-0 text-center shadow-sm"
             >
               Ver Planos
             </Link>
@@ -1061,21 +1061,21 @@ setUnconfirmedTomorrow(docs);
 
             {/* Growth Dashboard: KPIs simplificados e Growth Pro */}
             {growthMetrics && (
-              <section className="bg-brand-white p-6 md:p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col gap-6 relative overflow-hidden">
-                <div className="flex items-center justify-between border-b border-brand-linen pb-4">
+              <section className="bg-[#FCFBF9] p-6 md:p-8 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col gap-6 relative overflow-hidden transition-all opacity-90">
+                <div className="flex items-center justify-between border-b border-brand-mist/30 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                    <div className="p-2 bg-[#FAF9F8] border border-brand-mist/60 text-brand-stone/60 rounded-xl">
                       <TrendingUp size={16} />
                     </div>
                     <div>
                       <h3 className="text-[9px] font-bold uppercase tracking-[0.3em] text-brand-stone mb-1 flex items-center">
-                        Crescimento e Inteligência
+                        Crescimento
                       </h3>
-                      <p className="text-xs font-serif text-brand-ink italic">Visão estratégica da sua vitrine</p>
+                      <p className="text-[13px] font-serif text-brand-ink italic">Visão de sua vitrine</p>
                     </div>
                   </div>
-                  <div className="flex bg-brand-linen p-1 rounded-full text-[8px] font-bold uppercase tracking-widest hidden sm:flex">
-                    <span className="px-3 py-1 bg-brand-white rounded-full shadow-sm text-brand-ink">Últimos 30 dias</span>
+                  <div className="flex bg-[#FAF9F8] border border-brand-mist/40 p-1 rounded-full text-[8px] font-bold uppercase tracking-widest hidden sm:flex">
+                    <span className="px-3 py-1 bg-white border border-brand-mist/30 rounded-full shadow-sm text-brand-ink">Últimos 30 dias</span>
                   </div>
                 </div>
 
@@ -1087,7 +1087,7 @@ setUnconfirmedTomorrow(docs);
                         <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas na vitrine</p>
                         <div className="flex items-baseline gap-2">
                           <p className="text-xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
-                          <span className="text-[8px] font-bold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
+                          <span className="text-[8px] font-bold text-brand-stone bg-[#FAF9F8] border border-brand-mist/40 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
                         </div>
                       </div>
                       <div className="space-y-1">
@@ -1096,18 +1096,18 @@ setUnconfirmedTomorrow(docs);
                       </div>
                     </div>
 
-                    <div className="mt-2 bg-brand-linen/40 p-5 rounded-[24px] border border-brand-mist/50 flex flex-col items-start gap-4">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-brand-mist/20 text-brand-terracotta">
+                    <div className="mt-2 bg-[#FAF9F8] border border-brand-mist/40 p-5 rounded-[24px] flex flex-col items-start gap-4">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-brand-mist/30 text-brand-stone/60">
                         <Sparkles size={18} />
                       </div>
                       <div>
                          <h4 className="text-sm font-serif text-brand-ink mb-1">Evolua para o Nera Pro</h4>
-                         <p className="text-[11px] text-brand-stone font-light italic leading-relaxed mb-4">
-                           Desbloqueie insights inteligentes, saiba o que as clientes estão procurando, seu serviço campeão e horários mais desejados para faturar ainda mais.
+                         <p className="text-[11px] text-brand-stone font-light leading-relaxed mb-4">
+                           Ao assinar você desbloqueia estatísticas da IA, converções e serviço favorito.
                          </p>
                          <Link to="/planos" className="inline-block">
-                           <PremiumButton variant="terracotta" className="text-[9px] py-2 px-5 flex items-center justify-center gap-2">
-                             Ver planos Nera Pro <ChevronRight size={12} />
+                           <PremiumButton variant="ink" className="text-[9px] py-2 px-5 flex items-center justify-center gap-2">
+                             Explorar recursos <ChevronRight size={12} />
                            </PremiumButton>
                          </Link>
                       </div>
@@ -1118,17 +1118,17 @@ setUnconfirmedTomorrow(docs);
                   <div className="flex flex-col gap-6">
                     {/* Hero Insight */}
                     {growthMetrics.growthInsightsList && growthMetrics.growthInsightsList.length > 0 && (
-                      <div className="bg-brand-linen p-5 rounded-[24px] border border-brand-mist/40 flex items-start gap-4 shadow-sm relative overflow-hidden">
-                        <div className="absolute -top-4 -right-4 p-4 opacity-5 pointer-events-none text-brand-terracotta">
+                      <div className="bg-[#FAF9F8] border border-brand-mist/40 p-5 rounded-[24px] flex items-start gap-4 shadow-sm relative overflow-hidden">
+                        <div className="absolute -top-4 -right-4 p-4 opacity-[0.03] pointer-events-none text-brand-ink">
                           <Sparkles size={80} />
                         </div>
-                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-brand-mist/20 text-brand-terracotta z-10">
+                        <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-brand-mist/30 text-brand-stone">
                           <Zap size={18} />
                         </div>
                         <div className="flex-1 z-10">
                           <div className="flex items-center gap-2 mb-1.5">
                             <h4 className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">{growthMetrics.growthInsightsList[0].title}</h4>
-                            <span className="text-[7px] font-bold text-brand-terracotta bg-brand-terracotta/10 px-1.5 py-0.5 rounded uppercase tracking-widest">Nera AI</span>
+                            <span className="text-[7px] font-bold text-brand-stone bg-white border border-brand-mist/40 px-1.5 py-0.5 rounded uppercase tracking-widest">Nera AI</span>
                           </div>
                           <p className="text-[13px] text-brand-ink font-serif leading-relaxed italic pr-4">
                             "{growthMetrics.growthInsightsList[0].description}"
@@ -1139,22 +1139,22 @@ setUnconfirmedTomorrow(docs);
 
                     {/* Pro Metrics Grid */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                       <div className="p-4 bg-brand-white rounded-2xl border border-brand-mist/40 shadow-sm">
                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Visitas na vitrine (30d)</p>
                          <div className="flex items-baseline gap-2">
                            <p className="text-xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
-                           {growthMetrics.visits7d > 0 && <span className="text-[9px] font-serif italic text-brand-terracotta">+{growthMetrics.visits7d} na semana</span>}
+                           {growthMetrics.visits7d > 0 && <span className="text-[9px] font-serif italic text-brand-stone/60">+{growthMetrics.visits7d} na semana</span>}
                          </div>
                        </div>
-                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                       <div className="p-4 bg-brand-white rounded-2xl border border-brand-mist/40 shadow-sm">
                          <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Conversão média</p>
                          <p className="text-xl font-serif text-brand-ink">{growthMetrics.convRate.toFixed(1)}%</p>
                        </div>
-                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                       <div className="p-4 bg-brand-white rounded-2xl border border-brand-mist/40 shadow-sm">
                           <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Serviço Campeão</p>
                           <p className="text-sm font-serif text-brand-ink truncate font-medium">{growthMetrics.topService}</p>
                        </div>
-                       <div className="p-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50">
+                       <div className="p-4 bg-brand-white rounded-2xl border border-brand-mist/40 shadow-sm">
                           <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Melhor Horário</p>
                           <p className="text-sm font-serif text-brand-ink font-medium">{growthMetrics.bestTime}</p>
                        </div>
@@ -1164,8 +1164,8 @@ setUnconfirmedTomorrow(docs);
                     {growthMetrics.growthInsightsList && growthMetrics.growthInsightsList.length > 1 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
                         {growthMetrics.growthInsightsList.slice(1).map((insight: any, idx: number) => (
-                          <div key={idx} className="p-4 rounded-2xl border border-brand-mist/30 flex items-start gap-3 bg-brand-white">
-                            <div className="w-8 h-8 rounded-xl bg-brand-linen/50 flex items-center justify-center text-brand-stone shrink-0">
+                          <div key={idx} className="p-4 rounded-2xl border border-brand-mist/40 flex items-start gap-3 bg-brand-white shadow-sm">
+                            <div className="w-8 h-8 rounded-xl bg-[#FAF9F8] border border-brand-mist/60 flex items-center justify-center text-brand-stone/70 shrink-0">
                                {insight.icon === 'Star' ? <Star size={14} /> : insight.icon === 'Clock' ? <Clock size={14} /> : <Sparkles size={14} />}
                             </div>
                             <div>
@@ -1189,55 +1189,55 @@ setUnconfirmedTomorrow(docs);
 
         {/* GESTÃO CONTENT */}
         {activeTab === "gestao" && (
-          <div className="flex flex-col gap-8">
-            <section className="bg-brand-white p-6 md:p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col gap-6 relative overflow-hidden">
-              <div className="flex items-center justify-between border-b border-brand-linen pb-4">
+          <div className="flex flex-col gap-8 opacity-90 animate-in fade-in duration-500">
+            <section className="bg-[#FCFBF9] p-6 md:p-8 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col gap-6 relative overflow-hidden">
+              <div className="flex items-center justify-between border-b border-brand-mist/30 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-brand-linen text-brand-ink rounded-xl">
+                  <div className="p-2 bg-[#FAF9F8] border border-brand-mist/60 text-brand-stone/60 rounded-xl">
                     <Settings size={16} />
                   </div>
-                  <h3 className="text-xl font-serif text-brand-ink">Gestão do negócio</h3>
+                  <h3 className="text-lg font-serif text-brand-ink">Gestão do negócio</h3>
                 </div>
               </div>
               
               <div className="grid grid-cols-1 gap-4">
-                <Link to="/financeiro" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98] group">
+                <Link to="/financeiro" className="flex items-center justify-between p-4 bg-brand-white border border-brand-mist/40 rounded-2xl shadow-sm hover:border-brand-mist transition-all active:scale-[0.98] group">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm group-hover:scale-105 transition-transform">
-                      <DollarSign size={20} className="text-brand-terracotta" />
+                    <div className="w-12 h-12 rounded-full bg-[#FAF9F8] border border-brand-mist/60 flex items-center justify-center group-hover:bg-brand-white transition-colors text-brand-ink">
+                      <DollarSign size={20} className="text-brand-stone/70 group-hover:text-brand-ink transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-brand-ink">Financeiro</h3>
+                      <h3 className="text-[13px] font-bold text-brand-ink">Financeiro</h3>
                       <p className="text-[11px] text-brand-stone font-light mt-0.5">Receita, histórico e exportações.</p>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-brand-stone/50 group-hover:text-brand-terracotta transition-colors" />
+                  <ChevronRight size={16} className="text-brand-stone/40 group-hover:text-brand-ink transition-colors" />
                 </Link>
 
-                <Link to="/cupons" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98] group">
+                <Link to="/cupons" className="flex items-center justify-between p-4 bg-brand-white border border-brand-mist/40 rounded-2xl shadow-sm hover:border-brand-mist transition-all active:scale-[0.98] group">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm group-hover:scale-105 transition-transform">
-                      <Ticket size={20} className="text-brand-terracotta" />
+                    <div className="w-12 h-12 rounded-full bg-[#FAF9F8] border border-brand-mist/60 flex items-center justify-center group-hover:bg-brand-white transition-colors text-brand-ink">
+                      <Ticket size={20} className="text-brand-stone/70 group-hover:text-brand-ink transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-brand-ink">Cupons</h3>
+                      <h3 className="text-[13px] font-bold text-brand-ink">Cupons</h3>
                       <p className="text-[11px] text-brand-stone font-light mt-0.5">Crie incentivos para suas clientes.</p>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-brand-stone/50 group-hover:text-brand-terracotta transition-colors" />
+                  <ChevronRight size={16} className="text-brand-stone/40 group-hover:text-brand-ink transition-colors" />
                 </Link>
 
-                <Link to="/indicacoes" className="flex items-center justify-between p-4 bg-[#FAF9F8] border border-brand-mist/60 rounded-2xl shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] hover:border-brand-terracotta/30 transition-all active:scale-[0.98] group">
+                <Link to="/indicacoes" className="flex items-center justify-between p-4 bg-brand-white border border-brand-mist/40 rounded-2xl shadow-sm hover:border-brand-mist transition-all active:scale-[0.98] group">
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-brand-white flex items-center justify-center border border-brand-mist shadow-sm group-hover:scale-105 transition-transform">
-                      <Gift size={20} className="text-brand-terracotta" />
+                    <div className="w-12 h-12 rounded-full bg-[#FAF9F8] border border-brand-mist/60 flex items-center justify-center group-hover:bg-brand-white transition-colors text-brand-ink">
+                      <Gift size={20} className="text-brand-stone/70 group-hover:text-brand-ink transition-colors" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-brand-ink">Indicações</h3>
+                      <h3 className="text-[13px] font-bold text-brand-ink">Indicações</h3>
                       <p className="text-[11px] text-brand-stone font-light mt-0.5">Acompanhe convites e recompensas.</p>
                     </div>
                   </div>
-                  <ChevronRight size={16} className="text-brand-stone/50 group-hover:text-brand-terracotta transition-colors" />
+                  <ChevronRight size={16} className="text-brand-stone/40 group-hover:text-brand-ink transition-colors" />
                 </Link>
               </div>
             </section>
@@ -1252,20 +1252,20 @@ setUnconfirmedTomorrow(docs);
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-brand-ink p-8 rounded-[40px] shadow-xl relative overflow-hidden group"
+                className="bg-brand-ink p-8 rounded-[40px] shadow-md relative overflow-hidden group border border-brand-ink"
               >
                 {/* Visual Background Element */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-brand-terracotta/20 transition-colors" />
+                <div className="absolute top-0 right-0 w-48 h-48 bg-brand-terracotta/20 rounded-full blur-3xl -mr-20 -mt-20 group-hover:bg-brand-terracotta/30 transition-colors pointer-events-none" />
                 
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div className="flex items-center gap-5">
-                    <div className="w-14 h-14 bg-brand-terracotta/20 text-brand-terracotta rounded-2xl flex items-center justify-center shrink-0">
-                      <Zap size={28} />
+                  <div className="flex items-center gap-5 w-full md:w-auto">
+                    <div className="w-14 h-14 bg-white/10 text-white rounded-2xl flex items-center justify-center shrink-0 border border-white/10">
+                      <Zap size={24} strokeWidth={1.5} />
                     </div>
                     <div>
-                      <h4 className="text-base font-serif text-brand-white">Ative notificações no celular</h4>
-                      <p className="text-xs text-white/60 font-light italic mt-1 leading-relaxed">
-                        Saiba instantaneamente quando chegar uma nova reserva, mesmo com o app fechado.
+                      <h4 className="text-lg font-serif text-brand-white">Ative notificações no celular</h4>
+                      <p className="text-xs text-white/50 font-light mt-1 leading-relaxed max-w-sm">
+                        Saiba instantaneamente quando chegar um novo agendamento.
                       </p>
                     </div>
                   </div>
@@ -1274,7 +1274,7 @@ setUnconfirmedTomorrow(docs);
                     <button
                       onClick={handleEnablePushNotifications}
                       disabled={isPushLoading}
-                      className="w-full sm:w-auto px-8 py-4 bg-brand-terracotta text-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-8 py-4 bg-brand-white text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all flex items-center justify-center gap-2"
                     >
                       {isPushLoading ? 'Ativando...' : 'Ativar notificações'}
                       {!isPushLoading && <CheckCircle2 size={14} />}
@@ -1359,66 +1359,66 @@ setUnconfirmedTomorrow(docs);
               <motion.div 
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-brand-white p-8 md:p-12 rounded-[40px] border border-brand-mist shadow-xl relative overflow-hidden group mb-2"
+                className="bg-[#FCFBF9] p-8 md:p-12 rounded-[40px] border border-brand-mist/40 shadow-sm relative overflow-hidden group mb-2 opacity-95"
               >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-brand-linen rounded-full blur-3xl opacity-60 -mr-20 -mt-20 pointer-events-none transition-opacity group-hover:opacity-80" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-brand-linen rounded-full blur-3xl opacity-50 -mr-20 -mt-20 pointer-events-none transition-opacity group-hover:opacity-70" />
                 <div className="relative z-10 max-w-lg">
-                  <div className="w-16 h-16 bg-brand-ink text-brand-white rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-                    <Sparkles size={32} />
+                  <div className="w-16 h-16 bg-white border border-brand-mist/60 text-brand-stone rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                    <Sparkles size={32} strokeWidth={1} />
                   </div>
                   <h4 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Seu espaço está pronto.</h4>
-                  <p className="text-sm text-brand-stone italic mb-8 leading-relaxed">
-                    Tudo configurado! O próximo passo é deixar suas clientes encontrarem você. Compartilhe seu link exclusivo e comece a receber pedidos diretamente na sua Nera.
+                  <p className="text-[13px] text-brand-stone font-light mb-8 leading-relaxed">
+                    Sua vitrine já pode receber agendamentos. Compartilhe seu link exclusivo para começar a formatar sua agenda.
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-4">
                     <button 
                       onClick={() => setIsShareModalOpen(true)} 
-                      className="w-full sm:w-auto px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-lg flex items-center justify-center gap-2 group-hover:bg-brand-espresso"
+                      className="w-full sm:w-auto px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm flex items-center justify-center gap-2"
                     >
-                      <Share2 size={16} /> Divulgar agenda
+                      <Share2 size={16} /> Divulgar vitrine
                     </button>
                     <Link 
                       to="/profile" 
-                      className="w-full sm:w-auto px-8 py-4 bg-brand-parchment border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-8 py-4 bg-white border border-brand-mist/60 text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all flex items-center justify-center gap-2 shadow-sm"
                     >
-                      Ver meu perfil
+                      Configurar perfil
                     </Link>
                   </div>
                 </div>
               </motion.div>
             ) : (
-              <div className="bg-[#FAF9F8] p-5 rounded-2xl border border-brand-mist/50">
-                {displayedConfirmedToday.length === 0 && (
-                  <div className="mb-4 pb-4 border-b border-brand-mist/40">
-                    <p className="text-[14px] font-serif text-brand-stone italic">Dia tranquilo até agora — vamos preencher?</p>
-                    {daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
-                      <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone/60 mt-2">
-                        Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
-                      </p>
-                    )}
-                  </div>
-                )}
-                
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-                  <div className="flex items-center gap-5 md:gap-8 overflow-x-auto hide-scrollbar">
+              <div className="bg-[#FCFBF9] p-6 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
+                <div className="flex flex-col">
+                  {displayedConfirmedToday.length === 0 && (
+                    <div className="mb-4 pb-4 border-b border-brand-mist/40">
+                      <p className="text-[14px] font-serif text-brand-stone italic">Sua agenda está livre no momento.</p>
+                      {daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
+                        <p className="text-[9px] font-medium uppercase tracking-widest text-brand-stone/60 mt-1">
+                          Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar">
                     <div className="flex-none">
-                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/80 mb-1.5">Faturamento Hoje</p>
+                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Faturamento Hoje</p>
                       <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{formatCurrency(displayedDailyRevenue)}</p>
                     </div>
-                    <div className="w-px h-8 bg-brand-mist/60 shrink-0" />
+                    <div className="w-px h-8 bg-brand-mist/40 shrink-0" />
                     <div className="flex-none">
-                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/80 mb-1.5">Agendamentos</p>
+                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Agendamentos</p>
                       <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{displayedConfirmedToday.length}</p>
                     </div>
                   </div>
-                  
-                  <Link to="/financeiro" className="mt-2 md:mt-0 pt-4 md:pt-0 border-t border-brand-mist/40 md:border-0 w-full md:w-auto shrink-0">
-                    <button className="w-full md:w-auto px-5 py-2.5 bg-brand-white text-brand-ink border border-brand-mist/60 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-[#F2EFEA] hover:border-brand-mist transition-all flex items-center justify-center gap-2 group shadow-sm">
-                      Ver financeiro <span className="transform transition-transform text-brand-stone group-hover:translate-x-0.5 group-hover:text-brand-ink">→</span>
-                    </button>
-                  </Link>
                 </div>
+                
+                <Link to="/financeiro" className="mt-2 md:mt-0 pt-4 md:pt-0 border-t border-brand-mist/40 md:border-0 w-full md:w-auto shrink-0 flex justify-end">
+                  <button className="w-full md:w-auto px-6 py-2.5 bg-brand-white text-brand-ink border border-brand-mist/60 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-colors shadow-sm">
+                    Ver detalhes
+                  </button>
+                </Link>
               </div>
             )}
 
@@ -1434,21 +1434,21 @@ setUnconfirmedTomorrow(docs);
                     <div 
                       key={appt.id} 
                       className={cn(
-                        "bg-brand-white px-5 py-4 md:px-6 md:py-5 rounded-[24px] border border-brand-mist shadow-sm flex items-center justify-between group hover:border-brand-mist/80 transition-colors",
-                        isCompletedStatus(appt.status) && "bg-brand-linen/40 border-dashed shadow-none"
+                        "bg-[#FCFBF9] px-5 py-4 md:px-6 md:py-5 rounded-[24px] border border-brand-mist/60 shadow-sm flex items-center justify-between transition-colors opacity-90",
+                        isCompletedStatus(appt.status) && "bg-transparent border-dashed shadow-none opacity-60"
                       )}
                     >
                       <div className="flex items-center gap-4 md:gap-5 w-full">
                         <div className="text-center min-w-[48px] shrink-0">
-                          <p className={cn("text-[17px] font-serif font-bold leading-none", isCompletedStatus(appt.status) ? "text-brand-stone opacity-60" : "text-brand-ink")}>{appt.time}</p>
+                          <p className={cn("text-[17px] font-serif font-bold leading-none", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.time}</p>
                         </div>
-                        <div className="h-8 w-px bg-brand-mist/60 shrink-0" />
+                        <div className="h-8 w-px bg-brand-mist/40 shrink-0" />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone opacity-60" : "text-brand-ink")}>{appt.clientName}</h4>
-                            {isCompletedStatus(appt.status) && <CheckCircle2 size={12} className="text-brand-stone opacity-50 shrink-0" />}
+                            <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.clientName}</h4>
+                            {isCompletedStatus(appt.status) && <CheckCircle2 size={12} className="text-brand-stone shrink-0" />}
                           </div>
-                          <p className="text-[11px] text-brand-stone italic truncate leading-tight pr-2 mt-0.5">{appt.serviceName}</p>
+                          <p className="text-[11px] text-brand-stone font-light truncate leading-tight pr-2 mt-0.5">{appt.serviceName}</p>
                         </div>
                       </div>
                       
@@ -1457,12 +1457,12 @@ setUnconfirmedTomorrow(docs);
                           <button
                             onClick={() => handleComplete(appt)}
                             disabled={processingId === appt.id}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-brand-parchment/60 border border-brand-mist/50 text-brand-terracotta rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors active:scale-95 whitespace-nowrap"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-brand-white border border-brand-mist/40 text-brand-ink rounded-full text-[9px] font-medium tracking-wide shadow-sm hover:bg-[#FAF9F8] transition-colors active:scale-95 whitespace-nowrap"
                           >
                             {processingId === appt.id ? "..." : "Finalizar"}
                           </button>
                         )}
-                        <Link to="/agenda" className="p-2 text-brand-mist hover:text-brand-terracotta transition-colors">
+                        <Link to="/agenda" className="p-2 text-brand-stone/60 hover:text-brand-ink transition-colors">
                           <ChevronRight size={16} />
                         </Link>
                       </div>
@@ -1470,28 +1470,27 @@ setUnconfirmedTomorrow(docs);
                   ))}
                 </div>
               ) : (
-                <div className="bg-brand-white p-12 rounded-[40px] border border-brand-mist border-dashed text-center">
-                  <h4 className="font-serif text-2xl text-brand-ink mb-2">Hoje ainda está livre</h4>
-                  <p className="text-brand-stone italic text-sm mb-8">Aproveite para movimentar sua agenda:</p>
+                <div className="bg-[#FCFBF9] p-12 rounded-[40px] border border-brand-mist/40 border-dashed text-center flex flex-col items-center shadow-sm">
+                  <div className="w-12 h-12 bg-[#FAF9F8] flex items-center justify-center rounded-full border border-brand-mist/60 text-brand-stone/40 mb-4">
+                    <Clock size={20} strokeWidth={1} />
+                  </div>
+                  <h4 className="font-serif text-xl text-brand-ink mb-2">Sua agenda está livre hoje</h4>
+                  <p className="text-[13px] text-brand-stone font-light mb-8 max-w-xs mx-auto leading-relaxed">
+                    Acompanhe suas solicitações ou divulgue seu link para atrair novas clientes.
+                  </p>
                   
-                  <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                  <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
                     <button 
                       onClick={() => setIsShareModalOpen(true)}
-                      className="w-full py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-md group"
+                      className="w-full py-3.5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
                     >
-                      Atrair clientes agora →
+                      Divulgar online
                     </button>
                     <Link 
                       to="/clients"
-                      className="w-full py-4 bg-brand-linen text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-mist transition-all text-center"
+                      className="w-full py-3.5 bg-brand-white text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all text-center border border-brand-mist/40 shadow-sm"
                     >
-                      Ver clientes
-                    </Link>
-                    <Link 
-                      to="/services"
-                      className="w-full py-4 bg-brand-white border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all text-center"
-                    >
-                      Criar serviço
+                      Ver carteira de clientes
                     </Link>
                   </div>
                 </div>

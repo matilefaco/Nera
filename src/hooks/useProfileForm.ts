@@ -12,7 +12,7 @@ export function useProfileForm(profile: UserProfile | null) {
   const [paymentMethods, setPaymentMethods] = useState<string[]>(profile?.paymentMethods || []);
   const [antiNoShowEnabled, setAntiNoShowEnabled] = useState(profile?.antiNoShowEnabled || false);
   const [advancePaymentRequired, setAdvancePaymentRequired] = useState(profile?.advancePaymentRequired || false);
-  const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20>(profile?.delayTolerance || 15);
+  const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20 | 0>(profile?.delayTolerance ?? 15);
   const [slug, setSlug] = useState(profile?.slug || '');
   const [avatar, setAvatar] = useState(profile?.avatar || '');
   const [neighborhood, setNeighborhood] = useState(profile?.neighborhood || '');
@@ -51,7 +51,7 @@ export function useProfileForm(profile: UserProfile | null) {
       setPaymentMethods(profile.paymentMethods || []);
       setAntiNoShowEnabled(profile.antiNoShowEnabled || false);
       setAdvancePaymentRequired(profile.advancePaymentRequired || false);
-      setDelayTolerance(profile.delayTolerance || 15);
+      setDelayTolerance(profile.delayTolerance ?? 15);
       setSlug(profile.slug || '');
       setAvatar(profile.avatar || '');
       setNeighborhood(profile.neighborhood || '');

@@ -70,7 +70,7 @@ const PremiumButton = ({
         {loading ? (
           <>
             <Loader2 className="animate-spin" size={16} />
-            <span>{loadingText || 'Carregando...'}</span>
+            {loadingText && <span>{loadingText}</span>}
           </>
         ) : (
           <>

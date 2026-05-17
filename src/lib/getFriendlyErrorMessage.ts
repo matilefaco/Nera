@@ -41,7 +41,7 @@ export function getFriendlyErrorMessage(
     code === 'auth/network-request-failed' ||
     str.includes('network-request-failed')
   ) {
-    return "Verifique sua conexão e tente novamente.";
+    return "Sem conexão com a internet.";
   }
 
   // 2. Auth / Sessão / Permissões
@@ -51,11 +51,11 @@ export function getFriendlyErrorMessage(
     str.includes('not authorized') ||
     code === 'auth/requires-recent-login'
   ) {
-    return "Sua sessão expirou. Entre novamente para continuar.";
+    return "Sessão expirada. Por favor, acesse novamente.";
   }
 
   if (code === 'auth/email-already-in-use' || str.includes('email-already-in-use')) {
-    return "Este e-mail já está cadastrado.";
+    return "Este e-mail já está em uso.";
   }
 
   if (
@@ -64,7 +64,7 @@ export function getFriendlyErrorMessage(
     code === 'auth/user-not-found' ||
     str.includes('invalid-credential')
   ) {
-    return "Credenciais inválidas. Verifique os dados inseridos.";
+    return "Dados incorretos. Verifique e tente novamente.";
   }
 
   if (code === 'auth/too-many-requests' || str.includes('too-many-requests')) {
@@ -72,11 +72,11 @@ export function getFriendlyErrorMessage(
   }
 
   if (code === 'auth/user-disabled' || str.includes('user-disabled')) {
-    return "Este acesso não está mais disponível.";
+    return "Acesso indisponível.";
   }
 
   if (code === 'auth/popup-closed-by-user' || str.includes('popup-closed')) {
-    return "Ação cancelada antes da conclusão.";
+    return "Ação interrompida.";
   }
 
   // 3. Firestore técnicos crus que não devem aparecer (fallback)

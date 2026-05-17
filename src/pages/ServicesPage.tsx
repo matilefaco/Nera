@@ -224,14 +224,14 @@ export default function ServicesPage() {
       if (editingId) {
         const docRef = doc(db, 'services', editingId);
         await updateDoc(docRef, serviceData);
-        notify.success('Serviço atualizado com sucesso.');
+        notify.success('Serviço atualizado.');
       } else {
         const colRef = collection(db, 'services');
         await addDoc(colRef, {
           ...serviceData,
           createdAt: new Date().toISOString()
         });
-        notify.success('Novo serviço adicionado com sucesso.');
+        notify.success('Serviço adicionado.');
       }
       closeModal();
     } catch (error: any) {
@@ -373,17 +373,17 @@ export default function ServicesPage() {
               </motion.div>
             ))
           ) : (
-            <div className="lg:col-span-2 py-32 text-center bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist">
-              <div className="w-24 h-24 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta mx-auto mb-8">
-                <List size={40} />
+            <div className="lg:col-span-2 py-32 text-center bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist/60">
+              <div className="w-24 h-24 bg-[#FAF9F8] rounded-full flex items-center justify-center text-brand-stone/40 mx-auto mb-8 border border-brand-mist/40">
+                <List size={32} strokeWidth={1.5} />
               </div>
-              <h3 className="text-2xl font-serif font-normal text-brand-ink mb-3">Adicione seu primeiro serviço</h3>
-              <p className="text-brand-stone text-sm font-light mb-10 max-w-xs mx-auto">Você precisa de pelo menos um serviço ativo para aparecer na sua página profissional.</p>
+              <h3 className="text-2xl font-serif font-normal text-brand-ink mb-3">Nenhum serviço cadastrado ainda</h3>
+              <p className="text-brand-stone text-sm font-light mb-10 max-w-xs mx-auto text-balance">Eles aparecerão aqui e na sua vitrine assim que você os adicionar.</p>
               <button 
                 onClick={() => setIsModalOpen(true)}
-                className="bg-brand-ink text-brand-white px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-widest shadow-xl hover:bg-brand-espresso transition-all"
+                className="bg-brand-ink text-brand-white px-10 py-5 rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
               >
-                Criar meu primeiro serviço
+                Adicionar serviço
               </button>
             </div>
           )}

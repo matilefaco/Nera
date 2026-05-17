@@ -37,7 +37,7 @@ export default function LoginPage() {
       
       if (response.ok) {
         setForgotSent(true);
-        notify.success('Instruções enviadas com sucesso.');
+        notify.success('Instruções enviadas.');
       } else {
         notify.error(data.error || 'Erro ao processar solicitação.');
       }
@@ -57,7 +57,7 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       console.log('[Login] firebase auth success');
-      notify.success('Que bom ter você de volta!');
+      notify.success('Seja bem-vinda.');
       console.log('[Login] redirect start');
       navigate('/dashboard');
     } catch (error: any) {
@@ -92,7 +92,7 @@ export default function LoginPage() {
         return;
       }
 
-      notify.success('Que bom ter você de volta!');
+      notify.success('Seja bem-vinda.');
       console.log('[Login] redirect start');
       navigate('/dashboard');
     } catch (error: any) {

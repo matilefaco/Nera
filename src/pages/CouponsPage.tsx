@@ -280,14 +280,13 @@ export default function CouponsPage() {
             ))}
           </div>
         ) : coupons.length === 0 ? (
-          <div className="text-center py-24 bg-[#FCFBF9] rounded-[40px] border border-[#F2EFEA] shadow-[0_4px_20px_-10px_rgba(0,0,0,0.03)] relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-brand-terracotta/[0.03] rounded-full blur-[80px] -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
-            <div className="w-20 h-20 bg-brand-linen/60 text-brand-terracotta rounded-full flex items-center justify-center mx-auto mb-8 relative z-10">
-              <Tag size={28} strokeWidth={1.5} />
+          <div className="text-center py-24 bg-[#FCFBF9] rounded-[40px] border border-[#F2EFEA] border-dashed shadow-sm relative overflow-hidden flex flex-col items-center">
+            <div className="w-16 h-16 bg-[#FAF9F8] border border-brand-mist/60 text-brand-stone/40 rounded-full flex items-center justify-center mx-auto mb-6 relative z-10">
+              <Tag size={24} strokeWidth={1.5} />
             </div>
-            <h3 className="text-2xl font-serif text-brand-ink mb-3 relative z-10">Nenhum cupom ativo</h3>
-            <p className="text-base text-brand-stone font-light max-w-sm mx-auto mb-10 relative z-10 leading-relaxed">
-              Incentive novas marcações ou recompense suas clientes mais fiéis com vantagens exclusivas.
+            <h3 className="text-xl font-serif text-brand-ink mb-2 relative z-10">Ainda não há cupons criados</h3>
+            <p className="text-[13px] text-brand-stone font-light max-w-sm mx-auto mb-10 relative z-10 leading-relaxed">
+              Recompense suas clientes ou incentive novos agendamentos com vantagens exclusivas.
             </p>
             <button 
               onClick={() => {
@@ -297,7 +296,7 @@ export default function CouponsPage() {
               }}
               className="relative z-10 text-[11px] font-bold uppercase tracking-[0.2em] text-brand-terracotta flex items-center justify-center gap-2 mx-auto group hover:scale-105 transition-transform"
             >
-              Criar meu primeiro cupom <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              Criar cupom <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
         ) : (

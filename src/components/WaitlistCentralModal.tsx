@@ -144,8 +144,7 @@ setLoading(false);
           <div className="flex-1 overflow-y-auto p-8 md:p-10 no-scrollbar">
             {loading ? (
               <div className="py-20 text-center space-y-4">
-                <div className="w-10 h-10 border-2 border-brand-terracotta border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone">Carregando espera...</p>
+                <div className="w-8 h-8 rounded-full border border-brand-mist/60 border-t-brand-stone/40 animate-spin mx-auto" />
               </div>
             ) : filteredEntries.length === 0 ? (
               <div className="py-20 text-center flex flex-col items-center">

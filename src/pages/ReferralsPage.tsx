@@ -208,17 +208,17 @@ export default function ReferralsPage() {
             ))}
           </div>
         ) : referrals.length === 0 ? (
-          <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-16 text-center">
-            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist shadow-sm">
-              <Users size={32} />
+          <div className="bg-[#FCFBF9] rounded-[40px] border border-dashed border-brand-mist/60 p-16 text-center">
+            <div className="w-16 h-16 bg-[#FAF9F8] border border-brand-mist/60 rounded-full flex items-center justify-center mx-auto mb-6 text-brand-stone/40 shadow-sm">
+              <Users size={24} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-serif text-brand-ink mb-2 italic">Nenhuma indicação ainda</h3>
-            <p className="text-xs text-brand-stone font-light max-w-xs mx-auto mb-8">
-              Compartilhe seu código com outras profissionais e comece a ganhar créditos hoje mesmo!
+            <h3 className="text-xl font-serif text-brand-ink mb-2">Ainda não há indicações</h3>
+            <p className="text-[13px] text-brand-stone font-light max-w-xs mx-auto mb-8">
+              Convites para novas profissionais aparecerão aqui.
             </p>
             <button 
               onClick={handleCopy}
-              className="inline-flex items-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all"
+              className="inline-flex items-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
             >
               {copyAnim ? <CheckCircle2 size={14} className="text-green-400" /> : <Gift size={14} />}
               {copyAnim ? 'Copiado!' : 'Copiar meu código'}

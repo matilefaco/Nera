@@ -132,7 +132,7 @@ export default function SettingsPage() {
       });
 
       setHasRequested(true);
-      notify.success('Solicitação recebida com sucesso.');
+      notify.success('Solicitação enviada.');
       setShowDeleteModal(false);
     } catch (err) {
       console.error('[Settings] Error requesting deletion:', err);

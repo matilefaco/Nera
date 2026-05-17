@@ -511,17 +511,16 @@ export default function ClientsPage() {
       if (loading && clients.length === 0) {
         return (
           <AppLayout activeRoute="clients">
-            <div className="p-6 md:p-12 pb-32 max-w-5xl mx-auto w-full">
+            <div className="p-6 md:p-12 pb-32 max-w-5xl mx-auto w-full animate-in fade-in duration-700">
               <header className="mb-12">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 bg-brand-linen rounded-xl text-brand-terracotta">
+                  <div className="p-2 bg-[#FAF9F8] border border-brand-mist/40 rounded-xl text-brand-stone/40">
                     <Users size={24} />
                   </div>
                   <h1 className="text-4xl font-serif text-brand-ink">Seus Clientes</h1>
                 </div>
-                <p className="text-brand-stone font-light italic">Carregando seus relacionamentos...</p>
               </header>
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 opacity-70">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <ListCardSkeleton key={i} />
                 ))}
@@ -878,8 +877,8 @@ export default function ClientsPage() {
           ) : (
             <div className="text-center py-24 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist px-6">
               <Users size={40} className="text-brand-mist mx-auto mb-6 opacity-40" />
-              <p className="text-brand-stone font-serif italic text-lg mb-2">Nenhum cliente encontrado.</p>
-              <p className="text-[10px] text-brand-stone uppercase tracking-widest max-w-xs mx-auto">Tente ajustar seus filtros ou busca.</p>
+              <p className="text-brand-stone font-serif italic text-lg mb-2">Nenhum resultado encontrado</p>
+              <p className="text-[10px] text-brand-stone/60 uppercase tracking-widest max-w-xs mx-auto">Sua base de clientes aparecerá aqui.</p>
             </div>
           )}
         </div>

@@ -67,51 +67,50 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
   }
 
   const bodyHtml = `
-    <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
-      Tudo certo, ${clientName}! ${professionalName} confirmou seu horário.
+    <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 25px; font-weight: 500;">
+      Olá, ${clientName}.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.6;">
-      Anote na sua agenda e se prepare para esse momento.
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 35px; line-height: 1.7;">
+      Seu horário com <strong>${professionalName}</strong> foi confirmado. 
+      Abaixo você encontra os detalhes para o seu atendimento.
     </p>
     
     ${buildEmailCard([
       { label: 'Serviço', value: serviceName },
-      { label: 'Data e Hora', value: `${formattedDate} às ${time}` },
-      { label: 'Profissional', value: professionalName || 'Sua profissional' },
-      { label: 'Local', value: `
-        <div>
-          <div style="font-weight: bold;">${location}</div>
-          ${fullAddress}
-          ${mapsUrl ? `
-            <div style="margin-top: 8px;">
-              <a href="${mapsUrl}" target="_blank" style="color: ${COLORS.terracotta}; font-size: 11px; font-weight: bold; text-decoration: underline; text-transform: uppercase; letter-spacing: 0.05em;">
-                Abrir no Google Maps
-              </a>
-            </div>
-          ` : ''}
-        </div>
-      ` }
+      { label: 'Data e Horário', value: `${formattedDate} às ${time}` },
+      { label: 'Profissional', value: professionalName || 'Sua profissional' }
     ])}
 
+    <div style="margin-top: 30px; padding: 0 10px;">
+      <h4 style="font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Localização</h4>
+      <div style="font-family: Arial, sans-serif; font-size: 14px; color: #18120E; line-height: 1.5;">
+        <div style="font-weight: 500;">${location}</div>
+        ${fullAddress}
+        ${mapsUrl ? `
+          <div style="margin-top: 12px;">
+            <a href="${mapsUrl}" target="_blank" style="color: ${COLORS.stone}; font-size: 11px; font-weight: bold; text-decoration: underline; text-transform: uppercase; letter-spacing: 0.1em;">
+              Ver no Mapa
+            </a>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+
     ${prepInstructions ? `
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#F9F5F0" style="border: 1px dashed #E5DDD6; margin: 30px 0;">
-        <tr>
-          <td style="padding: 25px;">
-            <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.terracotta}; margin-bottom: 10px; font-family: Arial, sans-serif;">COMO SE PREPARAR</font>
-            <p style="font-size: 13px; color: #18120E; margin: 0; font-family: Arial, sans-serif; line-height: 1.5;">${prepInstructions}</p>
-          </td>
-        </tr>
-      </table>
+      <div style="margin-top: 40px; padding: 25px; border: 1px solid ${COLORS.mist};">
+        <h4 style="font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Instruções</h4>
+        <p style="font-family: Arial, sans-serif; font-size: 13px; color: #8A7060; margin: 0; line-height: 1.6;">${prepInstructions}</p>
+      </div>
     ` : ''}
 
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 40px;">
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 50px;">
       <!-- Primary Button -->
       <tr>
         <td align="center">
           <table role="presentation" border="0" cellpadding="0" cellspacing="0">
             <tr>
               <td align="center" bgcolor="${COLORS.ink}" style="padding: 18px 45px;">
-                <a href="${calendarUrl}" target="_blank" style="color: #FDFAF7; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; text-decoration: none; display: inline-block;">
+                <a href="${calendarUrl}" target="_blank" style="color: #FDFAF7; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.25em; text-decoration: none; display: inline-block;">
                   Adicionar ao Calendário
                 </a>
               </td>
@@ -123,7 +122,7 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
       ${whatsappUrl ? `
         <!-- Spacer -->
         <tr>
-          <td height="12" style="font-size: 12px; line-height: 12px;">&nbsp;</td>
+          <td height="16" style="font-size: 16px; line-height: 16px;">&nbsp;</td>
         </tr>
 
         <!-- Secondary Button -->
@@ -132,8 +131,8 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
             <table role="presentation" border="0" cellpadding="0" cellspacing="0">
               <tr>
                 <td align="center" style="border: 1px solid ${COLORS.mist}; padding: 14px 40px;">
-                  <a href="${whatsappUrl}" target="_blank" style="color: ${COLORS.stone}; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; text-decoration: none; display: inline-block;">
-                    Falar com ${professionalName}
+                  <a href="${whatsappUrl}" target="_blank" style="color: ${COLORS.stone}; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; text-decoration: none; display: inline-block;">
+                    Mensagem para profissional
                   </a>
                 </td>
               </tr>
@@ -143,20 +142,20 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
       ` : ''}
     </table>
 
-    <div style="margin-top: 35px; text-align: center;">
-      <p style="font-family: Arial, sans-serif; font-size: 12px; color: ${COLORS.stone};">
-        Precisa reagendar? <a href="${manageUrl}" style="color: ${COLORS.stone}; text-decoration: underline;">Faça isso pelo painel da sua reserva.</a>
+    <div style="margin-top: 45px; text-align: center; padding-top: 30px; border-top: 1px solid ${COLORS.mist};">
+      <p style="font-family: Arial, sans-serif; font-size: 11px; color: ${COLORS.stone}; letter-spacing: 0.05em;">
+        Precisa reagendar? <a href="${manageUrl}" style="color: ${COLORS.stone}; text-decoration: underline;">Gerencie sua reserva</a>.
       </p>
     </div>
   `;
 
   return buildEmailBase({
     topbarText: 'Confirmação',
-    heroVariant: 'terracotta',
+    heroVariant: 'parchment',
     heroLabel: 'Reserva confirmada',
-    heroTitle: 'Tudo pronto!',
-    heroTitleItalic: 'para te receber ✨',
-    badgeText: '✓ Agendamento Confirmado',
+    heroTitle: 'Tudo pronto',
+    heroTitleItalic: 'para a sua visita ✨',
+    badgeText: '✓ Confirmado',
     badgeVariant: 'success',
     bodyHtml
   });

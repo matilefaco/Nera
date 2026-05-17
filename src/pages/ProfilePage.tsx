@@ -24,6 +24,7 @@ import { useProfileForm } from '../hooks/useProfileForm';
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import UpgradeModal from '../components/UpgradeModal';
 import PremiumButton from '../components/PremiumButton';
+import SilentConfirmModal from '../components/SilentConfirmModal';
 
 const IDENTITY_DIFFERENTIALS = [
   'Pontualidade',
@@ -147,6 +148,9 @@ export default function ProfilePage() {
 
   const [savedSnapshotString, setSavedSnapshotString] = useState<string | null>(null);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  
+  const [showCalendarDisconnectModal, setShowCalendarDisconnectModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   useEffect(() => {
     if (profile?.uid && savedSnapshotString === null) {
@@ -174,7 +178,7 @@ export default function ProfilePage() {
         pricingStrategy: profile.pricingStrategy || 'none',
         antiNoShowEnabled: profile.antiNoShowEnabled || false,
         advancePaymentRequired: profile.advancePaymentRequired || false,
-        delayTolerance: profile.delayTolerance || 15,
+        delayTolerance: profile.delayTolerance ?? 15,
         profileTheme: profile.profileTheme?.variant || 'terracotta',
         differentials: [...(profile.professionalIdentity?.differentials || [])].sort(),
         serviceAreas: [...(profile.serviceAreas || [])].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
@@ -248,7 +252,7 @@ export default function ProfilePage() {
     const handleMessage = (event: MessageEvent) => {
       // Validate origin if needed
       if (event.data?.type === 'CALENDAR_AUTH_SUCCESS') {
-        notify.success('Google Calendar conectado com sucesso!');
+        notify.success('Agenda sincronizada.');
         fetchCalendarStatus();
       } else if (event.data?.type === 'CALENDAR_AUTH_ERROR') {
         notify.error(`Erro ao conectar: ${event.data.error}`);
@@ -316,7 +320,7 @@ export default function ProfilePage() {
   };
 
   const handleDisconnectCalendar = async () => {
-    if (!user || !confirm('Tem certeza que deseja remover a integração com Google Calendar?')) return;
+    if (!user) return;
     try {
       const token = await user.getIdToken();
       await fetch('/api/calendar/disconnect', {
@@ -336,7 +340,7 @@ export default function ProfilePage() {
   };
 
   if (authLoading) {
-    return <AppLoadingScreen message="Carregando seu perfil..." />;
+    return <AppLoadingScreen />;
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -459,7 +463,7 @@ export default function ProfilePage() {
         }
 
         console.log('[ProfileSave] Success');
-        notify.success('Seu perfil foi atualizado com sucesso.');
+        notify.success('Perfil atualizado.');
         setSavedSnapshotString(currentSnapshotString);
         setShowSaveSuccess(true);
         setTimeout(() => setShowSaveSuccess(false), 3000);
@@ -526,7 +530,7 @@ export default function ProfilePage() {
         // PERSISTENCE: Save immediately
         await saveProfilePartial(user.uid, { avatar: url });
         
-        notify.success('Foto atualizada com sucesso.');
+        notify.success('Foto atualizada.');
       } catch (err: any) {
         console.error('[Avatar] upload flow failed:', err);
         notify.error('Não foi possível salvar a imagem agora.');
@@ -1263,13 +1267,13 @@ export default function ProfilePage() {
             <hr className="border-brand-mist/50 my-6" />
 
             {/* Payment Methods Section */}
-              <div className="space-y-3 pt-2">
+              <div className="space-y-4 pt-4 border-t border-brand-mist/30">
                 <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
+                  <h3 className="text-[11px] font-medium uppercase tracking-widest text-brand-stone ml-2">
                     Formas de Pagamento Aceitas
                   </h3>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 px-2">
                   {[
                     { id: 'pix', label: 'Pix' },
                     { id: 'credito', label: 'Cartão de Crédito' },
@@ -1284,10 +1288,10 @@ export default function ProfilePage() {
                         prev.includes(m.id) ? prev.filter(p => p !== m.id) : [...prev, m.id]
                       )}
                       className={cn(
-                        "px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
+                        "px-4 py-2 rounded-full text-[11px] tracking-wide border transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30",
                         paymentMethods.includes(m.id)
-                          ? "bg-[#FAF9F8] text-brand-ink border-brand-ink/30"
-                          : "bg-white text-brand-stone border-brand-mist/60 hover:border-brand-stone/40 hover:bg-brand-mist/10"
+                          ? "bg-[#FAF9F8] text-brand-ink border-brand-mist/60 font-medium shadow-sm"
+                          : "bg-transparent text-brand-stone/80 border-brand-mist/40 font-normal hover:border-brand-mist hover:text-brand-stone hover:bg-[#FAF9F8]/50"
                       )}
                     >
                       {m.label}
@@ -1308,29 +1312,32 @@ export default function ProfilePage() {
             {/* Anti No-Show Section */}
             <div className="space-y-4 px-2">
               <div className="pt-2">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="p-1.5 bg-brand-terracotta/5 rounded-lg border border-brand-terracotta/10">
-                    <ShieldCheck size={16} className="text-brand-terracotta" />
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-1.5 bg-[#FAF9F8] rounded-xl border border-brand-mist/40 text-brand-stone/40">
+                    <ShieldCheck size={16} strokeWidth={1.5} />
                   </div>
-                  <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
-                    Proteção Anti No-Show
+                  <h3 className="text-[11px] font-medium uppercase tracking-widest text-brand-stone ml-2">
+                    Garantia de Confirmação
                   </h3>
                 </div>
+                <p className="text-[11px] text-brand-stone font-light mb-4 ml-10">
+                  Ajuda a reduzir faltas e confirmar presença com antecedência.
+                </p>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between py-3 border-b border-brand-mist/50">
+                  <div className="flex items-center justify-between py-3 border-b border-brand-mist/30">
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-0.5">Confirmação 24h</p>
-                      <p className="text-[10px] text-brand-stone font-light italic">Enviar lembrete 24h antes sugerindo confirmação.</p>
+                      <p className="text-[13px] font-medium text-brand-ink mb-0.5">Lembrete 24h</p>
+                      <p className="text-[11px] text-brand-stone font-light">Enviar mensagem automática sugerindo confirmação.</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setAntiNoShowEnabled(!antiNoShowEnabled)}
                       className={cn(
-                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2 active:scale-[0.92] border",
+                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 focus-visible:ring-offset-2 active:scale-[0.92] border",
                         antiNoShowEnabled
                           ? "bg-brand-ink border-brand-ink"
-                          : "bg-brand-parchment border-brand-mist/80 hover:border-brand-stone/30 hover:bg-white"
+                          : "bg-brand-mist/30 border-brand-mist/40 hover:border-brand-mist/60"
                       )}
                     >
                       <div className={cn(
@@ -1340,19 +1347,19 @@ export default function ProfilePage() {
                     </button>
                   </div>
 
-                  <div className="flex items-center justify-between py-3 border-b border-brand-mist/50">
+                  <div className="flex items-center justify-between py-3 border-b border-brand-mist/30">
                     <div>
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-0.5">Sinal Antecipado</p>
-                      <p className="text-[10px] text-brand-stone font-light italic">Solicitar sinal via Pix para garantir reserva.</p>
+                      <p className="text-[13px] font-medium text-brand-ink mb-0.5">Sinal Antecipado</p>
+                      <p className="text-[11px] text-brand-stone font-light">Exigir pagamento parcial via Pix para reservar.</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setAdvancePaymentRequired(!advancePaymentRequired)}
                       className={cn(
-                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2 active:scale-[0.92] border",
+                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 focus-visible:ring-offset-2 active:scale-[0.92] border",
                         advancePaymentRequired
                           ? "bg-brand-ink border-brand-ink"
-                          : "bg-brand-parchment border-brand-mist/80 hover:border-brand-stone/30 hover:bg-white"
+                          : "bg-brand-mist/30 border-brand-mist/40 hover:border-brand-mist/60"
                       )}
                     >
                       <div className={cn(
@@ -1363,21 +1370,22 @@ export default function ProfilePage() {
                   </div>
 
                   <div className="pt-3">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-3 ml-1">Tolerância de Atraso</p>
-                    <div className="flex gap-2">
-                      {[10, 15, 20].map(val => (
+                    <p className="text-[13px] font-medium text-brand-ink mb-0.5">Tempo limite para atrasos</p>
+                    <p className="text-[11px] text-brand-stone font-light mb-3">Tolerância aceitável antes de liberar o horário.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[0, 10, 15, 20].map(val => (
                         <button
                           key={val}
                           type="button"
-                          onClick={() => setDelayTolerance(val as 10 | 15 | 20)}
+                          onClick={() => setDelayTolerance(val as 0 | 10 | 15 | 20)}
                           className={cn(
-                            "px-5 py-2 rounded-xl text-[9px] font-bold uppercase tracking-widest border transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
+                            "px-4 py-2.5 rounded-full text-[11px] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 border",
                             delayTolerance === val
-                              ? "bg-brand-ink text-brand-white border-brand-ink shadow-md scale-[1.02]"
-                              : "bg-transparent text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
+                              ? "bg-brand-white text-brand-ink border-brand-mist/60 shadow-sm font-medium"
+                              : "bg-transparent text-brand-stone/70 border-brand-mist/40 hover:border-brand-mist hover:text-brand-stone"
                           )}
                         >
-                          {val} min
+                          {val === 0 ? "Flexível" : `Até ${val} min`}
                         </button>
                       ))}
                     </div>
@@ -1398,8 +1406,8 @@ export default function ProfilePage() {
             <div className="space-y-4 px-2">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 mb-2 sm:mb-0">
-                  <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100">
-                    <Calendar size={16} />
+                  <div className="p-1.5 bg-[#FAF9F8] border border-brand-mist/40 text-brand-stone/40 rounded-xl">
+                    <Calendar size={16} strokeWidth={1.5} />
                   </div>
                   <h3 className="font-serif italic text-lg text-brand-ink">Google Calendar</h3>
                 </div>
@@ -1414,35 +1422,35 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="p-4 bg-brand-white/80 rounded-2xl border border-brand-mist/50 shadow-sm">
+              <div className="p-5 bg-[#FCFBF9] rounded-[24px] border border-brand-mist/40 shadow-sm opacity-90 transition-all">
                 {!googleCalendarConnected ? (
-                  <div className="space-y-3">
-                    <p className="text-[11px] text-brand-stone font-light leading-relaxed">
+                  <div className="space-y-4">
+                    <p className="text-[12px] text-brand-stone font-light leading-relaxed">
                       Sincronize sua agenda da Nera com seu Google Calendar pessoal. Novos agendamentos confirmados serão adicionados automaticamente.
                     </p>
                     <button
                       type="button"
                       onClick={handleConnectCalendar}
                       disabled={calendarLoading}
-                      className="w-full sm:w-auto px-6 py-2.5 bg-brand-ink/5 border-none rounded-lg flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-ink/10 transition-all duration-300 ease-out hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100 mx-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50"
+                      className="w-full sm:w-auto px-6 py-2.5 bg-brand-white border border-brand-mist/40 rounded-full flex items-center justify-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:bg-[#FAF9F8] hover:border-brand-mist transition-all duration-300 ease-out disabled:opacity-50 mx-auto shadow-sm"
                     >
                       {calendarLoading ? (
                         <RefreshCw size={14} className="animate-spin" />
                       ) : (
                         <>
-                          <Calendar size={14} /> Conectar Conta
+                          <Calendar size={14} strokeWidth={2} /> Conectar ao Google
                         </>
                       )}
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-[11px] font-bold uppercase tracking-widest text-brand-ink mb-0.5">Sincronização Ativa</p>
-                        <p className="text-[10px] text-brand-stone font-light italic">
+                        <p className="text-[13px] font-medium text-brand-ink mb-0.5">Sincronização Ativa</p>
+                        <p className="text-[11px] text-brand-stone font-light">
                           {googleCalendarEnabled 
-                            ? "Sua agenda está sendo sincronizada automaticamente." 
+                            ? "Sua agenda está sendo atualizada." 
                             : "A sincronização está pausada."}
                         </p>
                       </div>
@@ -1450,10 +1458,10 @@ export default function ProfilePage() {
                         type="button"
                         onClick={() => handleToggleCalendar(!googleCalendarEnabled)}
                         className={cn(
-                          "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2 active:scale-[0.92] border",
+                          "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 border",
                           googleCalendarEnabled
                             ? "bg-brand-ink border-brand-ink"
-                            : "bg-brand-parchment border-brand-mist/80 hover:border-brand-stone/30 hover:bg-white"
+                            : "bg-brand-mist/30 border-brand-mist/40 hover:border-brand-mist/60"
                         )}
                       >
                         <div className={cn(
@@ -1463,17 +1471,17 @@ export default function ProfilePage() {
                       </button>
                     </div>
 
-                    <div className="pt-3 border-t border-brand-mist/50 flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-[10px] text-green-600 font-medium">
-                        <CheckCircle2 size={12} />
+                    <div className="pt-4 border-t border-brand-mist/30 flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-[11px] text-green-600/80 font-medium">
+                        <CheckCircle2 size={14} strokeWidth={1.5} />
                         Conectado ao seu Google
                       </div>
                       <button
                         type="button"
-                        onClick={handleDisconnectCalendar}
-                        className="text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-700 hover:bg-red-50/50 px-3 py-1.5 rounded-lg transition-all duration-300 ease-out flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+                        onClick={() => setShowCalendarDisconnectModal(true)}
+                        className="text-[10px] font-medium uppercase tracking-widest text-[#E33B31]/70 hover:text-[#E33B31] px-3 py-1.5 rounded-lg transition-all duration-300 ease-out flex items-center gap-2"
                       >
-                        <Trash2 size={12} /> Desconectar
+                        <Trash2 size={12} strokeWidth={1.5} /> Desconectar
                       </button>
                     </div>
                   </div>
@@ -1493,34 +1501,34 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 px-2">
               <Link 
                 to="/configuracoes"
-                className="flex items-center justify-between p-5 bg-brand-white border border-brand-mist rounded-2xl hover:border-brand-ink/30 transition-all group"
+                className="flex items-center justify-between p-4 bg-brand-white border border-brand-mist/40 rounded-[20px] shadow-sm hover:border-brand-mist hover:bg-[#FCFBF9] transition-all group opacity-90"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-terracotta/10">
-                    <Settings size={20} />
+                  <div className="w-10 h-10 rounded-xl bg-[#FAF9F8] border border-brand-mist/60 flex items-center justify-center text-brand-stone/60">
+                    <Settings size={20} strokeWidth={1.5} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-brand-ink line-clamp-1">Configurações</h3>
-                    <p className="text-[10px] text-brand-stone font-light line-clamp-1">Preferências da sua conta</p>
+                    <h3 className="text-[13px] font-medium text-brand-ink line-clamp-1">Configurações</h3>
+                    <p className="text-[11px] text-brand-stone font-light line-clamp-1 pt-0.5">Preferências da sua conta</p>
                   </div>
                 </div>
-                <ChevronRight size={16} className="text-brand-mist group-hover:translate-x-1 transition-transform" />
+                <ChevronRight size={16} className="text-brand-stone/40 group-hover:text-brand-ink transition-colors" />
               </Link>
 
               <Link 
                 to="/trocar-senha"
-                className="flex items-center justify-between p-5 bg-brand-white border border-brand-mist rounded-2xl hover:border-brand-ink/30 transition-all group"
+                className="flex items-center justify-between p-4 bg-brand-white border border-brand-mist/40 rounded-[20px] shadow-sm hover:border-brand-mist hover:bg-[#FCFBF9] transition-all group opacity-90"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-terracotta/10">
-                    <Key size={20} />
+                  <div className="w-10 h-10 rounded-xl bg-[#FAF9F8] border border-brand-mist/60 flex items-center justify-center text-brand-stone/60">
+                    <Key size={20} strokeWidth={1.5} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-brand-ink line-clamp-1">Trocar Senha</h3>
-                    <p className="text-[10px] text-brand-stone font-light line-clamp-1">Segurança do seu acesso</p>
+                    <h3 className="text-[13px] font-medium text-brand-ink line-clamp-1">Trocar Senha</h3>
+                    <p className="text-[11px] text-brand-stone font-light line-clamp-1 pt-0.5">Segurança do seu acesso</p>
                   </div>
                 </div>
-                <ChevronRight size={16} className="text-brand-mist group-hover:translate-x-1 transition-transform" />
+                <ChevronRight size={16} className="text-brand-stone/40 group-hover:text-brand-ink transition-colors" />
               </Link>
             </div>
           </section>
@@ -1529,7 +1537,7 @@ export default function ProfilePage() {
             <button 
               type="submit" 
               disabled={loading} 
-              className="w-full max-w-[240px] bg-brand-white text-brand-ink border border-brand-mist py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all duration-300 ease-out flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50"
+              className="w-full max-w-[240px] bg-brand-white text-brand-ink border border-brand-mist/60 py-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all duration-300 ease-out flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30"
             >
               {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
@@ -1537,17 +1545,7 @@ export default function ProfilePage() {
             <div className="pt-4 mt-2 mb-20 md:mb-0">
               <button 
                 type="button"
-                onClick={async () => {
-                   if (confirm('Tem certeza que deseja sair da sua conta?')) {
-                     try {
-                       await auth.signOut();
-                       window.location.href = '/login';
-                     } catch (err) {
-                       console.error('[Logout] Error during sign out:', err);
-                       window.location.href = '/login';
-                     }
-                   }
-                }}
+                onClick={() => setShowLogoutModal(true)}
                 className="w-auto bg-transparent text-brand-stone/60 py-2 px-4 rounded-xl text-[9px] font-bold uppercase tracking-widest hover:text-red-500 hover:bg-red-50 transition-all duration-300 ease-out flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
               >
                 <LogOut size={14} /> Sair da conta
@@ -1584,6 +1582,33 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        <SilentConfirmModal
+          open={showCalendarDisconnectModal}
+          onClose={() => setShowCalendarDisconnectModal(false)}
+          onConfirm={handleDisconnectCalendar}
+          title="Desconectar Google Calendar?"
+          description="A sincronização será interrompida e novos agendamentos não serão mais adicionados automaticamente à sua agenda pessoal."
+          confirmLabel="Desconectar"
+          variant="danger"
+        />
+
+        <SilentConfirmModal
+          open={showLogoutModal}
+          onClose={() => setShowLogoutModal(false)}
+          onConfirm={async () => {
+            try {
+              await auth.signOut();
+              window.location.href = '/login';
+            } catch (err) {
+              console.error('[Logout] Error during sign out:', err);
+              window.location.href = '/login';
+            }
+          }}
+          title="Sair da conta?"
+          description="Você será desconectado e precisará fazer login novamente para gerenciar sua agenda profissional."
+          confirmLabel="Sair agora"
+        />
 
         <UpgradeModal 
           open={isUpgradeModalOpen}

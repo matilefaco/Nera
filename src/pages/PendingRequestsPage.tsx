@@ -53,7 +53,7 @@ export default function PendingRequestsPage() {
       setIsPushLoading(true);
       const success = await requestPermission();
       if (success) {
-        notify.success('Notificações ativadas!');
+        notify.success('Notificações ativadas.');
       }
     } catch (error) {
       console.error(error);
@@ -225,7 +225,7 @@ export default function PendingRequestsPage() {
           throw new Error(errData.error || `Erro ao confirmar (${res.status})`);
         }
         
-        notify.success(`Reserva confirmada! ID: ${id}`);
+        notify.success('Horário confirmado.');
         // Transition to WhatsApp CTA after the check animation
         setTimeout(() => {
           setWhatsappCtaId(id);
@@ -244,7 +244,7 @@ export default function PendingRequestsPage() {
            throw new Error(errData.error || `Erro ao recusar (${res.status})`);
         }
         
-        notify.success('Reserva marcada como indisponível.');
+        notify.success('Indisponibilidade registrada.');
       }
       
       if (selectedRequest?.id === id) {
@@ -342,19 +342,18 @@ export default function PendingRequestsPage() {
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-32 space-y-4">
-            <div className="w-12 h-12 border-t-2 border-brand-terracotta rounded-full animate-spin" />
-            <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest">Carregando pedidos...</p>
+            <div className="w-8 h-8 rounded-full border border-brand-mist/60 border-t-brand-stone/40 animate-spin" />
           </div>
         ) : localRequests.length === 0 ? (
-          <div className="bg-brand-white border border-brand-mist border-dashed rounded-[48px] p-16 md:p-24 text-center flex flex-col items-center max-w-xl mx-auto shadow-sm">
-            <div className="w-24 h-24 bg-brand-linen rounded-[32px] flex items-center justify-center text-brand-stone/40 mb-8 rotate-3">
-              <Inbox size={48} strokeWidth={1} />
+          <div className="bg-brand-white border border-brand-mist/60 border-dashed rounded-[48px] p-16 md:p-24 text-center flex flex-col items-center max-w-xl mx-auto shadow-sm">
+            <div className="w-24 h-24 bg-brand-white rounded-[32px] flex items-center justify-center text-brand-stone/30 mb-8 border border-brand-mist/40 shadow-sm">
+              <Inbox size={32} strokeWidth={1} />
             </div>
-            <h2 className="text-2xl font-serif text-brand-ink mb-4 text-balance">Agenda livre de pedidos</h2>
-            <p className="text-sm text-brand-stone font-light italic mb-10 leading-relaxed px-4">
-              Quando novas clientes agendarem pelo seu link profissional, as solicitações aparecerão aqui para sua confirmação.
+            <h2 className="text-2xl font-serif text-brand-ink mb-3 text-balance">Nenhum pedido pendente</h2>
+            <p className="text-[13px] text-brand-stone font-light italic mb-10 leading-relaxed px-4 text-balance">
+              Novas solicitações de agendamento aparecerão aqui.
             </p>
-            <Link to="/dashboard" className="px-10 py-5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all premium-shadow">Voltar ao Início</Link>
+            <Link to="/dashboard" className="px-10 py-5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm">Voltar ao Início</Link>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10">

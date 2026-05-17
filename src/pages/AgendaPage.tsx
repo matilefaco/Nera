@@ -414,7 +414,7 @@ export default function AgendaPage() {
       );
     } else {
       setManualTime(fit.time);
-      notify.success('Horário de encaixe selecionado!');
+      notify.success('Horário de encaixe selecionado.');
     }
   };
 
@@ -485,7 +485,7 @@ export default function AgendaPage() {
       const reviewLink = `${window.location.origin}/review/${token}`;
       try {
         await navigator.clipboard.writeText(reviewLink);
-        notify.success('Link de avaliação copiado para área de transferência!');
+        notify.success('Link copiado.');
       } catch {
         // Ignorar erro do clipboard
       }
@@ -531,7 +531,7 @@ export default function AgendaPage() {
           const errData = await res.json().catch(() => ({}));
           throw new Error(errData.error || `Erro ao confirmar (${res.status})`);
         }
-        notify.success('Reserva confirmada!');
+        notify.success('Horário confirmado.');
       } else {
         if (appointment?.status === 'confirmed') {
           const res = await fetch(`/api/appointments/${id}/cancel-by-professional`, {
@@ -558,7 +558,7 @@ export default function AgendaPage() {
             throw new Error(errData.error || `Erro ao recusar (${res.status})`);
           }
         }
-        notify.success('Reserva marcada como indisponível.');
+        notify.success('Indisponibilidade registrada.');
       }
     } catch (err: any) {
       // Revert optimistic update

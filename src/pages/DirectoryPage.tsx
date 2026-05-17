@@ -215,11 +215,13 @@ export default function DirectoryPage() {
             ))}
           </div>
         ) : professionals.length === 0 ? (
-          <div className="py-32 text-center">
-            <Sparkles size={48} className="text-brand-mist mx-auto mb-6" />
-            <h2 className="text-2xl font-serif text-brand-ink mb-4 italic">Nenhum profissional encontrado</h2>
-            <p className="text-brand-stone text-sm font-light mb-8 max-w-xs mx-auto">
-              Tente ajustar seus filtros ou pesquisar por outra cidade.
+          <div className="py-32 text-center flex flex-col items-center">
+            <div className="w-16 h-16 bg-[#FAF9F8] border border-brand-mist/60 rounded-full flex items-center justify-center mb-6">
+              <Sparkles size={24} strokeWidth={1.5} className="text-brand-stone/40" />
+            </div>
+            <h2 className="text-xl font-serif text-brand-ink mb-2">Nenhum resultado encontrado</h2>
+            <p className="text-brand-stone text-[13px] font-light mb-8 max-w-xs mx-auto">
+              Não encontramos nenhum perfil com os filtros atuais.
             </p>
             <button 
               onClick={() => {

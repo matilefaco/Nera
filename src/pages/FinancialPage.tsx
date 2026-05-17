@@ -289,13 +289,13 @@ export default function FinancialPage() {
         </header>
 
         {monthlyGroups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center bg-[#FCFBF9] rounded-[40px] border border-brand-mist/60 shadow-[0_4px_20px_-10px_rgba(0,0,0,0.03)]">
-            <div className="w-20 h-20 bg-brand-linen/60 rounded-full flex items-center justify-center text-brand-terracotta mb-8">
-              <PieChart size={32} strokeWidth={1.5} />
+          <div className="flex flex-col items-center justify-center py-24 text-center bg-[#FCFBF9] rounded-[40px] border border-dashed border-brand-mist/60 shadow-sm">
+            <div className="w-16 h-16 bg-[#FAF9F8] rounded-full flex items-center justify-center text-brand-stone/40 mb-6 border border-brand-mist/40">
+              <DollarSign size={24} strokeWidth={1.5} />
             </div>
-            <h3 className="text-2xl font-serif text-brand-ink mb-3 px-2">Seu crescimento começa aqui</h3>
-            <p className="text-base text-brand-stone max-w-md mx-auto font-light leading-relaxed px-4">
-              Seus recebimentos vão aparecer aqui conforme sua agenda começar a movimentar.
+            <h3 className="text-xl font-serif text-brand-ink mb-2 px-2">Ainda não há lançamentos</h3>
+            <p className="text-[13px] text-brand-stone font-light leading-relaxed px-4">
+              Seu faturamento aparecerá aqui conforme suas clientes agendarem.
             </p>
           </div>
         ) : (
@@ -454,9 +454,9 @@ export default function FinancialPage() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-[#FCFBF9] p-10 rounded-[32px] border border-brand-mist/60 text-center shadow-sm">
-                  <p className="text-brand-stone font-light max-w-sm mx-auto">
-                    Assim que seus atendimentos forem confirmados, seus serviços mais fortes aparecerão aqui.
+                <div className="bg-[#FCFBF9] p-10 rounded-[32px] border border-brand-mist/60 border-dashed text-center shadow-sm">
+                  <p className="text-[13px] text-brand-stone font-light max-w-sm mx-auto">
+                    Ainda não há serviços com recebimentos neste mês.
                   </p>
                 </div>
               )}

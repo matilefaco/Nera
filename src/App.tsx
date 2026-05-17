@@ -222,7 +222,22 @@ export default function App() {
               } />
                 </Routes>
               </AppErrorBoundary>
-              <Toaster position="top-center" richColors />
+              <Toaster 
+                position="top-center" 
+                toastOptions={{
+                  style: {
+                    background: 'var(--color-brand-white)',
+                    border: '1px solid var(--color-brand-mist)',
+                    color: 'var(--color-brand-ink)',
+                    borderRadius: '24px',
+                    fontSize: '13px',
+                    fontWeight: '400',
+                    fontFamily: 'Outfit, sans-serif',
+                    padding: '12px 20px',
+                    boxShadow: '0 20px 40px -10px rgba(24, 18, 14, 0.08)',
+                  },
+                }}
+              />
             </div>
         </Router>
         </PendingAppointmentsProvider>

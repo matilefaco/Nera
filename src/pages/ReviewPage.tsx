@@ -164,7 +164,7 @@ export default function ReviewPage() {
   };
 
   if (loading) {
-    return <AppLoadingScreen message="Validando convite..." />;
+    return <AppLoadingScreen />;
   }
 
   if (error) {

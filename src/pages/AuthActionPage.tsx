@@ -26,7 +26,9 @@ export default function AuthActionPage() {
     }
 
     if (mode === 'verifyEmail') {
-      handleVerifyEmail(oobCode);
+      handleVerifyEmail(oobCode).catch(err => {
+        console.error('[AuthActionPage] Uncaught error in verification handler:', err);
+      });
     } else {
       setStatus('error');
       setErrorMsg('Este tipo de ação ainda não é suportado por este link.');

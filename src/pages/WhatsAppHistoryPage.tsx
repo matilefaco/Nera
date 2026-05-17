@@ -141,9 +141,8 @@ setLoading(false);
         {/* Logs List */}
         <div className="bg-brand-white rounded-[32px] border border-brand-mist/50 shadow-sm overflow-hidden">
           {loading ? (
-            <div className="p-12 flex flex-col items-center justify-center text-gray-400">
-              <Clock className="w-8 h-8 animate-spin mb-4" />
-              <p>Carregando histórico...</p>
+            <div className="p-12 flex flex-col items-center justify-center">
+              <div className="w-8 h-8 rounded-full border border-brand-mist/60 border-t-brand-stone/40 animate-spin" />
             </div>
           ) : filteredLogs.length > 0 ? (
             <div className="divide-y divide-brand-mist/30">
