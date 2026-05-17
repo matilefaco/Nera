@@ -12,33 +12,33 @@ export function buildWelcomeEmail(data: WelcomeData): string {
 
   const bodyHtml = `
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 24px; line-height: 1.6;">
-      É um prazer receber você na Nera. Acreditamos que a excelência profissional começa com uma presença digital impecável e uma agenda que trabalha a seu favor.
+      Sua vitrine profissional exclusiva já foi reservada. Agora, basta configurar seus serviços e horários para começar a receber seus primeiros agendamentos.
     </p>
 
     <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 32px; line-height: 1.7;">
-      Sua vitrine profissional exclusiva já foi reservada. Agora, basta adicionar seus serviços e horários para começar a receber agendamentos com toda a sofisticação que o seu trabalho merece.
+      Construímos a Nera para ser a ferramenta que valoriza seu talento e simplifica sua gestão.
     </p>
 
     ${buildEmailCard([
       { label: "Seu link exclusivo", value: `usenera.com/p/${slug}`, valueUrl: `https://usenera.com/p/${slug}` },
-      { label: "Sua conta", value: "Premium Access" }
+      { label: "Acesso", value: "Premium" }
     ])}
 
-    <p style="font-family: Arial, sans-serif; font-size: 13px; color: #8A7060; margin-top: 40px; margin-bottom: 20px; line-height: 1.6; text-align: center; font-style: italic;">
-      "A Nera foi criada para profissionais que entendem que cada detalhe comunica o valor do seu tempo."
-    </p>
+    <div style="margin-top: 40px;">
+      &nbsp;
+    </div>
   `;
 
   return buildEmailBase({
-    topbarText: 'Seja bem-vinda',
+    topbarText: 'Boas-vindas',
     heroVariant: 'ink',
-    heroLabel: 'Boas-vindas',
+    heroLabel: 'Conta Ativada',
     heroTitle: `${firstName},`,
-    heroTitleItalic: 'sua jornada começa aqui ✨',
-    badgeText: '✓ Conta Ativada',
+    heroTitleItalic: 'sua agenda está pronta ✨',
+    badgeText: '✓ Ativa',
     badgeVariant: 'success',
     bodyHtml,
-    ctaText: 'Criar Minha Vitrine',
+    ctaText: 'Acessar Painel',
     ctaUrl: onboardingUrl
   });
 }

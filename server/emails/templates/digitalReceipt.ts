@@ -28,21 +28,18 @@ export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
       Olá, ${firstName}.
     </p>
     <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.7;">
-      Foi um prazer receber você hoje. Acreditamos que seu tempo com ${professionalName} tenha sido um momento de cuidado e renovação. 
-      Abaixo, você encontra o registro da sua experiência.
+      Seu atendimento com ${professionalName} foi finalizado. Abaixo, você encontra o registro dos serviços realizados e valores correspondentes.
     </p>
     
     ${buildEmailCard([
-      { label: 'A Experiência', value: serviceName },
-      { label: 'O Momento', value: `${formattedDate} às ${time}` },
-      { label: 'Com', value: professionalName },
-      { label: 'Valor', value: price }
+      { label: 'Serviço', value: serviceName },
+      { label: 'Data e Horário', value: `${formattedDate} às ${time}` },
+      { label: 'Profissional', value: professionalName },
+      { label: 'Valor total', value: price }
     ])}
 
     <div style="margin-top: 40px; text-align: center;">
-      <p style="font-family: Arial, sans-serif; font-size: 12px; color: #8A7060; font-style: italic; margin-bottom: 30px;">
-        "A beleza reside na intenção que colocamos em cada detalhe."
-      </p>
+      &nbsp;
     </div>
 
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 10px;">
@@ -52,7 +49,7 @@ export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
             <tr>
               <td align="center" bgcolor="${COLORS.ink}" style="padding: 18px 45px;">
                 <a href="${bookingUrl}" target="_blank" style="color: #FDFAF7; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.25em; text-decoration: none; display: inline-block;">
-                  Agendar Próxima Visita
+                  Novo agendamento
                 </a>
               </td>
             </tr>
@@ -63,11 +60,11 @@ export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
   `;
 
   return buildEmailBase({
-    topbarText: 'Sua Experiência',
+    topbarText: 'Recibo',
     heroVariant: 'parchment',
     heroLabel: 'Recibo Digital',
-    heroTitle: 'Tudo pronto,',
-    heroTitleItalic: 'até breve ✨',
+    heroTitle: 'Atendimento',
+    heroTitleItalic: 'concluído ✨',
     badgeText: '✓ Finalizado',
     badgeVariant: 'success',
     bodyHtml
