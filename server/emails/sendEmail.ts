@@ -16,6 +16,7 @@ import { buildBookingRescheduledEmail } from './templates/bookingRescheduled.js'
 import { buildDigitalReceiptEmail } from './templates/digitalReceipt.js';
 import { buildReferralRewardEmail } from './templates/referralReward.js';
 import { buildTrialWillEndEmail } from './templates/trialWillEnd.js';
+import { buildVerificationEmail } from './templates/verificationEmail.js';
 import { logger, maskEmail, maskToken } from '../utils/logger.js';
 import { PUBLIC_APP_URL } from '../utils.js';
 
@@ -764,6 +765,40 @@ export async function sendPasswordResetEmail(data: { email: string, resetUrl: st
     return { success: true, id: resendData?.id };
   } catch (err: any) {
     logEmail('ERROR', 'password_reset', { error: err.message });
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * EVENT: email_verification
+ */
+export async function sendVerificationEmail(data: { email: string, verificationUrl: string }) {
+  logEmail('START', 'email_verification', { to: data.email });
+
+  if (!isValidEmail(data.email)) {
+    logEmail('ERROR', 'email_verification', { error: 'Invalid email', to: data.email });
+    return { success: false, error: 'Invalid email' };
+  }
+
+  const html = buildVerificationEmail(data);
+
+  try {
+    const resend = getResendClient();
+    const { data: resendData, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [data.email],
+      replyTo: REPLY_TO,
+      subject: 'Confirme sua conta no Nera ✨',
+      html,
+    });
+    if (error) {
+      logEmail('ERROR', 'email_verification', { error });
+      return { success: false, error };
+    }
+    logEmail('SUCCESS', 'email_verification', { resendId: resendData?.id });
+    return { success: true, id: resendData?.id };
+  } catch (err: any) {
+    logEmail('ERROR', 'email_verification', { error: err.message });
     return { success: false, error: err.message };
   }
 }

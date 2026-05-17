@@ -1,6 +1,6 @@
 import express from "express";
 import admin from "firebase-admin";
-import { sendPasswordResetEmail } from "../emails/sendEmail.js";
+import { sendPasswordResetEmail, sendVerificationEmail } from "../emails/sendEmail.js";
 import { logger, maskEmail } from "../utils/logger.js";
 import { PUBLIC_APP_URL } from "../utils.js";
 
@@ -21,12 +21,9 @@ router.post("/forgot-password", async (req, res) => {
   
   try {
     // 1. Generate the reset link using Firebase Admin
-    // This link handles the actual password change on Firebase's default handlers
-    // or we can point it to our custom page if we have one.
-    // For now, we point to /login so the user can see a success message or just be back at the entry point.
     const actionCodeSettings = {
       url: `${PUBLIC_APP_URL}/login?reset_success=1`,
-      handleCodeInApp: false, // Firebase handles the reset UI by default
+      handleCodeInApp: false,
     };
 
     const link = await admin.auth().generatePasswordResetLink(cleanEmail, actionCodeSettings);
@@ -42,7 +39,6 @@ router.post("/forgot-password", async (req, res) => {
         email: maskEmail(cleanEmail), 
         error: result.error 
       });
-      // Still return success to the user for security/privacy
     }
 
     return res.json({ 
@@ -51,7 +47,6 @@ router.post("/forgot-password", async (req, res) => {
     });
 
   } catch (error: any) {
-    // If user not found, we still return success for privacy
     if (error.code === 'auth/user-not-found') {
       logger.info("AUTH", "Password reset requested for non-existent user", { email: maskEmail(cleanEmail) });
       return res.json({ 
@@ -69,6 +64,54 @@ router.post("/forgot-password", async (req, res) => {
       error: "Erro interno", 
       message: "Ocorreu um erro ao processar sua solicitação. Tente novamente mais tarde." 
     });
+  }
+});
+
+/**
+ * POST /api/auth/send-verification
+ * Generates a Firebase email verification link and sends it via Resend
+ */
+router.post("/send-verification", async (req, res) => {
+  const { email } = req.body;
+
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return res.status(400).json({ error: "Email inválido" });
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  try {
+    const actionCodeSettings = {
+      url: `${PUBLIC_APP_URL}/verificar-email?verified=1`,
+      handleCodeInApp: false,
+    };
+
+    // Generate link via Firebase Admin
+    const link = await admin.auth().generateEmailVerificationLink(cleanEmail, actionCodeSettings);
+
+    // Send via Resend
+    const result = await sendVerificationEmail({
+      email: cleanEmail,
+      verificationUrl: link
+    });
+
+    if (!result.success) {
+      logger.error("AUTH", "Failed to send verification email", { 
+        email: maskEmail(cleanEmail), 
+        error: result.error 
+      });
+    }
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    // If user not found, we don't necessarily want to leak that, but for verification it's usually 
+    // called when we know the user exists (after signup or while logged in).
+    logger.error("AUTH", "Error generating verification link", { 
+      email: maskEmail(cleanEmail), 
+      error: error.message 
+    });
+
+    return res.json({ success: true }); // Return success regardless for privacy/UX consistency
   }
 });
 

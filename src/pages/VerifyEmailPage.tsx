@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate, Link } from 'react-router-dom';
-import { sendEmailVerification, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { notify } from '../lib/notify';
@@ -44,24 +44,23 @@ export default function VerifyEmailPage() {
   };
 
   const handleResend = async () => {
-    if (!user) return;
+    if (!user || !user.email) return;
     setResending(true);
     try {
-      const actionCodeSettings = {
-        url: `${window.location.origin}/verificar-email?verified=1`,
-        handleCodeInApp: false,
-      };
-      await sendEmailVerification(user, actionCodeSettings);
-      notify.success('E-mail de verificação reenviado!');
-    } catch (error: any) {
-      console.error('[VerifyEmailPage] Error resending verification:', error);
-      if (error.code === 'auth/too-many-requests') {
-        notify.error('Muitas solicitações. Aguarde um pouco antes de tentar novamente.');
-      } else if (error.code === 'auth/unauthorized-continue-uri') {
-        notify.error('Erro de configuração: o domínio atual não está autorizado no Firebase Console.');
+      const response = await fetch('/api/auth/send-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email }),
+      });
+
+      if (response.ok) {
+        notify.success('E-mail de verificação reenviado!');
       } else {
         notify.error('Erro ao reenviar e-mail.');
       }
+    } catch (error: any) {
+      console.error('[VerifyEmailPage] Error resending verification:', error);
+      notify.error('Erro de conexão. Tente novamente.');
     } finally {
       setResending(false);
     }

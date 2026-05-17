@@ -7,8 +7,7 @@ import {
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut, 
-  User,
-  sendEmailVerification 
+  User
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
@@ -171,21 +170,22 @@ export default function RegisterPage() {
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
       }
 
-      // Send verification email
+      // Send verification email via backend
       let emailSent = false;
       try {
-        const actionCodeSettings = {
-          url: `${window.location.origin}/verificar-email?verified=1`,
-          handleCodeInApp: false,
-        };
-        await sendEmailVerification(user, actionCodeSettings);
-        emailSent = true;
-      } catch (emailError: any) {
-        console.error('[SIGNUP FLOW] Error sending verification email:', emailError);
-        // If it fails with a specific error like unauthorized domain, we should know
-        if (emailError.code === 'auth/unauthorized-continue-uri') {
-          console.error('[SIGNUP FLOW] The domain is not authorized in Firebase Console.');
+        const response = await fetch('/api/auth/send-verification', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        
+        if (response.ok) {
+          emailSent = true;
+        } else {
+          console.error('[SIGNUP FLOW] Backend verification email failed');
         }
+      } catch (emailError: any) {
+        console.error('[SIGNUP FLOW] Error calling send-verification API:', emailError);
       }
 
       if (emailSent) {
