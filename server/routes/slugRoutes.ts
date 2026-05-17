@@ -56,10 +56,14 @@ router.get("/check", async (req, res) => {
     }
 
     try {
+      // Check slugs collection (Source of Truth)
       const slugDoc = await db.collection("slugs").doc(cleanSlug).get();
+      
+      // Secondary Check: users collection (Safety Net for legacy/missing slug docs)
+      const usersQuery = await db.collection("users").where("slug", "==", cleanSlug).limit(1).get();
 
-      if (slugDoc.exists) {
-        const ownerId = slugDoc.data()?.uid;
+      if (slugDoc.exists || !usersQuery.empty) {
+        const ownerId = slugDoc.exists ? slugDoc.data()?.uid : usersQuery.docs[0].id;
         
         // If the owner is the one asking, it's available
         if (currentUid && ownerId === currentUid) {

@@ -5,15 +5,30 @@ import { CreditCard, Wallet, Banknote, Landmark, CheckCircle2 } from 'lucide-rea
 interface PaymentMethodsProps {
   className?: string;
   professionalName?: string;
+  paymentMethods?: string[];
 }
 
-export function PaymentMethods({ className, professionalName }: PaymentMethodsProps) {
-  const methods = [
-    { name: 'Pix' },
-    { name: 'Crédito' },
-    { name: 'Débito' },
-    { name: 'Dinheiro' },
-  ];
+const PAYMENT_LABELS: Record<string, string> = {
+  pix: 'Pix',
+  credito: 'Crédito',
+  credit: 'Crédito',
+  debito: 'Débito',
+  debit: 'Débito',
+  dinheiro: 'Dinheiro',
+  cash: 'Dinheiro',
+  transferencia: 'Transferência',
+  transfer: 'Transferência'
+};
+
+export function PaymentMethods({ className, professionalName, paymentMethods }: PaymentMethodsProps) {
+  const methods = paymentMethods && paymentMethods.length > 0 
+    ? paymentMethods.map(m => ({ name: PAYMENT_LABELS[m.toLowerCase()] || m }))
+    : [
+        { name: 'Pix' },
+        { name: 'Crédito' },
+        { name: 'Débito' },
+        { name: 'Dinheiro' },
+      ];
 
   return (
     <section className={`py-12 px-6 bg-brand-white border-y border-brand-mist/20 ${className}`}>

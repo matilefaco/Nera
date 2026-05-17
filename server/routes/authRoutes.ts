@@ -35,7 +35,48 @@ router.post("/register", async (req, res) => {
 
     // 2. Initialize Firestore Profile with standard fields
     const db = admin.firestore();
-    const slug = generateSlug(cleanName);
+    
+    // START: Robust Unique Slug Generation
+    let slug = generateSlug(cleanName);
+    let isSlugUnique = false;
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (!isSlugUnique && attempts < maxAttempts) {
+      const currentSlug = attempts === 0 ? slug : `${slug}-${Math.floor(Math.random() * 90) + 10}`;
+      
+      // Use a transaction to check and reserve both users and slugs collections
+      const slugCheck = await db.runTransaction(async (transaction) => {
+        const slugRef = db.collection("slugs").doc(currentSlug);
+        const usersQuery = db.collection("users").where("slug", "==", currentSlug).limit(1);
+        
+        const [slugDoc, usersSnap] = await Promise.all([
+          transaction.get(slugRef),
+          transaction.get(usersQuery)
+        ]);
+
+        if (!slugDoc.exists && usersSnap.empty) {
+          // Reserve it in slugs collection immediately
+          transaction.set(slugRef, {
+            uid: userRecord.uid,
+            slug: currentSlug,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            source: "registration"
+          });
+          return currentSlug;
+        }
+        return null;
+      });
+
+      if (slugCheck) {
+        slug = slugCheck;
+        isSlugUnique = true;
+      } else {
+        attempts++;
+      }
+    }
+    // END: Robust Unique Slug Generation
+
     const referralCode = generateReferralCode(cleanName);
 
     await db.collection("users").doc(userRecord.uid).set({

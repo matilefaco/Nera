@@ -176,7 +176,13 @@ export const PublicHero = ({
                         <>{profile.studioAddress.neighborhood}, {profile.studioAddress.city}</>
                       ) : (
                         profile.studioAddress?.reference && (
-                          <>Próximo {profile.studioAddress.reference.toLowerCase().startsWith('à') || profile.studioAddress.reference.toLowerCase().startsWith('a ') ? '' : 'à '}{profile.studioAddress.reference}</>
+                          <>{(() => {
+                            const ref = profile.studioAddress.reference.trim();
+                            const lRef = ref.toLowerCase();
+                            if (lRef.startsWith('próximo') || lRef.startsWith('perto') || lRef.startsWith('ao lado')) return ref;
+                            const prefix = (lRef.startsWith('à') || lRef.startsWith('a ')) ? 'Próximo ' : 'Próximo à ';
+                            return `${prefix}${ref}`;
+                          })()}</>
                         )
                       )}
                     </span>

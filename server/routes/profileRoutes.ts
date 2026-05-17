@@ -67,32 +67,43 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
     const result = await db.runTransaction(async (transaction) => {
       const slugRef = db.collection("slugs").doc(slug);
       const userRef = db.collection("users").doc(uid);
+      const conflictingUserQuery = db.collection("users").where("slug", "==", slug).limit(1);
 
-      const [slugDoc, userSnap] = await Promise.all([
+      const [slugDoc, userSnap, conflictingUserSnap] = await Promise.all([
         transaction.get(slugRef),
-        transaction.get(userRef)
+        transaction.get(userRef),
+        transaction.get(conflictingUserQuery)
       ]);
 
-      // 1. If slug exists, verify ownership
+      // 1. If slug exists in dedicated collection, verify ownership
       if (slugDoc.exists) {
         const ownerId = slugDoc.data()?.uid;
         if (ownerId && ownerId !== uid) {
-          logger.warn("PROFILE", "Slug conflict detected", { professionalId: maskUid(uid), meta: { slug, ownerId: maskUid(ownerId) } });
+          logger.warn("PROFILE", "Slug conflict detected (slugs col)", { professionalId: maskUid(uid), meta: { slug, ownerId: maskUid(ownerId) } });
           throw new Error("Este link já está sendo usado por outra profissional.");
         }
       }
 
-      // 2. Handle old slug release if changed
+      // 2. Safety Net: Check if another user has this slug in their doc but NOT in slugs col
+      if (!conflictingUserSnap.empty) {
+        const conflictingUid = conflictingUserSnap.docs[0].id;
+        if (conflictingUid !== uid) {
+          logger.warn("PROFILE", "Slug conflict detected (users col fallback)", { professionalId: maskUid(uid), meta: { slug, conflictingUid: maskUid(conflictingUid) } });
+          throw new Error("Este link já está sendo usado por outra profissional.");
+        }
+      }
+
       const userData = userSnap.exists ? userSnap.data() : null;
       const currentSlug = userData?.slug;
       
+      // 3. Handle old slug release if changed
       if (currentSlug && currentSlug.toLowerCase() !== slug) {
         logger.info("PROFILE", "Releasing old slug", { professionalId: maskUid(uid), meta: { currentSlug } });
         const oldSlugRef = db.collection("slugs").doc(currentSlug.toLowerCase());
         transaction.delete(oldSlugRef);
       }
 
-      // 3. Securely Lock/Claim the new slug
+      // 4. Securely Lock/Claim the new slug
       transaction.set(slugRef, { 
         uid, 
         slug,
@@ -101,19 +112,10 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         source: "profile_save"
       }, { merge: true });
 
-      // 4. Update the user profile
-
-      // --- THEME VALIDATION (Security) ---
+      // 5. Build final profile data
       const userPlan = (userData?.plan || 'free').toLowerCase() as keyof typeof PLAN_CONFIGS;
       const themeVariant = sanitizedProfile?.profileTheme?.variant;
       
-      // WhatsApp validation on backend
-      const whatsapp = sanitizedProfile?.whatsapp;
-      if (whatsapp && !isValidWhatsapp(whatsapp)) {
-        logger.warn("PROFILE", "User tried to save invalid WhatsApp", { professionalId: maskUid(uid) });
-        throw new Error("O número de WhatsApp informado é inválido. Use um formato brasileiro (DDD + número).");
-      }
-
       const config = PLAN_CONFIGS[userPlan] || PLAN_CONFIGS.free;
       const allowed = config.themes;
 
@@ -123,29 +125,75 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         validatedTheme = { variant: 'terracotta' };
       }
 
+      // WhatsApp validation on backend
+      const whatsapp = sanitizedProfile?.whatsapp;
+      if (whatsapp && !isValidWhatsapp(whatsapp)) {
+        logger.warn("PROFILE", "User tried to save invalid WhatsApp", { professionalId: maskUid(uid) });
+        throw new Error("O número de WhatsApp informado é inválido. Use um formato brasileiro (DDD + número).");
+      }
+
+      // Set publication flags
+      const isFinishingOnboarding = sanitizedProfile.onboardingCompleted === true && !userData?.onboardingCompleted;
+      
       const finalProfileData = removeUndefinedDeep({
         ...sanitizedProfile,
         profileTheme: validatedTheme,
         slug,
-        updatedAt: new Date().toISOString()
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        // Add publication timestamp if completing onboarding
+        ...(isFinishingOnboarding ? { profilePublishedAt: admin.firestore.FieldValue.serverTimestamp() } : {})
       });
+
       transaction.set(userRef, finalProfileData, { merge: true });
 
-      // 5. Handle Services if provided
+      // 6. Handle Services if provided with Idempotency (Upsert by name) within the same transaction
       if (Array.isArray(services) && services.length > 0) {
+        // Fetch existing services for this user
+        const servicesQuery = db.collection("services").where("professionalId", "==", uid).where("active", "==", true);
+        const existingServicesSnap = await transaction.get(servicesQuery);
+        
+        const existingServicesMap = new Map();
+        existingServicesSnap.docs.forEach(doc => {
+          const data = doc.data();
+          const key = (data.name || "").toLowerCase().trim();
+          if (key && !existingServicesMap.has(key)) {
+            existingServicesMap.set(key, { id: doc.id, ...data });
+          }
+        });
+
         for (const service of services) {
           const sanitizedService = removeUndefinedDeep(service);
-          const serviceRef = db.collection("services").doc();
-          transaction.set(serviceRef, {
-            ...sanitizedService,
-            professionalId: uid,
-            createdAt: new Date().toISOString(),
-            active: true
-          });
+          const serviceName = (sanitizedService.name || "").toLowerCase().trim();
+          
+          if (!serviceName) continue;
+
+          const existingService = existingServicesMap.get(serviceName);
+
+          if (existingService) {
+            // UPDATING existing service
+            const serviceRef = db.collection("services").doc(existingService.id);
+            transaction.update(serviceRef, {
+              ...sanitizedService,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              source: "publish",
+              active: true
+            });
+          } else {
+            // CREATING new service
+            const serviceRef = db.collection("services").doc();
+            transaction.set(serviceRef, {
+              ...sanitizedService,
+              professionalId: uid,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              source: "publish",
+              active: true
+            });
+          }
         }
       }
 
-      return { success: true, slug };
+      return { success: true, slug, published: isFinishingOnboarding };
     });
 
     logger.info("PROFILE", "Transaction committed successfully", { professionalId: maskUid(uid) });

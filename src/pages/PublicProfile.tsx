@@ -341,9 +341,53 @@ function PublicProfileContent() {
       }
 
       try {
-        console.log(`[PublicProfile] starting getDocs for slug: ${slug}`);
+        console.log(`[PublicProfile] starting robust resolution for slug: ${slug}`);
         
-        const q = query(collection(db, "users"), where("slug", "==", slug));
+        // 1. First Strategy: Resolve UID via 'slugs' collection (Source of Truth)
+        const slugDocRef = await getDocs(query(collection(db, "slugs"), where("slug", "==", slug)));
+        let professionalId: string | null = null;
+        let isConflict = false;
+
+        if (!slugDocRef.empty) {
+          professionalId = slugDocRef.docs[0].data().uid;
+          console.log(`[PublicProfile] Resolved UID ${professionalId} via slugs collection`);
+        } else {
+          // 2. Second Strategy: Fallback to querying 'users' by slug
+          const userSlugQuery = query(collection(db, "users"), where("slug", "==", slug));
+          const userSlugSnapshot = await getDocs(userSlugQuery);
+          
+          if (!userSlugSnapshot.empty) {
+            if (userSlugSnapshot.docs.length > 1) {
+              console.warn(`[PublicProfile] CRITICAL CONFLICT: Multiple users found for slug ${slug}`);
+              isConflict = true;
+            } else {
+              professionalId = userSlugSnapshot.docs[0].id;
+              console.log(`[PublicProfile] Resolved UID ${professionalId} via users fallback`);
+            }
+          }
+        }
+
+        if (isConflict) {
+          if (isMounted) {
+            console.error(`[PublicProfile] High priority conflict for slug: ${slug}. Not resolving to any user.`);
+            setLoading(false);
+            setProfile(null); // Will trigger 404/Empty state
+          }
+          return;
+        }
+
+        if (!professionalId) {
+          console.log(`[PublicProfile] No user found for slug: ${slug}`);
+          if (isMounted) {
+            setLoading(false);
+            setProfile(null);
+          }
+          return;
+        }
+
+        // 3. Fetch full profile by resolved ID
+        const userDocRef = collection(db, "users");
+        const q = query(userDocRef, where("uid", "==", professionalId));
         
         // Fix for Safari iOS infinite getDocs hang (WebSocket/Auth lock): 
         // Force a timeout after 8 seconds so the UI never gets permanently stuck.
@@ -359,21 +403,21 @@ function PublicProfileContent() {
           if (timeoutId) clearTimeout(timeoutId);
         });
 
-        console.log(`[PublicProfile] getDocs resolved. empty: ${snapshot.empty}`);
+        console.log(`[PublicProfile] Resolved user fetch completed. empty: ${snapshot.empty}`);
 
-        if (!isMounted) {
-          console.log(`[PublicProfile] component unmounted before getting snapshot result`);
-          return;
-        }
+        if (!isMounted) return;
 
         if (!snapshot.empty) {
           const userData = snapshot.docs[0].data();
-          const professionalId = snapshot.docs[0].id;
+          // Verify slug still matches to prevent stale data if user changed it
+          if (userData.slug !== slug) {
+            console.warn(`[PublicProfile] Slug mismatch after fetch: expected ${slug}, found ${userData.slug}`);
+          }
           
           if (isMounted) {
-            console.log(`[PublicProfile] found user, setting profile and loading to false eagerly`);
+            console.log(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
             setProfile({ ...userData, uid: professionalId } as UserProfile);
-            setLoading(false); // Eagerly unblock UI to prevent infinite skeleton
+            setLoading(false); 
           }
 
           // Growth Analytics: Log Visit
@@ -770,7 +814,7 @@ function PublicProfileContent() {
       }
     >
       <SEOHead
-        title={`${profile.name} | ${profile.specialty || "Profissional Nera"}`}
+        title={`${profile.name} | Nera`}
         description={
           profile.bio ||
           `Agende um horário com ${profile.name}, especialista em beleza.`
@@ -892,7 +936,10 @@ function PublicProfileContent() {
         }}
       />
       <ReviewsSection reviews={reviews} stats={stats} />
-      <PaymentMethods professionalName={profile.name} />
+      <PaymentMethods 
+        professionalName={profile.name} 
+        paymentMethods={profile.paymentMethods}
+      />
       <WeekAvailability
         availability={weeklyAvailability}
         onSelectDate={(date) => {
