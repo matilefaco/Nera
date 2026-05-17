@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
-  createUserWithEmailAndPassword, 
-  updateProfile, 
+  signInWithEmailAndPassword,
   signInWithPopup, 
   GoogleAuthProvider, 
   signOut, 
@@ -136,74 +135,39 @@ export default function RegisterPage() {
         await signOut(auth);
       }
 
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      try {
-        await updateProfile(user, { displayName: name });
-      } catch (updateError) {
-        console.warn('[SIGNUP FLOW] Warning updating displayName:', updateError);
-      }
-      
-      const slug = generateSlug(name);
-      const userReferralCode = generateReferralCode(name);
-      
-      try {
-        await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
+      // 1. Create account via Premium Backend API using Admin SDK
+      // This prevents Firebase from sending the generic/unbranded verification email
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name,
           email,
-          slug,
-          specialty: '',
-          bio: '',
-          location: '',
-          whatsapp: '',
-          avatar: '',
-          onboardingCompleted: false,
-          referredBy: manualReferralCode || null,
-          referralCode: userReferralCode,
-          credits: 0,
-          createdAt: new Date().toISOString()
-        });
-      } catch (firestoreError: any) {
-        console.error('[SIGNUP FLOW] Firestore creation failed:', firestoreError);
-        handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
+          password,
+          referredBy: manualReferralCode
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Erro ao processar registro");
       }
 
-      // Send verification email via backend
-      let emailSent = false;
-      try {
-        const response = await fetch('/api/auth/send-verification', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
-        });
-        
-        if (response.ok) {
-          emailSent = true;
-        } else {
-          console.error('[SIGNUP FLOW] Backend verification email failed');
-        }
-      } catch (emailError: any) {
-        console.error('[SIGNUP FLOW] Error calling send-verification API:', emailError);
-      }
+      // 2. Sign in manually to establish client session for the newly created user
+      await signInWithEmailAndPassword(auth, email, password);
 
-      if (emailSent) {
-        notify.success('Perfil criado! Enviamos um e-mail de confirmação.', {
-          icon: <Sparkles className="text-brand-terracotta" size={18} />
-        });
-      } else {
-        notify.info('Perfil criado, mas não conseguimos enviar o e-mail de confirmação automaticamente. Tente reenviar no próximo passo.', {
-          duration: 8000
-        });
-      }
+      notify.success('Perfil criado! Enviamos um e-mail de confirmação premium.', {
+        icon: <Sparkles className="text-brand-terracotta" size={18} />
+      });
       
-      // Instead of going to checkout or onboarding, go to check email
+      // 3. Redirect to verification landing
       navigate('/verificar-email');
 
     } catch (error: any) {
       console.error('[SIGNUP FLOW] Manual registration error:', error);
-      notify.error(error, "Não foi possível registrar.");
+      const friendlyError = getHumanError(error.message);
+      notify.error(friendlyError);
     } finally {
       setLoading(false);
     }

@@ -351,13 +351,13 @@ function PublicProfileContent() {
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutId = setTimeout(() => reject(new Error("FIRESTORE_TIMEOUT")), 8000);
         });
-        timeoutPromise.catch(() => {}); // Prevent unhandled promise rejection
         
         const snapshot = await Promise.race([
           getDocs(q),
           timeoutPromise
-        ]);
-        clearTimeout(timeoutId);
+        ]).finally(() => {
+          if (timeoutId) clearTimeout(timeoutId);
+        });
 
         console.log(`[PublicProfile] getDocs resolved. empty: ${snapshot.empty}`);
 

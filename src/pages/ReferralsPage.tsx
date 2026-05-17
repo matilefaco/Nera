@@ -53,14 +53,17 @@ export default function ReferralsPage() {
           where('referredBy', '==', profile?.referralCode)
         );
 
+        let timeoutId: any;
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 8000)
+          timeoutId = setTimeout(() => reject(new Error('timeout')), 8000)
         );
 
         const snapshot = await Promise.race([
           getDocs(q),
           timeoutPromise
-        ]) as any;
+        ]).finally(() => {
+          if (timeoutId) clearTimeout(timeoutId);
+        }) as any;
         
         if (!isMounted || isCancelled) return;
 

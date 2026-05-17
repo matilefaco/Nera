@@ -78,8 +78,12 @@ export default function LoginPage() {
     console.log('[Login] firebase auth start');
     try {
       const authPromise = signInWithEmailAndPassword(auth, email, password);
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('TIMEOUT_FIREBASE')), 10000));
-      await Promise.race([authPromise, timeoutPromise]);
+      let timeoutId: any;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('TIMEOUT_FIREBASE')), 10000);
+      });
+      
+      await Promise.race([authPromise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
       const user = auth.currentUser;
       
       console.log('[Login] firebase auth success');

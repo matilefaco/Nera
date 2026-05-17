@@ -387,9 +387,7 @@ setUnconfirmedTomorrow(docs);
     const cachedAppointments = appointmentsHistoryCache.get(appointmentsCacheKey);
 
     let fetchValid = true;
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), 8000)
-    );
+    let timeoutId: any;
 
     if (cachedAppointments && Date.now() - cachedAppointments.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
       setAppointments(cachedAppointments.data);
@@ -405,6 +403,10 @@ setUnconfirmedTomorrow(docs);
         where('date', '<=', endDateStr),
         orderBy('date', 'desc')
       );
+
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('timeout')), 8000);
+      });
 
       Promise.race([getDocs(qAll), timeoutPromise]).then((result) => {
         const snapshot = result as any;
@@ -422,6 +424,7 @@ setUnconfirmedTomorrow(docs);
         console.error("Firestore getDocs error:", error); 
         fetchValid = false;
       }).finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
         if (isMounted) {
           setIsInitialLoading(false);
         }
