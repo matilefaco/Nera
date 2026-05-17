@@ -54,8 +54,20 @@ export function getFriendlyErrorMessage(
     return "Sessão expirada. Por favor, acesse novamente.";
   }
 
-  if (code === 'auth/email-already-in-use' || str.includes('email-already-in-use')) {
-    return "Este e-mail já está em uso.";
+  if (code === 'EMAIL_ALREADY_EXISTS' || str.includes('email_already_exists') || code === 'auth/email-already-in-use' || str.includes('email-already-in-use')) {
+    return "Este e-mail já está cadastrado. Entre na sua conta ou recupere sua senha.";
+  }
+
+  if (code === 'INVALID_EMAIL' || code === 'auth/invalid-email') {
+    return "Informe um e-mail válido.";
+  }
+
+  if (code === 'WEAK_PASSWORD' || code === 'auth/weak-password' || code === 'auth/invalid-password') {
+    return "Use uma senha com pelo menos 6 caracteres.";
+  }
+
+  if (code === 'SLUG_UNAVAILABLE') {
+    return "Esse link já está em uso. Escolha outro.";
   }
 
   if (

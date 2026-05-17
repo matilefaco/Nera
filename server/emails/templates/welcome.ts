@@ -21,7 +21,7 @@ export function buildWelcomeEmail(data: WelcomeData): string {
 
     ${buildEmailCard([
       { label: "Seu link exclusivo", value: `usenera.com/p/${slug}`, valueUrl: `https://usenera.com/p/${slug}` },
-      { label: "Acesso", value: "Premium" }
+      { label: "Acesso", value: "Ativo" }
     ])}
 
     <div style="margin-top: 40px;">

@@ -151,23 +151,49 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Erro ao processar registro");
+        const errorCode = data.code;
+        const fallbackMessage = data.message || "Erro ao processar registro";
+
+        if (errorCode === 'EMAIL_ALREADY_EXISTS') {
+          notify.error("EMAIL_ALREADY_EXISTS", undefined, {
+            action: {
+              label: 'Entrar',
+              onClick: () => navigate('/login')
+            }
+          });
+        } else if (errorCode === 'INVALID_EMAIL') {
+          notify.error("Informe um e-mail válido.");
+        } else if (errorCode === 'WEAK_PASSWORD') {
+          notify.error("Use uma senha com pelo menos 6 caracteres.");
+        } else if (errorCode === 'SLUG_UNAVAILABLE') {
+          notify.error("Esse link já está em uso. Escolha outro.");
+        } else {
+          notify.error(fallbackMessage);
+        }
+        return;
       }
 
       // 2. Sign in manually to establish client session for the newly created user
       await signInWithEmailAndPassword(auth, email, password);
 
-      notify.success('Perfil criado! Enviamos um e-mail de confirmação premium.', {
-        icon: <Sparkles className="text-brand-terracotta" size={18} />
-      });
+      if (data.code === 'VERIFICATION_EMAIL_FAILED') {
+        notify.warning(data.message || "Sua conta foi criada, mas não conseguimos enviar o e-mail agora. Tente reenviar em instantes.");
+      } else {
+        notify.success('Seu acesso está quase pronto. Agora é só confirmar seu e-mail.', {
+          icon: <Sparkles className="text-brand-terracotta" size={18} />
+        });
+      }
       
       // 3. Redirect to verification landing
       navigate('/verificar-email');
 
     } catch (error: any) {
       console.error('[SIGNUP FLOW] Manual registration error:', error);
-      const friendlyError = getHumanError(error.message);
-      notify.error(friendlyError);
+      // Only show error if it wasn't already handled by the response check above
+      if (error instanceof Error && error.message !== 'handled') {
+        const friendlyError = getHumanError(error.message);
+        notify.error(friendlyError);
+      }
     } finally {
       setLoading(false);
     }
@@ -202,7 +228,7 @@ export default function RegisterPage() {
             </div>
             <h3 className="text-2xl font-serif font-normal text-brand-ink mb-4">Você já está conectada</h3>
             <p className="text-brand-stone text-sm mb-8 leading-relaxed font-light">
-              Para criar uma nova vitrine premium, você precisa sair da conta atual ({currentUser.displayName || currentUser.email}).
+              Para criar uma nova vitrine, você precisa sair da conta atual ({currentUser.displayName || currentUser.email}).
             </p>
             <div className="flex flex-col w-full gap-3">
               <button 

@@ -76,6 +76,15 @@ router.post("/register", async (req, res) => {
       }
     }
     // END: Robust Unique Slug Generation
+    
+    if (!isSlugUnique) {
+      logger.error("AUTH", "Slug generation failed", { name: cleanName });
+      return res.status(400).json({ 
+        ok: false,
+        code: "SLUG_UNAVAILABLE",
+        message: "Esse link já está em uso. Escolha outro."
+      });
+    }
 
     const referralCode = generateReferralCode(cleanName);
 
@@ -115,17 +124,22 @@ router.post("/register", async (req, res) => {
       verificationUrl: finalLink
     });
 
+    logger.info("AUTH", "Registration completed successfully", { uid: userRecord.uid });
+
     if (!emailResult.success) {
       logger.error("AUTH", "Premium verification email failed during signup", { 
         uid: userRecord.uid, 
         error: emailResult.error 
       });
+      return res.json({ 
+        ok: true,
+        code: "VERIFICATION_EMAIL_FAILED",
+        message: "Sua conta foi criada, mas não conseguimos enviar o e-mail agora. Tente reenviar em instantes."
+      });
     }
 
-    logger.info("AUTH", "Registration completed successfully", { uid: userRecord.uid });
-
     return res.json({ 
-      success: true, 
+      ok: true, 
       uid: userRecord.uid,
       message: "Conta criada com sucesso." 
     });
@@ -133,17 +147,27 @@ router.post("/register", async (req, res) => {
   } catch (error: any) {
     logger.error("AUTH", "Registration failed", { email: maskEmail(cleanEmail), error: error.message });
     
-    if (error.code === 'auth/email-already-in-use') {
-      return res.status(400).json({ error: "Este e-mail já está em uso." });
-    }
-    
-    if (error.code === 'auth/invalid-password') {
-      return res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres." });
+    let code = "REGISTER_FAILED";
+    let status = 400; // Use 400 for most client errors
+    let message = "Não foi possível concluir agora. Tente novamente.";
+
+    if (error.code === 'auth/email-already-exists' || error.code === 'auth/email-already-in-use') {
+      code = "EMAIL_ALREADY_EXISTS";
+      message = "Este e-mail já está cadastrado.";
+    } else if (error.code === 'auth/invalid-email') {
+      code = "INVALID_EMAIL";
+      message = "Informe um e-mail válido.";
+    } else if (error.code === 'auth/weak-password' || error.code === 'auth/invalid-password') {
+      code = "WEAK_PASSWORD";
+      message = "Use uma senha com pelo menos 6 caracteres.";
+    } else {
+      status = 500;
     }
 
-    return res.status(500).json({ 
-      error: "Erro interno", 
-      message: "Ocorreu um erro ao criar sua conta. Tente novamente mais tarde." 
+    return res.status(status).json({ 
+      ok: false,
+      code,
+      message
     });
   }
 });

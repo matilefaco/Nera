@@ -12,7 +12,7 @@ export function buildVerificationEmail(data: VerificationEmailData): string {
       Sua conta está quase pronta.
     </p>
     <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.6;">
-      Confirme seu e-mail para ativar sua agenda e começar a construir sua vitrine profissional premium na Nera.
+      Confirme seu e-mail para ativar sua agenda e sua vitrine profissional na Nera.
     </p>
 
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 40px; margin-bottom: 40px;">

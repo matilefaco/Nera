@@ -160,7 +160,7 @@ export default function VerifyEmailPage() {
         </div>
 
         <p className="text-center mt-10 text-[10px] text-brand-stone font-light uppercase tracking-widest">
-          Nera · Sua vitrine profissional premium
+          Nera · Sua vitrine profissional
         </p>
       </motion.div>
     </div>
