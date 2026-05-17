@@ -1,4 +1,6 @@
 import express from "express";
+import crypto from "crypto";
+import admin from "firebase-admin";
 import { google } from "googleapis";
 import { getDb } from "../firebaseAdmin.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
@@ -18,7 +20,7 @@ function getOAuthClient(redirectUri: string) {
 }
 
 // 1. Get Auth URL
-router.get("/auth-url", requireFirebaseAuth, (req: AuthenticatedRequest, res: express.Response) => {
+router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const uid = req.uid;
   const professionalIdQuery = req.query.professionalId as string;
   if (professionalIdQuery && professionalIdQuery !== uid) {
@@ -34,11 +36,28 @@ router.get("/auth-url", requireFirebaseAuth, (req: AuthenticatedRequest, res: ex
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`;
   const oauth2Client = getOAuthClient(redirectUri);
 
+  // Generate secure state
+  const state = crypto.randomUUID();
+  const db = getDb();
+  
+  try {
+    await db.collection("oauth_states").doc(state).set({
+      uid: professionalId,
+      provider: "google_calendar",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+      used: false
+    });
+  } catch (err) {
+    logger.error("CALENDAR", "Failed to persist OAuth state", { professionalId: maskUid(professionalId), error: err });
+    return res.status(500).json({ error: "Erro ao iniciar autenticação" });
+  }
+
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline", // Required to get refresh_token
     scope: SCOPES,
     prompt: "consent", // Force consent to ensure refresh_token is provided every time for safety during dev
-    state: professionalId, // Pass professionalId through state
+    state: state, // Pass the secure random state
   });
 
   res.json({ url });
@@ -47,12 +66,12 @@ router.get("/auth-url", requireFirebaseAuth, (req: AuthenticatedRequest, res: ex
 // 2. OAuth Callback
 router.get("/callback", async (req, res) => {
   const db = getDb();
-  const { code, state } = req.query;
-  const professionalId = state as string;
+  const { code, state: stateParam } = req.query;
+  const stateStr = stateParam as string;
   const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`;
   const appUrl = PUBLIC_APP_URL;
 
-  if (!code || !professionalId) {
+  if (!code || !stateStr) {
     const safeError = JSON.stringify("Missing code or state");
     return res.send(`
       <html>
@@ -67,6 +86,23 @@ router.get("/callback", async (req, res) => {
   }
 
   try {
+    // Validate state
+    const stateDoc = await db.collection("oauth_states").doc(stateStr).get();
+    
+    if (!stateDoc.exists) {
+      throw new Error("Solicitação de autenticação inválida ou expirada (state not found)");
+    }
+    
+    const stateData = stateDoc.data();
+    if (!stateData || stateData.provider !== "google_calendar" || stateData.used || stateData.expiresAt < Date.now()) {
+      throw new Error("Solicitação de autenticação inválida, já utilizada ou expirada");
+    }
+    
+    const professionalId = stateData.uid;
+
+    // Mark state as used immediately
+    await db.collection("oauth_states").doc(stateStr).update({ used: true });
+
     const oauth2Client = getOAuthClient(redirectUri);
     const { tokens } = await oauth2Client.getToken(code as string);
 
@@ -91,7 +127,7 @@ router.get("/callback", async (req, res) => {
       </html>
     `);
   } catch (err: any) {
-    logger.error("CALENDAR", "Failed to process OAuth callback", { requestId: req.requestId, professionalId: maskUid(professionalId), error: err });
+    logger.error("CALENDAR", "Failed to process OAuth callback", { requestId: req.requestId, state: stateStr, error: err });
     const safeError = JSON.stringify(String(err?.message || "Erro desconhecido"));
     res.send(`
       <html>

@@ -180,9 +180,9 @@ export default function PlansPage() {
                     <ShieldCheck size={32} />
                   </motion.div>
                 </div>
-                <h3 className="text-2xl font-serif text-brand-ink leading-tight mb-3">Seu perfil agora faz parte do Nera Pro.</h3>
+                <h3 className="text-2xl font-serif text-brand-ink leading-tight mb-3">Solicitação enviada com sucesso.</h3>
                 <p className="text-sm text-brand-stone font-light leading-relaxed">
-                  Os recursos premium já foram liberados para sua conta.
+                  Seu plano está sendo atualizado. Os novos recursos estarão disponíveis em instantes, assim que a Stripe confirmar a transação.
                 </p>
               </motion.div>
             )}

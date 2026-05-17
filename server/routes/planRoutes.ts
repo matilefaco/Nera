@@ -62,18 +62,11 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       logger.info("STRIPE", "Initiating checkout session", { professionalId: maskUid(uid), meta: { plan } });
     }
     
-    const OFFICIAL_PRICES: Record<string, string> = {
-      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-    };
-    
-    const priceId = plan === 'pro' 
-      ? (process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro)
-      : (process.env.STRIPE_PRICE_ESSENCIAL || OFFICIAL_PRICES.essencial);
+    const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
 
     if (!priceId) {
-      logger.error("STRIPE", "Price ID not configured. Check environment variables.");
-      return res.status(400).json({ error: `O plano ${plan} não está configurado corretamente (Price ID ausente). Por favor, contate o suporte.` });
+      logger.error("STRIPE", "Price ID not configured", { professionalId: maskUid(uid), meta: { plan } });
+      return res.status(400).json({ error: `O plano ${plan} não está configurado corretamente (Price ID ausente no ambiente). Por favor, contate o suporte.` });
     }
 
     // Check for credits before creating session params
@@ -157,17 +150,21 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
       logger.info("STRIPE", "Initiating customer portal session", { professionalId: maskUid(uid) });
     }
 
-    const OFFICIAL_PRICES: Record<string, string> = {
-      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-    };
+    // Debug price IDs check (optional/logging)
+    const envPro = process.env.STRIPE_PRICE_PRO;
+    const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
 
     try {
       const subscriptions = await stripe.subscriptions.list({ customer: userData.stripeCustomerId, status: 'active', limit: 1 });
       if (subscriptions.data.length > 0) {
         const sub = subscriptions.data[0];
         const priceId = sub.items.data[0]?.price?.id;
-        logger.info("STRIPE", "Customer subscription verified", { uid, subId: sub.id, priceId });
+        
+        let planType = 'unknown';
+        if (priceId === envPro) planType = 'pro';
+        else if (priceId === envEssencial) planType = 'essencial';
+        
+        logger.info("STRIPE", "Customer subscription verified", { uid, subId: sub.id, priceId, planType });
       } else {
         logger.warn("STRIPE", "No active subscription found for customer", { uid, customer: userData.stripeCustomerId });
       }
@@ -240,12 +237,12 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
       logger.info("STRIPE", "Initiating direct upgrade to pro", { professionalId: maskUid(uid) });
     }
 
-    const OFFICIAL_PRICES: Record<string, string> = {
-      essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-      pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-    };
+    const targetPriceId = process.env.STRIPE_PRICE_PRO;
 
-    const targetPriceId = process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro;
+    if (!targetPriceId) {
+      logger.error("STRIPE", "STRIPE_PRICE_PRO not configured", { professionalId: maskUid(uid) });
+      return res.status(400).json({ error: "O plano Pro não está configurado corretamente (Price ID ausente). Por favor, contate o suporte." });
+    }
 
     const subscriptions = await stripe.subscriptions.list({ 
       customer: userData.stripeCustomerId, 
@@ -269,15 +266,12 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
       proration_behavior: 'always_invoice', // Immediately invoice the difference
     });
 
-    // We can confidently update the user document to reflect the change.
-    await db.collection("users").doc(uid).update({
-      plan: 'pro',
-      planRank: 2
-    });
-
-    logger.info("STRIPE", "Direct upgrade to pro completed", { professionalId: maskUid(uid), subId: sub.id, targetPriceId });
+    // Removed optimistic update. Access will be granted via Stripe webhook (customer.subscription.updated)
+    // confirmed through the system to ensure actual payment/verification.
     
-    res.json({ success: true, message: "Plano atualizado com sucesso!" });
+    logger.info("STRIPE", "Direct upgrade to pro initiated via Stripe API", { professionalId: maskUid(uid), subId: sub.id, targetPriceId });
+    
+    res.json({ success: true, message: "Seu plano está sendo atualizado. Isso pode levar alguns instantes." });
 
   } catch (err: any) {
     logger.error("STRIPE", "Failed to upgrade to pro", { requestId: req.requestId, error: err, errMessage: err.message });
@@ -570,18 +564,14 @@ router.post("/webhook", async (req, res) => {
         // Handle Plan Change from Stripe Portal (Upgrade/Downgrade)
         const priceId = subscription.items?.data?.[0]?.price?.id;
         if (priceId) {
-          const OFFICIAL_PRICES: Record<string, string> = {
-            essencial: 'price_1TQhKBLqzItSzLk0NlC9xVRh',
-            pro: 'price_1TQhKALqzItSzLk0D1andoSs'
-          };
-          const envPro = process.env.STRIPE_PRICE_PRO || OFFICIAL_PRICES.pro;
-          const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL || OFFICIAL_PRICES.essencial;
+          const envPro = process.env.STRIPE_PRICE_PRO;
+          const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
 
-          if (priceId === envPro) {
+          if (envPro && priceId === envPro) {
             updateData.plan = 'pro';
             updateData.planRank = 2;
             updateData.indexable = true;
-          } else if (priceId === envEssencial) {
+          } else if (envEssencial && priceId === envEssencial) {
             updateData.plan = 'essencial';
             updateData.planRank = 1;
             updateData.indexable = true;
