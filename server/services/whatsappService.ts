@@ -1,5 +1,6 @@
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskPhone, maskUid } from "../utils/logger.js";
+import { PUBLIC_APP_URL } from "../utils.js";
 import admin from "firebase-admin";
 
 interface WhatsAppMetadata {
@@ -387,8 +388,7 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
 
     await logRef.update({ appointmentId: targetAppt.id });
 
-    const baseUrl = process.env.BASE_URL || 'https://usenera.com';
-    const profileLink = `${baseUrl}/p/${targetAppt.professionalSlug || 'app'}`;
+    const profileLink = `${PUBLIC_APP_URL}/p/${targetAppt.professionalSlug || 'app'}`;
 
     switch (intent) {
       case 'confirm':

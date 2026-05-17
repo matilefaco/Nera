@@ -2,6 +2,8 @@ import { getDb } from "./firebaseAdmin.js";
 import admin from "firebase-admin";
 import { logWhatsAppMessage, normalizePhone } from "./services/whatsappService.js";
 
+export const PUBLIC_APP_URL = process.env.APP_URL || "https://usenera.com";
+
 // Helper to format Brazilian phone numbers for WhatsApp Cloud API
 export function formatBRNumber(phone: string): string {
   return normalizePhone(phone);

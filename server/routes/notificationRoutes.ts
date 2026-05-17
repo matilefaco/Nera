@@ -124,7 +124,7 @@ import {
   buildCancellationMessage, 
   buildReviewRequestMessage 
 } from "../services/whatsappMessages.js";
-import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
+import { shouldSendEmail, markEmailSent, sendWhatsAppMeta, PUBLIC_APP_URL } from "../utils.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
 import { authMutationLimiter } from "../middleware/rateLimiter.js";
@@ -153,7 +153,7 @@ router.get("/debug-email", debugOnly, async (req, res) => {
     resendKeyPresent: !!apiKey,
     resendKeyPrefix: apiKey ? `${apiKey.substring(0, 5)}...` : 'N/A',
     from,
-    appUrl: appUrl || `${req.protocol}://${req.get('host')}`,
+    appUrl: appUrl || PUBLIC_APP_URL,
     nodeEnv: process.env.NODE_ENV
   });
 });
@@ -453,7 +453,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
     payload.professionalId = uid;
   }
 
-  const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const baseUrl = PUBLIC_APP_URL;
   
   if (type === 'BOOKING_PENDING_CLIENT' || type === 'NEW_BOOKING_REQUEST') {
     logger.warn("NOTIFICATION", `Deprecated POST /notify used for type ${type}. Please migrate this call to the backend.`, { 
@@ -827,7 +827,7 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
         let deliveryChannel = '';
 
         const clientPhone = appt.clientWhatsapp;
-        const baseUrl = process.env.APP_URL || 'https://usenera.com';
+        const baseUrl = PUBLIC_APP_URL;
         if (clientPhone) {
           const formattedDate = tomorrowStr.split('-').reverse().join('/');
           const msg = buildReminderMessage24h({
@@ -989,7 +989,7 @@ router.get('/cron/review-requests', requireCronSecret, async (req, res) => {
       .get();
 
     let sentCount = 0;
-    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = PUBLIC_APP_URL;
 
     for (const docSnap of snap.docs) {
       const appt = docSnap.data();
@@ -1076,7 +1076,7 @@ router.get('/cron/anti-no-show', requireCronSecret, async (req, res) => {
       .get();
     
     let sentCount = 0;
-    const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://usenera.com';
+    const appUrl = PUBLIC_APP_URL;
 
     for (const docSnap of snap.docs) {
       const appt = docSnap.data();
@@ -1137,7 +1137,7 @@ router.get('/cron/retention', requireCronSecret, async (req, res) => {
       .get();
     
     let sentCount = 0;
-    const appUrl = process.env.VITE_APP_URL || process.env.APP_URL || 'https://usenera.com';
+    const appUrl = PUBLIC_APP_URL;
 
     for (const docSnap of snap.docs) {
       const appt = docSnap.data();

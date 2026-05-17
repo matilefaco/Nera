@@ -17,6 +17,7 @@ import { buildDigitalReceiptEmail } from './templates/digitalReceipt.js';
 import { buildReferralRewardEmail } from './templates/referralReward.js';
 import { buildTrialWillEndEmail } from './templates/trialWillEnd.js';
 import { logger, maskEmail, maskToken } from '../utils/logger.js';
+import { PUBLIC_APP_URL } from '../utils.js';
 
 // Lazy initialization of Resend client
 let _resendClient: Resend | null = null;
@@ -40,7 +41,7 @@ function getResendClient() {
 
 const FROM_EMAIL = process.env.EMAIL_FROM || "Nera <ola@usenera.com>";
 const REPLY_TO = process.env.EMAIL_REPLY_TO || "contato@usenera.com";
-const APP_URL = process.env.APP_URL || process.env.VITE_APP_URL || "https://usenera.com";
+const APP_URL = PUBLIC_APP_URL;
 
 /**
  * Standard Logging Helper

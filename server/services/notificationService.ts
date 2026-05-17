@@ -5,17 +5,7 @@ import {
 import { sendBookingPendingEmail, sendProfessionalNewBookingEmail } from "../emails/sendEmail.js";
 import { buildNewBookingMessageForPro } from "./whatsappMessages.js";
 import { sendWhatsApp } from "./whatsappService.js";
-import { logger } from "../utils/logger.js";
-
-function maskEmail(email?: string): string {
-  if (!email || typeof email !== "string") return "";
-  const parts = email.split("@");
-  if (parts.length !== 2) return "***";
-  const name = parts[0];
-  const domain = parts[1];
-  if (name.length <= 2) return `***@${domain}`;
-  return `${name.substring(0, 2)}***@${domain}`;
-}
+import { logger, maskEmail } from "../utils/logger.js";
 
 // Types
 export interface BookingPendingClientPayload {

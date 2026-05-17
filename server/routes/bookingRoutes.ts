@@ -9,6 +9,7 @@ import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
 import { sendBookingPendingClientNotification, sendNewBookingRequestNotification } from "../services/notificationService.js";
+import { PUBLIC_APP_URL } from "../utils.js";
 
 const router = express.Router();
 
@@ -592,7 +593,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 
     logger.info("BOOKING", `SUCCESS: Committed Appt ${apptRef.id}`);
 
-    const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = PUBLIC_APP_URL;
     
     // Background task: Send notifications safely without failing the booking
     (async () => {

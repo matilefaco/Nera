@@ -5,6 +5,7 @@ import { sendReferralRewardEmail, sendTrialWillEndEmail } from "../emails/sendEm
 import Stripe from "stripe";
 import { logger, maskToken, maskUid } from "../utils/logger.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
+import { PUBLIC_APP_URL } from "../utils.js";
 
 const router = express.Router();
 
@@ -90,8 +91,8 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       customer_email: email,
       client_reference_id: uid,
       payment_method_collection: "if_required",
-      success_url: `${process.env.APP_URL}/checkout/success`,
-      cancel_url: `${process.env.APP_URL}/checkout/canceled`,
+      success_url: `${PUBLIC_APP_URL}/checkout/success`,
+      cancel_url: `${PUBLIC_APP_URL}/checkout/canceled`,
       metadata: {
         professionalId: uid,
         plan,
@@ -176,7 +177,7 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
 
     const params: any = {
       customer: userData.stripeCustomerId,
-      return_url: `${(process.env.APP_URL && process.env.APP_URL !== 'undefined') ? process.env.APP_URL : (req.headers.origin || 'https://usenera.com')}/planos`,
+      return_url: `${PUBLIC_APP_URL}/planos`,
     };
 
     // Ignore STRIPE_PORTAL_CONFIGURATION_ID initially to use the Dashboard's default configuration
@@ -194,7 +195,7 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
         session = await stripe.billingPortal.sessions.create(params);
       } else if (err.message?.includes('return_url')) {
         logger.warn("STRIPE", "Failed to create portal session with return_url, falling back to default", { uid, error: err.message });
-        params.return_url = `https://usenera.com/planos`;
+        params.return_url = `${PUBLIC_APP_URL}/planos`;
         session = await stripe.billingPortal.sessions.create(params);
       } else {
         throw err;

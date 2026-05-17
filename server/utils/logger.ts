@@ -1,6 +1,6 @@
 import * as crypto from "crypto";
 
-export type LogLevel = "info" | "warn" | "error";
+export type LogLevel = "info" | "warn" | "error" | "debug";
 
 export type LogScope =
   | "BOOKING"
@@ -166,6 +166,11 @@ function writeLog(level: LogLevel, scope: LogScope, message: string, payload?: L
     case "error":
       console.error(logString);
       break;
+    case "debug":
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(logString);
+      }
+      break;
   }
 }
 
@@ -173,4 +178,5 @@ export const logger = {
   info: (scope: LogScope, message: string, payload?: LogPayload) => writeLog("info", scope, message, payload),
   warn: (scope: LogScope, message: string, payload?: LogPayload) => writeLog("warn", scope, message, payload),
   error: (scope: LogScope, message: string, payload?: LogPayload) => writeLog("error", scope, message, payload),
+  debug: (scope: LogScope, message: string, payload?: LogPayload) => writeLog("debug", scope, message, payload),
 };

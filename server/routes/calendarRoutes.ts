@@ -3,6 +3,7 @@ import { google } from "googleapis";
 import { getDb } from "../firebaseAdmin.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { logger, maskUid } from "../utils/logger.js";
+import { PUBLIC_APP_URL } from "../utils.js";
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ router.get("/auth-url", requireFirebaseAuth, (req: AuthenticatedRequest, res: ex
     return res.status(400).json({ error: "Missing professionalId" });
   }
 
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${(process.env.APP_URL || "https://usenera.com").replace(/\/+$/, "")}/api/calendar/callback`;
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`;
   const oauth2Client = getOAuthClient(redirectUri);
 
   const url = oauth2Client.generateAuthUrl({
@@ -48,8 +49,8 @@ router.get("/callback", async (req, res) => {
   const db = getDb();
   const { code, state } = req.query;
   const professionalId = state as string;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${(process.env.APP_URL || "https://usenera.com").replace(/\/+$/, "")}/api/calendar/callback`;
-  const appUrl = process.env.APP_URL || "https://usenera.com";
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`;
+  const appUrl = PUBLIC_APP_URL;
 
   if (!code || !professionalId) {
     const safeError = JSON.stringify("Missing code or state");
