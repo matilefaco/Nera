@@ -47,54 +47,18 @@ export default function ReferralsPage() {
       try {
         setLoading(true);
         setError(false);
-        const { getDocs } = await import('firebase/firestore');
-        const q = query(
-          collection(db, 'users'),
-          where('referredBy', '==', profile?.referralCode)
-        );
-
-        let timeoutId: any;
-        const timeoutPromise = new Promise((_, reject) =>
-          timeoutId = setTimeout(() => reject(new Error('timeout')), 8000)
-        );
-
-        const snapshot = await Promise.race([
-          getDocs(q),
-          timeoutPromise
-        ]).finally(() => {
-          if (timeoutId) clearTimeout(timeoutId);
-        }) as any;
+        
+        const response = await fetch('/api/profile/referrals');
+        if (!response.ok) throw new Error(`API_ERROR_${response.status}`);
+        
+        const docs = await response.json();
         
         if (!isMounted || isCancelled) return;
-
-        console.log(`[Referrals] query success count=${snapshot.docs.length}`);
-
-        if (snapshot.empty) {
-          console.log('[Referrals] empty state');
-          setReferrals([]);
-          return;
-        }
-
-        const docs = snapshot.docs.map((doc: any) => {
-            const data = doc.data();
-            return {
-              id: doc.id,
-              name: data.name || 'Nova Profissional',
-              email: data.email || '',
-              createdAt: data.createdAt || new Date().toISOString(),
-              plan: data.plan || 'free'
-            } as ReferralRecord;
-        });
 
         setReferrals(docs);
       } catch (err: any) {
         if (!isMounted || isCancelled) return;
-        
-        if (err.message === 'timeout') {
-            console.log('[Referrals] timeout');
-        } else {
-            console.error("[Referrals] error:", err);
-        }
+        console.error("[Referrals] error:", err);
         setError(true);
         setReferrals([]);
       } finally {

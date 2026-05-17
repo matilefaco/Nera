@@ -341,95 +341,56 @@ function PublicProfileContent() {
       }
 
       try {
-        console.log(`[PublicProfile] starting robust resolution for slug: ${slug}`);
+        console.log(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
         
-        // 1. First Strategy: Resolve UID via 'slugs' collection (Source of Truth)
-        const slugDocRef = await getDocs(query(collection(db, "slugs"), where("slug", "==", slug)));
-        let professionalId: string | null = null;
-        let isConflict = false;
-
-        if (!slugDocRef.empty) {
-          professionalId = slugDocRef.docs[0].data().uid;
-          console.log(`[PublicProfile] Resolved UID ${professionalId} via slugs collection`);
-        } else {
-          // 2. Second Strategy: Fallback to querying 'users' by slug
-          const userSlugQuery = query(collection(db, "users"), where("slug", "==", slug));
-          const userSlugSnapshot = await getDocs(userSlugQuery);
-          
-          if (!userSlugSnapshot.empty) {
-            if (userSlugSnapshot.docs.length > 1) {
-              console.warn(`[PublicProfile] CRITICAL CONFLICT: Multiple users found for slug ${slug}`);
-              isConflict = true;
-            } else {
-              professionalId = userSlugSnapshot.docs[0].id;
-              console.log(`[PublicProfile] Resolved UID ${professionalId} via users fallback`);
+        // 1. Fetch sanitized profile from backend API
+        const response = await fetch(`/api/profile/public-profile/${slug}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            console.log(`[PublicProfile] No user found for slug: ${slug}`);
+            if (isMounted) {
+              setLoading(false);
+              setProfile(null);
             }
+            return;
           }
+          
+          if (response.status === 409) {
+             console.error(`[PublicProfile] High priority conflict for slug: ${slug}`);
+             if (isMounted) {
+               setLoading(false);
+               setProfile(null);
+             }
+             return;
+          }
+
+          throw new Error(`API_ERROR_${response.status}`);
         }
 
-        if (isConflict) {
-          if (isMounted) {
-            console.error(`[PublicProfile] High priority conflict for slug: ${slug}. Not resolving to any user.`);
-            setLoading(false);
-            setProfile(null); // Will trigger 404/Empty state
-          }
-          return;
-        }
-
-        if (!professionalId) {
-          console.log(`[PublicProfile] No user found for slug: ${slug}`);
-          if (isMounted) {
-            setLoading(false);
-            setProfile(null);
-          }
-          return;
-        }
-
-        // 3. Fetch full profile by resolved ID
-        const userDocRef = collection(db, "users");
-        const q = query(userDocRef, where("uid", "==", professionalId));
-        
-        // Fix for Safari iOS infinite getDocs hang (WebSocket/Auth lock): 
-        // Force a timeout after 8 seconds so the UI never gets permanently stuck.
-        let timeoutId: any;
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error("FIRESTORE_TIMEOUT")), 8000);
-        });
-        
-        const snapshot = await Promise.race([
-          getDocs(q),
-          timeoutPromise
-        ]).finally(() => {
-          if (timeoutId) clearTimeout(timeoutId);
-        });
-
-        console.log(`[PublicProfile] Resolved user fetch completed. empty: ${snapshot.empty}`);
+        const userData = await response.json();
+        const professionalId = userData.uid;
 
         if (!isMounted) return;
 
-        if (!snapshot.empty) {
-          const userData = snapshot.docs[0].data();
-          // Verify slug still matches to prevent stale data if user changed it
-          if (userData.slug !== slug) {
-            console.warn(`[PublicProfile] Slug mismatch after fetch: expected ${slug}, found ${userData.slug}`);
-          }
-          
-          if (isMounted) {
-            console.log(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
-            setProfile({ ...userData, uid: professionalId } as UserProfile);
-            setLoading(false); 
-          }
+        console.log(`[PublicProfile] Resolved user fetch completed via API. UID: ${professionalId}`);
 
-          // Growth Analytics: Log Visit
-          if (slug !== "helena-prado" && slug !== "exemplo") {
-            logAnalyticsEvent(professionalId, "visit").catch((err) => {
-              console.log("[PublicProfile] Analytics error:", err);
-            });
-          }
+        if (isMounted) {
+          console.log(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
+          setProfile(userData as UserProfile);
+          setLoading(false); 
+        }
 
-          console.log(`[PublicProfile] Starting secondary background parallel fetches`);
-          // Secondary fetches should be silent, independent, and parallel
-          Promise.allSettled([
+        // Growth Analytics: Log Visit
+        if (slug !== "helena-prado" && slug !== "exemplo") {
+          logAnalyticsEvent(professionalId, "visit").catch((err) => {
+            console.log("[PublicProfile] Analytics error:", err);
+          });
+        }
+
+        console.log(`[PublicProfile] Starting secondary background parallel fetches`);
+        // Secondary fetches should be silent, independent, and parallel
+        Promise.allSettled([
             // 1. Services
             (async () => {
               const servicesQ = query(
@@ -508,10 +469,6 @@ function PublicProfileContent() {
               }
             })()
           ]);
-        } else {
-          console.log(`[PublicProfile] snapshot is empty. Setting profile to null.`);
-          if (isMounted) setProfile(null);
-        }
       } catch (error: any) {
         console.error("Critical error fetching public profile:", error);
         if (error.message === "FIRESTORE_TIMEOUT") {

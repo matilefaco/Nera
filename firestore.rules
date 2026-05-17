@@ -110,7 +110,7 @@ service cloud.firestore {
 
     // Profile Rules
     match /users/{userId} {
-      allow read: if true; 
+      allow read: if isSignedIn() && (isOwner(userId) || isAdmin()); 
       allow create: if isOwner(userId) && isValidUser(incoming());
       allow update: if (isOwner(userId) && 
                         isValidUser(incoming()) && 

@@ -68,11 +68,13 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       const slugRef = db.collection("slugs").doc(slug);
       const userRef = db.collection("users").doc(uid);
       const conflictingUserQuery = db.collection("users").where("slug", "==", slug).limit(1);
+      const servicesQuery = db.collection("services").where("professionalId", "==", uid).where("active", "==", true);
 
-      const [slugDoc, userSnap, conflictingUserSnap] = await Promise.all([
+      const [slugDoc, userSnap, conflictingUserSnap, existingServicesSnap] = await Promise.all([
         transaction.get(slugRef),
         transaction.get(userRef),
-        transaction.get(conflictingUserQuery)
+        transaction.get(conflictingUserQuery),
+        transaction.get(servicesQuery)
       ]);
 
       // 1. If slug exists in dedicated collection, verify ownership
@@ -148,10 +150,6 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
 
       // 6. Handle Services if provided with Idempotency (Upsert by name) within the same transaction
       if (Array.isArray(services) && services.length > 0) {
-        // Fetch existing services for this user
-        const servicesQuery = db.collection("services").where("professionalId", "==", uid).where("active", "==", true);
-        const existingServicesSnap = await transaction.get(servicesQuery);
-        
         const existingServicesMap = new Map();
         existingServicesSnap.docs.forEach(doc => {
           const data = doc.data();
@@ -349,6 +347,185 @@ router.get("/debug-reservation", debugOnly, async (req, res) => {
     res.json(results);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * GET /api/public-profile/:slug
+ * Resolves a public profile by slug and returns sanitized data.
+ */
+router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
+  const { slug } = req.params;
+  const cleanSlug = slug?.toLowerCase()?.trim();
+
+  if (!cleanSlug) {
+    return res.status(400).json({ error: "Slug é obrigatório." });
+  }
+
+  try {
+    const db = getDb();
+    if (!db) throw new Error("Database not connected");
+
+    logger.info("PUBLIC_PROFILE", "Fetching public profile", { slug: cleanSlug });
+
+    let uid: string | null = null;
+
+    // 1. Resolve UID via slugs collection (Source of Truth)
+    const slugRef = db.collection("slugs").doc(cleanSlug);
+    const slugDoc = await slugRef.get();
+
+    if (slugDoc.exists) {
+      uid = slugDoc.data()?.uid;
+    }
+
+    // 2. Fallback to users collection (for legacy or edge cases)
+    if (!uid) {
+      const usersQuery = db.collection("users")
+        .where("slug", "==", cleanSlug)
+        .limit(2);
+      
+      const usersSnapshot = await usersQuery.get();
+      
+      if (usersSnapshot.empty) {
+        return res.status(404).json({ error: "Perfil não encontrado." });
+      }
+
+      if (usersSnapshot.docs.length > 1) {
+        logger.warn("PUBLIC_PROFILE", "Conflict: Multiple users for same slug", { slug: cleanSlug });
+        return res.status(409).json({ error: "Conflito de link. Entre em contato com o suporte." });
+      }
+
+      uid = usersSnapshot.docs[0].id;
+    }
+
+    if (!uid) {
+      return res.status(404).json({ error: "Perfil não encontrado." });
+    }
+
+    // 3. Fetch user data
+    const userDoc = await db.collection("users").doc(uid).get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "Perfil não encontrado." });
+    }
+
+    const userData = userDoc.data() || {};
+
+    // 4. Sanitize data - Return ONLY what's needed for the public profile
+    const sanitizedData = {
+      uid: uid,
+      name: userData.name,
+      displayName: userData.displayName || userData.businessName || userData.name,
+      slug: userData.slug,
+      avatar: userData.avatar || userData.photoUrl,
+      photoUrl: userData.photoUrl || userData.avatar,
+      bio: userData.bio,
+      headline: userData.headline,
+      specialty: userData.specialty,
+      city: userData.city,
+      neighborhood: userData.neighborhood,
+      address: userData.address || userData.publicAddress,
+      serviceMode: userData.serviceMode,
+      workingHours: userData.workingHours,
+      professionalIdentity: userData.professionalIdentity,
+      portfolio: userData.portfolio || [],
+      profileTheme: userData.profileTheme,
+      paymentMethods: userData.paymentMethods || [],
+      instagram: userData.instagram,
+      whatsapp: userData.whatsapp,
+      plan: userData.plan || 'free',
+      onboardingCompleted: userData.onboardingCompleted
+    };
+
+    return res.json(sanitizedData);
+  } catch (err: any) {
+    logger.error("PUBLIC_PROFILE", "Error fetching profile", { slug: cleanSlug, error: err.message });
+    return res.status(500).json({ error: "Erro ao carregar perfil." });
+  }
+});
+
+/**
+ * GET /api/profile/public-directory
+ * Returns a list of professionals for the directory page, sanitized.
+ */
+router.get("/public-directory", publicReadLimiter, async (req, res) => {
+  try {
+    const db = getDb();
+    if (!db) throw new Error("Database not connected");
+
+    // Basic query for directory
+    let q: admin.firestore.Query = db.collection("users")
+      .where("onboardingCompleted", "==", true)
+      .orderBy("planRank", "desc")
+      .orderBy("averageRating", "desc")
+      .limit(40); // Slightly more than the UI displays initially
+
+    const snapshot = await q.get();
+    const professionals = snapshot.docs.map(doc => {
+      const data = doc.data();
+      // Sanitize: Return only what's needed for the directory card
+      return {
+        uid: doc.id,
+        name: data.name,
+        slug: data.slug,
+        avatar: data.avatar || data.photoUrl,
+        specialty: data.specialty,
+        city: data.city,
+        neighborhood: data.neighborhood,
+        averageRating: data.averageRating || 0,
+        totalReviews: data.totalReviews || 0,
+        planRank: data.planRank || 0,
+        serviceMode: data.serviceMode,
+        professionalIdentity: {
+          mainSpecialty: data.professionalIdentity?.mainSpecialty,
+          differentials: data.professionalIdentity?.differentials
+        }
+      };
+    });
+
+    res.json(professionals);
+  } catch (err: any) {
+    logger.error("PUBLIC_DIRECTORY", "Error fetching directory", { error: err.message });
+    res.status(500).json({ error: "Erro ao carregar diretório." });
+  }
+});
+
+/**
+ * GET /api/profile/referrals
+ * Returns list of professionals referred by the current user.
+ */
+router.get("/referrals", requireFirebaseAuth, async (req: AuthenticatedRequest, res) => {
+  try {
+    const db = getDb();
+    const uid = req.uid;
+    
+    // Get current user's referral code
+    const userDoc = await db.collection("users").doc(uid).get();
+    if (!userDoc.exists) return res.status(404).json({ error: "Usuário não encontrado." });
+    
+    const referralCode = userDoc.data()?.referralCode;
+    if (!referralCode) return res.json([]);
+
+    const snapshot = await db.collection("users")
+      .where("referredBy", "==", referralCode)
+      .limit(100)
+      .get();
+      
+    const referrals = snapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        name: data.name || 'Nova Profissional',
+        email: data.email || '',
+        createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : new Date().toISOString(),
+        plan: data.plan || 'free'
+      };
+    });
+
+    res.json(referrals);
+  } catch (err: any) {
+    logger.error("REFERRALS", "Error fetching referrals", { error: err.message });
+    res.status(500).json({ error: "Erro ao carregar indicações." });
   }
 });
 

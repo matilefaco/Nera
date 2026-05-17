@@ -46,32 +46,15 @@ export default function DirectoryPage() {
   const fetchProfessionals = async (isNextPage = false) => {
     setLoading(true);
     try {
-      let q = query(
-        collection(db, 'users'),
-        where('onboardingCompleted', '==', true),
-        orderBy('planRank', 'desc'),
-        orderBy('averageRating', 'desc'),
-        limit(20)
-      );
-
-      // Apply indexable filter if we strictly want only those who opt-in
-      // However, usually directories show all completed ones unless they opt-out
-      // q = query(q, where('indexable', '==', true));
-
-      // Note: city and specialty filters in Firestore would require additional indexes
-      // For this build, we'll fetch and filter if we can't build composite indexes dynamically
-      // But for a production app, we'd add where('city', '==', cityFilter) if set.
+      // 1. Fetch from backend API (which returns sanitized data)
+      const response = await fetch('/api/profile/public-directory');
+      if (!response.ok) throw new Error('API_ERROR');
       
-      if (isNextPage && lastVisible) {
-        q = query(q, startAfter(lastVisible));
-      }
-
-      const snapshot = await getDocs(q);
-      const docs = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile));
-
+      const docs = await response.json();
+      
       let result = docs;
 
-      // In-memory filters for fields that might not have composite indexes yet
+      // In-memory filters (mirroring existing logic)
       if (cityFilter) {
         result = result.filter(p => p.city?.toLowerCase().includes(cityFilter.toLowerCase()));
       }
@@ -91,8 +74,7 @@ export default function DirectoryPage() {
         setProfessionals(result);
       }
 
-      setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
-      setHasMore(snapshot.docs.length === 20);
+      setHasMore(docs.length === 40);
     } catch (err) {
       console.error('Error fetching professionals:', err);
     } finally {
