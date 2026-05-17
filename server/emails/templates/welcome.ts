@@ -11,69 +11,34 @@ export function buildWelcomeEmail(data: WelcomeData): string {
   const firstName = name.split(' ')[0];
 
   const bodyHtml = `
-    <p style="font-family: Arial, sans-serif; font-size: 15px; color: #18120E; margin-bottom: 24px;">
-      Em menos de 5 minutos, você vai receber seus primeiros agendamentos.
+    <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 24px; line-height: 1.6;">
+      É um prazer receber você na Nera. Acreditamos que a excelência profissional começa com uma presença digital impecável e uma agenda que trabalha a seu favor.
+    </p>
+
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 32px; line-height: 1.7;">
+      Sua vitrine profissional exclusiva já foi reservada. Agora, basta adicionar seus serviços e horários para começar a receber agendamentos com toda a sofisticação que o seu trabalho merece.
     </p>
 
     ${buildEmailCard([
-      { label: "Seu plano atual", value: "Gratuito — até 15 agendamentos por mês" },
-      { label: "Seu link exclusivo", value: `usenera.com/p/${slug}`, valueUrl: `https://usenera.com/p/${slug}` }
+      { label: "Seu link exclusivo", value: `usenera.com/p/${slug}`, valueUrl: `https://usenera.com/p/${slug}` },
+      { label: "Sua conta", value: "Premium Access" }
     ])}
 
-    <p style="font-family: Arial, sans-serif; font-size: 13px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px;">
-      3 passos para começar
+    <p style="font-family: Arial, sans-serif; font-size: 13px; color: #8A7060; margin-top: 40px; margin-bottom: 20px; line-height: 1.6; text-align: center; font-style: italic;">
+      "A Nera foi criada para profissionais que entendem que cada detalhe comunica o valor do seu tempo."
     </p>
-
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-      <tr>
-        <td style="padding-bottom: 12px;">
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-            <tr>
-              <td width="24" valign="top" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; color: #A85C3A;">1.</td>
-              <td style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060;">
-                <a href="https://usenera.com/servicos" style="color: #18120E; text-decoration: underline;">Adicione seus serviços e preços</a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding-bottom: 12px;">
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-            <tr>
-              <td width="24" valign="top" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; color: #A85C3A;">2.</td>
-              <td style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060;">
-                <a href="https://usenera.com/perfil" style="color: #18120E; text-decoration: underline;">Configure seus horários</a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td>
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-            <tr>
-              <td width="24" valign="top" style="font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; color: #A85C3A;">3.</td>
-              <td style="font-family: Arial, sans-serif; font-size: 14px; color: #18120E;">
-                Compartilhe seu link com suas clientes
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
   `;
 
   return buildEmailBase({
-    topbarText: 'Bem-vinda',
+    topbarText: 'Seja bem-vinda',
     heroVariant: 'ink',
-    heroLabel: 'Sua agenda começa agora',
+    heroLabel: 'Boas-vindas',
     heroTitle: `${firstName},`,
-    heroTitleItalic: 'sua vitrine está pronta.',
-    badgeText: '✓ Conta criada com sucesso',
+    heroTitleItalic: 'sua jornada começa aqui ✨',
+    badgeText: '✓ Conta Ativada',
     badgeVariant: 'success',
     bodyHtml,
-    ctaText: 'Completar Meu Perfil',
+    ctaText: 'Criar Minha Vitrine',
     ctaUrl: onboardingUrl
   });
 }
