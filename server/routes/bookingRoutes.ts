@@ -3,7 +3,7 @@ import express from "express";
 import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
-import { logger, maskEmail, maskPhone, maskToken, maskUid } from "../utils/logger.js";
+import { logger, maskPhone, maskToken, maskUid } from "../utils/logger.js";
 import { sendBookingConfirmedEmail, sendDigitalReceiptEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
