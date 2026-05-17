@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import admin from "firebase-admin";
 import { logger } from "../utils/logger.js";
 import { getDb } from "../firebaseAdmin.js";
 
@@ -46,14 +47,43 @@ router.get("/db", (req: Request, res: Response) => {
   }
 });
 
-router.get("/integrations", (req: Request, res: Response) => {
+router.get("/integrations", async (req: Request, res: Response) => {
   try {
+    // Check for admin status to decide whether to show details
+    let isAdmin = false;
+    const authHeader = req.headers.authorization;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split('Bearer ')[1];
+      try {
+        const decodedToken = await admin.auth().verifyIdToken(token);
+        
+        // Admin if has claim or role in Firestore
+        if (decodedToken.admin === true) {
+          isAdmin = true;
+        } else {
+          const db = getDb();
+          const userDoc = await db.collection('users').doc(decodedToken.uid).get();
+          if (userDoc.exists && userDoc.data()?.role === 'admin') {
+            isAdmin = true;
+          }
+        }
+      } catch (e) {
+        // Auth failure - treat as public
+      }
+    }
+
+    if (!isAdmin) {
+      logger.info("HEALTH", "Integrations health check requested (Public)", { requestId: req.requestId });
+      return res.json({ status: "ok" });
+    }
+
     const hasStripe = Boolean(process.env.STRIPE_SECRET_KEY);
     const hasResend = Boolean(process.env.RESEND_API_KEY);
     const hasWhatsapp = Boolean(process.env.Z_API_INSTANCE_ID || process.env.META_ACCESS_TOKEN);
     const hasCalendar = Boolean(process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_CLIENT_SECRET);
 
-    logger.info("HEALTH", "Integrations health check requested", { requestId: req.requestId });
+    logger.info("HEALTH", "Integrations health check requested (Admin)", { requestId: req.requestId });
     
     res.json({
       stripe: hasStripe,
