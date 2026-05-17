@@ -47,6 +47,11 @@ export async function createServerApp() {
 
   const firebaseAdmin = await import("./server/firebaseAdmin.js");
   const { requestIdMiddleware } = await import("./server/middleware/requestId.js");
+  const { 
+    publicLookupLimiter, 
+    bookingLimiter, 
+    analyticsLimiter 
+  } = await import("./server/middleware/rateLimiter.js");
   
   const app = express();
 
@@ -121,16 +126,17 @@ export async function createServerApp() {
   // Specific routers
   apiRouter.use("/auth", (await import("./server/routes/authRoutes.js")).default);
   apiRouter.use("/ai", (await import("./server/routes/aiRoutes.js")).default);
-  apiRouter.use("/slug", (await import("./server/routes/slugRoutes.js")).default);
+  apiRouter.use("/slug", publicLookupLimiter, (await import("./server/routes/slugRoutes.js")).default);
   apiRouter.use("/health", (await import("./server/routes/healthRoutes.js")).default);
+  apiRouter.use("/profile/reservation", publicLookupLimiter);
   apiRouter.use("/profile", (await import("./server/routes/profileRoutes.js")).default);
   apiRouter.use("/plans", (await import("./server/routes/planRoutes.js")).default);
   apiRouter.use("/calendar", (await import("./server/routes/calendarRoutes.js")).default);
 
   // Generic catch-all routers for remaining endpoints (mounting directly at root of apiRouter)
-  apiRouter.use((await import("./server/routes/bookingRoutes.js")).default);
+  apiRouter.use(bookingLimiter, (await import("./server/routes/bookingRoutes.js")).default);
   apiRouter.use((await import("./server/routes/notificationRoutes.js")).default);
-  apiRouter.use((await import("./server/routes/analyticsRoutes.js")).default);
+  apiRouter.use(analyticsLimiter, (await import("./server/routes/analyticsRoutes.js")).default);
 
   app.use("/api", apiRouter);
 
@@ -155,17 +161,32 @@ export async function createServerApp() {
         return res.redirect(fallback);
       }
 
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const imageResponse = await fetch(imageUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (!imageResponse.ok) {
+          return res.redirect(fallback);
+        }
+
+        const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
+        const buffer = Buffer.from(await imageResponse.arrayBuffer());
+
+        res.setHeader("Content-Type", contentType);
+        res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400"); // 7 days cache
+        return res.send(buffer);
+      } catch (fetchErr: any) {
+        clearTimeout(timeoutId);
+        if (fetchErr.name === 'AbortError') {
+          logger.warn("SSR", "OG Proxy timeout", { meta: { imageUrl, slug } });
+        } else {
+          logger.error("SSR", "OG Proxy fetch error", { error: fetchErr, meta: { imageUrl, slug } });
+        }
         return res.redirect(fallback);
       }
-
-      const contentType = imageResponse.headers.get("content-type") || "image/jpeg";
-      const buffer = Buffer.from(await imageResponse.arrayBuffer());
-
-      res.setHeader("Content-Type", contentType);
-      res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400"); // 7 days cache
-      return res.send(buffer);
     } catch (err) {
       logger.error("SSR", "OG Proxy error", { error: err, meta: { slugWithExt: req.params.slugWithExt } });
       return res.redirect("https://usenera.com/og-default.jpg");
@@ -203,7 +224,7 @@ export async function createServerApp() {
     return html;
   }
 
-  app.get("/p/:slug", async (req, res, next) => {
+  app.get("/p/:slug", publicLookupLimiter, async (req, res, next) => {
     try {
       const { slug } = req.params;
       const db = firebaseAdmin.getDb();
@@ -285,7 +306,7 @@ export async function createServerApp() {
     }
   });
 
-  app.get("/review/:token", async (req, res, next) => {
+  app.get("/review/:token", publicLookupLimiter, async (req, res, next) => {
     try {
       const { token } = req.params;
       const db = firebaseAdmin.getDb();
