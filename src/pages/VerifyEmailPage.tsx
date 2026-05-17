@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useAuth } from '../AuthContext';
 import { notify } from '../lib/notify';
-import { Mail, RefreshCw, LogOut, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Mail, RefreshCw, LogOut, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 import Logo from '../components/Logo';
 
 export default function VerifyEmailPage() {
   const { user, isAuthReady } = useAuth();
+  const [searchParams] = useSearchParams();
+  const isVerifiedSuccess = searchParams.get('verified') === '1';
+
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const navigate = useNavigate();
@@ -105,41 +108,46 @@ export default function VerifyEmailPage() {
       >
         <div className="text-center mb-10">
           <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-6 mx-auto">
-            <Mail size={32} />
+            {isVerifiedSuccess ? <Sparkles size={32} /> : <Mail size={32} />}
           </div>
-          <h2 className="text-3xl font-serif font-normal text-brand-ink mb-4">Confirme seu e-mail</h2>
+          <h2 className="text-3xl font-serif font-normal text-brand-ink mb-4">
+            {isVerifiedSuccess ? 'Tudo pronto!' : 'Confirme seu e-mail'}
+          </h2>
           <p className="text-brand-stone text-sm font-light leading-relaxed">
-            Enviamos um link de confirmação para <span className="font-medium text-brand-ink">{user.email}</span>. 
-            Por favor, verifique sua caixa de entrada (e a pasta de spam) para ativar sua conta.
+            {isVerifiedSuccess 
+              ? 'Seu e-mail foi confirmado com sucesso. Agora sua agenda está pronta para receber agendamentos.'
+              : <>Enviamos um link de confirmação para <span className="font-medium text-brand-ink">{user.email}</span>. Por favor, verifique sua caixa de entrada (e a pasta de spam) para ativar sua conta.</>}
           </p>
         </div>
 
         <div className="space-y-4">
           <button 
-            onClick={handleReload}
+            onClick={isVerifiedSuccess ? () => navigate('/dashboard') : handleReload}
             disabled={loading}
             className="w-full bg-brand-ink text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
             {loading ? (
               <RefreshCw className="animate-spin" size={18} />
             ) : (
-              <CheckCircle2 size={18} />
+              isVerifiedSuccess ? <ArrowRight size={18} /> : <CheckCircle2 size={18} />
             )}
-            {loading ? 'Verificando...' : 'Já confirmei, continuar'}
+            {loading ? 'Verificando...' : (isVerifiedSuccess ? 'Ir para o Painel' : 'Já confirmei, continuar')}
           </button>
 
-          <button 
-            onClick={handleResend}
-            disabled={resending}
-            className="w-full bg-brand-linen text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-          >
-            {resending ? (
-              <RefreshCw className="animate-spin" size={16} />
-            ) : (
-              <Mail size={16} />
-            )}
-            {resending ? 'Enviando...' : 'Reenviar link de confirmação'}
-          </button>
+          {!isVerifiedSuccess && (
+            <button 
+              onClick={handleResend}
+              disabled={resending}
+              className="w-full bg-brand-linen text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {resending ? (
+                <RefreshCw className="animate-spin" size={16} />
+              ) : (
+                <Mail size={16} />
+              )}
+              {resending ? 'Enviando...' : 'Reenviar link de confirmação'}
+            </button>
+          )}
 
           <div className="pt-6 border-t border-brand-mist/50 mt-6 flex justify-center">
             <button 

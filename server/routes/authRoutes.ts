@@ -87,12 +87,17 @@ router.post("/send-verification", async (req, res) => {
     };
 
     // Generate link via Firebase Admin
-    const link = await admin.auth().generateEmailVerificationLink(cleanEmail, actionCodeSettings);
+    const firebaseLink = await admin.auth().generateEmailVerificationLink(cleanEmail, actionCodeSettings);
+
+    // Extract Firebase parameters and point to our custom handler inside the app
+    // This maintains security but allows for a custom visual experience
+    const urlObj = new URL(firebaseLink);
+    const finalLink = `${PUBLIC_APP_URL}/auth/action${urlObj.search}`;
 
     // Send via Resend
     const result = await sendVerificationEmail({
       email: cleanEmail,
-      verificationUrl: link
+      verificationUrl: finalLink
     });
 
     if (!result.success) {

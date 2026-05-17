@@ -41,6 +41,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import ReviewPage from './pages/ReviewPage';
 import BookingResponsePage from './pages/BookingResponsePage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import AuthActionPage from './pages/AuthActionPage';
 import PendingRequestsPage from './pages/PendingRequestsPage';
 import ManageBookingPage from './pages/ManageBookingPage';
 import CouponsPage from './pages/CouponsPage';
@@ -120,6 +121,7 @@ export default function App() {
               <Route path="/termos" element={<TermsPage />} />
               <Route path="/p/:slug" element={<PublicProfile />} />
               <Route path="/verificar-email" element={<VerifyEmailPage />} />
+              <Route path="/auth/action" element={<AuthActionPage />} />
               <Route path="/reserva/:id/gerenciar" element={<ManageBookingPage />} />
               <Route path="/r/:token" element={<ManageBookingPage />} />
               <Route path="/profissionais" element={<DirectoryPage />} />
