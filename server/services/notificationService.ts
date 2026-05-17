@@ -2,7 +2,7 @@ import { getDb } from "../firebaseAdmin.js";
 import { 
   shouldSendEmail, markEmailSent
 } from "../utils.js";
-import { sendBookingPendingEmail, sendProfessionalNewBookingEmail } from "../emails/sendEmail.js";
+import { sendBookingPendingEmail, sendProfessionalNewBookingEmail, sendBookingConfirmedEmail } from "../emails/sendEmail.js";
 import { buildNewBookingMessageForPro } from "./whatsappMessages.js";
 import { sendWhatsApp } from "./whatsappService.js";
 import { logger, maskEmail } from "../utils/logger.js";
@@ -67,6 +67,60 @@ export const sendBookingPendingClientNotification = async (payload: BookingPendi
     return { success: true, skipped: 'duplicate' };
   } catch (err: any) {
     logger.error("NOTIFICATION", "Failed to send BOOKING_PENDING_CLIENT", { appointmentId: payload.appointmentId, error: err.message });
+    return { success: false, error: err.message };
+  }
+};
+
+export interface BookingConfirmedClientPayload {
+  appointmentId: string;
+}
+
+export const sendBookingConfirmedClientNotification = async (payload: BookingConfirmedClientPayload, baseUrl: string) => {
+  const db = getDb();
+  const eventKey = 'bookingConfirmedClient';
+
+  try {
+    const apptDoc = await db.collection('appointments').doc(payload.appointmentId).get();
+    if (!apptDoc.exists) return { success: false, error: 'Appointment not found' };
+    const apptData = apptDoc.data() as any;
+
+    if (!apptData.clientEmail) {
+      logger.warn("NOTIFICATION", "Skipped confirmation email: client has no email", { appointmentId: payload.appointmentId });
+      return { success: true, skipped: 'no_email' };
+    }
+
+    if (await shouldSendEmail(payload.appointmentId, eventKey)) {
+      const proSnap = await db.collection('users').doc(apptData.professionalId).get();
+      const pro = proSnap.exists ? proSnap.data() : null;
+
+      const waPhone = pro?.whatsapp ? pro.whatsapp.replace(/\D/g, '') : '';
+      const whatsappUrl = waPhone ? `https://wa.me/${waPhone}` : undefined;
+      const token = apptData.manageSlug || apptData.token || apptData.manageToken;
+
+      const result = await sendBookingConfirmedEmail({
+        clientName: apptData.clientName,
+        serviceName: apptData.serviceName,
+        date: apptData.date,
+        time: apptData.time,
+        location: apptData.locationType === 'home' || apptData.locationType === 'domicilio' 
+          ? `Domicílio (${apptData.neighborhood || 'Bairro omitido'})` 
+          : 'Estúdio / Local Fixo',
+        clientEmail: apptData.clientEmail,
+        professionalName: pro?.name || 'Sua Profissional',
+        professionalEmail: pro?.email || '',
+        bookingId: payload.appointmentId,
+        token: token,
+        prepInstructions: apptData.prepInstructions,
+        whatsappUrl,
+        manageUrl: token ? `${baseUrl}/r/${token}` : undefined
+      });
+
+      if (result.success) await markEmailSent(payload.appointmentId, eventKey);
+      return result;
+    }
+    return { success: true, skipped: 'duplicate' };
+  } catch (err: any) {
+    logger.error("NOTIFICATION", "Failed to send BOOKING_CONFIRMED_CLIENT", { appointmentId: payload.appointmentId, error: err.message });
     return { success: false, error: err.message };
   }
 };

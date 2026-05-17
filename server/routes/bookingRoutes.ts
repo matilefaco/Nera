@@ -8,7 +8,7 @@ import { sendBookingConfirmedEmail, sendDigitalReceiptEmail } from "../emails/se
 import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
-import { sendBookingPendingClientNotification, sendNewBookingRequestNotification } from "../services/notificationService.js";
+import { sendBookingPendingClientNotification, sendNewBookingRequestNotification, sendBookingConfirmedClientNotification } from "../services/notificationService.js";
 import { PUBLIC_APP_URL } from "../utils.js";
 
 const router = express.Router();
@@ -1267,12 +1267,21 @@ router.post("/appointments/:appointmentId/confirm", requireFirebaseAuth, async (
       return { success: true, appointmentId, lockId, status: "confirmed" };
     });
 
-    // Create Google Calendar event (don't await to avoid delaying the response)
-    // We could fetch the appointment data again, or pass the data we had
-    const apptDoc = await db.collection('appointments').doc(appointmentId).get();
-    if (apptDoc.exists) {
-      createGoogleCalendarEvent({ id: appointmentId, ...apptDoc.data() }, professionalId);
-    }
+    // Create Google Calendar event and send notification (background tasks)
+    (async () => {
+      try {
+        const apptDoc = await db.collection('appointments').doc(appointmentId).get();
+        if (apptDoc.exists) {
+          const apptData = apptDoc.data();
+          // 1. Google Calendar Integration
+          createGoogleCalendarEvent({ id: appointmentId, ...apptData }, professionalId);
+          // 2. Email Confirmation to Client
+          await sendBookingConfirmedClientNotification({ appointmentId }, PUBLIC_APP_URL);
+        }
+      } catch (err: any) {
+        logger.error("NOTIFICATION", "Post-confirmation tasks failed", { appointmentId, error: err.message });
+      }
+    })();
 
     return res.json(result);
 
