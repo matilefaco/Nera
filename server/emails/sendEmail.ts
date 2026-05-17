@@ -150,6 +150,15 @@ export interface BookingEmailData {
   cancellationReason?: string;
   waitlistCount?: number;
   profileUrl?: string;
+  locationType?: string;
+  address?: {
+    street?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+  };
 }
 
 // --- EMAIL FUNCTIONS ---

@@ -11,6 +11,15 @@ interface BookingConfirmedData {
   manageUrl: string;
   prepInstructions?: string; // instruções de preparo enviadas pela profissional
   whatsappUrl?: string;      // link wa.me/ para a profissional
+  locationType?: string;
+  address?: {
+    street?: string;
+    number?: string;
+    complement?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+  };
 }
 
 export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
@@ -24,8 +33,38 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
     calendarUrl,
     manageUrl,
     prepInstructions,
-    whatsappUrl
+    whatsappUrl,
+    address,
+    locationType
   } = data;
+
+  const isStudio = locationType === 'studio' || locationType === 'estudio' || !locationType;
+  const hasValidAddress = address && address.street;
+  
+  // Format full address
+  let fullAddress = '';
+  let mapsUrl = '';
+
+  if (isStudio && hasValidAddress) {
+    const parts = [];
+    if (address.street) parts.push(address.street);
+    if (address.number) parts.push(address.number);
+    if (address.complement) parts.push(address.complement);
+    
+    const secondLine = [];
+    if (address.neighborhood) secondLine.push(address.neighborhood);
+    if (address.city) secondLine.push(address.city);
+
+    fullAddress = `
+      <div style="font-size: 13px; color: #18120E; margin-top: 4px; font-family: Arial, sans-serif; line-height: 1.4;">
+        ${parts.join(', ')}<br/>
+        ${secondLine.join(' — ')}
+      </div>
+    `;
+
+    const searchQuery = encodeURIComponent(`${address.street}, ${address.number}, ${address.neighborhood}, ${address.city}`);
+    mapsUrl = `https://www.google.com/maps/search/?api=1&query=${searchQuery}`;
+  }
 
   const bodyHtml = `
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
@@ -39,7 +78,19 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
       { label: 'Serviço', value: serviceName },
       { label: 'Data e Hora', value: `${formattedDate} às ${time}` },
       { label: 'Profissional', value: professionalName || 'Sua profissional' },
-      { label: 'Local', value: location }
+      { label: 'Local', value: `
+        <div>
+          <div style="font-weight: bold;">${location}</div>
+          ${fullAddress}
+          ${mapsUrl ? `
+            <div style="margin-top: 8px;">
+              <a href="${mapsUrl}" target="_blank" style="color: ${COLORS.terracotta}; font-size: 11px; font-weight: bold; text-decoration: underline; text-transform: uppercase; letter-spacing: 0.05em;">
+                Abrir no Google Maps
+              </a>
+            </div>
+          ` : ''}
+        </div>
+      ` }
     ])}
 
     ${prepInstructions ? `

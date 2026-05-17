@@ -91,18 +91,33 @@ export const sendBookingConfirmedClientNotification = async (payload: BookingCon
 
     if (await shouldSendEmail(payload.appointmentId, eventKey)) {
       const proSnap = await db.collection('users').doc(apptData.professionalId).get();
-      const pro = proSnap.exists ? proSnap.data() : null;
+      const pro = proSnap.exists ? proSnap.data() as any : null;
 
       const waPhone = pro?.whatsapp ? pro.whatsapp.replace(/\D/g, '') : '';
       const whatsappUrl = waPhone ? `https://wa.me/${waPhone}` : undefined;
       const token = apptData.manageSlug || apptData.token || apptData.manageToken;
+
+      const isStudio = apptData.locationType === 'studio' || apptData.locationType === 'estudio' || !apptData.locationType;
+      const isHome = apptData.locationType === 'home' || apptData.locationType === 'domicilio';
+
+      let addressData = undefined;
+      if (isStudio && pro?.studioAddress) {
+        addressData = {
+          street: pro.studioAddress.street,
+          number: pro.studioAddress.number,
+          complement: pro.studioAddress.complement,
+          neighborhood: pro.studioAddress.neighborhood,
+          city: pro.studioAddress.city,
+          state: pro.studioAddress.state,
+        };
+      }
 
       const result = await sendBookingConfirmedEmail({
         clientName: apptData.clientName,
         serviceName: apptData.serviceName,
         date: apptData.date,
         time: apptData.time,
-        location: apptData.locationType === 'home' || apptData.locationType === 'domicilio' 
+        location: isHome 
           ? `Domicílio (${apptData.neighborhood || 'Bairro omitido'})` 
           : 'Estúdio / Local Fixo',
         clientEmail: apptData.clientEmail,
@@ -112,7 +127,9 @@ export const sendBookingConfirmedClientNotification = async (payload: BookingCon
         token: token,
         prepInstructions: apptData.prepInstructions,
         whatsappUrl,
-        manageUrl: token ? `${baseUrl}/r/${token}` : undefined
+        manageUrl: token ? `${baseUrl}/r/${token}` : undefined,
+        address: addressData,
+        locationType: apptData.locationType
       });
 
       if (result.success) await markEmailSent(payload.appointmentId, eventKey);
