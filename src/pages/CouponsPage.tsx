@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, Tag, Calendar, Users, 
@@ -25,6 +26,7 @@ import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
 
 export default function CouponsPage() {
+  const navigate = useNavigate();
   const { user, isAuthReady } = useAuth();
   const { features } = usePlanFeatures();
   const { 
@@ -235,23 +237,51 @@ export default function CouponsPage() {
       />
       <div className="max-w-5xl mx-auto px-6 py-8">
         {!features.coupons ? (
-          <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-12 md:p-16 text-center max-w-2xl mx-auto mt-12 shadow-sm">
-            <div className="w-20 h-20 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-8 text-brand-terracotta shadow-sm">
-               <Tag size={32} />
+          <div className="max-w-4xl mx-auto py-12 md:py-24 px-6">
+            <div className="text-center mb-16 md:mb-24">
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6 block">Recurso Exclusivo</span>
+              <h2 className="text-4xl md:text-6xl font-serif text-brand-ink mb-8 italic leading-tight">Campanhas e incentivos</h2>
+              <p className="text-base md:text-xl text-brand-stone font-light leading-relaxed max-w-2xl mx-auto">
+                Crie ações pontuais para incentivar retornos, movimentar horários estratégicos e fortalecer a relação com suas clientes.
+              </p>
             </div>
-            <h2 className="text-3xl font-serif text-brand-ink mb-4">Cupons de desconto</h2>
-            <p className="text-sm text-brand-stone font-light leading-relaxed mb-10 max-w-md mx-auto">
-              Crie campanhas pontuais para incentivar retornos, preencher horários estratégicos e cuidar da relação com suas clientes.
-              <br /><br />
-              <span className="font-medium text-brand-ink">Disponível nos planos Essencial e Pro.</span>
-            </p>
-            <PremiumButton 
-              variant="terracotta" 
-              onClick={() => checkFeatureAccess('coupons')}
-              className="px-8 py-4"
-            >
-              Ver planos
-            </PremiumButton>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-16 mb-24">
+              <div className="group">
+                <div className="h-px w-8 bg-brand-terracotta/30 mb-6 group-hover:w-12 transition-all duration-500"></div>
+                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-brand-ink mb-4">Retorno em até 30 dias</h4>
+                <p className="text-[13px] text-brand-stone font-light leading-relaxed">
+                  Um incentivo simples para clientes que já passaram pela sua agenda.
+                </p>
+              </div>
+              <div className="group">
+                <div className="h-px w-8 bg-brand-terracotta/30 mb-6 group-hover:w-12 transition-all duration-500"></div>
+                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-brand-ink mb-4">Horários específicos</h4>
+                <p className="text-[13px] text-brand-stone font-light leading-relaxed">
+                  Movimente períodos mais tranquilos sem depender de divulgação agressiva.
+                </p>
+              </div>
+              <div className="group">
+                <div className="h-px w-8 bg-brand-terracotta/30 mb-6 group-hover:w-12 transition-all duration-500"></div>
+                <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-brand-ink mb-4">Clientes recorrentes</h4>
+                <p className="text-[13px] text-brand-stone font-light leading-relaxed">
+                  Benefícios discretos para fortalecer frequência e relacionamento.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-brand-parchment/40 rounded-[48px] p-12 md:p-20 text-center border border-brand-mist/50 backdrop-blur-sm">
+              <p className="text-xs text-brand-stone font-medium uppercase tracking-[0.2em] mb-10">
+                Disponível nos planos Essencial e Pro
+              </p>
+              <PremiumButton 
+                variant="terracotta" 
+                onClick={() => navigate('/planos')}
+                className="px-14 py-5 text-[11px]"
+              >
+                Ver planos
+              </PremiumButton>
+            </div>
           </div>
         ) : (
           <>
