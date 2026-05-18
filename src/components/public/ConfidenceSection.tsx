@@ -17,8 +17,10 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
   const badges = [
     {
       icon: <Clock size={16} />,
-      text: "Atendimento rápido direto no WhatsApp, sem complicação",
-      show: !!profile.whatsapp
+      text: profile.plan === 'pro' && profile.whatsapp 
+        ? "Atendimento rápido direto no WhatsApp, sem complicação"
+        : "Sistema de reservas prático com notificação por e-mail",
+      show: true
     },
     {
       icon: <ShieldCheck size={16} />,

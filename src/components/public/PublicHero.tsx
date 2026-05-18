@@ -44,20 +44,37 @@ export const PublicHero = ({
   const initials = fullName ? fullName.split(" ").map(w => w ? w[0] : "").filter(Boolean).slice(0, 2).join("").toUpperCase() : "P";
 
   useEffect(() => {
+    let timeElapsed = false;
+    const timer = setTimeout(() => {
+      timeElapsed = true;
+    }, 15000); // 15 seconds
+
     const handleScroll = () => {
       setScrollY(window.scrollY);
       
-      // Dynamic logic for interest popup similar to PublicProfile
+      if (showInterestPopup || interestPopupDismissed) return;
+      
+      // Dynamic logic for interest popup
       const docHeight = document.documentElement.scrollHeight;
       const winHeight = window.innerHeight;
-      const scrollPercent = window.scrollY / (docHeight - winHeight);
       
-      if (scrollPercent > 0.8 && !showInterestPopup && !interestPopupDismissed) {
+      if (docHeight <= winHeight) return;
+      
+      const scrollPercent = window.scrollY / (docHeight - winHeight);
+      const passedHero = window.scrollY > winHeight * 0.4;
+      
+      // Trigger if scrolled past 45% of the page
+      // OR 15 seconds have passed AND user has scrolled past the hero section
+      if ((scrollPercent > 0.45 || (timeElapsed && passedHero)) && !showInterestPopup && !interestPopupDismissed) {
         setShowInterestPopup(true);
       }
     };
+    
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timer);
+    };
   }, [showInterestPopup, interestPopupDismissed]);
 
   const tagline = getProfileHeroCopy(
@@ -360,12 +377,12 @@ export const PublicHero = ({
       {/* Interest Popup */}
       <AnimatePresence>
         {showInterestPopup && (
-          <div className="fixed bottom-8 left-6 right-6 md:left-auto md:right-10 md:w-96 z-[400]">
+          <div className="fixed bottom-6 left-4 right-4 md:bottom-8 md:left-auto md:right-10 md:w-96 z-[400]">
             <motion.div 
               initial={{ y: 100, opacity: 0, scale: 0.9 }} 
               animate={{ y: 0, opacity: 1, scale: 1 }} 
               exit={{ y: 100, opacity: 0, scale: 0.9 }} 
-              className="bg-brand-ink text-brand-white p-8 rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10"
+              className="bg-brand-ink text-brand-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10"
             >
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl" />
               <button 
@@ -384,7 +401,7 @@ export const PublicHero = ({
                 <h3 className="text-xl font-serif mb-2 leading-tight">
                   Ainda está pensando?
                 </h3>
-                <p className="text-xs text-white/60 font-light mb-8 leading-relaxed">
+                <p className="text-xs text-white/60 font-light mb-6 md:mb-8 leading-relaxed">
                   {interestPopupText}
                 </p>
                 <div className="flex flex-col gap-3">

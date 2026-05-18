@@ -1,14 +1,18 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { ChevronRight, ShieldCheck, Clock } from 'lucide-react';
+import { ChevronRight, ShieldCheck, Clock, Mail } from 'lucide-react';
 import PremiumButton from '../PremiumButton';
+import { UserProfile } from '../../types';
 
 interface FinalCTAProps {
   onBookingClick: () => void;
   completedBookings?: number;
+  profile: UserProfile;
 }
 
-export const FinalCTA = ({ onBookingClick, completedBookings }: FinalCTAProps) => {
+export const FinalCTA = ({ onBookingClick, completedBookings, profile }: FinalCTAProps) => {
+  const isProWithWhatsapp = profile.plan === 'pro' && !!profile.whatsapp;
+
   return (
     <section className="bg-brand-ink py-40 px-6 relative overflow-hidden">
       {/* Decorative Circles */}
@@ -54,11 +58,21 @@ export const FinalCTA = ({ onBookingClick, completedBookings }: FinalCTAProps) =
             Agendamento seguro
           </div>
           <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.2em] text-brand-blush">
-            <Clock size={14} />
-            Confirmação via WhatsApp
+            {isProWithWhatsapp ? (
+              <>
+                <Clock size={14} />
+                Confirmação via WhatsApp
+              </>
+            ) : (
+              <>
+                <Mail size={14} />
+                Confirmação por e-mail
+              </>
+            )}
           </div>
         </div>
       </motion.div>
     </section>
   );
 };
+

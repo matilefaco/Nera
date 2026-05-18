@@ -910,6 +910,7 @@ function PublicProfileContent() {
       <ConfidenceSection profile={profile} stats={stats} />
       <div ref={finalCtaRef}>
         <FinalCTA
+          profile={profile}
           onBookingClick={() => {
             if (profile && profile.uid !== "mock-helena") {
               logAnalyticsEvent(profile.uid, "click_book_final");
