@@ -1,6 +1,9 @@
 process.env.NODE_ENV = "production";
 
 import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
+
+const NVIDIA_API_KEY = defineSecret("NVIDIA_API_KEY");
 
 /**
  * Universal backend entry point for Firebase Functions v2 / Cloud Run.
@@ -33,6 +36,7 @@ export const api = onRequest(
     minInstances: 0,
     cors: false,
     secrets: [
+      NVIDIA_API_KEY,
       "RESEND_API_KEY",
       "EMAIL_FROM",
       "EMAIL_REPLY_TO",
