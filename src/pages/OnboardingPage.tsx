@@ -183,38 +183,51 @@ export default function OnboardingPage() {
         // If the slug changed while the fetch was in progress, ignore result
         if (slugCheckRef.current !== cleanSlug) return;
 
-        console.log(`[SlugCheck] Response status: ${res.status}`);
-        
         let data: any = {};
         try {
           data = await res.json();
-        } catch(e) {}
+        } catch(e) {
+          console.error('[SlugCheck] JSON parse error', e);
+        }
         
-        console.log(`[SlugCheck] Response body:`, data);
-
-        if (!res.ok) {
-          setSlugStatus('invalid');
-          setSlugMessage(data.error || 'Não consegui verificar agora. Tente novamente.');
-          return;
+        let finalStatus: 'available' | 'unavailable' | 'invalid' = 'invalid';
+        if (res.ok) {
+          if (data.available === true) {
+            finalStatus = 'available';
+          } else if (data.available === false) {
+            finalStatus = 'unavailable';
+          }
         }
 
-        if (data.available === true) {
+        console.log("[SlugCheck]", {
+          status: res.status,
+          body: data,
+          finalStatus
+        });
+
+        if (finalStatus === 'available') {
           setSlugStatus('available');
           setSlugMessage(data.message || 'Seu link está disponível!');
           setSlugSuggestions([]);
-        } else if (data.available === false) {
+        } else if (finalStatus === 'unavailable') {
           setSlugStatus('unavailable');
           setSlugMessage(data.message || 'Esse link já está sendo usado');
           setSlugSuggestions(data.suggestions || []);
         } else {
           setSlugStatus('invalid');
-          setSlugMessage('Resposta inesperada. Tente novamente.');
+          setSlugMessage(data.error || 'Não consegui verificar agora. Tente novamente.');
         }
       } catch (err) {
         console.error('[SlugCheck] Caught error:', err);
         // Only update if it's still the same slug
         if (slugCheckRef.current === cleanSlug) {
-          setSlugStatus('invalid');
+          const finalStatus = 'invalid';
+          console.log("[SlugCheck]", {
+            status: 'caught_error',
+            error: String(err),
+            finalStatus
+          });
+          setSlugStatus(finalStatus);
           setSlugMessage('Erro de rede. Tente novamente.');
         }
       }

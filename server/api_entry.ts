@@ -1,3 +1,4 @@
+// slug check deploy sync
 process.env.NODE_ENV = "production";
 
 import { onRequest } from "firebase-functions/v2/https";
