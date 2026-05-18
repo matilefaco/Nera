@@ -9,6 +9,7 @@ import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimite
 // Duplicated from src/constants/plans.ts to avoid src/ dependency on server
 const PLAN_CONFIGS: any = {
   free: {
+    themes: ['terracotta'],
     features: {
       unlimitedBookings: false,
       whatsappNotifications: false,
@@ -22,6 +23,7 @@ const PLAN_CONFIGS: any = {
     }
   },
   essencial: {
+    themes: ['terracotta', 'rose', 'sage'],
     features: {
       unlimitedBookings: true,
       whatsappNotifications: false,
@@ -35,6 +37,7 @@ const PLAN_CONFIGS: any = {
     }
   },
   pro: {
+    themes: ['terracotta', 'rose', 'sage', 'navy', 'plum'],
     features: {
       unlimitedBookings: true,
       whatsappNotifications: true,
@@ -156,43 +159,65 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         source: "profile_save"
       }, { merge: true });
 
-      // 5. Build final profile data
+      // 5. Build final profile data with strict ALLOWLIST
       const userPlan = (userData?.plan || 'free').toLowerCase() as keyof typeof PLAN_CONFIGS;
       const themeVariant = sanitizedProfile?.profileTheme?.variant;
       
       const config = PLAN_CONFIGS[userPlan] || PLAN_CONFIGS.free;
-      const allowed = config.themes;
+      const allowedThemes = config.themes || ['terracotta'];
 
       let validatedTheme = sanitizedProfile?.profileTheme;
-      if (themeVariant && !allowed.includes(themeVariant)) {
+      if (themeVariant && !allowedThemes.includes(themeVariant)) {
         logger.warn("PROFILE", "User tried to use an unauthorized theme variant. Resetting.", { professionalId: maskUid(uid), meta: { userPlan, requestedTheme: themeVariant } });
         validatedTheme = { variant: 'terracotta' };
       }
 
+      // PICKS only allowed fields from incoming data to prevent security exploits
+      const ALLOWED_FIELDS = [
+        'name', 'displayName', 'bio', 'specialty', 'city', 'neighborhood', 'headline',
+        'instagram', 'whatsapp', 'slug', 'avatar', 'photoURL', 'coverImage',
+        'portfolio', 'profileTheme', 'serviceMode', 'studioAddress', 
+        'serviceAreaType', 'serviceAreas', 'pricingStrategy', 'workingHours', 
+        'paymentMethods', 'antiNoShowEnabled', 'advancePaymentRequired', 
+        'delayTolerance', 'professionalIdentity', 'onboardingCompleted'
+      ];
+
+      const filteredProfile: any = {};
+      ALLOWED_FIELDS.forEach(field => {
+        if (sanitizedProfile[field] !== undefined) {
+          filteredProfile[field] = sanitizedProfile[field];
+        }
+      });
+
+      // Override with validated/internal values
+      filteredProfile.profileTheme = validatedTheme;
+      filteredProfile.slug = slug;
+      filteredProfile.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+
+      // Ensure UID is correct
+      filteredProfile.uid = uid;
+
       // WhatsApp validation on backend
-      const whatsapp = sanitizedProfile?.whatsapp;
+      const whatsapp = filteredProfile.whatsapp;
       if (whatsapp && !isValidWhatsapp(whatsapp)) {
         logger.warn("PROFILE", "User tried to save invalid WhatsApp", { professionalId: maskUid(uid) });
         throw new Error("O número de WhatsApp informado é inválido. Use um formato brasileiro (DDD + número).");
       }
 
       // Set publication flags
-      const isFinishingOnboarding = sanitizedProfile.onboardingCompleted === true && !userData?.onboardingCompleted;
+      const isFinishingOnboarding = filteredProfile.onboardingCompleted === true && !userData?.onboardingCompleted;
       
       const missingDefaults: any = {};
       if (userData?.planRank === undefined) missingDefaults.planRank = 0;
       if (userData?.averageRating === undefined) missingDefaults.averageRating = 0;
       if (userData?.totalReviews === undefined) missingDefaults.totalReviews = 0;
 
-      const finalProfileData = removeUndefinedDeep({
-        ...sanitizedProfile,
-        profileTheme: validatedTheme,
-        slug,
+      const finalProfileData = {
+        ...filteredProfile,
         ...missingDefaults,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         // Add publication timestamp if completing onboarding
         ...(isFinishingOnboarding ? { profilePublishedAt: admin.firestore.FieldValue.serverTimestamp() } : {})
-      });
+      };
 
       transaction.set(userRef, finalProfileData, { merge: true });
 
