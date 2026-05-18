@@ -3,7 +3,7 @@ import { UserProfile } from '../types';
 
 export function useProfileForm(profile: UserProfile | null) {
   const [name, setName] = useState(profile?.name || '');
-  const [specialty, setSpecialty] = useState(profile?.specialty || '');
+  const [specialty, setSpecialty] = useState(profile?.professionalIdentity?.mainSpecialty || profile?.specialty || '');
   const [bio, setBio] = useState(profile?.bio || '');
   const [headline, setHeadline] = useState(profile?.headline || '');
   const [city, setCity] = useState(profile?.city || '');
@@ -42,7 +42,7 @@ export function useProfileForm(profile: UserProfile | null) {
   useEffect(() => {
     if (profile) {
       setName(profile.name || '');
-      setSpecialty(profile.specialty || '');
+      setSpecialty(profile.professionalIdentity?.mainSpecialty || profile.specialty || '');
       setBio(profile.bio || '');
       setHeadline(profile.headline || '');
       setCity(profile.city || '');

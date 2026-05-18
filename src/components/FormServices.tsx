@@ -132,6 +132,12 @@ export const FormServices = ({
     setServices(newServices);
   };
 
+  const updateServiceFields = (index: number, updates: Partial<ServiceDraft>) => {
+    const newServices = [...services];
+    newServices[index] = { ...newServices[index], ...updates };
+    setServices(newServices);
+  };
+
   const removeService = (index: number) => {
     if (services.length === 1) return;
     setServices(services.filter((_, i) => i !== index));
@@ -195,20 +201,36 @@ export const FormServices = ({
                       Você pode ajustar nome, duração e preço depois.
                     </p>
                     <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none -mx-2 px-2 md:mx-0 md:px-0">
-                      {suggestions.map((sug, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => {
-                            updateService(index, 'name', sug.name);
-                            updateService(index, 'duration', String(sug.duration));
-                            setShowCustom(prev => ({ ...prev, [index]: false }));
-                          }}
-                          className="flex-shrink-0 px-3 py-1.5 bg-brand-parchment border border-brand-mist hover:border-brand-ink rounded-full text-[10px] font-medium text-brand-ink transition-all shadow-sm"
-                        >
-                          {sug.name} <span className="text-brand-stone font-normal ml-0.5">• {sug.duration} min</span>
-                        </button>
-                      ))}
+                      {suggestions.map((sug, idx) => {
+                        const isActive = service.name === sug.name;
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              updateServiceFields(index, {
+                                name: sug.name,
+                                duration: String(sug.duration)
+                              });
+                              setShowCustom(prev => ({ ...prev, [index]: false }));
+                            }}
+                            className={cn(
+                              "flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-medium transition-all duration-300 ease-out border flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
+                              isActive
+                                ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
+                                : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
+                            )}
+                          >
+                            {sug.name}{" "}
+                            <span className={cn(
+                              "font-normal tracking-normal normal-case",
+                              isActive ? "text-brand-white/80" : "text-brand-stone/80"
+                            )}>
+                              • {sug.duration} min
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

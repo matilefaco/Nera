@@ -38,6 +38,8 @@ export interface WorkingHours {
   startTime: string; // HH:mm
   endTime: string; // HH:mm
   workingDays: number[]; // 0-6 (Sunday-Saturday)
+  breakStart?: string; // HH:mm
+  breakEnd?: string; // HH:mm
 }
 
 export interface ProfessionalIdentity {
@@ -89,6 +91,8 @@ export interface UserProfile {
   
   serviceMode: 'studio' | 'home' | 'hybrid';
   serviceAreaType?: 'city_wide' | 'custom';
+  travelFeeMode?: 'none' | 'fixed';
+  fixedTravelFee?: number;
   pricingStrategy?: 'extra' | 'none'; // Official pricing strategy
   
   workingHours: WorkingHours; // Official format

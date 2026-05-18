@@ -41,6 +41,10 @@ export interface FormLocationProps {
   setNewAreaFee?: (val: string) => void;
   serviceAreaType?: 'city_wide' | 'specific_neighborhoods';
   setServiceAreaType?: (val: 'city_wide' | 'specific_neighborhoods') => void;
+  travelFeeMode?: 'none' | 'fixed';
+  setTravelFeeMode?: (val: 'none' | 'fixed') => void;
+  fixedTravelFee?: string;
+  setFixedTravelFee?: (val: string) => void;
   addArea?: () => void;
   removeArea?: (idx: number) => void;
   formatCurrency?: (val: number) => string;
@@ -50,6 +54,35 @@ export interface FormLocationProps {
   subtitle?: string;
   showLabels?: boolean;
 }
+
+const MAJOR_CITIES = [
+  "São Paulo, SP",
+  "Rio de Janeiro, RJ",
+  "Belo Horizonte, MG",
+  "Fortaleza, CE",
+  "Salvador, BA",
+  "Recife, PE",
+  "Brasília, DF",
+  "Curitiba, PR",
+  "Porto Alegre, RS",
+  "Goiânia, GO",
+  "Manaus, AM",
+  "Belém, PA",
+  "Florianópolis, SC",
+  "Vitória, ES",
+  "Natal, RN",
+  "João Pessoa, PB",
+  "Maceió, AL",
+  "São Luís, MA",
+  "Teresina, PI",
+  "Cuiabá, MT",
+  "Campo Grande, MS",
+  "Aracaju, SE",
+  "Ribeirão Preto, SP",
+  "Campinas, SP",
+  "Santos, SP",
+  "Niterói, RJ",
+];
 
 const FormError = ({ message }: { message?: string }) => (
   <AnimatePresence>
@@ -85,6 +118,10 @@ export const FormLocation = ({
   setNewAreaFee,
   serviceAreaType,
   setServiceAreaType,
+  travelFeeMode,
+  setTravelFeeMode,
+  fixedTravelFee,
+  setFixedTravelFee,
   addArea,
   removeArea,
   formatCurrency,
@@ -99,6 +136,24 @@ export const FormLocation = ({
       (studioAddress.neighborhood && studioAddress.neighborhood.trim() !== '' && studioAddress.neighborhood !== neighborhood)
     ));
   });
+
+  const [showCitySuggestions, setShowCitySuggestions] = React.useState(false);
+  const cityInputRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (cityInputRef.current && !cityInputRef.current.contains(event.target as Node)) {
+        setShowCitySuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const normalizedCityInput = city ? city.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() : "";
+  const filteredCities = normalizedCityInput 
+    ? MAJOR_CITIES.filter(c => c.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(normalizedCityInput) && c !== city)
+    : MAJOR_CITIES;
 
   return (
     <div className="w-full space-y-6">
@@ -117,20 +172,56 @@ export const FormLocation = ({
                 Cidade base <span className="text-brand-terracotta">*</span>
               </label>
             )}
-            <div className="relative">
+            <div className="relative" ref={cityInputRef}>
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-stone/40" size={14} />
               <input 
                 type="text" 
                 value={city} 
-                onChange={(e) => setCity(e.target.value)} 
+                onChange={(e) => {
+                  setCity(e.target.value);
+                  setShowCitySuggestions(true);
+                }}
+                onFocus={() => {
+                  if (filteredCities.length > 0) setShowCitySuggestions(true);
+                }}
                 placeholder="Ex: São Paulo, SP" 
                 className={cn(
                   "w-full pl-9 pr-3 py-2 bg-brand-white border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
                   errors.city ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/60"
                 )}
               />
+              
+              <AnimatePresence>
+                {showCitySuggestions && filteredCities.length > 0 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="absolute z-10 w-full mt-1 bg-white border border-brand-mist/60 rounded-lg shadow-lg overflow-hidden"
+                  >
+                    <div className="max-h-48 overflow-y-auto scrollbar-thin">
+                      {filteredCities.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            setCity(c);
+                            setShowCitySuggestions(false);
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm font-light text-brand-ink hover:bg-brand-linen/50 transition-colors border-b border-brand-mist/20 last:border-0"
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <FormError message={errors.city} />
+            <p className="text-[9px] text-brand-stone/70 font-light italic ml-1 mt-1">
+              Ajuda suas clientes a encontrarem você por região.
+            </p>
           </div>
           <div className="space-y-1">
             {showLabels && (
@@ -396,6 +487,57 @@ export const FormLocation = ({
                       Bairros específicos
                     </button>
                   </div>
+                </div>
+              )}
+
+              {serviceAreaType === 'city_wide' && setTravelFeeMode && setFixedTravelFee && (
+                <div className="bg-[#FAF9F8] p-4 rounded-xl border border-brand-mist/40 space-y-4">
+                  <h4 className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">Taxa de Deslocamento</h4>
+                  <div className="flex gap-2">
+                    <button 
+                      type="button"
+                      onClick={() => setTravelFeeMode('none')}
+                      className={cn(
+                        "flex-1 py-2 px-3 rounded-lg border transition-all duration-300 text-[10px] font-bold uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
+                        travelFeeMode === 'none' || !travelFeeMode
+                          ? 'border-brand-ink/30 bg-white shadow-sm text-brand-ink' 
+                          : 'border-brand-mist/50 bg-white text-brand-stone hover:border-brand-stone/30 hover:bg-brand-mist/10'
+                      )}
+                    >
+                      Sem taxa
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setTravelFeeMode('fixed')}
+                      className={cn(
+                        "flex-1 py-2 px-3 rounded-lg border transition-all duration-300 text-[10px] font-bold uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
+                        travelFeeMode === 'fixed' 
+                          ? 'border-brand-ink/30 bg-white shadow-sm text-brand-ink' 
+                          : 'border-brand-mist/50 bg-white text-brand-stone hover:border-brand-stone/30 hover:bg-brand-mist/10'
+                      )}
+                    >
+                      Taxa fixa
+                    </button>
+                  </div>
+                  
+                  {travelFeeMode === 'fixed' && (
+                    <div className="space-y-2 pt-2 border-t border-brand-mist/30">
+                      <label className="text-[10px] font-medium text-brand-ink uppercase tracking-widest block ml-1">Valor da taxa</label>
+                      <div className="relative max-w-[200px]">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-stone text-sm">R$</span>
+                        <input
+                          type="number"
+                          value={fixedTravelFee}
+                          onChange={(e) => setFixedTravelFee(e.target.value)}
+                          placeholder="20"
+                          className="w-full pl-9 pr-3 py-2 bg-white border border-brand-mist rounded-lg outline-none focus:border-brand-ink/30 transition-all font-light text-sm"
+                        />
+                      </div>
+                      <p className="text-[9px] text-brand-stone font-light italic ml-1 max-w-sm">
+                        Use uma taxa média para cobrir seu deslocamento pela cidade.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -212,6 +212,8 @@ export default function OnboardingPage() {
 
   // Step 2: Service Mode Details
   const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>('city_wide');
+  const [travelFeeMode, setTravelFeeMode] = useState<'none' | 'fixed'>('none');
+  const [fixedTravelFee, setFixedTravelFee] = useState('');
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
@@ -239,6 +241,96 @@ export default function OnboardingPage() {
   // New Identity State
   const [yearsExperience, setYearsExperience] = useState('3-5');
   const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
+  
+  // Step 3: Schedule state extensions
+  const [showBreak, setShowBreak] = useState(false);
+  const [breakStart, setBreakStart] = useState('12:00');
+  const [breakEnd, setBreakEnd] = useState('13:00');
+  
+  // Local Draft Hydration and Saving
+  const draftKey = user ? `nera:onboarding:draft:${user.uid}` : '';
+
+  useEffect(() => {
+    if (!draftKey || isFinalizing) return;
+    
+    // Auto-save any changes to a local draft
+    const draft = {
+      name,
+      specialty,
+      headline,
+      bio,
+      whatsapp,
+      slug,
+      paymentMethods,
+      services,
+      yearsExperience,
+      selectedStyles,
+      selectedDifferentials,
+      step,
+      serviceMode,
+      serviceAreaType,
+      travelFeeMode,
+      fixedTravelFee,
+      city,
+      workingDays,
+      startTime,
+      endTime,
+      showBreak,
+      breakStart,
+      breakEnd
+    };
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch(e) {}
+  }, [
+    draftKey, isFinalizing, name, specialty, headline, bio, whatsapp, slug,
+    paymentMethods, services, yearsExperience, selectedStyles, selectedDifferentials,
+    step, serviceMode, serviceAreaType, travelFeeMode, fixedTravelFee, city,
+    workingDays, startTime, endTime, showBreak, breakStart, breakEnd
+  ]);
+
+  const hasHydratedDraft = useRef(false);
+  useEffect(() => {
+    if (!draftKey || !profile || hasHydratedDraft.current) return;
+    
+    try {
+      const draftStr = localStorage.getItem(draftKey);
+      if (draftStr) {
+        const draft = JSON.parse(draftStr);
+        if (draft.step) setStep(draft.step);
+        if (draft.name && !name) setName(draft.name);
+        if (draft.specialty && !specialty) setSpecialty(draft.specialty);
+        if (draft.headline && !headline) setHeadline(draft.headline);
+        if (draft.bio && !bio) setBio(draft.bio);
+        if (draft.whatsapp && !whatsapp) setWhatsapp(draft.whatsapp);
+        if (draft.slug && !slug) setSlug(draft.slug);
+        
+        if (draft.paymentMethods?.length > 0 && paymentMethods.length === 0) setPaymentMethods(draft.paymentMethods);
+        if (draft.services?.length > 0 && (!services || services.length === 0 || (services.length === 1 && services[0].name === ''))) setServices(draft.services);
+        if (draft.yearsExperience && yearsExperience === '3-5') setYearsExperience(draft.yearsExperience);
+        if (draft.selectedStyles?.length > 0 && selectedStyles.length === 0) setSelectedStyles(draft.selectedStyles);
+        if (draft.selectedDifferentials?.length > 0 && selectedDifferentials.length === 0) setSelectedDifferentials(draft.selectedDifferentials);
+        if (draft.serviceMode && serviceMode === 'studio') setServiceMode(draft.serviceMode);
+        if (draft.serviceAreaType && serviceAreaType === 'city_wide') setServiceAreaType(draft.serviceAreaType);
+        if (draft.travelFeeMode) setTravelFeeMode(draft.travelFeeMode);
+        if (draft.fixedTravelFee) setFixedTravelFee(draft.fixedTravelFee);
+        if (draft.city && !city) setCity(draft.city);
+        
+        if (draft.workingDays?.length) setWorkingDays(draft.workingDays);
+        if (draft.startTime) setStartTime(draft.startTime);
+        if (draft.endTime) setEndTime(draft.endTime);
+        if (draft.showBreak !== undefined) setShowBreak(draft.showBreak);
+        if (draft.breakStart) setBreakStart(draft.breakStart);
+        if (draft.breakEnd) setBreakEnd(draft.breakEnd);
+        
+        console.log('[Onboarding] Hydrated from local draft');
+      }
+    } catch (e) {
+      console.warn('[Onboarding] Failed to hydrate draft', e);
+    }
+    
+    hasHydratedDraft.current = true;
+  }, [draftKey, profile]);
 
   useEffect(() => {
     if (profile) {
@@ -252,17 +344,25 @@ export default function OnboardingPage() {
       // 1. If onboarding is already completed on server, App.tsx guard will handle redirect.
       if (profile.onboardingCompleted && !isFinalizing && step !== 4) { // step 4 is considered out of bounds, meaning done. Or we check 3. It used to be 5.
         // Actually we will just return if it's already completed.
+        if (draftKey) {
+          try { localStorage.removeItem(draftKey); } catch(e) {}
+        }
         return;
       }
 
       // Sync specific onboarding fields not covered by common hook
       if (!loading && !isFinalizing) {
         if (profile.serviceAreaType) setServiceAreaType(profile.serviceAreaType);
+        if (profile.travelFeeMode) setTravelFeeMode(profile.travelFeeMode);
+        if (profile.fixedTravelFee) setFixedTravelFee(String(profile.fixedTravelFee));
         if ((profile as any).servicesDraft) setServices((profile as any).servicesDraft);
         if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
         if (profile.professionalIdentity?.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
         if (profile.portfolio && profile.portfolio.length > 0) setPortfolio(profile.portfolio as any);
         if (profile.onboardingStep !== undefined) setStep(profile.onboardingStep);
+        if (profile.workingHours?.breakStart) setBreakStart(profile.workingHours.breakStart);
+        if (profile.workingHours?.breakEnd) setBreakEnd(profile.workingHours.breakEnd);
+        if (profile.workingHours?.breakStart || profile.workingHours?.breakEnd) setShowBreak(true);
       }
     }
   }, [profile?.uid, isFinalizing, loading]);
@@ -374,7 +474,8 @@ export default function OnboardingPage() {
       workingHours: {
         startTime,
         endTime,
-        workingDays
+        workingDays,
+        ...(showBreak ? { breakStart, breakEnd } : {})
       },
       professionalIdentity: {
         mainSpecialty: specialty,
@@ -608,6 +709,8 @@ export default function OnboardingPage() {
       avatar,
       serviceMode,
       serviceAreaType,
+      travelFeeMode,
+      fixedTravelFee: travelFeeMode === 'fixed' ? (Number(fixedTravelFee) || 0) : 0,
       studioAddress: {
         street: (studioAddress.street || '').trim(),
         number: (studioAddress.number || '').trim(),
@@ -623,7 +726,8 @@ export default function OnboardingPage() {
       workingHours: {
         startTime,
         endTime,
-        workingDays
+        workingDays,
+        ...(showBreak ? { breakStart, breakEnd } : {})
       },
       professionalIdentity: {
         mainSpecialty: specialty.trim(),
@@ -695,6 +799,10 @@ export default function OnboardingPage() {
     
     setIsFinalizing(true);
     try {
+      if (draftKey) {
+        localStorage.removeItem(draftKey);
+      }
+      
       await saveProfilePartial(user.uid, { 
         onboardingCompleted: true,
         onboardingStep: 3
@@ -1075,6 +1183,10 @@ export default function OnboardingPage() {
                 setStudioAddress={setStudioAddress}
                 serviceAreaType={serviceAreaType as any}
                 setServiceAreaType={setServiceAreaType as any}
+                travelFeeMode={travelFeeMode}
+                setTravelFeeMode={setTravelFeeMode}
+                fixedTravelFee={fixedTravelFee}
+                setFixedTravelFee={setFixedTravelFee}
                 serviceAreas={serviceAreas}
                 setServiceAreas={setServiceAreas}
                 pricingStrategy={pricingStrategy}
@@ -1135,7 +1247,7 @@ export default function OnboardingPage() {
                   <Clock size={32} />
                 </div>
                 <h1 className="text-4xl font-serif font-normal text-brand-ink">Dias e Horários</h1>
-                <p className="text-brand-stone font-light text-center">Defina sua disponibilidade inicial. Depois você poderá ajustar dias e horários quando quiser.</p>
+                <p className="text-brand-stone font-light text-center">Sua agenda começa a funcionar a partir desses horários. Depois você poderá ajustar tudo quando quiser.</p>
               </div>
 
               <div className="bg-brand-white p-6 md:p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">
@@ -1147,10 +1259,10 @@ export default function OnboardingPage() {
                         key={idx}
                         onClick={() => toggleDay(idx)}
                         className={cn(
-                          "w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full text-[9px] sm:text-[10px] font-bold transition-all border flex items-center justify-center",
+                          "w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full text-[9px] sm:text-[10px] font-bold transition-all duration-300 border flex items-center justify-center active:scale-95",
                           workingDays.includes(idx)
-                            ? "bg-brand-ink text-brand-white border-brand-ink shadow-md"
-                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                            ? "bg-brand-ink text-brand-white border-brand-terracotta/40 shadow-lg shadow-brand-terracotta/20"
+                            : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/50 hover:bg-brand-mist/20"
                         )}
                       >
                         {day}
@@ -1159,7 +1271,7 @@ export default function OnboardingPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-2 min-w-0">
                     <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início <span className="text-brand-terracotta">*</span></label>
                     <div className="relative w-full">
@@ -1168,7 +1280,7 @@ export default function OnboardingPage() {
                         type="time" 
                         value={startTime} 
                         onChange={(e) => setStartTime(e.target.value)} 
-                        className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                        className="w-full pl-11 pr-4 py-3 bg-[#FAF9F8] border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                       />
                     </div>
                   </div>
@@ -1180,11 +1292,78 @@ export default function OnboardingPage() {
                         type="time" 
                         value={endTime} 
                         onChange={(e) => setEndTime(e.target.value)} 
-                        className="w-full pl-11 pr-4 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                        className="w-full pl-11 pr-4 py-3 bg-[#FAF9F8] border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                       />
                     </div>
                   </div>
                 </div>
+
+                {!showBreak ? (
+                  <button 
+                    onClick={() => setShowBreak(true)}
+                    className="text-[11px] font-medium text-brand-stone hover:text-brand-ink transition-colors flex items-center gap-2 px-2"
+                  >
+                    + Adicionar pausa
+                  </button>
+                ) : (
+                  <div className="space-y-4 pt-4 border-t border-brand-mist/50">
+                    <div className="flex justify-between items-center px-1">
+                      <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest">Horário de Pausa</label>
+                      <button 
+                        onClick={() => setShowBreak(false)}
+                        className="text-[10px] text-brand-terracotta hover:text-red-700 transition-colors"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início da pausa</label>
+                        <div className="relative w-full">
+                          <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
+                          <input 
+                            type="time" 
+                            value={breakStart} 
+                            onChange={(e) => setBreakStart(e.target.value)} 
+                            className="w-full pl-11 pr-4 py-3 bg-white border border-brand-mist/60 rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2 min-w-0">
+                        <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim da pausa</label>
+                        <div className="relative w-full">
+                          <Clock className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
+                          <input 
+                            type="time" 
+                            value={breakEnd} 
+                            onChange={(e) => setBreakEnd(e.target.value)} 
+                            className="w-full pl-11 pr-4 py-3 bg-white border border-brand-mist/60 rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {workingDays.length > 0 && (
+                  <div className="pt-6 border-t border-brand-mist/30">
+                    <p className="text-[10px] font-bold text-brand-ink uppercase tracking-[0.15em] mb-4">Resumo da sua agenda</p>
+                    <div className="bg-[#FAF9F8] rounded-2xl p-5 border border-brand-mist/40 flex flex-col gap-2">
+                       <p className="text-sm text-brand-stone">Dias: <span className="font-semibold text-brand-ink">{workingDays.map(d => WEEKDAYS[d]).join(', ')}</span></p>
+                       <p className="text-sm text-brand-stone">Horário: <span className="font-semibold text-brand-ink">{startTime} às {endTime}</span></p>
+                       {showBreak && (
+                         <p className="text-sm text-brand-stone">Pausa: <span className="font-semibold text-brand-ink">{breakStart} às {breakEnd}</span></p>
+                       )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="text-center pb-2">
+                <p className="text-[11px] text-brand-stone font-medium uppercase tracking-widest">
+                  Depois disso, sua vitrine estará pronta para receber agendamentos.
+                </p>
               </div>
 
               <div className="flex gap-4">

@@ -112,7 +112,7 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
     const result = await db.runTransaction(async (transaction) => {
       const slugRef = db.collection("slugs").doc(slug);
       const userRef = db.collection("users").doc(uid);
-      const conflictingUserQuery = db.collection("users").where("slug", "==", slug).limit(1);
+      const conflictingUserQuery = db.collection("users").where("slug", "==", slug).limit(2);
       const servicesQuery = db.collection("services").where("professionalId", "==", uid).where("active", "==", true);
 
       const [slugDoc, userSnap, conflictingUserSnap, existingServicesSnap] = await Promise.all([
@@ -127,16 +127,16 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         const ownerId = slugDoc.data()?.uid;
         if (ownerId && ownerId !== uid) {
           logger.warn("PROFILE", "Slug conflict detected (slugs col)", { professionalId: maskUid(uid), meta: { slug, ownerId: maskUid(ownerId) } });
-          throw new Error("Este link já está sendo usado por outra profissional.");
+          throw new Error("Esse link já está sendo usado. Escolha outro endereço.");
         }
       }
 
       // 2. Safety Net: Check if another user has this slug in their doc but NOT in slugs col
       if (!conflictingUserSnap.empty) {
-        const conflictingUid = conflictingUserSnap.docs[0].id;
-        if (conflictingUid !== uid) {
-          logger.warn("PROFILE", "Slug conflict detected (users col fallback)", { professionalId: maskUid(uid), meta: { slug, conflictingUid: maskUid(conflictingUid) } });
-          throw new Error("Este link já está sendo usado por outra profissional.");
+        const hasOtherUser = conflictingUserSnap.docs.some(doc => doc.id !== uid);
+        if (hasOtherUser) {
+          logger.warn("PROFILE", "Slug conflict detected (users col fallback)");
+          throw new Error("Esse link já está sendo usado. Escolha outro endereço.");
         }
       }
 
@@ -201,7 +201,7 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       const whatsapp = filteredProfile.whatsapp;
       if (whatsapp && !isValidWhatsapp(whatsapp)) {
         logger.warn("PROFILE", "User tried to save invalid WhatsApp", { professionalId: maskUid(uid) });
-        throw new Error("O número de WhatsApp informado é inválido. Use um formato brasileiro (DDD + número).");
+        throw new Error("WhatsApp inválido. Use formato brasileiro com DDD.");
       }
 
       // Set publication flags
