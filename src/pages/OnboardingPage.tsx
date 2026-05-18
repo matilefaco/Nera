@@ -201,8 +201,8 @@ export default function OnboardingPage() {
         console.error('Error checking slug:', err);
         // Only update if it's still the same slug
         if (slugCheckRef.current === cleanSlug) {
-          setSlugStatus('idle');
-          setSlugMessage('');
+          setSlugStatus('invalid');
+          setSlugMessage('Erro ao verificar disponibilidade.');
         }
       }
     }, 600);
@@ -297,7 +297,10 @@ export default function OnboardingPage() {
       const draftStr = localStorage.getItem(draftKey);
       if (draftStr) {
         const draft = JSON.parse(draftStr);
-        if (draft.step) setStep(draft.step);
+        let safeStep = draft.step || 1;
+        if (safeStep > 1 && (!draft.name || !draft.specialty || !draft.whatsapp)) safeStep = 1;
+        if (safeStep > 2 && (!draft.city || !draft.neighborhood || !draft.services || draft.services.length === 0 || !draft.services[0].name)) safeStep = 2;
+        setStep(safeStep);
         if (draft.name && !name) setName(draft.name);
         if (draft.specialty && !specialty) setSpecialty(draft.specialty);
         if (draft.headline && !headline) setHeadline(draft.headline);
@@ -359,7 +362,20 @@ export default function OnboardingPage() {
         if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
         if (profile.professionalIdentity?.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
         if (profile.portfolio && profile.portfolio.length > 0) setPortfolio(profile.portfolio as any);
-        if (profile.onboardingStep !== undefined) setStep(profile.onboardingStep);
+        if (profile.onboardingStep !== undefined) {
+          let safeStep = profile.onboardingStep;
+          const currentName = profile.name || name;
+          const currentSpecialty = profile.professionalIdentity?.mainSpecialty || profile.specialty || specialty;
+          const currentWhatsapp = profile.whatsapp || whatsapp;
+          const currentCity = profile.city || city;
+          const currentNeighborhood = profile.neighborhood || neighborhood;
+          const currentServices = (profile as any).servicesDraft || services;
+
+          if (safeStep > 1 && (!currentName || !currentSpecialty || !currentWhatsapp)) safeStep = 1;
+          if (safeStep > 2 && (!currentCity || !currentNeighborhood || !currentServices || currentServices.length === 0 || !currentServices[0].name)) safeStep = 2;
+          
+          setStep(safeStep);
+        }
         if (profile.workingHours?.breakStart) setBreakStart(profile.workingHours.breakStart);
         if (profile.workingHours?.breakEnd) setBreakEnd(profile.workingHours.breakEnd);
         if (profile.workingHours?.breakStart || profile.workingHours?.breakEnd) setShowBreak(true);
@@ -466,11 +482,18 @@ export default function OnboardingPage() {
       name,
       slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       whatsapp: cleanWhatsapp(whatsapp),
+      instagram: instagram.trim().replace('@', ''), // Save instagram
       bio,
       headline,
+      city,
+      neighborhood,
       serviceMode,
+      serviceAreaType,
+      travelFeeMode,
+      fixedTravelFee: travelFeeMode === 'fixed' ? (Number(fixedTravelFee) || 0) : 0,
       paymentMethods: paymentMethods as any,
       onboardingStep: nextStepNum,
+      servicesDraft: services as any, // Save services temporarily before finalizing
       workingHours: {
         startTime,
         endTime,

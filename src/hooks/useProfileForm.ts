@@ -41,47 +41,39 @@ export function useProfileForm(profile: UserProfile | null) {
   // Sincronizar quando profile mudar
   useEffect(() => {
     if (profile) {
-      setName(profile.name || '');
-      setSpecialty(profile.professionalIdentity?.mainSpecialty || profile.specialty || '');
-      setBio(profile.bio || '');
-      setHeadline(profile.headline || '');
-      setCity(profile.city || '');
-      setWhatsapp(profile.whatsapp || '');
-      setInstagram(profile.instagram || '');
-      setPaymentMethods(profile.paymentMethods || []);
-      setAntiNoShowEnabled(profile.antiNoShowEnabled || false);
-      setAdvancePaymentRequired(profile.advancePaymentRequired || false);
-      setDelayTolerance(profile.delayTolerance ?? 15);
-      setSlug(profile.slug || '');
-      setAvatar(profile.avatar || '');
-      setNeighborhood(profile.neighborhood || '');
-      setServiceMode(profile.serviceMode || 'studio');
-      setAvatarSkipped(profile.avatarSkipped || false);
-      setProfileTheme(profile.profileTheme || { variant: 'terracotta' });
-      setStudioAddress(profile.studioAddress || {
-        street: '',
-        number: '',
-        complement: '',
-        neighborhood: '',
-        city: '',
-        reference: '',
-        privacyMode: 'reveal_after_booking'
-      });
-      setServiceAreas(profile.serviceAreas || []);
-      setServiceAreaType(profile.serviceAreaType || 'city_wide');
-      setPricingStrategy(profile.pricingStrategy || 'none');
-      setDifferentials(profile.professionalIdentity?.differentials || []);
+      if (profile.name) setName(profile.name);
+      if (profile.professionalIdentity?.mainSpecialty || profile.specialty) setSpecialty(profile.professionalIdentity?.mainSpecialty || profile.specialty);
+      if (profile.bio) setBio(profile.bio);
+      if (profile.headline) setHeadline(profile.headline);
+      if (profile.city) setCity(profile.city);
+      if (profile.whatsapp) setWhatsapp(profile.whatsapp);
+      if (profile.instagram) setInstagram(profile.instagram);
+      if (profile.paymentMethods?.length) setPaymentMethods(profile.paymentMethods);
+      if (profile.antiNoShowEnabled !== undefined) setAntiNoShowEnabled(profile.antiNoShowEnabled);
+      if (profile.advancePaymentRequired !== undefined) setAdvancePaymentRequired(profile.advancePaymentRequired);
+      if (profile.delayTolerance !== undefined) setDelayTolerance(profile.delayTolerance);
+      if (profile.slug) setSlug(profile.slug);
+      if (profile.avatar) setAvatar(profile.avatar);
+      if (profile.neighborhood) setNeighborhood(profile.neighborhood);
+      if (profile.serviceMode) setServiceMode(profile.serviceMode);
+      if (profile.avatarSkipped !== undefined) setAvatarSkipped(profile.avatarSkipped);
+      if (profile.profileTheme) setProfileTheme(profile.profileTheme);
+      if (profile.studioAddress) setStudioAddress(profile.studioAddress);
+      if (profile.serviceAreas?.length) setServiceAreas(profile.serviceAreas);
+      if (profile.serviceAreaType) setServiceAreaType(profile.serviceAreaType);
+      if (profile.pricingStrategy) setPricingStrategy(profile.pricingStrategy);
+      if (profile.professionalIdentity?.differentials?.length) setDifferentials(profile.professionalIdentity.differentials);
       
       const wh = profile.workingHours;
       if (wh) {
-        setWorkingDays(wh.workingDays || [1, 2, 3, 4, 5]);
-        setStartTime(wh.startTime || '09:00');
-        setEndTime(wh.endTime || '18:00');
+        if (wh.workingDays?.length) setWorkingDays(wh.workingDays);
+        if (wh.startTime) setStartTime(wh.startTime);
+        if (wh.endTime) setEndTime(wh.endTime);
       } else {
         // Fallback legado (apenas leitura)
-        setWorkingDays(profile.workingDays || [1, 2, 3, 4, 5]);
-        setStartTime(profile.startTime || '09:00');
-        setEndTime(profile.endTime || '18:00');
+        if (profile.workingDays?.length) setWorkingDays(profile.workingDays);
+        if (profile.startTime) setStartTime(profile.startTime);
+        if (profile.endTime) setEndTime(profile.endTime);
       }
     }
   }, [profile?.uid]);
