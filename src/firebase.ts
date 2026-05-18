@@ -159,8 +159,9 @@ export async function uploadImageToStorage(file: File, path: string): Promise<st
 
 export async function saveProfilePartial(uid: string, data: Partial<UserProfile>) {
   const userRef = doc(db, 'users', uid);
+  const sanitized = removeUndefinedDeep(data);
   await updateDoc(userRef, {
-    ...data,
+    ...sanitized,
     updatedAt: serverTimestamp()
   });
 }
@@ -235,12 +236,14 @@ export async function createBookingRequest(appointmentData: Partial<Appointment>
 
 export async function updateUserProfile(uid: string, profileData: Partial<UserProfile>) {
   const userRef = doc(db, 'users', uid);
-  await updateDoc(userRef, { ...profileData, updatedAt: serverTimestamp() });
+  const sanitized = removeUndefinedDeep(profileData);
+  await updateDoc(userRef, { ...sanitized, updatedAt: serverTimestamp() });
 }
 
 export async function createUserProfile(uid: string, profileData: Partial<UserProfile>) {
   const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, { ...profileData, uid, createdAt: serverTimestamp() });
+  const sanitized = removeUndefinedDeep(profileData);
+  await setDoc(userRef, { ...sanitized, uid, createdAt: serverTimestamp() });
 }
 
 export async function updateBlockedSchedules(uid: string, date: string, time: string, isBlocked: boolean) {

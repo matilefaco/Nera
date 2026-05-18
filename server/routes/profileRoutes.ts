@@ -190,7 +190,9 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       });
 
       // Override with validated/internal values
-      filteredProfile.profileTheme = validatedTheme;
+      if (validatedTheme !== undefined) {
+        filteredProfile.profileTheme = validatedTheme;
+      }
       filteredProfile.slug = slug;
       filteredProfile.updatedAt = admin.firestore.FieldValue.serverTimestamp();
 

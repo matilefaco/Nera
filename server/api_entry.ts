@@ -1,4 +1,4 @@
-// slug check deploy sync
+// slug check deploy sync - forced redeploy at 2024-05-18T23:42
 process.env.NODE_ENV = "production";
 
 import { onRequest } from "firebase-functions/v2/https";
@@ -8,30 +8,36 @@ const NVIDIA_API_KEY = defineSecret("NVIDIA_API_KEY");
 
 /**
  * Universal backend entry point for Firebase Functions v2 / Cloud Run.
- * Optimized for < 1s startup via lazy initialization.
  */
 let cachedApp: any = null;
 
-/**
- * Lazy initialization of the Express app.
- * This prevents heavy imports from blocking the overall process startup.
- */
 async function createExpressApp() {
   if (!cachedApp) {
-    // We import dynamically to keep the initial script evaluation instantaneous
-    // Using explicit .cjs path means esbuild won't bundle it, avoiding heavy parsing overhead
-    const module = await import("./server.cjs");
-    const createServerApp = module.createServerApp;
+    console.log("[BOOT] Loading server implementation from ./server.cjs");
+    try {
+      const module = await import("./server.cjs");
+      // CJS/ESM Interop: try direct named export, then default.named, then default (if it were the function itself)
+      const createServerApp = module.createServerApp || (module.default && module.default.createServerApp) || module.default;
 
-    if (typeof createServerApp !== "function") {
-      console.error("[CRITICAL ERROR] createServerApp is not a function", { 
-        moduleKeys: Object.keys(module),
-        hasDefault: !!module.default
+      if (typeof createServerApp !== "function") {
+        console.error("[CRITICAL ERROR] createServerApp is not a function", { 
+          moduleKeys: Object.keys(module),
+          hasDefault: !!module.default,
+          defaultKeys: module.default ? Object.keys(module.default) : []
+        });
+        throw new Error("Invalid server bundle: createServerApp is not a function in ./server.cjs");
+      }
+
+      console.log("[BOOT] Initializing server app...");
+      cachedApp = await createServerApp();
+      console.log("[BOOT] Server app initialized successfully");
+    } catch (err: any) {
+      console.error("[BOOT ERROR] Failed to load or initialize server app", {
+        message: err.message,
+        stack: err.stack
       });
-      throw new Error("Invalid server bundle: createServerApp is not a function in ./server.cjs");
+      throw err;
     }
-
-    cachedApp = await createServerApp();
   }
   return cachedApp;
 }

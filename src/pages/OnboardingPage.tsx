@@ -110,7 +110,8 @@ export default function OnboardingPage() {
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,
-    avatarSkipped, setAvatarSkipped
+    avatarSkipped, setAvatarSkipped,
+    profileTheme, setProfileTheme
   } = useProfileForm(profile);
 
   const [instagramConfirmed, setInstagramConfirmed] = useState(false);
@@ -523,6 +524,7 @@ export default function OnboardingPage() {
       travelFeeMode,
       fixedTravelFee: travelFeeMode === 'fixed' ? (Number(fixedTravelFee) || 0) : 0,
       paymentMethods: paymentMethods as any,
+      profileTheme: profileTheme || { variant: 'terracotta' },
       onboardingStep: nextStepNum,
       servicesDraft: services as any, // Save services temporarily before finalizing
       workingHours: {
@@ -761,6 +763,7 @@ export default function OnboardingPage() {
       headline: headline.trim(),
       instagram: instagram.trim().replace('@', ''),
       avatar,
+      profileTheme: profileTheme || { variant: 'terracotta' },
       serviceMode,
       serviceAreaType,
       travelFeeMode,

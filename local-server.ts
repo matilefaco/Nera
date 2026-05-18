@@ -3,9 +3,10 @@ import { createServerApp } from "./server.ts";
 export { createServerApp };
 
 async function start() {
-  // Guard: Do not bind to port if running in Firebase/Functions environment
-  if (process.env.FUNCTIONS_TARGET || process.env.K_SERVICE || process.env.FIREBASE_CONFIG) {
-    console.log("[SERVER] Skipping local listen (Running in cloud environment)");
+  // Guard: Do not bind to port if running in Firebase Functions environment
+  // We want to skip this when imported by api_entry.ts in the Functions environment
+  if (process.env.FUNCTIONS_TARGET || process.env.FIREBASE_CONFIG) {
+    console.log("[SERVER] Skipping local listen (Running in Firebase Functions environment)");
     return;
   }
 
