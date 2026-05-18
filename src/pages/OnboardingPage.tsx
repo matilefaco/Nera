@@ -293,17 +293,56 @@ export default function OnboardingPage() {
       });
 
       const data = await response.json();
+      console.log('[BioAI] Response payload:', data);
       
       if (!response.ok) {
         throw new Error(data.error || 'Erro na resposta do servidor.');
       }
 
-      if (!data.bio && !data.headline) {
-        throw new Error('Conteúdo não gerado');
+      // Robust extraction & cleanup
+      let parsedData = data;
+      if (Array.isArray(data) && data.length > 0) {
+        parsedData = data[0];
+      }
+      
+      // Case-insensitive key lookup
+      const getVal = (obj: any, keys: string[]) => {
+        if (!obj || typeof obj !== 'object') return '';
+        const lowerObj = Object.keys(obj).reduce((acc, k) => {
+          acc[k.toLowerCase()] = obj[k];
+          return acc;
+        }, {} as Record<string, any>);
+        for (const k of keys) {
+          if (lowerObj[k] && typeof lowerObj[k] === 'string') return lowerObj[k];
+        }
+        return '';
+      };
+
+      const nestedContainer = parsedData.properties || parsedData.content || parsedData.data || parsedData.response || parsedData;
+      
+      let newBio = getVal(nestedContainer, ['bio', 'description', 'bio_profissional', 'biografia']).trim();
+      let newHeadline = getVal(nestedContainer, ['headline', 'title', 'frase_principal', 'frase']).trim();
+
+      // If LLaMA failed to JSON wrap and just returned plain text
+      if (!newBio && !newHeadline && typeof data === 'string') {
+        const parts = data.split('\n').filter(p => p.trim());
+        if (parts.length > 0) {
+          newHeadline = parts[0];
+          newBio = parts.slice(1).join(' ').trim() || parts[0];
+        }
       }
 
-      if (data.bio) setBio(data.bio);
-      if (data.headline) setHeadline(data.headline);
+      if (!newBio || !newHeadline) {
+        console.error('[BioAI] Extraction failed or incomplete. Raw data:', data);
+        throw new Error('Não consegui preencher sua bio agora. Você pode escrever manualmente e tentar novamente.');
+      }
+
+      console.log('[BioAI] Extracted:', { newBio, newHeadline });
+
+      if (newBio) setBio(newBio);
+      if (newHeadline) setHeadline(newHeadline);
+      
+      // Delay success toast sligthly to let react state update if needed, though not strictly required
       notify.success('Sua marca foi personalizada com IA ✨');
     } catch (error: any) {
       console.error('[BioAI] Generation failed:', error);
