@@ -137,10 +137,16 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       // Set publication flags
       const isFinishingOnboarding = sanitizedProfile.onboardingCompleted === true && !userData?.onboardingCompleted;
       
+      const missingDefaults: any = {};
+      if (userData?.planRank === undefined) missingDefaults.planRank = 0;
+      if (userData?.averageRating === undefined) missingDefaults.averageRating = 0;
+      if (userData?.totalReviews === undefined) missingDefaults.totalReviews = 0;
+
       const finalProfileData = removeUndefinedDeep({
         ...sanitizedProfile,
         profileTheme: validatedTheme,
         slug,
+        ...missingDefaults,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         // Add publication timestamp if completing onboarding
         ...(isFinishingOnboarding ? { profilePublishedAt: admin.firestore.FieldValue.serverTimestamp() } : {})
@@ -454,14 +460,14 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
     if (!db) throw new Error("Database not connected");
 
     // Basic query for directory
+    // We remove orderBy from firestore to avoid missing documents that lack planRank or averageRating.
+    // Memory sort is fine since we apply a limit.
     let q: admin.firestore.Query = db.collection("users")
       .where("onboardingCompleted", "==", true)
-      .orderBy("planRank", "desc")
-      .orderBy("averageRating", "desc")
-      .limit(40); // Slightly more than the UI displays initially
+      .limit(100); 
 
     const snapshot = await q.get();
-    const professionals = snapshot.docs.map(doc => {
+    let professionals = snapshot.docs.map(doc => {
       const data = doc.data();
       // Sanitize: Return only what's needed for the directory card
       return {
@@ -482,6 +488,17 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
         }
       };
     });
+
+    // Memory sort: planRank desc, then averageRating desc
+    professionals.sort((a, b) => {
+      if (b.planRank !== a.planRank) {
+        return b.planRank - a.planRank;
+      }
+      return b.averageRating - a.averageRating;
+    });
+
+    // Limit to 40 after sorting
+    professionals = professionals.slice(0, 40);
 
     res.json(professionals);
   } catch (err: any) {

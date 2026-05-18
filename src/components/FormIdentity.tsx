@@ -531,9 +531,12 @@ export const FormIdentity = ({
           {(slug !== undefined && setSlug) && (
             <div className="space-y-3">
               {showLabels && (
-                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
-                  Link Personalizado (Slug) <span className="text-brand-terracotta">*</span>
-                </label>
+                <>
+                  <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
+                    Crie seu link profissional <span className="text-brand-terracotta">*</span>
+                  </label>
+                  <p className="text-[9px] text-brand-stone/60 font-light mt-0 mb-3 ml-1">Esse será o endereço público da sua vitrine na Nera.</p>
+                </>
               )}
               <div className={cn(
                 "flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50",

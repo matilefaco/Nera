@@ -166,7 +166,7 @@ export default function RegisterPage() {
         } else if (errorCode === 'WEAK_PASSWORD') {
           notify.error("Use uma senha com pelo menos 6 caracteres.");
         } else if (errorCode === 'SLUG_UNAVAILABLE') {
-          notify.error("Esse link já está em uso. Escolha outro.");
+          notify.error("Esse link já está sendo usado");
         } else {
           notify.error(fallbackMessage);
         }

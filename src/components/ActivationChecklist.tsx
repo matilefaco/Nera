@@ -113,7 +113,7 @@ export const ActivationChecklist = ({
     },
     {
       id: 'share',
-      label: 'Seu link personalizado',
+      label: 'Seu link profissional',
       description: 'Divulgue sua vitrine para suas clientes.',
       icon: Share2,
       isComplete: hasShared,

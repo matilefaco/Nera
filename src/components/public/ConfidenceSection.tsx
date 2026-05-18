@@ -22,7 +22,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
     },
     {
       icon: <ShieldCheck size={16} />,
-      text: "Profissionais verificadas para sua segurança e tranquilidade",
+      text: "Agendamento online seguro e direto pelo seu navegador",
       show: true
     },
     {
@@ -63,7 +63,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
 
         <div className="mt-16 p-8 bg-brand-linen/10 rounded-[40px] border border-brand-mist/50 text-center">
           <p className="text-[10px] text-brand-stone font-medium uppercase tracking-[0.2em] italic">
-            "Na Nera, você agenda com confiança. Profissionais verificadas e atendimento de alto padrão."
+            "Na Nera, você agenda com praticidade. Informações organizadas e atendimento de alto padrão."
           </p>
         </div>
       </div>

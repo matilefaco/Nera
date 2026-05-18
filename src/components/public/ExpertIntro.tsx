@@ -69,7 +69,7 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
               className="flex items-center justify-center gap-2 text-[var(--theme-accent,var(--color-brand-terracotta))]/70 pt-4"
             >
               <ShieldCheck size={14} />
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Profissional Certificada Nera</span>
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Agendamento online disponível</span>
             </motion.div>
           </div>
         </div>

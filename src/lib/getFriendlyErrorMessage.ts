@@ -67,7 +67,7 @@ export function getFriendlyErrorMessage(
   }
 
   if (code === 'SLUG_UNAVAILABLE') {
-    return "Esse link já está em uso. Escolha outro.";
+    return "Esse link já está sendo usado";
   }
 
   if (

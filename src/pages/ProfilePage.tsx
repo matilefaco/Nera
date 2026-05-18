@@ -356,7 +356,7 @@ export default function ProfilePage() {
     const errors: Record<string, string> = {};
     if (!name.trim()) errors.name = 'O nome é obrigatório';
     if (!specialty.trim()) errors.specialty = 'Informe sua especialidade';
-    if (!slug.trim()) errors.slug = 'O link da página é obrigatório';
+    if (!slug.trim()) errors.slug = 'O link da sua vitrine é obrigatório';
     if (!whatsapp.trim()) {
       errors.whatsapp = 'O WhatsApp é obrigatório';
     } else if (!isValidWhatsapp(whatsapp)) {
@@ -1043,7 +1043,7 @@ export default function ProfilePage() {
 
               <div className="space-y-2">
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
-                  Link Personalizado <span className="text-brand-terracotta">*</span>
+                  Seu link profissional <span className="text-brand-terracotta">*</span>
                 </label>
                 <p className="text-[10px] text-brand-stone/60 font-light mt-0.5 mb-2 ml-1">Compartilhe este link com as clientes para que elas possam agendar.</p>
                 <div className={cn(

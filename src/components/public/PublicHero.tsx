@@ -352,10 +352,7 @@ export const PublicHero = ({
                 </div>
               </div>
 
-            {/* Shield Badge */}
-            <div className="absolute top-8 right-8 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-brand-mist/50 z-20">
-               <ShieldCheck size={24} className="text-brand-terracotta" />
-            </div>
+
           </div>
         </motion.div>
       </div>

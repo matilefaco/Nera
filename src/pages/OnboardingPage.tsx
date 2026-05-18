@@ -150,7 +150,7 @@ export default function OnboardingPage() {
 
     if (cleanSlug.length < 3 || cleanSlug.length > 50) {
       setSlugStatus('invalid');
-      setSlugMessage('O link deve ter entre 3 e 50 caracteres.');
+      setSlugMessage('Seu link precisa ter pelo menos 3 caracteres');
       slugCheckRef.current = cleanSlug;
       return;
     }
@@ -164,7 +164,7 @@ export default function OnboardingPage() {
 
     slugCheckRef.current = cleanSlug;
     setSlugStatus('checking');
-    setSlugMessage('Verificando disponibilidade...');
+    setSlugMessage('Verificando link...');
 
     const timer = setTimeout(async () => {
       // If the slug changed during the debounce, don't proceed with the old one
@@ -187,11 +187,11 @@ export default function OnboardingPage() {
         
         if (data.available === true) {
           setSlugStatus('available');
-          setSlugMessage('Link disponível!');
+          setSlugMessage('Seu link está disponível!');
           setSlugSuggestions([]);
         } else if (data.available === false) {
           setSlugStatus('unavailable');
-          setSlugMessage('Este link já está em uso.');
+          setSlugMessage('Esse link já está sendo usado');
           setSlugSuggestions(data.suggestions || []);
         } else {
           setSlugStatus('idle');
