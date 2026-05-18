@@ -50,7 +50,7 @@ export default function AgendaPage() {
     checkFeatureAccess,
     openUpgradeModal
   } = useUpgradeTriggers();
-  const { features } = usePlanFeatures();
+  const { features, plan } = usePlanFeatures();
 
   const [view, setView] = useState<'month' | 'week' | 'day'>(() => {
     const saved = localStorage.getItem('nera_agenda_view') as any;
@@ -234,21 +234,24 @@ export default function AgendaPage() {
     setBlockedSchedules(dailyBlocks as any);
   }, [allAppointments, allBlockedSchedules, selectedDate]);
 
+  // Extract reference month (YYYY-MM) to avoid re-subscribing daily
+  const referenceMonth = selectedDate.substring(0, 7);
+
   // Fetch all appointments for week/month view with a safe window
   useEffect(() => {
     if (!user) return;
     
-    // We base the window on 'selectedDate' (which is YYYY-MM-DD)
-    const baseDate = new Date(selectedDate + 'T12:00:00');
+    // We base the window on the 15th of the reference month
+    const baseDate = new Date(`${referenceMonth}-15T12:00:00`);
     
-    // Calculate visibleStart: 30 days before baseDate
+    // Calculate visibleStart: ~45 days before baseDate (approx beginning of previous month)
     const start = new Date(baseDate);
-    start.setDate(start.getDate() - 30);
+    start.setDate(start.getDate() - 45);
     const visibleStartStr = formatDateKey(start);
     
-    // Calculate visibleEnd: 60 days after baseDate
+    // Calculate visibleEnd: ~75 days after baseDate (approx end of next 2 months)
     const end = new Date(baseDate);
-    end.setDate(end.getDate() + 60);
+    end.setDate(end.getDate() + 75);
     const visibleEndStr = formatDateKey(end);
 
     const q = query(
@@ -287,7 +290,7 @@ export default function AgendaPage() {
     return () => {
       unsubAll();
     };
-  }, [user]);
+  }, [user, referenceMonth]);
 
   const fetchBlockedSchedules = async (forceRefetch = false) => {
     if (!user) return;
@@ -423,6 +426,13 @@ export default function AgendaPage() {
       notify.error('Preencha nome da cliente, data e horário.');
       return;
     }
+    
+    if (plan === 'free' && usageCount >= 15) {
+      setIsManualModalOpen(false);
+      openUpgradeModal('unlimitedBookings');
+      return;
+    }
+
     setIsCreating(true);
     try {
       const selectedSvc = services.find(s => s.id === manualService);

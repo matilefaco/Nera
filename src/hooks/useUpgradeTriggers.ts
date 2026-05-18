@@ -35,26 +35,6 @@ export function useUpgradeTriggers(appointments: Appointment[] = []) {
     });
 
     setUsageCount(currentMonthAppts.length);
-
-    // Trigger at 80% (12)
-    if (currentMonthAppts.length >= 12) {
-      const hasSeen80 = sessionStorage.getItem(`nera_upgrade_80_seen_${new Date().getMonth()}`);
-      if (!hasSeen80) {
-        setFeature('unlimitedBookings');
-        setIsOpen(true);
-        sessionStorage.setItem(`nera_upgrade_80_seen_${new Date().getMonth()}`, 'true');
-      }
-    }
-
-    // Trigger at 100% (15)
-    if (currentMonthAppts.length >= 15) {
-      const hasSeen100 = sessionStorage.getItem(`nera_upgrade_100_seen_${new Date().getMonth()}`);
-      if (!hasSeen100) {
-        setFeature('unlimitedBookings');
-        setIsOpen(true);
-        sessionStorage.setItem(`nera_upgrade_100_seen_${new Date().getMonth()}`, 'true');
-      }
-    }
   }, [appointments, plan]);
 
   const closeUpgradeModal = () => setIsOpen(false);

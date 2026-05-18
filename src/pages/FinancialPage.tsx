@@ -17,6 +17,8 @@ import { exportFinancialCsv } from '../lib/exportCsv';
 import { FinancialSkeleton } from '../components/ui/FinancialSkeleton';
 import { notify } from '../lib/notify';
 import { calculateFinancialMetrics, RevenueByService } from '../lib/financialMetrics';
+import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
+import UpgradeModal from '../components/UpgradeModal';
 
 interface MonthlyGroup {
   monthKey: string; // YYYY-MM
@@ -48,6 +50,8 @@ export default function FinancialPage() {
   const [retryCount, setRetryCount] = useState(0);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
 
+  const { openUpgradeModal, isUpgradeModalOpen, closeUpgradeModal, upgradeFeature } = useUpgradeTriggers();
+
   useEffect(() => {
     let isMounted = true;
     let isCancelled = false;
@@ -64,7 +68,7 @@ export default function FinancialPage() {
       setError(false);
       try {
         const now = new Date();
-        const past = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+        const past = new Date(now.getFullYear(), now.getMonth() - 2, 1);
         const startDateStr = formatDateKey(past);
         const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
         const endDateStr = formatDateKey(end);
@@ -201,7 +205,7 @@ export default function FinancialPage() {
 
   const handleExportCSV = (group: MonthlyGroup) => {
     if (profile?.plan === 'free' || !profile?.plan) {
-      notify.error('Opa! Exportação de relatórios é um recurso Pro. Que tal fazer o upgrade?');
+      openUpgradeModal('reports');
       return;
     }
 
@@ -613,6 +617,11 @@ export default function FinancialPage() {
           </div>
         )}
       </div>
+      <UpgradeModal 
+        open={isUpgradeModalOpen} 
+        onClose={closeUpgradeModal}
+        feature={upgradeFeature}
+      />
       </PageErrorBoundary>
     </AppLayout>
   );

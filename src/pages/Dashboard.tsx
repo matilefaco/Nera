@@ -914,27 +914,6 @@ setUnconfirmedTomorrow(docs);
           </motion.div>
         )}
 
-        {/* Soft Upgrade CTA for Free Plan */}
-        {plan === 'free' && usageCount >= 10 && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-[#FCFBF9] border border-brand-mist/40 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm opacity-90"
-          >
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone/60 mb-2">Seu espaço está lotado</p>
-              <h2 className="text-xl font-serif text-brand-ink mb-1">Você recebeu {usageCount} reservas este mês.</h2>
-              <p className="text-[13px] text-brand-stone font-light">Evolua para o Essencial e continue recebendo reservas ilimitadas.</p>
-            </div>
-            <Link 
-              to="/planos" 
-              className="px-6 py-3 bg-brand-white border border-brand-mist/60 text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all shrink-0 text-center shadow-sm"
-            >
-              Ver Planos
-            </Link>
-          </motion.div>
-        )}
-
         {/* Missing Service Duration Banner */}
         {services.some(s => !s.duration) && (
           <motion.div 
@@ -987,13 +966,15 @@ setUnconfirmedTomorrow(docs);
                 )}
                 <span className="text-brand-mist text-[10px] hidden sm:inline">|</span>
                 <p className="text-[12px] text-brand-stone font-light hidden sm:block">
-                  <strong className="font-medium text-brand-ink">{appointments.filter(a => {
-                    if (!a.date) return false;
-                    const d = safeParseLocalDate(a.date);
-                    if (!d) return false;
-                    const now = new Date();
-                    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                  }).length}</strong> atendimentos no mês
+                  {plan === 'free' ? (
+                    <>
+                      <strong className="font-medium text-brand-ink">{usageCount}</strong> de 15 agendamentos usados este mês
+                    </>
+                  ) : (
+                    <>
+                      <strong className="font-medium text-brand-ink">{usageCount}</strong> atendimentos no mês
+                    </>
+                  )}
                 </p>
               </div>
             </div>

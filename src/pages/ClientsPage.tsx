@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { isRevenueStatus, isCancelledStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { db, updateClientSummaryFromAppointment } from '../firebase';
-import { collection, query, where, onSnapshot, orderBy, limit, getDocs, startAfter, QueryDocumentSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, getDocs, getDoc, startAfter, QueryDocumentSnapshot, doc, updateDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { 
   Users, Search, MessageCircle, 
   TrendingUp, Calendar, ChevronRight, Star,
@@ -30,13 +30,41 @@ const ClientNotes = ({
   client: ClientSummary;
   onSave: (clientId: string, notes: string) => Promise<void>;
 }) => {
+  const { user } = useAuth();
   const [notes, setNotes] = useState(client.notes || '');
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [loadingNotes, setLoadingNotes] = useState(false);
 
   useEffect(() => {
-    setNotes(client.notes || '');
-  }, [client.notes]);
+    if (client.notes !== undefined) {
+      setNotes(client.notes);
+      return;
+    }
+    
+    let isMounted = true;
+    const fetchNote = async () => {
+      if (!user) return;
+      setLoadingNotes(true);
+      try {
+        const noteDoc = await getDoc(doc(db, 'users', user.uid, 'client_notes', client.id));
+        if (isMounted) {
+          if (noteDoc.exists()) {
+            setNotes(noteDoc.data().notes || '');
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load client note:", err);
+      } finally {
+        if (isMounted) setLoadingNotes(false);
+      }
+    };
+    fetchNote();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [client.id, client.notes, user]);
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -122,7 +150,6 @@ export default function ClientsPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [visibleLimit, setVisibleLimit] = useState(30);
   const [isMigrating, setIsMigrating] = useState(false);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
 
@@ -200,44 +227,45 @@ export default function ClientsPage() {
     risk: 0
   });
 
-  const fetchClients = useCallback(async () => {
+  const fetchClients = useCallback(async (isLoadMore = false) => {
     if (!user) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-
-    const clientsCacheKey = user.uid;
-    const cached = clientsPageCache.get(clientsCacheKey);
-    if (cached && Date.now() - cached.fetchedAt < CLIENTS_CACHE_TTL_MS) {
-      setClients(cached.data);
-      setLoading(false);
-      return;
+    
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
     }
 
-    const mergeNotes = async (clientDocs: ClientSummary[]) => {
-      try {
-        const notesQ = query(collection(db, 'users', user.uid, 'client_notes'));
-        const notesSnap = await getDocs(notesQ);
-        const notesMap = new Map();
-        notesSnap.forEach(doc => notesMap.set(doc.id, doc.data().notes));
-        return clientDocs.map(d => ({ ...d, notes: notesMap.get(d.id) || d.notes || '' }));
-      } catch (err) {
-        return clientDocs;
-      }
-    };
-
     try {
-      const q = query(
-        collection(db, 'client_summaries'),
-        where('professionalId', '==', user.uid)
-      );
+      const collRef = collection(db, 'client_summaries');
 
-      const snapshot = await getDocs(q);
-      let docs = snapshot.docs.map(doc => {
-        const data = doc.data();
+      let finalQ;
+      if (isLoadMore && lastVisible) {
+        finalQ = query(
+          collRef,
+          where('professionalId', '==', user.uid),
+          orderBy('lastAppointmentDate', 'desc'),
+          startAfter(lastVisible),
+          limit(50)
+        );
+      } else {
+        finalQ = query(
+          collRef,
+          where('professionalId', '==', user.uid),
+          orderBy('lastAppointmentDate', 'desc'),
+          limit(50)
+        );
+      }
+
+      const snapshot = await getDocs(finalQ);
+      
+      const newDocs = snapshot.docs.map(docSnap => {
+        const data = docSnap.data() as any;
         return { 
-          id: doc.id,
+          id: docSnap.id,
           ...data,
           clientName: data.clientName || 'Cliente',
           clientPhone: data.clientPhone || '',
@@ -247,30 +275,36 @@ export default function ClientsPage() {
         } as ClientSummary;
       });
       
-      docs.sort((a, b) => new Date(b.lastAppointmentDate).getTime() - new Date(a.lastAppointmentDate).getTime());
+      if (snapshot.docs.length > 0) {
+        setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+      }
       
-      docs = await mergeNotes(docs);
-      
-      setClients(docs);
-      clientsPageCache.set(clientsCacheKey, { data: docs, fetchedAt: Date.now() });
-      setHasMore(false);
+      setHasMore(snapshot.docs.length === 50);
 
-      // Removido throw new Error('empty_summaries') que acionava fallback caro
+      setClients(prev => {
+        const result = isLoadMore ? [...prev, ...newDocs] : newDocs;
+        // Optional caching only for initial load
+        if (!isLoadMore) {
+          clientsPageCache.set(user.uid, { data: result, fetchedAt: Date.now() });
+        }
+        return result;
+      });
     } catch (err: any) {
       console.error('[ClientsPage] Failed to load clients', err);
       if (err.message && err.message.includes('index')) {
         console.warn('[ClientsPage] Composite index required for client_summaries: professionalId ASC, lastAppointmentDate DESC.');
-        // We no longer fallback automatically to avoid expensive queries on large databases.
       } else {
         notify.error('Erro ao carregar clientes. Tente novamente mais tarde.');
       }
-      setClients([]);
-      setHasMore(false);
+      if (!isLoadMore) {
+        setClients([]);
+        setHasMore(false);
+      }
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [user]);
+  }, [user, lastVisible]);
 
   useEffect(() => {
     let isMounted = true;
@@ -292,10 +326,6 @@ export default function ClientsPage() {
       clearTimeout(timeout);
     };
   }, [fetchClients]);
-
-  useEffect(() => {
-    setVisibleLimit(30);
-  }, [searchTerm, filterService, filterStatus]);
 
   const handleMigrate = async () => {
     if (!user) return;
@@ -502,11 +532,7 @@ export default function ClientsPage() {
       });
   }, [enrichedClients, searchTerm, filterService, filterStatus]);
 
-  const visibleClients = useMemo(() => {
-    return filteredClients.slice(0, visibleLimit);
-  }, [filteredClients, visibleLimit]);
-
-  const hasMoreVisual = filteredClients.length > visibleLimit;
+  const visibleClients = filteredClients;
 
       if (loading && clients.length === 0) {
         return (
@@ -628,7 +654,7 @@ export default function ClientsPage() {
               />
             </div>
             
-            {(filterService || filterStatus !== 'all' || searchTerm || hasMoreVisual) ? (
+            {(filterService || filterStatus !== 'all' || searchTerm || hasMore) ? (
               <div className="flex items-center justify-between px-2">
                 <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
                   Exibindo {visibleClients.length} de {filteredClients.length} clientes
@@ -832,15 +858,15 @@ export default function ClientsPage() {
                 </motion.div>
               ))}
               
-              {hasMoreVisual && (
+              {hasMore && (
                 <div className="pt-8 text-center">
                   <PremiumButton 
-                    onClick={() => setVisibleLimit(prev => prev + 30)} 
+                    onClick={() => fetchClients(true)} 
                     variant="linen" 
                     className="text-[10px] py-4 px-10 flex items-center gap-2 mx-auto"
                   >
                     <ChevronDown size={14} />
-                    Carregar mais clientes
+                    {loadingMore ? 'Carregando...' : 'Carregar mais clientes'}
                   </PremiumButton>
                 </div>
               )}
