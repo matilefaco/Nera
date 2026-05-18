@@ -18,7 +18,8 @@ let cachedApp: any = null;
 async function createExpressApp() {
   if (!cachedApp) {
     // We import dynamically to keep the initial script evaluation instantaneous
-    const { createServerApp } = await import("../server.js");
+    // Using explicit .cjs path means esbuild won't bundle it, avoiding heavy parsing overhead
+    const { createServerApp } = await import("./server.cjs");
     cachedApp = await createServerApp();
   }
   return cachedApp;
