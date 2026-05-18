@@ -546,26 +546,18 @@ function PublicProfileContent() {
           (doc) => ({ id: doc.id, ...doc.data() }) as any,
         );
 
-        // Fetch all appointments for the next 7 days once to avoid loop queries
+        // Fetch all appointments for the next 14 days securely via backend (Blindagem)
         const todayStr = getLocalDateStr(now);
         const endGame = new Date();
         endGame.setDate(endGame.getDate() + 14);
         const endGameStr = getLocalDateStr(endGame);
-
-        const apptsQ = query(
-          collection(db, "appointments"),
-          where("professionalId", "==", profile.uid),
-          where("date", ">=", todayStr),
-          where("date", "<=", endGameStr)
-        );
-        const snapshot = await getDocs(apptsQ);
-        const allAppts = snapshot.docs
-          .map((doc) => doc.data() as Appointment)
-          .filter(a => ["pending", "confirmed", "completed"].includes(a.status));
-
+  
+        const slotsResponse = await fetch(`/api/public/occupied-slots/${profile.uid}?start=${todayStr}&end=${endGameStr}`);
+        const { slots: allAppts } = await slotsResponse.json();
+  
         const result = getNextAvailableSlot({
           workingHours: profile.workingHours,
-          appointments: allAppts,
+          appointments: allAppts as any[],
           blockedSchedules,
           serviceDuration: duration,
           daysToLookAhead: 14,

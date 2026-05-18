@@ -65,36 +65,44 @@ export default function ReviewPage() {
       }
 
       try {
-        // 1. Find the review request
-        const q = query(collection(db, 'review_requests'), where('token', '==', token));
-        const snapshot = await getDocs(q);
-
-        if (snapshot.empty) {
+        // 1. Find the review request by token (which is the document ID)
+        const docRef = doc(db, 'review_requests', token);
+        const docSnap = await getDoc(docRef);
+  
+        if (!docSnap.exists()) {
           setError('Solicitação de avaliação não encontrada.');
           setLoading(false);
           return;
         }
-
-        const requestData = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as any;
+  
+        const requestData = { id: docSnap.id, ...docSnap.data() } as any;
         
         if (requestData.status === 'submitted') {
           setError('Esta avaliação já foi enviada. Obrigado!');
           setLoading(false);
           return;
         }
-
+  
         if (requestData.status === 'expired') {
           setError('Este link de avaliação expirou.');
           setLoading(false);
           return;
         }
-
+  
         setRequest(requestData);
-
-        // 2. Fetch professional info
-        const profDoc = await getDoc(doc(db, 'users', requestData.professionalId));
-        if (profDoc.exists()) {
-          setProfessional(profDoc.data() as any);
+  
+        // 2. Use professional info baked into the request
+        if (requestData.professionalName) {
+          setProfessional({
+            name: requestData.professionalName,
+            avatar: requestData.professionalAvatar
+          } as any);
+        } else {
+          // Fallback legacy (only works if professional allows public read or is logged in)
+          const profDoc = await getDoc(doc(db, 'users', requestData.professionalId));
+          if (profDoc.exists()) {
+            setProfessional(profDoc.data() as any);
+          }
         }
 
         // 3. Fetch booking info

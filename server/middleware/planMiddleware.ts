@@ -37,15 +37,16 @@ export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
       const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
       const activePlan = isExpired ? 'free' : plan;
 
-      const features: PlanFeatures = {
+      const features: any = {
         unlimitedBookings: activePlan === 'essencial' || activePlan === 'pro',
-        whatsappNotifications: activePlan === 'essencial' || activePlan === 'pro',
+        whatsappNotifications: activePlan === 'pro',
         advancedDashboard: activePlan === 'pro',
         waitlist: activePlan === 'pro',
         antiNoShow: activePlan === 'essencial' || activePlan === 'pro',
-        coupons: activePlan === 'essencial' || activePlan === 'pro',
+        coupons: activePlan === 'pro',
         analytics: activePlan === 'pro',
         reports: activePlan === 'pro',
+        referrals: activePlan === 'pro',
       };
 
       if (!features[featureName]) {

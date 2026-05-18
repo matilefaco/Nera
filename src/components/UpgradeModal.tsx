@@ -79,6 +79,18 @@ export default function UpgradeModal({
           desc: "Gere documentos em PDF com sua performance e serviços.",
           limit: "Sua gestão com mais clareza"
         };
+      case 'antiNoShow':
+        return {
+          title: "Lembretes e Confirmações",
+          desc: "Envie e-mails automáticos para suas clientes confirmarem presença.",
+          limit: "Experiência Profissional"
+        };
+      case 'whatsappNotifications':
+        return {
+          title: "Notificações WhatsApp",
+          desc: "Envie confirmações e lembretes automáticos diretamente pelo WhatsApp com integração oficial.",
+          limit: "Experiência Premium no WhatsApp"
+        };
       case 'theme':
         return {
           title: "Personalize sua vitrine",

@@ -43,6 +43,46 @@ const getClientKey = (phone?: string, email?: string, name?: string): string => 
 };
 
 
+// --- NEW: SECURE SLOT LOOKUP (Blindagem) ---
+router.get("/public/occupied-slots/:professionalId", async (req, res) => {
+  const db = getDb();
+  const { professionalId } = req.params;
+  const { start, end } = req.query;
+
+  if (!professionalId || !start || !end) {
+    return res.status(400).json({ error: "Missing professionalId, start or end date" });
+  }
+
+  try {
+    const snapshot = await db.collection('appointments')
+      .where('professionalId', '==', professionalId)
+      .where('date', '>=', start)
+      .where('date', '<=', end)
+      .get();
+
+    const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
+    const slots = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        if (countingStatuses.includes(data.status)) {
+          return {
+            date: data.date,
+            time: data.time,
+            duration: Number(data.duration || data.serviceDuration || 60),
+            status: data.status
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    res.json({ slots });
+  } catch (err: any) {
+    logger.error("BOOKING", "Failed to fetch occupied slots", { error: err.message });
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Tokens públicos de acesso precisam ser criptograficamente seguros. Não usar Math.random.
 function generateSecureToken(bytes: number = 16): string {
   return randomBytes(bytes).toString("hex");

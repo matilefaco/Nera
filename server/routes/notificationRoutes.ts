@@ -822,13 +822,18 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
         const proSnap = await db.collection('users').doc(appt.professionalId).get();
         if (!proSnap.exists) continue;
         
-        const pro = proSnap.data();
+        const pro = proSnap.data() as any;
+        const plan = pro?.plan || 'free';
+        const expiresAt = pro?.planExpiresAt;
+        const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+        const activePlan = isExpired ? 'free' : plan;
+
         let sentSuccessfully = false;
         let deliveryChannel = '';
 
         const clientPhone = appt.clientWhatsapp;
         const baseUrl = PUBLIC_APP_URL;
-        if (clientPhone) {
+        if (clientPhone && activePlan === 'pro') {
           const formattedDate = tomorrowStr.split('-').reverse().join('/');
           const msg = buildReminderMessage24h({
             clienteNome: appt.clientName,
@@ -858,7 +863,7 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
         }
 
         const proPhone = pro?.whatsapp;
-        if (proPhone) {
+        if (proPhone && activePlan === 'pro') {
           const formattedDate = tomorrowStr.split('-').reverse().join('/');
           const msg = `Lembrete Nera! 🔔\n\nAmanhã, ${formattedDate}, você tem um atendimento com ${appt.clientName} às ${appt.time} (${appt.serviceName}).`;
           
@@ -949,20 +954,29 @@ router.get('/cron/reminders2h', requireCronSecret, async (req, res) => {
 
       if (diffMinutes > 90 && diffMinutes < 150) {
         if (appt.clientWhatsapp) {
-          const msg = `Estamos te esperando hoje às ${appt.time} 💛`;
-          const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {
-            appointmentId: apptId,
-            userId: appt.professionalId,
-            type: 'reminder_2h',
-            clientName: appt.clientName,
-            clientWhatsapp: appt.clientWhatsapp
-          });
+          const proSnap = await db.collection('users').doc(appt.professionalId).get();
+          const pro = proSnap.data() as any;
+          const plan = pro?.plan || 'free';
+          const expiresAt = pro?.planExpiresAt;
+          const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+          const activePlan = isExpired ? 'free' : plan;
 
-          if (result.success) {
-            await docSnap.ref.update({
-              reminder2hSentAt: admin.firestore.FieldValue.serverTimestamp()
+          if (activePlan === 'pro') {
+            const msg = `Estamos te esperando hoje às ${appt.time} 💛`;
+            const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {
+              appointmentId: apptId,
+              userId: appt.professionalId,
+              type: 'reminder_2h',
+              clientName: appt.clientName,
+              clientWhatsapp: appt.clientWhatsapp
             });
-            sentCount++;
+
+            if (result.success) {
+              await docSnap.ref.update({
+                reminder2hSentAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+              sentCount++;
+            }
           }
         }
       }
@@ -997,11 +1011,20 @@ router.get('/cron/review-requests', requireCronSecret, async (req, res) => {
       const clientPhone = appt.clientWhatsapp;
 
       if (clientPhone) {
+        const proSnap = await db.collection('users').doc(appt.professionalId).get();
+        const pro = proSnap.data() as any;
+        const plan = pro?.plan || 'free';
+        const expiresAt = pro?.planExpiresAt;
+        const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+        const activePlan = isExpired ? 'free' : plan;
+
         const token = generateSecureToken(24);
         const reviewUrl = `${baseUrl}/review/${token}`;
         
-        await db.collection('review_requests').add({
+        await db.collection('review_requests').doc(token).set({
           professionalId: appt.professionalId,
+          professionalName: pro?.name || appt.professionalName || 'Sua Profissional',
+          professionalAvatar: pro?.avatar || pro?.photoUrl || '',
           bookingId: apptId,
           token,
           status: 'pending',
@@ -1010,22 +1033,24 @@ router.get('/cron/review-requests', requireCronSecret, async (req, res) => {
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        const proName = appt.professionalName || 'sua profissional';
-        const msg = buildReviewRequestMessage({
-          clienteNome: appt.clientName,
-          profissionalNome: proName,
-          servicoNome: appt.serviceName,
-          linkReview: reviewUrl
-        });
-        const result = await sendWhatsApp(db, clientPhone, msg, {
-          appointmentId: apptId,
-          userId: appt.professionalId,
-          type: 'review_request',
-          clientName: appt.clientName,
-          clientWhatsapp: clientPhone
-        });
-        
-        let sent = result.success;
+        let sent = false;
+        if (activePlan === 'pro') {
+          const proName = appt.professionalName || 'sua profissional';
+          const msg = buildReviewRequestMessage({
+            clienteNome: appt.clientName,
+            profissionalNome: proName,
+            servicoNome: appt.serviceName,
+            linkReview: reviewUrl
+          });
+          const result = await sendWhatsApp(db, clientPhone, msg, {
+            appointmentId: apptId,
+            userId: appt.professionalId,
+            type: 'review_request',
+            clientName: appt.clientName,
+            clientWhatsapp: clientPhone
+          });
+          sent = result.success;
+        }
 
         if (appt.clientEmail) {
           const eventKey = 'reviewRequestClient';

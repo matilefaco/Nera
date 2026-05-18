@@ -245,19 +245,19 @@ export default function PlansPage() {
                   <ul className="space-y-4">
                     <li className="flex items-start gap-3">
                       <div className="mt-0.5 w-5 h-5 rounded-full bg-brand-parchment flex items-center justify-center text-brand-terracotta shrink-0">
+                        <Zap size={12} />
+                      </div>
+                      <span className="text-sm text-brand-ink">Notificações por WhatsApp</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-brand-parchment flex items-center justify-center text-brand-terracotta shrink-0">
                         <TrendingUp size={12} />
                       </div>
-                      <span className="text-sm text-brand-ink">Insights avançados da vitrine</span>
+                      <span className="text-sm text-brand-ink">Insights avançados e relatórios</span>
                     </li>
                     <li className="flex items-start gap-3">
                       <div className="mt-0.5 w-5 h-5 rounded-full bg-brand-parchment flex items-center justify-center text-brand-terracotta shrink-0">
                         <ShieldCheck size={12} />
-                      </div>
-                      <span className="text-sm text-brand-ink">Badge Pro de confiança</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <div className="mt-0.5 w-5 h-5 rounded-full bg-brand-parchment flex items-center justify-center text-brand-terracotta shrink-0">
-                        <Zap size={12} />
                       </div>
                       <span className="text-sm text-brand-ink">Lista de espera inteligente</span>
                     </li>

@@ -1325,7 +1325,7 @@ export default function ProfilePage() {
                   </h3>
                 </div>
                 <p className="text-[11px] text-brand-stone font-light mb-4 ml-10">
-                  Ajuda a reduzir faltas e confirmar presença com antecedência.
+                  Lembretes e confirmações automáticas para uma agenda mais profissional.
                 </p>
 
                 <div className="space-y-3">

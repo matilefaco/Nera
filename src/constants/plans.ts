@@ -35,7 +35,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
     themes: ['terracotta', 'rose', 'sage'],
     features: {
       unlimitedBookings: true,
-      whatsappNotifications: true,
+      whatsappNotifications: false,
       advancedDashboard: false,
       waitlist: false,
       antiNoShow: true,

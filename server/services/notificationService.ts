@@ -186,25 +186,32 @@ export const sendNewBookingRequestNotification = async (payload: NewBookingReque
     }
 
     if (proPhone) {
-      const formattedDate = payload.date.split('-').reverse().join('/');
-      const msg = buildNewBookingMessageForPro({
-        profissionalNome: pro?.name || 'Profissional',
-        servicoNome: payload.serviceName,
-        data: formattedDate,
-        horario: payload.time,
-        clienteNome: payload.clientName,
-        clienteWhatsApp: payload.clientWhatsapp || 'Não informado',
-        local: payload.locationDetail || payload.neighborhood || 'Estúdio',
-        linkManage: `${baseUrl}/pedidos?id=${payload.appointmentId}&token=${payload.token}`
-      });
+      const plan = pro?.plan || 'free';
+      const expiresAt = pro?.planExpiresAt;
+      const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+      const activePlan = isExpired ? 'free' : plan;
 
-      await sendWhatsApp(db, proPhone, msg, {
-        appointmentId: payload.appointmentId,
-        userId: payload.professionalId,
-        type: 'professional_new_booking',
-        clientName: payload.clientName,
-        clientWhatsapp: payload.clientWhatsapp || ''
-      });
+      if (activePlan === 'pro') {
+        const formattedDate = payload.date.split('-').reverse().join('/');
+        const msg = buildNewBookingMessageForPro({
+          profissionalNome: pro?.name || 'Profissional',
+          servicoNome: payload.serviceName,
+          data: formattedDate,
+          horario: payload.time,
+          clienteNome: payload.clientName,
+          clienteWhatsApp: payload.clientWhatsapp || 'Não informado',
+          local: payload.locationDetail || payload.neighborhood || 'Estúdio',
+          linkManage: `${baseUrl}/pedidos?id=${payload.appointmentId}&token=${payload.token}`
+        });
+
+        await sendWhatsApp(db, proPhone, msg, {
+          appointmentId: payload.appointmentId,
+          userId: payload.professionalId,
+          type: 'professional_new_booking',
+          clientName: payload.clientName,
+          clientWhatsapp: payload.clientWhatsapp || ''
+        });
+      }
     }
 
     // Add UI Alert

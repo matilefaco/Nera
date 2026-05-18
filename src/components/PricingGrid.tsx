@@ -25,7 +25,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <ul className="plan-features">
             <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium (foto, bio e serviços)</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Até 15 agendamentos por mês</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Aprovação manual (seu filtro)</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Notificações básicas por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Link direto para bio</li>
           </ul>
           {isLanding ? (
@@ -46,10 +46,10 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)' }}>&nbsp;</p>
           <ul className="plan-features">
             <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos ilimitados</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Notificações WhatsApp</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Experiência profissional por e-mail</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Confirmações e lembretes por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio de horários</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Lembrete automático 24h para reduzir faltas</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Histórico de clientes</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Histórico completo de clientes</li>
           </ul>
           {isLanding ? (
             <Link to="/register?plan=essencial" className="btn-plan white-solid">Testar Essencial por 15 dias</Link>
@@ -73,12 +73,11 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <div className="plan-period">por mês · ferramentas completas para crescer mais rápido</div>
           <p className="plan-tagline">&nbsp;</p>
           <ul className="plan-features">
-            <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial, com recursos para crescer mais rápido</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente para preencher horários vagos automaticamente</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Cupons de desconto</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Relatório mensal em PDF</li>
+            <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial + Notificações WhatsApp</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente para preencher horários</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Cupons de desconto e fidelidade</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Relatório mensal de performance</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Link de indicação premiado</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Badge Pro Nera na vitrine</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Suporte prioritário</li>
           </ul>
           {isLanding ? (

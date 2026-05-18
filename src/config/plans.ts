@@ -46,9 +46,9 @@ export const PLANS: Plan[] = [
     features: [
       { text: 'Agenda digital com agendamentos ilimitados' },
       { text: 'Vitrine pública premium com seus serviços' },
-      { text: 'Lembretes por WhatsApp (reduz faltas)' },
-      { text: 'Gestão de clientes e histórico de atendimentos' },
-      { text: 'Flexibilidade com bloqueio de horários' }
+      { text: 'Experiência profissional por e-mail' },
+      { text: 'Confirmações e lembretes por e-mail' },
+      { text: 'Gestão de clientes e histórico de atendimentos' }
     ],
     cta: 'Testar Essencial por 15 dias'
   },
@@ -62,10 +62,10 @@ export const PLANS: Plan[] = [
     popular: true,
     tagline: 'Crescimento e Autoridade',
     features: [
-      { text: 'Tudo do Essencial, mais recursos para crescer com controle', isHighlight: true },
+      { text: 'Tudo do Essencial + Notificações WhatsApp', isHighlight: true },
       { text: 'Lista de espera para recuperar horários' },
-      { text: 'Cupons de desconto para clientes' },
-      { text: 'Relatório mensal em PDF' },
+      { text: 'Cupons de desconto para fidelização' },
+      { text: 'Relatório mensal de performance em PDF' },
       { text: 'Badge Pro na vitrine' },
       { text: 'Link de indicação premiado' },
       { text: 'Suporte prioritário' }

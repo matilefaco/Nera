@@ -169,7 +169,7 @@ export default function LandingPage() {
               <div className="step-num">2</div>
               <div className="step-body">
                 <h3 className="step-title">Clientes agendam <em>sozinhos</em></h3>
-                <p className="step-desc">Compartilhe seu link e pronto. Confirmação automática por WhatsApp para você e para a cliente — sem nenhum esforço da sua parte.</p>
+                <p className="step-desc">Compartilhe seu link e pronto. Confirmações automáticas enviadas para você e para a cliente — sem nenhum esforço da sua parte.</p>
               </div>
             </div>
             <div className="step reveal rd2">
@@ -207,8 +207,8 @@ export default function LandingPage() {
             <div className="feat-icon">
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
             </div>
-            <h3 className="feat-title">Confirmação automática</h3>
-            <p className="feat-desc">Lembrete 24h antes via WhatsApp com sua identidade. Falta virou exceção — não regra.</p>
+            <h3 className="feat-title">Lembretes profissionais</h3>
+            <p className="feat-desc">Notificações por e-mail ou WhatsApp (Pro) para suas clientes não esquecerem o horário. Mais praticidade e menos faltas.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon">

@@ -372,6 +372,19 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
 
     const targetAppt = futureAppts[0];
     
+    // Plan check for automation
+    const proDocForPlan = await db.collection('users').doc(targetAppt.professionalId).get();
+    const proDataForPlan = proDocForPlan.exists ? proDocForPlan.data() as any : null;
+    const plan = proDataForPlan?.plan || 'free';
+    const expiresAt = proDataForPlan?.planExpiresAt;
+    const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+    const activePlan = isExpired ? 'free' : plan;
+
+    if (activePlan !== 'pro') {
+      logger.warn("WHATSAPP", `Inbound message ignored: Professional ${targetAppt.professionalId} is not on PRO plan.`, { plan: activePlan });
+      return { success: false, reason: 'unauthorized_plan' };
+    }
+
     if (!targetAppt) {
       logger.warn("WHATSAPP", `No active appointment for variants of ${maskPhone(normalizedPhone)}`);
       await logRef.update({ 

@@ -139,6 +139,12 @@ export interface UserProfile {
   waitlistMode?: 'auto' | 'manual';
   callmebotApiKey?: string;
   callmebotPhone?: string;
+  
+  // WhatsApp Integration (Pro)
+  whatsappInstanceId?: string;
+  whatsappStatus?: 'active' | 'disconnected' | 'auth_required' | 'initializing';
+  whatsappLastActive?: string;
+
   // Sharing & Open Graph
   ogTitle?: string;
   ogDescription?: string;
