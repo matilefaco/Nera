@@ -249,8 +249,8 @@ export async function createServerApp() {
       
       let html = baseHtml; // Create a local copy for this request
 
-      let title = "Nera | Vitrine & Agendamento Premium";
-      let description = "Agende serviços de beleza com praticidade pela Nera.";
+      let title = "nera — agenda e presença para profissionais de beleza";
+      let description = "Agendamentos, vitrine profissional e presença digital para profissionais de beleza que levam o próprio trabalho a sério.";
       let ogImage = "https://usenera.com/og-default.png";
       let pageUrl = `https://usenera.com/p/${escapeHtml(encodeURIComponent(slug))}`;
 
