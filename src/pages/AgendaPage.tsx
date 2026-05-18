@@ -788,19 +788,19 @@ export default function AgendaPage() {
         )}
 
         {/* 1.5 FIND RESERVATION BAR (Discrete) */}
-        <div className="bg-white/60 backdrop-blur-md border border-brand-mist/60 rounded-[14px] p-1.5 mb-6 flex items-center gap-2.5 px-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06)] focus-within:border-brand-mist/80 transition-all duration-300">
-          <Search size={13} strokeWidth={1.5} className="text-brand-stone/60 shrink-0" />
+        <div className="bg-white/60 backdrop-blur-md border border-brand-mist/60 rounded-2xl p-1 mb-6 flex items-center gap-2.5 px-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] focus-within:shadow-[0_4px_16px_-4px_rgba(0,0,0,0.06)] focus-within:border-brand-mist/80 transition-all duration-300">
+          <Search size={14} strokeWidth={1.5} className="text-brand-stone/60 shrink-0" />
           <input
             type="text"
             value={searchCode}
             onChange={(e) => setSearchCode(e.target.value)}
             placeholder="Buscar reserva por código..."
-            className="flex-1 bg-transparent py-1 text-[11px] font-medium text-brand-ink focus:outline-none placeholder:text-brand-stone/50 placeholder:font-normal tracking-wide transition-colors"
+            className="flex-1 bg-transparent py-3 text-[11px] font-medium text-brand-ink focus:outline-none placeholder:text-brand-stone/50 placeholder:font-normal tracking-wide transition-colors min-h-[44px]"
           />
           <button 
             onClick={handleCodeSearch}
             disabled={isSearchingCode || !searchCode.trim()}
-            className="text-[9px] flex items-center justify-center font-bold uppercase tracking-widest text-brand-terracotta/90 disabled:opacity-30 hover:text-brand-terracotta px-3 py-1.5 rounded-[10px] hover:bg-brand-terracotta/5 transition-colors"
+            className="text-[9px] flex items-center justify-center font-bold uppercase tracking-widest text-brand-terracotta/90 disabled:opacity-30 hover:text-brand-terracotta px-4 py-2 rounded-xl hover:bg-brand-terracotta/5 transition-colors min-h-[36px]"
           >
             {isSearchingCode ? <RefreshCw size={12} strokeWidth={1.5} className="animate-spin" /> : 'Ir'}
           </button>
@@ -942,7 +942,7 @@ export default function AgendaPage() {
       </div>
 
       {/* 6. BOTÃO FLUTUANTE FIXO (FAB) */}
-      <div className="fixed bottom-28 right-6 z-[100] md:bottom-12 md:right-12">
+      <div className="fixed bottom-[calc(92px+env(safe-area-inset-bottom))] right-5 z-[100] md:bottom-12 md:right-12">
         <AnimatePresence>
           {isFabOpen && (
             <motion.div 
@@ -950,23 +950,35 @@ export default function AgendaPage() {
               animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
               exit={{ opacity: 0, y: 10, scale: 0.95, filter: "blur(2px)" }}
               transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-              className="absolute bottom-20 right-0 w-[14rem] bg-white/85 backdrop-blur-2xl border border-brand-mist/40 p-2 rounded-[28px] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.12),0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-0.5"
+              className="absolute bottom-16 right-0 w-[14rem] bg-white/95 backdrop-blur-2xl border border-brand-mist/40 p-1.5 rounded-[24px] shadow-[0_24px_48px_-12px_rgba(0,0,0,0.15)] space-y-0.5"
             >
-              <button onClick={() => { setIsBlockModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+              <button 
+                onClick={() => { setIsBlockModalOpen(true); setIsFabOpen(false); }} 
+                className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[20px] flex items-center gap-3 transition-colors group"
+              >
                 <Lock size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Bloquear</span>
+                <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Bloquear</span>
               </button>
-              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+              <button 
+                onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} 
+                className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[20px] flex items-center gap-3 transition-colors group"
+              >
                 <Sparkles size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Encaixe</span>
+                <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Encaixe</span>
               </button>
-              <button onClick={() => { setIsWaitlistOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+              <button 
+                onClick={() => { setIsWaitlistOpen(true); setIsFabOpen(false); }} 
+                className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[20px] flex items-center gap-3 transition-colors group"
+              >
                 <Users size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Espera</span>
+                <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Espera</span>
               </button>
-              <button onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[22px] flex items-center gap-3 transition-colors group">
+              <button 
+                onClick={() => { setManualTime(''); setIsManualModalOpen(true); setIsFabOpen(false); }} 
+                className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[20px] flex items-center gap-3 transition-colors group"
+              >
                 <CalendarCheck2 size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />
-                <span className="text-[11px] font-medium text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Reserva</span>
+                <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Reserva</span>
               </button>
             </motion.div>
           )}
@@ -1029,12 +1041,15 @@ export default function AgendaPage() {
               className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md bg-brand-white rounded-[32px] p-8 shadow-2xl border border-brand-mist overflow-y-auto max-h-[90vh]"
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-brand-white rounded-t-[32px] md:rounded-[40px] px-6 sm:px-10 pt-12 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)] md:max-h-[85vh] no-scrollbar"
             >
-              <button onClick={() => setIsManualModalOpen(false)} className="absolute top-6 right-6 p-2 text-brand-stone hover:text-brand-ink transition-colors">
+              <button 
+                onClick={() => setIsManualModalOpen(false)} 
+                className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-brand-mist/40 rounded-full text-brand-stone/80 hover:text-brand-ink transition-colors z-20"
+              >
                 <X size={20} />
               </button>
 
@@ -1291,15 +1306,17 @@ export default function AgendaPage() {
               className="absolute inset-0 bg-brand-ink/40 backdrop-blur-sm"
             />
             <motion.div 
-              initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-              className="relative w-full max-w-md bg-brand-white rounded-t-[32px] md:rounded-[40px] px-5 sm:px-6 pt-10 sm:pt-10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] overflow-y-auto max-h-[calc(100dvh-3rem)] sm:max-h-[85vh] pb-[calc(2rem+env(safe-area-inset-bottom))]"
+              initial={{ y: "100%" }} 
+              animate={{ y: 0 }} 
+              exit={{ y: "100%" }}
+              className="relative w-full max-w-md bg-brand-white rounded-t-[32px] md:rounded-[40px] px-5 sm:px-6 pt-12 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.15)] overflow-y-auto max-h-[calc(100dvh-2rem)] md:max-h-[85vh] pb-[calc(2rem+env(safe-area-inset-bottom))] no-scrollbar"
             >
               <button 
                 onClick={() => setIsDetailsOpen(false)}
-                className="absolute top-5 right-5 sm:right-6 p-2 bg-brand-mist/40 rounded-full text-brand-stone/80 hover:text-brand-ink hover:bg-brand-mist/80 transition-colors z-20"
+                className="absolute top-5 right-5 sm:right-6 w-10 h-10 flex items-center justify-center bg-brand-mist/40 rounded-full text-brand-stone/80 hover:text-brand-ink hover:bg-brand-mist/80 transition-colors z-20"
                 title="Fechar"
               >
-                <X size={20} strokeWidth={2} />
+                <X size={20} strokeWidth={2.5} />
               </button>
 
               <div className="mb-5 sm:mb-6 pr-12 relative">

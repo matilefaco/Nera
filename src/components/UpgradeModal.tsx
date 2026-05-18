@@ -111,7 +111,7 @@ export default function UpgradeModal({
             initial={{ opacity: 0, scale: 0.9, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 30 }}
-            className="w-[calc(100vw-24px)] md:w-full max-w-lg bg-brand-white rounded-[32px] md:rounded-[48px] shadow-2xl border border-brand-mist relative overflow-hidden flex flex-col max-h-[calc(100dvh-32px)]"
+            className="w-[calc(100vw-24px)] md:w-full max-w-lg bg-brand-white rounded-[32px] md:rounded-[48px] shadow-2xl border border-brand-mist relative overflow-hidden flex flex-col max-h-[calc(100dvh-24px)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Background elements */}
@@ -129,8 +129,8 @@ export default function UpgradeModal({
             </div>
 
             {/* Scrollable Content Area */}
-            <div className="relative z-10 flex-1 overflow-y-auto">
-              <div className="p-6 md:p-10 pb-0 flex flex-col items-center text-center mt-4 md:mt-0">
+            <div className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden pt-2 no-scrollbar">
+              <div className="p-5 md:p-10 pb-0 flex flex-col items-center text-center mt-4 md:mt-0">
                 <motion.div 
                   initial={{ rotate: -10, scale: 0.8 }}
                   animate={{ rotate: 0, scale: 1 }}
@@ -176,22 +176,22 @@ export default function UpgradeModal({
                 </div>
               </div>
 
-              <div className="p-6 md:p-10 pt-0">
+              <div className="p-5 md:p-10 pt-0">
                 <Link to="/planos" className="w-full block" onClick={onClose}>
                   <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="w-full py-5 md:py-6 bg-brand-terracotta text-white rounded-full text-[11px] md:text-[12px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-brand-terracotta/20"
+                    className="w-full py-4 md:py-6 bg-brand-terracotta text-white rounded-full text-[11px] md:text-[12px] font-bold uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl shadow-brand-terracotta/20 min-h-[44px]"
                   >
                     Ver planos disponíveis <ArrowRight size={16} />
                   </motion.div>
                 </Link>
 
-                <div className="mt-6 md:mt-8 flex items-center justify-center gap-6 pb-2">
+                <div className="mt-6 md:mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 pb-2">
                   <button 
                     type="button"
                     onClick={onClose}
-                    className="text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
+                    className="text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors min-h-[44px] flex items-center"
                   >
                     Decidir depois
                   </button>

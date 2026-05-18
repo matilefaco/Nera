@@ -827,10 +827,35 @@ export default function ProfilePage() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {portfolio.map((item, idx) => (
-                    <div key={item.id || idx} className="aspect-square bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist">
-                      <img src={item.url} className={`w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" alt={`Portfolio ${idx}`} />
+                    <div key={item.id || idx} className="bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist flex flex-col h-[200px] sm:h-[240px]">
+                      <div className="relative flex-1 bg-brand-stone/5 overflow-hidden">
+                        <img src={item.url} className={`absolute inset-0 w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" alt={`Portfolio ${idx}`} />
+                        
+                        {!item.isUploading && (
+                          <button 
+                            type="button"
+                            onClick={() => item.id && removePortfolioImage(item.id)}
+                            disabled={deletingId === item.id}
+                            className="absolute top-2 right-2 w-10 h-10 bg-brand-white/90 backdrop-blur-sm text-red-500 rounded-full shadow-md flex items-center justify-center opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-105 disabled:opacity-50 z-20"
+                          >
+                            {deletingId === item.id ? (
+                              <RefreshCw size={16} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={16} />
+                            )}
+                          </button>
+                        )}
+
+                        {item.isUploading && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                              <Sparkles size={24} className="text-brand-white" />
+                            </motion.div>
+                          </div>
+                        )}
+                      </div>
                       
-                      <div className="absolute inset-0 bg-brand-ink/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center p-3 backdrop-blur-[2px]">
+                      <div className="bg-brand-white p-2 border-t border-brand-mist flex items-center z-20">
                         <input 
                           type="text" 
                           value={item.category} 
@@ -849,31 +874,10 @@ export default function ProfilePage() {
                               }
                             }
                           }}
-                          className="w-full bg-brand-white/10 border border-brand-white/20 rounded-lg px-2 py-1.5 text-[10px] text-brand-white placeholder:text-brand-white/50 outline-none text-center mb-3 font-light"
+                          className="w-full bg-[#FAF9F8] border border-brand-mist/60 rounded-xl px-2 h-10 text-[11px] text-brand-ink placeholder:text-brand-stone/60 outline-none text-center font-medium focus:bg-brand-white focus:border-brand-mist/80 transition-colors"
                           placeholder="Categoria"
                         />
                       </div>
-
-                      {!item.isUploading && (
-                        <button 
-                          type="button"
-                          onClick={() => item.id && removePortfolioImage(item.id)}
-                          disabled={deletingId === item.id}
-                          className="absolute top-2 right-2 p-2 bg-white text-red-500 rounded-full shadow-lg opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 disabled:opacity-50 z-20"
-                        >
-                          {deletingId === item.id ? (
-                            <RefreshCw size={14} className="animate-spin" />
-                          ) : <Trash2 size={14} />}
-                        </button>
-                      )}
-
-                      {item.isUploading && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                            <Sparkles size={24} className="text-brand-white" />
-                          </motion.div>
-                        </div>
-                      )}
                     </div>
                   ))}
                   <div 
@@ -1556,14 +1560,14 @@ export default function ProfilePage() {
 
         {/* Sticky Save Bar */}
         {(hasUnsavedChanges || showSaveSuccess) && (
-          <div className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] md:bottom-8 left-0 right-0 z-[60] flex justify-center px-4 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-300">
-            <div className="bg-white/90 backdrop-blur-md border border-brand-mist/80 shadow-2xl shadow-brand-ink/5 rounded-2xl p-3 flex items-center justify-between gap-4 max-w-sm w-full pointer-events-auto">
-              <div className="flex-1">
-                <p className="text-xs font-bold text-brand-ink">
-                  {showSaveSuccess ? 'Alterações salvas' : 'Alterações não salvas'}
+          <div className="fixed bottom-[calc(80px+env(safe-area-inset-bottom))] md:bottom-8 left-0 right-0 z-[60] flex justify-center px-4 pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="bg-white/95 backdrop-blur-xl border border-brand-mist/80 shadow-2xl shadow-brand-ink/10 rounded-[24px] p-3 md:p-4 flex items-center justify-between gap-4 max-w-md w-full pointer-events-auto">
+              <div className="flex-1 ml-2">
+                <p className="text-[11px] md:text-xs font-bold uppercase tracking-widest text-brand-ink">
+                  {showSaveSuccess ? 'Salvo!' : 'Não salvo'}
                 </p>
-                <p className="text-[10px] text-brand-stone font-light">
-                  {showSaveSuccess ? 'Seu perfil está atualizado.' : 'Não esqueça de salvar suas edições.'}
+                <p className="text-[10px] md:text-[11px] text-brand-stone/80 font-medium tracking-wide">
+                  {showSaveSuccess ? 'Seu perfil está atualizado.' : 'Você tem alterações pendentes.'}
                 </p>
               </div>
               <button
@@ -1571,10 +1575,10 @@ export default function ProfilePage() {
                 onClick={handleSave}
                 disabled={loading || showSaveSuccess || !hasUnsavedChanges}
                 className={cn(
-                  "px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ease-out shrink-0 focus-visible:outline-none",
+                  "min-h-[44px] flex items-center justify-center px-6 md:px-8 py-3 md:py-3.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all duration-300 shrink-0",
                   showSaveSuccess 
                     ? "bg-green-50 text-green-600 border border-green-200 cursor-default" 
-                    : "bg-brand-ink text-brand-white hover:bg-brand-espresso shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2"
+                    : "bg-brand-ink text-brand-white hover:bg-brand-espresso shadow-lg shadow-brand-ink/20 hover:scale-[1.02] active:scale-[0.98]"
                 )}
               >
                 {loading ? '...' : showSaveSuccess ? 'Salvo' : 'Salvar'}

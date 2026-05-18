@@ -88,18 +88,15 @@ export default function FinancialPage() {
           where('date', '<=', endDateStr)
         );
 
-        let timeoutId: any;
         const timeoutPromise = new Promise((_, reject) =>
-          timeoutId = setTimeout(() => reject(new Error('timeout')), 8000)
+          setTimeout(() => reject(new Error('timeout')), 8000)
         );
 
         console.log('[Financial] fetch start');
         const snapshot = await Promise.race([
           getDocs(q),
           timeoutPromise
-        ]).finally(() => {
-          if (timeoutId) clearTimeout(timeoutId);
-        }) as any;
+        ]) as any;
 
         if (!isMounted || isCancelled) return;
         
@@ -244,7 +241,7 @@ export default function FinancialPage() {
   if (error) {
     return (
       <AppLayout activeRoute="financial">
-        <div className="p-6 md:p-12 pb-40 max-w-5xl mx-auto w-full">
+        <div className="p-4 sm:p-6 md:p-12 pb-40 max-w-5xl mx-auto w-full">
           <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-16 text-center mt-12">
             <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist shadow-sm">
                <DollarSign size={32} />
@@ -274,11 +271,11 @@ export default function FinancialPage() {
       <PageErrorBoundary 
         title="Não foi possível carregar seu financeiro." 
       >
-      <div className="p-6 md:p-12 pb-40 max-w-5xl mx-auto w-full">
-        <header className="mb-10 md:mb-14 flex flex-col md:flex-row md:items-start justify-between gap-6">
+      <div className="p-4 sm:p-6 md:p-12 pb-40 max-w-5xl mx-auto w-full">
+        <header className="mb-8 md:mb-14 flex flex-col md:flex-row md:items-start justify-between gap-6">
           <div className="max-w-md">
-            <h1 className="text-3xl md:text-4xl font-serif text-brand-ink mb-2 md:mb-3 tracking-tight">Financeiro</h1>
-            <p className="text-brand-stone font-light text-base md:text-lg">Tudo o que entra no seu negócio, em um só lugar.</p>
+            <h1 className="text-3xl md:text-4xl font-serif text-brand-ink mb-1 md:mb-3 tracking-tight">Financeiro</h1>
+            <p className="text-brand-stone font-light text-sm md:text-base lg:text-lg">Tudo o que entra no seu negócio, em um só lugar.</p>
           </div>
           <div className="pt-0 md:pt-2">
             <button
@@ -308,7 +305,7 @@ export default function FinancialPage() {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="lg:col-span-2 bg-[#FCFBF9] p-5 md:p-10 rounded-[32px] border border-[#F2EFEA] shadow-[0_8px_40px_-12px_rgba(137,103,88,0.06)] relative overflow-hidden flex flex-col justify-between min-h-[auto] md:min-h-[320px]"
+                className="lg:col-span-2 bg-[#FCFBF9] p-5 sm:p-8 md:p-10 rounded-[32px] border border-[#F2EFEA] shadow-[0_8px_40px_-12px_rgba(137,103,88,0.06)] relative overflow-hidden flex flex-col justify-between min-h-[auto] md:min-h-[320px]"
               >
                 <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-brand-terracotta/[0.04] rounded-full blur-[60px] -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                 
@@ -337,11 +334,11 @@ export default function FinancialPage() {
                   </div>
                   
                   <div className="flex flex-col lg:flex-row lg:items-end gap-3 md:gap-8 lg:gap-10">
-                    <div className="flex-1">
-                      <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Recebido
                       </p>
-                      <p className="text-3xl md:text-5xl lg:text-[64px] font-serif text-brand-ink tracking-tight leading-none">
+                      <p className="text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-[64px] font-serif text-brand-ink tracking-tight leading-none break-words">
                         {formatCurrency(currentMonthData.current?.revenue || 0)}
                       </p>
                     </div>
@@ -349,11 +346,11 @@ export default function FinancialPage() {
                     <div className="hidden lg:block h-20 w-px bg-brand-mist/60" />
                     <div className="block lg:hidden h-px w-full bg-brand-mist/60" />
                     
-                    <div className="flex-1 flex flex-col justify-end">
-                      <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2">
+                    <div className="flex-1 flex flex-col justify-end min-w-0">
+                      <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Previsto
                       </p>
-                      <p className="text-xl md:text-3xl lg:text-4xl font-serif text-brand-ink/80 mb-1 md:mb-2 leading-none tracking-tight">
+                      <p className="text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl font-serif text-brand-ink/80 mb-1 md:mb-2 leading-none tracking-tight break-words">
                         {formatCurrency(currentMonthData.current?.plannedRevenue || 0)}
                       </p>
                       <p className="text-[9px] md:text-[10px] text-brand-stone/70 font-light max-w-[200px] leading-relaxed">
@@ -364,11 +361,11 @@ export default function FinancialPage() {
                     <div className="hidden lg:block h-20 w-px bg-brand-mist/60" />
                     <div className="block lg:hidden h-px w-full bg-brand-mist/60" />
 
-                    <div className="flex-1 flex flex-col justify-end">
-                      <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2">
+                    <div className="flex-1 flex flex-col justify-end min-w-0">
+                      <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Aguardando
                       </p>
-                      <p className="text-lg md:text-2xl lg:text-3xl font-serif text-brand-ink/60 mb-1 md:mb-2 leading-none tracking-tight">
+                      <p className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif text-brand-ink/60 mb-1 md:mb-2 leading-none tracking-tight break-words">
                         {formatCurrency(currentMonthData.current?.pendingRevenue || 0)}
                       </p>
                       <p className="text-[9px] md:text-[10px] text-brand-stone/70 font-light max-w-[200px] leading-relaxed">
@@ -485,17 +482,17 @@ export default function FinancialPage() {
                   >
                     <button 
                       onClick={() => setExpandedMonth(expandedMonth === group.monthKey ? null : group.monthKey)}
-                      className="w-full px-5 py-5 lg:px-8 lg:py-7 flex items-center justify-between text-left hover:bg-brand-parchment/30 transition-colors"
+                      className="w-full px-5 py-5 sm:py-6 lg:px-8 lg:py-7 flex items-center justify-between text-left hover:bg-brand-parchment/30 transition-colors min-h-[44px]"
                     >
-                      <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8 flex-1">
-                        <div className="min-w-[140px]">
+                      <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8 flex-1 min-w-0">
+                        <div className="min-w-0 md:min-w-[140px]">
                           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Mês</span>
-                          <span className="text-xl font-serif text-brand-ink tracking-tight">{group.monthLabel}</span>
+                          <span className="text-lg sm:text-xl font-serif text-brand-ink tracking-tight truncate block">{group.monthLabel}</span>
                         </div>
                         
-                        <div className="min-w-[130px]">
+                        <div className="min-w-0 md:min-w-[130px]">
                           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/80"></span> Recebido</span>
-                          <span className="text-lg font-serif text-brand-ink tracking-tight">{formatCurrency(group.revenue)}</span>
+                          <span className="text-base sm:text-lg font-serif text-brand-ink tracking-tight truncate block">{formatCurrency(group.revenue)}</span>
                         </div>
                         
                         <div className="hidden sm:block min-w-[120px]">

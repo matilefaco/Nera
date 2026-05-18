@@ -165,10 +165,10 @@ export default function DayView({
                   hasActivity ? "h-[5.75rem]" : "h-[4.5rem]"
                 )}
               >
-                <div className="w-16 sm:w-20 text-right -ml-16 sm:-ml-20 pr-3 sm:pr-4 pt-1 z-10 shrink-0 bg-transparent">
+                <div className="w-16 sm:w-20 text-right -ml-16 sm:-ml-20 pr-2.5 sm:pr-4 pt-1 z-10 shrink-0 bg-transparent">
                   <span className={cn(
-                    "text-[10px] font-medium tracking-widest",
-                    hasActivity ? "text-brand-ink" : "text-brand-stone opacity-60"
+                    "text-[10px] font-bold tracking-widest",
+                    hasActivity ? "text-brand-ink" : "text-brand-stone/50"
                   )}>
                     {idx % 2 === 0 ? time : ''}
                   </span>
@@ -221,7 +221,7 @@ export default function DayView({
                         isConfirmedOrCompleted
                           ? "bg-brand-ink text-white border-brand-ink shadow-brand-ink/10"
                           : "bg-white text-brand-ink border-brand-mist/60 hover:border-brand-terracotta/30",
-                        appIdx > 0 && "translate-x-2 translate-y-2 shadow-xl z-30"
+                        appIdx > 0 && "translate-x-1.5 translate-y-1.5 sm:translate-x-2 sm:translate-y-2 shadow-xl z-30"
                       )}
                     >
                       <div className={cn(

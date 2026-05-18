@@ -104,8 +104,8 @@ export default function ReferralsPage() {
 
   return (
     <AppLayout activeRoute="dashboard">
-      <div className="max-w-4xl mx-auto py-12 px-6">
-        <header className="mb-12">
+      <div className="max-w-4xl mx-auto py-8 md:py-12 px-4 sm:px-6">
+        <header className="mb-8 md:mb-12">
           <Link 
             to="/dashboard" 
             className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors mb-8"
@@ -166,19 +166,19 @@ export default function ReferralsPage() {
         ) : (
           <>
         {/* Link Section */}
-        <section className="mb-12 bg-brand-white p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col md:flex-row items-center gap-6 justify-between">
+        <section className="mb-8 md:mb-12 bg-brand-white p-5 sm:p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col md:flex-row items-center gap-6 justify-between">
           <div className="max-w-md w-full">
             <h3 className="text-base font-serif text-brand-ink mb-1">Seu Código de Indicação</h3>
             <p className="text-[11px] text-brand-stone font-light">Envie este link para outras profissionais ganharem vantagens exclusivas pelo seu convite.</p>
           </div>
           
           <div className="flex w-full md:w-auto items-stretch md:items-center gap-2 flex-col md:flex-row">
-            <div className="bg-[#FAF9F8] px-4 py-3 rounded-2xl border border-brand-mist/60 font-mono text-sm tracking-widest text-brand-ink flex-1 text-center md:text-left min-w-[200px]">
+            <div className="bg-[#FAF9F8] px-4 py-3 rounded-2xl border border-brand-mist/60 font-mono text-sm tracking-widest text-brand-ink flex-1 text-center md:text-left min-w-0 break-all">
               {profile?.referralCode || '------'}
             </div>
             <button 
               onClick={handleCopy}
-              className="bg-brand-ink text-brand-white px-6 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-espresso transition-all whitespace-nowrap"
+              className="bg-brand-ink text-brand-white px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-brand-espresso transition-all whitespace-nowrap min-h-[44px]"
             >
               {copyAnim ? <CheckCircle2 size={14} className="text-green-400" /> : <Gift size={14} />} 
               {copyAnim ? 'Copiado!' : 'Copiar Link'}
@@ -236,7 +236,7 @@ export default function ReferralsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-4 px-6 text-[9px] font-bold uppercase tracking-widest text-brand-stone">
+            <div className="hidden sm:grid grid-cols-4 px-6 text-[9px] font-bold uppercase tracking-widest text-brand-stone">
               <div className="col-span-2">Profissional</div>
               <div>Data</div>
               <div>Status</div>
@@ -248,16 +248,16 @@ export default function ReferralsPage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className="bg-brand-white border border-brand-mist p-6 rounded-3xl flex items-center justify-between"
+                className="bg-brand-white border border-brand-mist p-5 sm:p-6 rounded-3xl"
               >
-                <div className="grid grid-cols-4 w-full items-center">
-                  <div className="col-span-2 flex items-center gap-4">
-                    <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-ink font-serif italic text-lg">
+                <div className="flex flex-col sm:grid sm:grid-cols-4 w-full items-start sm:items-center gap-4 sm:gap-0">
+                  <div className="sm:col-span-2 flex items-center gap-4 w-full min-w-0">
+                    <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-ink font-serif italic text-lg shrink-0">
                       {referral.name.charAt(0)}
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-brand-ink uppercase tracking-tight">{referral.name}</h4>
-                      <p className="text-[10px] text-brand-stone font-light truncate max-w-[150px]">{referral.email}</p>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold text-brand-ink uppercase tracking-tight truncate">{referral.name}</h4>
+                      <p className="text-[10px] text-brand-stone font-light truncate">{referral.email}</p>
                     </div>
                   </div>
 
