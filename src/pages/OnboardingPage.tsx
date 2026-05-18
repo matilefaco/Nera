@@ -176,33 +176,46 @@ export default function OnboardingPage() {
           uid: user?.uid || '',
           city: city || ''
         });
+        
+        console.log(`[SlugCheck] Requesting check for slug: ${cleanSlug}`);
         const res = await fetch(`/api/slug/check?${queryParams}`);
         
         // If the slug changed while the fetch was in progress, ignore result
         if (slugCheckRef.current !== cleanSlug) return;
 
-        if (!res.ok) throw new Error('API failed');
-
-        const data = await res.json();
+        console.log(`[SlugCheck] Response status: ${res.status}`);
         
+        let data: any = {};
+        try {
+          data = await res.json();
+        } catch(e) {}
+        
+        console.log(`[SlugCheck] Response body:`, data);
+
+        if (!res.ok) {
+          setSlugStatus('invalid');
+          setSlugMessage(data.error || 'Não consegui verificar agora. Tente novamente.');
+          return;
+        }
+
         if (data.available === true) {
           setSlugStatus('available');
-          setSlugMessage('Seu link está disponível!');
+          setSlugMessage(data.message || 'Seu link está disponível!');
           setSlugSuggestions([]);
         } else if (data.available === false) {
           setSlugStatus('unavailable');
-          setSlugMessage('Esse link já está sendo usado');
+          setSlugMessage(data.message || 'Esse link já está sendo usado');
           setSlugSuggestions(data.suggestions || []);
         } else {
-          setSlugStatus('idle');
-          setSlugMessage('');
+          setSlugStatus('invalid');
+          setSlugMessage('Resposta inesperada. Tente novamente.');
         }
       } catch (err) {
-        console.error('Error checking slug:', err);
+        console.error('[SlugCheck] Caught error:', err);
         // Only update if it's still the same slug
         if (slugCheckRef.current === cleanSlug) {
           setSlugStatus('invalid');
-          setSlugMessage('Erro ao verificar disponibilidade.');
+          setSlugMessage('Erro de rede. Tente novamente.');
         }
       }
     }, 600);
@@ -272,6 +285,8 @@ export default function OnboardingPage() {
       travelFeeMode,
       fixedTravelFee,
       city,
+      neighborhood,
+      instagram,
       workingDays,
       startTime,
       endTime,
@@ -283,9 +298,9 @@ export default function OnboardingPage() {
       localStorage.setItem(draftKey, JSON.stringify(draft));
     } catch(e) {}
   }, [
-    draftKey, isFinalizing, name, specialty, headline, bio, whatsapp, slug,
+    draftKey, isFinalizing, name, specialty, headline, bio, whatsapp, slug, instagram,
     paymentMethods, services, yearsExperience, selectedStyles, selectedDifferentials,
-    step, serviceMode, serviceAreaType, travelFeeMode, fixedTravelFee, city,
+    step, serviceMode, serviceAreaType, travelFeeMode, fixedTravelFee, city, neighborhood,
     workingDays, startTime, endTime, showBreak, breakStart, breakEnd
   ]);
 
@@ -298,7 +313,7 @@ export default function OnboardingPage() {
       if (draftStr) {
         const draft = JSON.parse(draftStr);
         let safeStep = draft.step || 1;
-        if (safeStep > 1 && (!draft.name || !draft.specialty || !draft.whatsapp)) safeStep = 1;
+        if (safeStep > 1 && (!draft.name || !draft.specialty || !draft.whatsapp || !draft.slug)) safeStep = 1;
         if (safeStep > 2 && (!draft.city || !draft.neighborhood || !draft.services || draft.services.length === 0 || !draft.services[0].name)) safeStep = 2;
         setStep(safeStep);
         if (draft.name && !name) setName(draft.name);
@@ -307,6 +322,7 @@ export default function OnboardingPage() {
         if (draft.bio && !bio) setBio(draft.bio);
         if (draft.whatsapp && !whatsapp) setWhatsapp(draft.whatsapp);
         if (draft.slug && !slug) setSlug(draft.slug);
+        if (draft.instagram && !instagram) setInstagram(draft.instagram);
         
         if (draft.paymentMethods?.length > 0 && paymentMethods.length === 0) setPaymentMethods(draft.paymentMethods);
         if (draft.services?.length > 0 && (!services || services.length === 0 || (services.length === 1 && services[0].name === ''))) setServices(draft.services);
@@ -318,6 +334,7 @@ export default function OnboardingPage() {
         if (draft.travelFeeMode) setTravelFeeMode(draft.travelFeeMode);
         if (draft.fixedTravelFee) setFixedTravelFee(draft.fixedTravelFee);
         if (draft.city && !city) setCity(draft.city);
+        if (draft.neighborhood && !neighborhood) setNeighborhood(draft.neighborhood);
         
         if (draft.workingDays?.length) setWorkingDays(draft.workingDays);
         if (draft.startTime) setStartTime(draft.startTime);
@@ -367,11 +384,12 @@ export default function OnboardingPage() {
           const currentName = profile.name || name;
           const currentSpecialty = profile.professionalIdentity?.mainSpecialty || profile.specialty || specialty;
           const currentWhatsapp = profile.whatsapp || whatsapp;
+          const currentSlug = profile.slug || slug;
           const currentCity = profile.city || city;
           const currentNeighborhood = profile.neighborhood || neighborhood;
           const currentServices = (profile as any).servicesDraft || services;
 
-          if (safeStep > 1 && (!currentName || !currentSpecialty || !currentWhatsapp)) safeStep = 1;
+          if (safeStep > 1 && (!currentName || !currentSpecialty || !currentWhatsapp || !currentSlug)) safeStep = 1;
           if (safeStep > 2 && (!currentCity || !currentNeighborhood || !currentServices || currentServices.length === 0 || !currentServices[0].name)) safeStep = 2;
           
           setStep(safeStep);
