@@ -36,13 +36,13 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
   if (services.length === 0) return null;
 
   return (
-    <section className="py-24 px-6 max-w-7xl mx-auto w-full">
+    <section className="py-16 md:py-24 px-6 max-w-7xl mx-auto w-full">
       <div className="flex items-center gap-4 mb-4">
         <span className="label-text">Menu de Experiências</span>
         <div className="flex-1 h-px bg-brand-mist/50" />
       </div>
       
-      <div className="flex flex-col gap-8 mb-12">
+      <div className="flex flex-col gap-6 md:gap-8 mb-8 md:mb-12">
         <h2 className="heading-section text-brand-ink">
           Escolha sua<br />
           <em className="font-serif italic text-brand-stone">experiência</em>

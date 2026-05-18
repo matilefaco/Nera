@@ -35,9 +35,9 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
   ].filter(b => b.show);
 
   return (
-    <section className="py-24 px-6 bg-brand-white relative overflow-hidden">
+    <section className="py-16 md:py-24 px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-16">
+        <div className="text-center mb-10 md:mb-16">
           <span className="label-text text-[var(--theme-accent,var(--color-brand-terracotta))]/60 mb-4 block">Segurança e Qualidade</span>
           <h2 className="text-3xl font-serif text-brand-ink mb-4">Por que escolher a Nera?</h2>
           <div className="w-12 h-1 bg-brand-linen mx-auto rounded-full" />
@@ -63,7 +63,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
           ))}
         </div>
 
-        <div className="mt-16 p-8 bg-brand-linen/10 rounded-[40px] border border-brand-mist/50 text-center">
+        <div className="mt-10 md:mt-16 p-8 bg-brand-linen/10 rounded-[40px] border border-brand-mist/50 text-center">
           <p className="text-[10px] text-brand-stone font-medium uppercase tracking-[0.2em] italic">
             "Na Nera, você agenda com praticidade. Informações organizadas e atendimento de alto padrão."
           </p>

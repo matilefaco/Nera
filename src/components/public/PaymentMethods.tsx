@@ -31,8 +31,8 @@ export function PaymentMethods({ className, professionalName, paymentMethods }: 
       ];
 
   return (
-    <section className={`py-12 px-6 bg-brand-white border-y border-brand-mist/20 ${className}`}>
-      <div className="max-w-4xl mx-auto flex flex-col items-center gap-8">
+    <section className={`py-8 md:py-12 px-6 bg-brand-white border-y border-brand-mist/20 ${className}`}>
+      <div className="max-w-4xl mx-auto flex flex-col items-center gap-6 md:gap-8">
         <div className="text-center space-y-1">
           <h3 className="text-[13px] font-bold uppercase tracking-[0.3em] text-brand-ink">Pagamento aceito</h3>
           <p className="text-[10px] text-brand-stone font-light italic">Seu atendimento pode ser pago no local {professionalName ? `com ${professionalName.split(' ')[0]}` : ''}.</p>

@@ -23,9 +23,9 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
     : portfolio.filter(item => item.category === activeCategory);
 
   return (
-    <section className="bg-brand-linen py-32 px-6 border-y border-brand-mist/50">
+    <section className="bg-brand-linen py-20 md:py-32 px-6 border-y border-brand-mist/50">
       <div className="max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 mb-16">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 mb-10 md:mb-16">
           <div>
             <div className="flex items-center gap-4 mb-4">
               <span className="label-text">Portfólio</span>
@@ -37,10 +37,12 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
             </h2>
           </div>
 
-          <PremiumButton onClick={onBookingClick} variant="terracotta" className="px-10 py-5 text-[10px] tracking-widest shadow-lg">
-            Quero esse resultado
-            <ChevronRight size={14} className="ml-2" />
-          </PremiumButton>
+          <div className="hidden md:block">
+            <PremiumButton onClick={onBookingClick} variant="terracotta" className="px-10 py-5 text-[10px] tracking-widest shadow-lg">
+              Quero esse resultado
+              <ChevronRight size={14} className="ml-2" />
+            </PremiumButton>
+          </div>
         </div>
 
         {/* Categories */}

@@ -798,8 +798,10 @@ function PublicProfileContent() {
       )}
       <AnimatePresence>
         {scrolledPastHero &&
+          !showInterestPopup &&
           !isCtaVisibleInContent &&
           !isBookingModalOpen &&
+          !isWaitlistOpen &&
           !loading && (
             <motion.div
               initial={{ y: 100, opacity: 0 }}
@@ -909,25 +911,23 @@ function PublicProfileContent() {
       />
       <ConfidenceSection profile={profile} stats={stats} />
       <div ref={finalCtaRef}>
-        <FinalCTA
-          profile={profile}
-          onBookingClick={() => {
-            if (profile && profile.uid !== "mock-helena") {
-              logAnalyticsEvent(profile.uid, "click_book_final");
-            }
-            if (urgencyInfo?.isAgendaFull && features?.waitlist) {
-              setIsWaitlistOpen(true);
-            } else {
+        {!urgencyInfo?.isAgendaFull || !features?.waitlist ? (
+          <FinalCTA
+            profile={profile}
+            onBookingClick={() => {
+              if (profile && profile.uid !== "mock-helena") {
+                logAnalyticsEvent(profile.uid, "click_book_final");
+              }
               setIsBookingModalOpen(true);
-            }
-          }}
-          completedBookings={stats?.totalCompletedBookings}
-        />
-      </div>
-      <div className="h-32 md:hidden" /> {/* Bottom spacing for mobile CTA */}
-      {urgencyInfo?.isAgendaFull && features?.waitlist && (
-        <section className="px-6 pb-20 -mt-10">
-          <motion.div
+            }}
+            completedBookings={stats?.totalCompletedBookings}
+          />
+        ) : null}
+        
+        <div className="h-24 md:hidden" /> {/* Bottom spacing for mobile CTA */}
+        {urgencyInfo?.isAgendaFull && features?.waitlist && (
+          <section className="px-6 pb-16 md:pb-20 -mt-10">
+            <motion.div
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -956,7 +956,8 @@ function PublicProfileContent() {
           </motion.div>
         </section>
       )}
-      <footer className="bg-brand-white border-t border-brand-mist py-14 px-6 text-center">
+      </div>
+      <footer className="bg-brand-white border-t border-brand-mist py-10 md:py-14 px-6 text-center">
         <div className="max-w-7xl mx-auto flex flex-col items-center gap-7">
           <div className="text-[12px] font-normal tracking-[0.4em] uppercase text-brand-stone opacity-40">
             Nera

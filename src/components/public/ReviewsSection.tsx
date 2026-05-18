@@ -15,8 +15,8 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
   }
 
   return (
-    <section className="py-32 px-6 max-w-7xl mx-auto w-full">
-      <div className="flex flex-col md:flex-row md:items-center gap-16 mb-24">
+    <section className="py-20 md:py-32 px-6 max-w-7xl mx-auto w-full">
+      <div className="flex flex-col md:flex-row md:items-center gap-10 md:gap-16 mb-16 md:mb-24">
         <div className="flex items-baseline gap-4">
           <span className="font-serif text-[80px] leading-none text-brand-ink">
             {stats?.averageRating ? stats.averageRating.toFixed(1) : (reviews.length > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) : '')}

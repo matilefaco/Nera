@@ -47,16 +47,26 @@ router.post("/generate-content", requireFirebaseAuth, checkPlanFeature('advanced
 
   try {
     const prompt = `Você é um especialista em branding para profissionais de beleza brasileiras.
-Gere uma bio e um headline para esta profissional:
-Nome: ${name}
-Especialidade: ${specialty}
-Anos de experiência: ${yearsExperience}
-Estilo de atendimento: ${serviceStyle}
-Diferenciais: ${differentials}
-Tom desejado: ${bioStyle} (elegante | natural | direta)
+Gere uma frase principal curta (headline) e uma bio profissional para:
+Nome: ${name || 'A profissional'}
+Especialidade: ${specialty || 'Beleza e Estética'}
+Anos de experiência: ${yearsExperience || 'alguns'}
+Estilo de atendimento: ${serviceStyle || 'personalizado'}
+Diferenciais: ${differentials || 'atendimento de qualidade'}
+Tom desejado: ${bioStyle || 'elegante'} (elegante | natural | direta)
 
-Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato:
-{"bio": "texto aqui", "headline": "texto aqui"}`;
+Diretrizes obrigatórias:
+- Tom natural, brasileiro e elegante.
+- Escreva especificamente para a área de beleza/estética.
+- SEM exageros, SEM promessas falsas.
+- NÃO use frases clichês como "a melhor da cidade".
+- NÃO invente certificações não informadas.
+- Evite linguagem genérica e fria.
+
+Exemplo de bio com tom elegante e natural: "Especialista em maquiagem com atendimento cuidadoso, acabamento elegante e uma experiência pensada para realçar sua beleza com leveza."
+
+Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato exato (as aspas devem ser duplas e a resposta deve ser puramente o JSON e nada mais):
+{"bio": "sua bio aqui", "headline": "Sua headline curta aqui"}`;
 
     const content = await callNvidiaAI([
       { role: "user", content: prompt }
@@ -69,7 +79,13 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato:
     // Attempt to parse JSON from response string
     let parsed;
     try {
-      parsed = JSON.parse(content.replace(/```json|```/g, '').trim());
+      let jsonString = content.replace(/```json|```/g, '').trim();
+      const firstBrace = jsonString.indexOf('{');
+      const lastBrace = jsonString.lastIndexOf('}');
+      if (firstBrace >= 0 && lastBrace >= firstBrace) {
+        jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+      }
+      parsed = JSON.parse(jsonString);
     } catch (e) {
       console.error("[BioAI] JSON parse error from model output:", content);
       throw new Error("Invalid format from AI model");

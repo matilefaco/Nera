@@ -95,12 +95,12 @@ export const PublicHero = ({
       <div className="absolute top-0 left-[48%] w-px h-full bg-gradient-to-b from-transparent via-brand-mist to-transparent hidden lg:block z-10 pointer-events-none" />
 
       {/* Content Side */}
-      <div className="flex flex-col justify-center px-6 md:px-16 pt-32 pb-24 lg:py-20 relative z-20 order-2 lg:order-1">
+      <div className="flex flex-col justify-center px-6 md:px-16 pt-24 pb-16 lg:py-20 relative z-20 order-2 lg:order-1">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="space-y-10"
+          className="space-y-8 md:space-y-10"
         >
           <div className="space-y-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-brand-stone/60">
@@ -384,10 +384,10 @@ export const PublicHero = ({
               exit={{ y: 100, opacity: 0, scale: 0.9 }} 
               className="bg-brand-ink text-brand-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10"
             >
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl" />
+              <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl pointer-events-none" />
               <button 
                 onClick={() => { setShowInterestPopup(false); setInterestPopupDismissed(true); }} 
-                className="absolute top-6 right-6 p-1 text-white/40 hover:text-white transition-colors"
+                className="absolute top-4 xl:top-6 right-4 xl:right-6 p-3 z-20 text-white/40 hover:text-white transition-colors"
               >
                 <X size={18} />
               </button>

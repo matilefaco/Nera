@@ -31,11 +31,13 @@ export function buildVerificationEmail(data: VerificationEmailData): string {
       </tr>
     </table>
 
-    <div style="margin-top: 35px; text-align: center;">
-      <p style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; line-height: 1.6;">
-        Se o botão acima não funcionar, copie e cole o link abaixo no seu navegador:<br/>
-        <a href="${verificationUrl}" style="color: #18120E; word-break: break-all;">${verificationUrl}</a>
+    <div style="margin-top: 35px; text-align: center; border-top: 1px solid #EBE4DD; padding-top: 24px;">
+      <p style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; line-height: 1.6; margin-bottom: 12px;">
+        Se o botão acima não funcionar, abra manualmente:
       </p>
+      <a href="${verificationUrl}" style="color: #18120E; font-family: Arial, sans-serif; font-size: 12px; text-decoration: underline; font-weight: bold;">
+        Verificar conta
+      </a>
     </div>
   `;
 

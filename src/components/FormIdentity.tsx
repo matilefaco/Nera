@@ -311,16 +311,23 @@ export const FormIdentity = ({
                     </details>
                   )}
                 </div>
-                {onGenerateBio && (
-                  <button 
-                    type="button"
-                    onClick={onGenerateBio}
-                    disabled={isGeneratingBio}
-                    className="flex items-center gap-2 text-[10px] font-bold text-brand-white bg-brand-ink px-4 py-2 rounded-full uppercase tracking-[0.1em] shadow-sm hover:bg-brand-espresso disabled:opacity-50 transition-all h-fit mt-1 sm:mt-0"
-                  >
-                    <Sparkles size={14} /> {isGeneratingBio ? 'Gerando...' : 'Sugerir bio com IA'}
-                  </button>
-                )}
+                <div className="mt-4 sm:mt-0 max-w-sm">
+                  {onGenerateBio && (
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        type="button"
+                        onClick={onGenerateBio}
+                        disabled={isGeneratingBio}
+                        className="flex items-center gap-2 text-[10px] font-bold text-brand-white bg-brand-ink px-4 py-2 rounded-full uppercase tracking-[0.1em] shadow-md hover:shadow-lg hover:-translate-y-0.5 hover:bg-brand-espresso disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-md transition-all h-fit w-fit"
+                      >
+                        <Sparkles size={14} className="text-brand-terracotta" /> {isGeneratingBio ? 'Gerando...' : 'Sugerir bio com IA'}
+                      </button>
+                      <p className="text-[9px] text-brand-stone/60 font-light italic leading-relaxed md:max-w-xs pl-2 border-l border-brand-mist/50">
+                        Descrevemos seu trabalho no tom ideal para atrair as clientes certas e transmitir autoridade.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
               <textarea 
                 value={bio} 
@@ -428,11 +435,11 @@ export const FormIdentity = ({
             <div className="space-y-2">
               {showLabels && (
                 <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
-                  WhatsApp da Profissional <span className="text-brand-terracotta">*</span>
+                  Telefone para Notificações <span className="text-brand-terracotta">*</span>
                 </label>
               )}
-              <p className="text-[10px] text-brand-stone font-light mt-1 ml-1">
-                Você receberá novos agendamentos por aqui. Essencial para o funcionamento.
+              <p className="text-[10px] text-brand-stone font-light mt-1 ml-1 mb-2">
+                Usado para avisos importantes sobre os agendamentos da sua agenda.
               </p>
               <input 
                 type="tel" 

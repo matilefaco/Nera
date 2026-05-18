@@ -291,15 +291,28 @@ export default function OnboardingPage() {
           bioStyle: selectedBioStyle
         })
       });
+
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro na resposta do servidor.');
+      }
+
+      if (!data.bio && !data.headline) {
+        throw new Error('Conteúdo não gerado');
+      }
+
       if (data.bio) setBio(data.bio);
       if (data.headline) setHeadline(data.headline);
       notify.success('Sua marca foi personalizada com IA ✨');
     } catch (error: any) {
       console.error('[BioAI] Generation failed:', error);
-      notify.error(error.message === 'Muitas solicitações. Tente novamente em um minuto.' 
-        ? error.message 
-        : 'O concierge está ocupado agora. Tente novamente em instantes.');
+      notify.error(
+        error.message === 'Muitas solicitações. Tente novamente em um minuto.' ||
+        error.message === 'Configuração de IA ausente.'
+          ? error.message 
+          : 'Não consegui gerar sua bio agora. Você pode escrever manualmente e tentar novamente depois.'
+      );
     } finally {
       setIsGeneratingContent(false);
     }
@@ -900,15 +913,26 @@ export default function OnboardingPage() {
           />
         </div>
         {step <= TOTAL_STEPS && (
-          <div className="py-3 px-6 flex justify-center items-center">
-            <p className="text-[10px] text-brand-stone font-semibold uppercase tracking-[0.2em]">
-              Passo {step} de {TOTAL_STEPS} <span className="mx-2 text-brand-mist">•</span> {stepDescriptions[step - 1]}
+          <div className="py-5 px-6 flex flex-col items-center gap-3">
+            <p className="text-[9px] text-brand-stone font-bold uppercase tracking-[0.25em]">
+              Passo {step} <span className="opacity-40">de {TOTAL_STEPS}</span>
+            </p>
+            <div className="w-32 md:w-48 h-[2px] bg-brand-mist/50 rounded-full overflow-hidden">
+              <motion.div 
+                className="h-full bg-[var(--theme-accent,var(--color-brand-terracotta))]"
+                initial={{ width: `${((step - 1) / TOTAL_STEPS) * 100}%` }}
+                animate={{ width: `${(step / TOTAL_STEPS) * 100}%` }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              />
+            </div>
+            <p className="text-[10px] text-brand-ink/60 font-medium tracking-[0.1em]">
+              {stepDescriptions[step - 1]}
             </p>
           </div>
         )}
       </div>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full py-20">
+      <main className="flex-1 flex flex-col items-center justify-center p-6 max-w-2xl mx-auto w-full pt-36 pb-20 md:pt-32">
         <AnimatePresence mode="wait">
           {step === 1 && (
             <motion.div 
@@ -964,7 +988,12 @@ export default function OnboardingPage() {
               <button 
                 onClick={nextStep}
                 disabled={!name || !specialty || !slug || !whatsapp || uploadingImage || isSavingStep || slugStatus !== 'available'}
-                className="w-full bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                className={cn(
+                  "w-full py-6 rounded-full text-[11px] font-medium uppercase tracking-widest transition-all duration-500 ease-out flex items-center justify-center gap-3 relative overflow-hidden group",
+                  (!name || !specialty || !slug || !whatsapp || uploadingImage || isSavingStep || slugStatus !== 'available') 
+                  ? "bg-brand-mist/20 text-brand-stone/40 border border-brand-mist/50 cursor-not-allowed" 
+                  : "bg-brand-ink text-brand-white shadow-[0_8px_32px_rgba(var(--theme-accent-rgb),20,20,20,0.15)] hover:shadow-[0_16px_48px_rgba(var(--theme-accent-rgb),20,20,20,0.25)] hover:-translate-y-0.5 hover:bg-brand-espresso"
+                )}
               >
                 {isSavingStep || uploadingImage ? (
                   <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
@@ -1033,7 +1062,15 @@ export default function OnboardingPage() {
                     (serviceMode === 'home' && serviceAreaType === 'custom' && serviceAreas.length === 0) ||
                     (serviceMode === 'hybrid' && serviceAreaType === 'custom' && serviceAreas.length === 0)
                   }
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                  className={cn(
+                    "flex-1 py-6 rounded-full text-[11px] font-medium uppercase tracking-widest transition-all duration-500 ease-out flex items-center justify-center gap-3 relative overflow-hidden group",
+                    (isSavingStep ||
+                    !city || !neighborhood ||
+                    (serviceMode === 'home' && serviceAreaType === 'custom' && serviceAreas.length === 0) ||
+                    (serviceMode === 'hybrid' && serviceAreaType === 'custom' && serviceAreas.length === 0))
+                    ? "bg-brand-mist/20 text-brand-stone/40 border border-brand-mist/50 cursor-not-allowed"
+                    : "bg-brand-ink text-brand-white shadow-[0_8px_32px_rgba(var(--theme-accent-rgb),20,20,20,0.15)] hover:shadow-[0_16px_48px_rgba(var(--theme-accent-rgb),20,20,20,0.25)] hover:-translate-y-0.5 hover:bg-brand-espresso"
+                  )}
                 >
                   {isSavingStep ? (
                     <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
@@ -1118,7 +1155,12 @@ export default function OnboardingPage() {
                 <button 
                   onClick={handleFinish}
                   disabled={loading || isFinalizing || slugStatus !== 'available' || workingDays.length === 0}
-                  className="flex-1 bg-brand-ink text-brand-white py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-xl"
+                  className={cn(
+                    "flex-1 py-6 rounded-full text-[11px] font-medium uppercase tracking-[0.2em] transition-all duration-500 ease-out flex items-center justify-center gap-3 relative overflow-hidden group",
+                    (loading || isFinalizing || slugStatus !== 'available' || workingDays.length === 0)
+                    ? "bg-brand-mist/20 text-brand-stone/40 border border-brand-mist/50 cursor-not-allowed"
+                    : "bg-brand-ink text-brand-white shadow-[0_8px_32px_rgba(var(--theme-accent-rgb),20,20,20,0.15)] hover:shadow-[0_16px_48px_rgba(var(--theme-accent-rgb),20,20,20,0.25)] hover:-translate-y-0.5 hover:bg-brand-espresso"
+                  )}
                 >
                   {isFinalizing ? (
                     <>

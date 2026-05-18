@@ -11,9 +11,9 @@ interface ExpertIntroProps {
 
 export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
   return (
-    <section className="py-24 px-6 bg-brand-white relative overflow-hidden">
+    <section className="py-16 md:py-24 px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col items-center text-center space-y-10">
+        <div className="flex flex-col items-center text-center space-y-8 md:space-y-10">
           {/* Text Content */}
           <div className="space-y-8">
             <div className="space-y-4">

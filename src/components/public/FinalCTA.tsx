@@ -14,7 +14,7 @@ export const FinalCTA = ({ onBookingClick, completedBookings, profile }: FinalCT
   const isProWithWhatsapp = profile.plan === 'pro' && !!profile.whatsapp;
 
   return (
-    <section className="bg-brand-ink py-40 px-6 relative overflow-hidden">
+    <section className="bg-brand-ink py-24 md:py-40 px-6 relative overflow-hidden">
       {/* Decorative Circles */}
       <div className="absolute top-[-160px] right-[-160px] w-[520px] h-[520px] rounded-full border border-white/5 pointer-events-none" />
       <div className="absolute bottom-[-160px] left-[-160px] w-[440px] h-[440px] rounded-full border border-white/5 pointer-events-none" />
@@ -34,7 +34,7 @@ export const FinalCTA = ({ onBookingClick, completedBookings, profile }: FinalCT
           <em className="font-serif italic text-brand-blush/60">atendimento</em>
         </h2>
         
-        <p className="text-brand-blush/60 text-sm max-w-md mx-auto mb-10">
+        <p className="text-brand-blush/60 text-sm max-w-md mx-auto mb-8 md:mb-10">
           Atendimento profissional com agendamento simples, rápido e organizado.
         </p>
 
