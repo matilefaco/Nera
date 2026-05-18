@@ -20,7 +20,17 @@ async function createExpressApp() {
   if (!cachedApp) {
     // We import dynamically to keep the initial script evaluation instantaneous
     // Using explicit .cjs path means esbuild won't bundle it, avoiding heavy parsing overhead
-    const { createServerApp } = await import("./server.cjs");
+    const module = await import("./server.cjs");
+    const createServerApp = module.createServerApp;
+
+    if (typeof createServerApp !== "function") {
+      console.error("[CRITICAL ERROR] createServerApp is not a function", { 
+        moduleKeys: Object.keys(module),
+        hasDefault: !!module.default
+      });
+      throw new Error("Invalid server bundle: createServerApp is not a function in ./server.cjs");
+    }
+
     cachedApp = await createServerApp();
   }
   return cachedApp;
@@ -74,8 +84,12 @@ export const api = onRequest(
       const app = await createExpressApp();
       return app(req, res);
     } catch (err: any) {
-      console.error("[CRITICAL STARTUP ERROR]", err);
-      res.status(500).send("Internal Server Error during initialization");
+      console.error("[CRITICAL STARTUP ERROR]", {
+        message: err.message,
+        stack: err.stack,
+        code: err.code
+      });
+      res.status(500).send(`Internal Server Error during initialization: ${err.message}`);
     }
   }
 );

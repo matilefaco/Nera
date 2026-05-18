@@ -41,6 +41,7 @@ function isAllowedOrigin(origin?: string): boolean {
 }
 
 export async function createServerApp() {
+  // slug check deploy sync - forced redeploy
   // 1. Initial configuration (Move heavy logic here)
   const { config } = await import("dotenv");
   config();
@@ -124,6 +125,25 @@ export async function createServerApp() {
   const apiRouter = express.Router();
 
   // Specific routers
+  let routes: any[] = [];
+  try {
+    routes = await Promise.all([
+      import("./server/routes/authRoutes.js"),
+      import("./server/routes/aiRoutes.js"),
+      import("./server/routes/slugRoutes.js"),
+      import("./server/routes/healthRoutes.js"),
+      import("./server/routes/profileRoutes.js"),
+      import("./server/routes/planRoutes.js"),
+      import("./server/routes/calendarRoutes.js"),
+      import("./server/routes/bookingRoutes.js"),
+      import("./server/routes/notificationRoutes.js"),
+      import("./server/routes/analyticsRoutes.js")
+    ]);
+  } catch (routeErr: any) {
+    logger.error("SERVER", "Failed to import one or more routes", { error: routeErr.message, stack: routeErr.stack });
+    throw routeErr;
+  }
+
   const [
     authRoutes,
     aiRoutes,
@@ -135,18 +155,7 @@ export async function createServerApp() {
     bookingRoutes,
     notificationRoutes,
     analyticsRoutes
-  ] = await Promise.all([
-    import("./server/routes/authRoutes.js"),
-    import("./server/routes/aiRoutes.js"),
-    import("./server/routes/slugRoutes.js"),
-    import("./server/routes/healthRoutes.js"),
-    import("./server/routes/profileRoutes.js"),
-    import("./server/routes/planRoutes.js"),
-    import("./server/routes/calendarRoutes.js"),
-    import("./server/routes/bookingRoutes.js"),
-    import("./server/routes/notificationRoutes.js"),
-    import("./server/routes/analyticsRoutes.js")
-  ]);
+  ] = routes;
 
   apiRouter.use("/auth", authRoutes.default);
   apiRouter.use("/ai", aiRoutes.default);

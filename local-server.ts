@@ -1,6 +1,14 @@
 import { createServerApp } from "./server.ts";
 
+export { createServerApp };
+
 async function start() {
+  // Guard: Do not bind to port if running in Firebase/Functions environment
+  if (process.env.FUNCTIONS_TARGET || process.env.K_SERVICE || process.env.FIREBASE_CONFIG) {
+    console.log("[SERVER] Skipping local listen (Running in cloud environment)");
+    return;
+  }
+
   console.log("[DEV SERVER] Initializing Express + Vite...");
   const app = await createServerApp();
   const port = 3000;
