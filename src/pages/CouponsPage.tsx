@@ -240,9 +240,9 @@ export default function CouponsPage() {
           <div className="max-w-4xl mx-auto py-12 md:py-24 px-6">
             <div className="text-center mb-16 md:mb-24">
               <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6 block">Recurso Exclusivo</span>
-              <h2 className="text-4xl md:text-6xl font-serif text-brand-ink mb-8 italic leading-tight">Campanhas e incentivos</h2>
+              <h2 className="text-4xl md:text-6xl font-serif text-brand-ink mb-8 italic leading-tight">Cupons de desconto</h2>
               <p className="text-base md:text-xl text-brand-stone font-light leading-relaxed max-w-2xl mx-auto">
-                Crie ações pontuais para incentivar retornos, movimentar horários estratégicos e fortalecer a relação com suas clientes.
+                Crie campanhas pontuais para incentivar retornos, movimentar horários estratégicos e fortalecer a relação com suas clientes.
               </p>
             </div>
 
@@ -272,14 +272,14 @@ export default function CouponsPage() {
 
             <div className="bg-brand-parchment/40 rounded-[48px] p-12 md:p-20 text-center border border-brand-mist/50 backdrop-blur-sm">
               <p className="text-xs text-brand-stone font-medium uppercase tracking-[0.2em] mb-10">
-                Disponível nos planos Essencial e Pro
+                Disponível no plano Pro
               </p>
               <PremiumButton 
                 variant="terracotta" 
                 onClick={() => navigate('/planos')}
                 className="px-14 py-5 text-[11px]"
               >
-                Ver planos
+                Ver plano Pro
               </PremiumButton>
             </div>
           </div>

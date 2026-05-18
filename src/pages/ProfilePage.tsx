@@ -120,7 +120,7 @@ export default function ProfilePage() {
 
   const { plan, allowedThemes } = usePlanFeatures();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-  const [upgradeFeature, setUpgradeFeature] = useState<'analytics' | 'advancedDashboard' | 'unlimitedBookings' | 'whatsappNotifications' | 'waitlist' | 'antiNoShow' | 'coupons' | 'reports'>('advancedDashboard');
+  const [upgradeFeature, setUpgradeFeature] = useState<'analytics' | 'advancedDashboard' | 'unlimitedBookings' | 'whatsappNotifications' | 'waitlist' | 'antiNoShow' | 'coupons' | 'reports' | 'theme'>('advancedDashboard');
 
   const isThemeLocked = (variant: string) => {
     return !allowedThemes.includes(variant);
@@ -128,7 +128,7 @@ export default function ProfilePage() {
 
   const handleThemeClick = (variant: string) => {
     if (isThemeLocked(variant)) {
-      setUpgradeFeature('advancedDashboard'); // Themes are part of advanced branding/dashboard features
+      setUpgradeFeature('theme');
       setIsUpgradeModalOpen(true);
       return;
     }

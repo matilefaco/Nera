@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Users, Gift, ArrowLeft, Calendar, CheckCircle2, Clock } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
 import { auth } from '../firebase';
 import AppLayout from '../components/AppLayout';
 import { formatCurrency } from '../lib/utils';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import PremiumButton from '../components/PremiumButton';
 
 interface ReferralRecord {
   id: string;
@@ -18,7 +20,9 @@ interface ReferralRecord {
 }
 
 export default function ReferralsPage() {
+  const navigate = useNavigate();
   const { profile, isAuthReady } = useAuth();
+  const { features } = usePlanFeatures();
   const [referrals, setReferrals] = useState<ReferralRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -30,6 +34,12 @@ export default function ReferralsPage() {
     console.log('[Referrals] start');
     if (!isAuthReady) {
       console.log('[Referrals] auth not ready, waiting');
+      return;
+    }
+
+    if (!features.referrals) {
+      console.log('[Referrals] not available for this plan, loading=false');
+      setLoading(false);
       return;
     }
 
@@ -81,7 +91,7 @@ export default function ReferralsPage() {
       isMounted = false;
       isCancelled = true;
     };
-  }, [profile?.referralCode, isAuthReady, retryCount]);
+  }, [profile?.referralCode, isAuthReady, retryCount, features.referrals]);
 
   const totalCredits = (referrals.filter(r => r.plan !== 'free').length) * 10;
   const referralLink = `${window.location.origin}/register?ref=${profile?.referralCode || ''}`;
@@ -116,18 +126,45 @@ export default function ReferralsPage() {
               </p>
             </div>
 
-            <div className="bg-brand-ink text-white p-6 rounded-3xl min-w-[200px]">
-              <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 block mb-1">Total Ganho</span>
-              <span className="text-3xl font-serif text-brand-terracotta">{formatCurrency(profile?.credits || 0)}</span>
-              {(profile?.credits || 0) > 0 && (
-                <div className="mt-2 text-[9px] text-brand-linen/80 uppercase tracking-widest font-medium border-t border-white/10 pt-2">
-                  aplicados no próximo upgrade
-                </div>
-              )}
-            </div>
+            {features.referrals && (
+              <div className="bg-brand-ink text-white p-6 rounded-3xl min-w-[200px]">
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 block mb-1">Total Ganho</span>
+                <span className="text-3xl font-serif text-brand-terracotta">{formatCurrency(profile?.credits || 0)}</span>
+                {(profile?.credits || 0) > 0 && (
+                  <div className="mt-2 text-[9px] text-brand-linen/80 uppercase tracking-widest font-medium border-t border-white/10 pt-2">
+                    aplicados no próximo upgrade
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </header>
 
+        {!features.referrals ? (
+          <div className="max-w-4xl mx-auto py-12 px-6">
+            <div className="text-center mb-16 md:mb-24">
+              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-6 block">Recurso Exclusivo</span>
+              <h2 className="text-4xl md:text-6xl font-serif text-brand-ink mb-8 italic leading-tight">Indicação premiada</h2>
+              <p className="text-base md:text-xl text-brand-stone font-light leading-relaxed max-w-2xl mx-auto">
+                Compartilhe a Nera com outras profissionais e acompanhe seus créditos quando a indicação se tornar ativa.
+              </p>
+            </div>
+
+            <div className="bg-brand-parchment/40 rounded-[48px] p-12 md:p-20 text-center border border-brand-mist/50 backdrop-blur-sm">
+              <p className="text-xs text-brand-stone font-medium uppercase tracking-[0.2em] mb-10">
+                Disponível no plano Pro
+              </p>
+              <PremiumButton 
+                variant="terracotta" 
+                onClick={() => navigate('/planos')}
+                className="px-14 py-5 text-[11px]"
+              >
+                Ver plano Pro
+              </PremiumButton>
+            </div>
+          </div>
+        ) : (
+          <>
         {/* Link Section */}
         <section className="mb-12 bg-brand-white p-8 rounded-[32px] border border-brand-mist shadow-sm flex flex-col md:flex-row items-center gap-6 justify-between">
           <div className="max-w-md w-full">
@@ -264,6 +301,8 @@ export default function ReferralsPage() {
             ))}
           </ul>
         </footer>
+        </>
+        )}
       </div>
     </AppLayout>
   );

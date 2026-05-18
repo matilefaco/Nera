@@ -575,11 +575,13 @@ export default function ClientsPage() {
             <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl -mr-16 -mt-16" />
             <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
               <div className="space-y-2">
-                <span className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] block">Oportunidade de Receita</span>
+                <span className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] block">Retenção de Clientes</span>
                 <h3 className="text-2xl font-serif">
                   Você tem {clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length} clientes sem voltar há 30+ dias.
                 </h3>
-                <p className="text-white/60 text-xs font-light">Um convite personalizado pode recuperar até {formatCurrency(clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).reduce((acc, curr) => acc + (curr.totalSpent / curr.confirmedAppointments || 0), 0))} em faturamento hoje.</p>
+                <p className="text-white/70 text-xs font-light leading-relaxed max-w-md">
+                  Um acompanhamento cuidadoso pode ajudar a trazer algumas delas de volta para sua agenda.
+                </p>
               </div>
               <button 
                 onClick={() => setFilterStatus('inactive')}
@@ -650,37 +652,6 @@ export default function ClientsPage() {
                   {filteredClients.length} clientes
                 </span>
               </div>
-            )}
-
-            {clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length > 0 && (
-              <PremiumButton
-                onClick={() => {
-                  if (!checkFeatureAccess('analytics')) return;
-                  
-                  const top10 = clients
-                    .filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30)
-                    .sort((a,b) => b.totalSpent - a.totalSpent)
-                    .slice(0, 10);
-                  
-                  notify.info(`Iniciando reativação de ${top10.length} clientes VIP...`, {
-                    description: "Abriremos o WhatsApp de cada uma com uma mensagem personalizada."
-                  });
-
-                  // Sequence them (opening multiple tabs at once might be blocked, but we'll try or provide a list)
-                  top10.forEach((c, i) => {
-                    setTimeout(() => {
-                      const profileUrl = profile?.slug ? `https://usenera.com/p/${profile.slug}` : 'https://usenera.com';
-                      const msg = `Oi, ${c.clientName.split(' ')[0]} ✨\nFaz um tempinho desde o seu último atendimento e lembrei de você 🤎\nMinha agenda está disponível:\n${profileUrl}`;
-                      window.open(buildWhatsappLink(c.clientPhone, msg), '_blank');
-                    }, i * 1500);
-                  });
-                }}
-                variant="linen"
-                className="text-[10px] py-6 px-8 flex items-center gap-2 whitespace-nowrap"
-              >
-                <RefreshCw size={14} className="text-brand-terracotta" />
-                Reativar Top 10 VIP
-              </PremiumButton>
             )}
           </div>
 

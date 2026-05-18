@@ -58,6 +58,7 @@ export interface PlanFeatures {
   coupons: boolean;
   analytics: boolean;
   reports: boolean;
+  referrals: boolean;
 }
 
 export interface UserProfile {

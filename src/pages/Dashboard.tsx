@@ -1128,7 +1128,7 @@ setUnconfirmedTomorrow(docs);
                         <div className="flex-1 z-10">
                           <div className="flex items-center gap-2 mb-1.5">
                             <h4 className="text-[10px] font-bold text-brand-ink uppercase tracking-widest">{growthMetrics.growthInsightsList[0].title}</h4>
-                            <span className="text-[7px] font-bold text-brand-stone bg-white border border-brand-mist/40 px-1.5 py-0.5 rounded uppercase tracking-widest">Nera AI</span>
+                            <span className="text-[7px] font-bold text-brand-stone bg-white border border-brand-mist/40 px-1.5 py-0.5 rounded uppercase tracking-widest">Insight da semana</span>
                           </div>
                           <p className="text-[13px] text-brand-ink font-serif leading-relaxed italic pr-4">
                             "{growthMetrics.growthInsightsList[0].description}"
@@ -1964,9 +1964,9 @@ setUnconfirmedTomorrow(docs);
 
               <div className="mt-10 p-6 bg-brand-ink text-brand-white rounded-[32px] border border-white/10 relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl opacity-50" />
-                <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] mb-3 relative z-10">Eficiência Automática</p>
+                <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] mb-3 relative z-10">Sempre Conectada</p>
                 <p className="text-[11px] text-white/70 leading-relaxed italic relative z-10">
-                  No modo <strong>Automático</strong>, a Nera envia um convite por WhatsApp assim que uma vaga compatível surge. A primeira a aceitar fica com o horário — sem você precisar mover um dedo.
+                  Organize interessadas e acompanhe oportunidades. Quando surgir uma vaga, você pode priorizar clientes que já estão aguardando horários futuros.
                 </p>
               </div>
             </motion.div>
