@@ -20,6 +20,7 @@ export interface FormServicesProps {
     startTime: string;
     endTime: string;
   };
+  specialty?: string;
 }
 
 const FormError = ({ message }: { message?: string }) => (
@@ -53,9 +54,73 @@ export const FormServices = ({
   errors = [],
   title,
   subtitle,
-  workingHours = { startTime: '09:00', endTime: '18:00' }
+  workingHours = { startTime: '09:00', endTime: '18:00' },
+  specialty
 }: FormServicesProps) => {
   const [showCustom, setShowCustom] = React.useState<Record<number, boolean>>({});
+
+  const getServiceSuggestions = (spec?: string) => {
+    if (!spec) {
+      return [
+        { name: 'Atendimento personalizado', duration: 60 },
+        { name: 'Consulta inicial', duration: 30 },
+        { name: 'Serviço principal', duration: 60 }
+      ];
+    }
+    
+    // Normalize string: lowercase, remove accents
+    const s = spec.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    if (s.includes('lash') || s.includes('cilio')) {
+      return [
+        { name: 'Extensão fio a fio', duration: 120 },
+        { name: 'Volume brasileiro', duration: 120 },
+        { name: 'Manutenção de cílios', duration: 60 }
+      ];
+    }
+    if (s.includes('sobrancelha') || s.includes('micropigmentadora')) {
+      return [
+        { name: 'Design de sobrancelhas', duration: 60 },
+        { name: 'Design com henna', duration: 60 },
+        { name: 'Brow lamination', duration: 90 }
+      ];
+    }
+    if (s.includes('maqui')) {
+      return [
+        { name: 'Maquiagem social', duration: 60 },
+        { name: 'Maquiagem para noiva', duration: 120 },
+        { name: 'Produção para formanda', duration: 90 }
+      ];
+    }
+    if (s.includes('nail') || s.includes('unha') || s.includes('manicure')) {
+      return [
+        { name: 'Manicure', duration: 60 },
+        { name: 'Banho de gel', duration: 90 },
+        { name: 'Alongamento de unhas', duration: 120 }
+      ];
+    }
+    if (s.includes('estetic') || s.includes('masso') || s.includes('depila') || s.includes('tto')) {
+      return [
+        { name: 'Limpeza de pele', duration: 60 },
+        { name: 'Drenagem linfática', duration: 60 },
+        { name: 'Peeling facial', duration: 60 }
+      ];
+    }
+    if (s.includes('cabel') || s.includes('trancista') || s.includes('terapeuta capilar') || s.includes('hair')) {
+      return [
+        { name: 'Corte feminino', duration: 60 },
+        { name: 'Escova', duration: 60 },
+        { name: 'Coloração', duration: 120 }
+      ];
+    }
+    return [
+      { name: 'Atendimento personalizado', duration: 60 },
+      { name: 'Consulta inicial', duration: 30 },
+      { name: 'Serviço principal', duration: 60 }
+    ];
+  };
+
+  const suggestions = getServiceSuggestions(specialty);
 
   const addService = () => {
     setServices([...services, { name: '', duration: '', price: '', description: '' }]);
@@ -123,6 +188,30 @@ export const FormServices = ({
                   <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
                     Nome do serviço <span className="text-brand-terracotta">*</span>
                   </label>
+                  
+                  <div className="mb-3">
+                    <p className="text-[10px] font-medium text-brand-ink ml-1 mb-0.5">Sugestões para começar</p>
+                    <p className="text-[9px] text-brand-stone font-light italic ml-1 mb-2">
+                      Você pode ajustar nome, duração e preço depois.
+                    </p>
+                    <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none -mx-2 px-2 md:mx-0 md:px-0">
+                      {suggestions.map((sug, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            updateService(index, 'name', sug.name);
+                            updateService(index, 'duration', String(sug.duration));
+                            setShowCustom(prev => ({ ...prev, [index]: false }));
+                          }}
+                          className="flex-shrink-0 px-3 py-1.5 bg-brand-parchment border border-brand-mist hover:border-brand-ink rounded-full text-[10px] font-medium text-brand-ink transition-all shadow-sm"
+                        >
+                          {sug.name} <span className="text-brand-stone font-normal ml-0.5">• {sug.duration} min</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <input 
                     type="text" 
                     value={service.name} 
@@ -222,7 +311,7 @@ export const FormServices = ({
                 </div>
 
                 <div className="md:col-span-1 space-y-2">
-                  <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Valor (R$)</label>
+                  <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Valor do serviço (Obrigatório) <span className="text-brand-terracotta">*</span></label>
                   <div className="relative">
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
                     <input 

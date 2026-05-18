@@ -25,10 +25,14 @@ export const FinalCTA = ({ onBookingClick, completedBookings }: FinalCTAProps) =
           Horários disponíveis
         </span>
         
-        <h2 className="display-hero text-brand-white mb-10">
-          Transforme o seu<br />
-          <em className="font-serif italic text-brand-blush/60">olhar hoje</em>
+        <h2 className="display-hero text-brand-white mb-6">
+          Reserve seu próximo<br />
+          <em className="font-serif italic text-brand-blush/60">atendimento</em>
         </h2>
+        
+        <p className="text-brand-blush/60 text-sm max-w-md mx-auto mb-10">
+          Atendimento profissional com agendamento simples, rápido e organizado.
+        </p>
 
         <div className="flex flex-col items-center gap-4">
           <PremiumButton

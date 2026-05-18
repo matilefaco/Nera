@@ -107,6 +107,25 @@ export const FormIdentity = ({
   selectedBioStyle = 'elegante',
   setSelectedBioStyle
 }: FormIdentityProps) => {
+  const [showAllSpecialties, setShowAllSpecialties] = React.useState(false);
+  const specialtySuggestions = [
+    'Lash designer',
+    'Designer de sobrancelhas',
+    'Nail designer',
+    'Manicure',
+    'Maquiadora',
+    'Cabeleireira',
+    'Esteticista',
+    'Micropigmentadora',
+    'Depiladora',
+    'Trancista',
+    'Massoterapeuta',
+    'Designer de cílios',
+    'Bronzeamento',
+    'Terapeuta capilar'
+  ];
+  const displayedSpecialties = showAllSpecialties ? specialtySuggestions : specialtySuggestions.slice(0, 8);
+
   const styles = [
     { id: 'elegante', label: 'Elegante' },
     { id: 'delicada', label: 'Delicada' },
@@ -161,8 +180,9 @@ export const FormIdentity = ({
           </div>
           <div className="flex-1 space-y-1 sm:pt-2">
             <h3 className="text-lg font-serif italic text-brand-ink">Sua melhor foto</h3>
-            <p className="text-[10px] sm:text-xs font-light text-brand-stone leading-relaxed max-w-xs mx-auto sm:mx-0">
-              Uma boa foto profissional transmite confiança e aumenta as chances de agendamento.
+            <p className="text-[10px] sm:text-xs font-light text-brand-stone leading-relaxed max-w-xs mx-auto sm:mx-0 block">
+              Uma boa foto profissional transmite confiança. <br />
+              <span className="italic">Você pode adicionar sua foto agora ou deixar para ajustar depois.</span>
             </p>
           </div>
         </div>
@@ -187,7 +207,7 @@ export const FormIdentity = ({
               />
               <FormError message={errors.name} />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 flex flex-col">
               {showLabels && (
                 <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
                   Sua Especialidade Principal <span className="text-brand-terracotta">*</span>
@@ -203,6 +223,44 @@ export const FormIdentity = ({
                   errors.specialty ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
                 )}
               />
+              <p className="text-[10px] text-brand-stone font-light italic ml-1 mt-1">
+                Escolha uma sugestão ou escreva do seu jeito.
+              </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                 {displayedSpecialties.map(s => (
+                   <button
+                     key={s}
+                     type="button"
+                     onClick={() => setSpecialty(s)}
+                     className={cn(
+                       "px-3 py-1.5 rounded-full text-[10px] font-medium transition-all duration-300 ease-out border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
+                       specialty === s
+                         ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
+                         : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
+                     )}
+                   >
+                     {s}
+                   </button>
+                 ))}
+                 {!showAllSpecialties && specialtySuggestions.length > 8 && (
+                   <button
+                     type="button"
+                     onClick={() => setShowAllSpecialties(true)}
+                     className="px-3 py-1.5 rounded-full text-[10px] font-medium text-brand-terracotta underline hover:text-brand-sienna transition-all"
+                   >
+                     Ver mais
+                   </button>
+                 )}
+                 {showAllSpecialties && (
+                   <button
+                     type="button"
+                     onClick={() => setShowAllSpecialties(false)}
+                     className="px-3 py-1.5 rounded-full text-[10px] font-medium text-brand-terracotta underline hover:text-brand-sienna transition-all"
+                   >
+                     Ver menos
+                   </button>
+                 )}
+              </div>
               <FormError message={errors.specialty} />
             </div>
           </div>
@@ -224,27 +282,33 @@ export const FormIdentity = ({
 
           {(bio !== undefined && setBio) && (
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                <div className="space-y-1">
-                  {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua bio profissional</label>}
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="space-y-1 flex-1">
+                  {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua bio profissional (Opcional)</label>}
                   {setSelectedBioStyle && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {styles.map(s => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => setSelectedBioStyle(s.id)}
-                          className={cn(
-                            "px-3 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-wider transition-all border",
-                            selectedBioStyle === s.id
-                              ? "bg-brand-ink text-brand-white border-brand-ink"
-                              : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
-                          )}
-                        >
-                          {s.label}
-                        </button>
-                      ))}
-                    </div>
+                    <details className="mt-1 group">
+                      <summary className="text-[9px] cursor-pointer text-brand-stone/80 hover:text-brand-ink italic list-none flex items-center gap-1 ml-1 mb-2 outline-none">
+                        <span>Ajustar tom da bio</span>
+                        <span className="text-[8px] group-open:rotate-180 transition-transform">▼</span>
+                      </summary>
+                      <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
+                        {styles.map(s => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => setSelectedBioStyle(s.id)}
+                            className={cn(
+                              "px-3 py-1.5 rounded-full text-[8px] font-bold uppercase tracking-wider transition-all border",
+                              selectedBioStyle === s.id
+                                ? "bg-brand-ink text-brand-white border-brand-ink"
+                                : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone"
+                            )}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+                    </details>
                   )}
                 </div>
                 {onGenerateBio && (
@@ -252,9 +316,9 @@ export const FormIdentity = ({
                     type="button"
                     onClick={onGenerateBio}
                     disabled={isGeneratingBio}
-                    className="flex items-center gap-2 text-[10px] font-medium text-brand-terracotta uppercase tracking-[0.2em] hover:text-brand-sienna disabled:opacity-50 h-fit pb-1"
+                    className="flex items-center gap-2 text-[10px] font-bold text-brand-white bg-brand-ink px-4 py-2 rounded-full uppercase tracking-[0.1em] shadow-sm hover:bg-brand-espresso disabled:opacity-50 transition-all h-fit mt-1 sm:mt-0"
                   >
-                    <Sparkles size={14} /> {isGeneratingBio ? 'Refinando...' : 'Bio sugerida com IA'}
+                    <Sparkles size={14} /> {isGeneratingBio ? 'Gerando...' : 'Sugerir bio com IA'}
                   </button>
                 )}
               </div>
@@ -391,11 +455,11 @@ export const FormIdentity = ({
 
           {(instagram !== undefined && setInstagram) && (
             <div className="space-y-2">
-              {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">Instagram (@usuario)</label>}
+              {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">Instagram (@usuario) (Opcional)</label>}
               <div className={cn(
                 "flex items-center gap-2 bg-brand-parchment/60 px-4 py-2.5 rounded-lg border transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50",
                 instagramStatus === 'valid' ? "border-green-200 ring-1 ring-green-100" :
-                instagramStatus === 'invalid' ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
+                instagramStatus === 'invalid' && instagram ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
                 "border-brand-mist/50 shadow-sm"
               )}>
                 <span className="text-brand-stone text-xs ml-1">@</span>

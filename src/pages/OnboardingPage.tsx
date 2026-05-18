@@ -428,8 +428,7 @@ export default function OnboardingPage() {
       if (!neighborhood.trim()) errors.neighborhood = 'Informe seu bairro';
 
       if (serviceMode !== 'home') {
-        if (!studioAddress.street.trim()) errors.studioStreet = 'Informe a rua';
-        if (!studioAddress.number.trim()) errors.studioNumber = 'Informe o número';
+        // Relaxing address block to allow saving without full details on day 1
       }
 
       let hasServiceError = false;
@@ -992,6 +991,7 @@ export default function OnboardingPage() {
                 setServices={setServices as any}
                 errors={servicesErrors}
                 workingHours={{ startTime, endTime }}
+                specialty={specialty}
               />
 
               <FormLocation
@@ -1030,7 +1030,6 @@ export default function OnboardingPage() {
                   disabled={
                     isSavingStep ||
                     !city || !neighborhood ||
-                    (serviceMode !== 'home' && (!studioAddress.street || !studioAddress.number || !studioAddress.neighborhood)) || 
                     (serviceMode === 'home' && serviceAreaType === 'custom' && serviceAreas.length === 0) ||
                     (serviceMode === 'hybrid' && serviceAreaType === 'custom' && serviceAreas.length === 0)
                   }

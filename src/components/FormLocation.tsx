@@ -193,7 +193,10 @@ export const FormLocation = ({
           <div className="space-y-4 pt-4 mt-2 border-t border-brand-mist/40">
             <div className="flex items-center gap-2 text-brand-ink mb-1">
               <Building2 size={14} className="text-brand-terracotta" />
-              <h3 className="font-serif text-[15px]">Localização do estúdio</h3>
+              <div className="flex flex-col">
+                <h3 className="font-serif text-[15px]">Localização do estúdio</h3>
+                <span className="text-[9px] text-brand-stone italic mt-0.5">Opcional — você pode completar depois. Você escolhe se o endereço aparece público ou só após reserva.</span>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
