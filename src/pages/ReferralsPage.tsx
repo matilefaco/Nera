@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
+import { auth } from '../firebase';
 import AppLayout from '../components/AppLayout';
 import { formatCurrency } from '../lib/utils';
 
@@ -48,7 +49,12 @@ export default function ReferralsPage() {
         setLoading(true);
         setError(false);
         
-        const response = await fetch('/api/profile/referrals');
+        const token = await auth.currentUser?.getIdToken();
+        const response = await fetch('/api/profile/referrals', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         if (!response.ok) throw new Error(`API_ERROR_${response.status}`);
         
         const docs = await response.json();

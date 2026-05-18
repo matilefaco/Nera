@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, TrendingUp, Zap, Sparkles, Heart, Target, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatCurrency } from '../lib/utils';
 
 interface UpgradeModalProps {
   open: boolean;
@@ -13,22 +12,22 @@ interface UpgradeModalProps {
   averageTicket?: number;
 }
 
-const variantA = { // Emotional
-  title: "Você está crescendo 🚀",
-  subtitle: "Sucesso à vista",
-  tagline: "O mundo precisa do seu talento.",
-  featureTitle: "A Nera cresce com você",
-  featureDesc: "Não deixe que limites técnicos freiem a sua paixão e o seu brilho.",
-  cta: "Liberar agenda ilimitada"
+const variantA = {
+  title: "Evolua sua gestão",
+  subtitle: "CRESCIMENTO",
+  tagline: "Dê o próximo passo.",
+  featureTitle: "Cresça com consistência",
+  featureDesc: "Acesse ferramentas essenciais para organizar sua agenda.",
+  cta: "Ver planos disponíveis"
 };
 
-const variantB = { // Rational
-  title: "Aumente seu faturamento 📈",
-  subtitle: "Otimização de lucro",
-  tagline: "Dados não mentem.",
-  featureTitle: "Decisões baseadas em números",
-  featureDesc: "Recupere o valor investido na primeira semana com economia de tempo e zero faltas.",
-  cta: "Maximizar meus ganhos"
+const variantB = {
+  title: "Profissionalize sua rotina",
+  subtitle: "GESTÃO INTELIGENTE",
+  tagline: "Eleve o nível do seu atendimento.",
+  featureTitle: "Decisões baseadas em dados",
+  featureDesc: "Recursos completos para automatizar seu dia a dia.",
+  cta: "Ver planos disponíveis"
 };
 
 export default function UpgradeModal({ 
@@ -54,37 +53,35 @@ export default function UpgradeModal({
         return {
           title: "Lista de Espera Inteligente",
           desc: "Nunca mais perca uma cliente por falta de horário. Ative a fila automática.",
-          limit: "Recupere até 4h/semana de ociosidade"
+          limit: "Otimize seus horários"
         };
       case 'coupons':
         return {
           title: "Incentivos e Cupons",
-          desc: "Crie campanhas de desconto para fidelizar suas clientes VIP.",
-          limit: "Aumente sua taxa de retorno em até 30%"
+          desc: "Crie campanhas de desconto para fidelizar suas clientes.",
+          limit: "Aumente as taxas de retorno"
         };
       case 'analytics':
         return {
           title: "Inteligência de Dados",
-          desc: "Saiba exatamente quem são suas clientes VIP e quem está em risco.",
-          limit: "Decisões precisas, lucro garantido"
+          desc: "Saiba exatamente quem são suas clientes VIP e o desempenho do seu negócio.",
+          limit: "Decisões precisas"
         };
       case 'reports':
         return {
           title: "Relatórios Profissionais",
-          desc: "Gere documentos em PDF com sua performance mensal e top serviços.",
-          limit: "Sua gestão elevada ao nível Pro"
+          desc: "Gere documentos em PDF com sua performance e serviços.",
+          limit: "Sua gestão com mais clareza"
         };
       case 'unlimitedBookings':
       default:
         return {
           title: "Agenda Ilimitada",
-          desc: "Não deixe que limites técnicos freiem o seu crescimento profissional.",
-          limit: "Você está perdendo clientes por limite de agenda"
+          desc: "Remova as restrições e aceite quantos agendamentos precisar.",
+          limit: "Aceite mais agendamentos"
         };
     }
   }, [feature]);
-
-  const potentialRevenue = (25 - 15) * averageTicket; // Calculation based on getting 10 more clients if unlimited
 
   return (
     <AnimatePresence>
@@ -124,17 +121,13 @@ export default function UpgradeModal({
                   {variant.title}
                 </h2>
                 
-                <div className="grid grid-cols-2 gap-4 w-full mb-8">
-                  <div className="bg-brand-parchment/40 rounded-3xl p-6 border border-brand-mist/50">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-2">Já atendeu</p>
-                    <p className="text-2xl font-serif text-brand-ink italic">{totalClients || count || 20}+ únicas</p>
-                    <p className="text-[9px] text-brand-stone mt-1 font-medium italic">CLIENTES CONVENCIDAS</p>
-                  </div>
-                  <div className="bg-brand-parchment/40 rounded-3xl p-6 border border-brand-mist/50">
-                    <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-2">Potencial Extra</p>
-                    <p className="text-2xl font-serif text-brand-terracotta italic">+{formatCurrency(potentialRevenue)}</p>
-                    <p className="text-[9px] text-brand-stone mt-1 font-medium italic">MARGEM DE CRESCIMENTO</p>
-                  </div>
+                <div className="flex flex-col items-center justify-center bg-brand-parchment/40 rounded-3xl p-6 border border-brand-mist/50 mb-8 w-full">
+                  <h3 className="text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-2">
+                    Recursos para crescer com mais controle
+                  </h3>
+                  <p className="text-[11px] text-brand-stone font-light text-center max-w-[250px] leading-relaxed">
+                    Campanhas, relatórios e automações para profissionalizar sua rotina.
+                  </p>
                 </div>
 
                 <div className="w-full bg-brand-ink text-white rounded-3xl p-6 mb-8 text-left relative overflow-hidden group">
@@ -146,7 +139,7 @@ export default function UpgradeModal({
                       {feature === 'unlimitedBookings' ? <Target size={12} /> : <Zap size={12} />}
                     </div>
                     <p className="text-[10px] font-bold uppercase tracking-widest">
-                      {feature === 'unlimitedBookings' ? 'Alerta de Ganho' : 'Recurso Premium'}
+                      {feature === 'unlimitedBookings' ? 'Alerta de Limite' : 'Recurso Exclusivo'}
                     </p>
                   </div>
                   <p className="text-lg font-serif italic mb-2 leading-tight">

@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import { Coupon, Service } from '../types';
 import AppLayout from '../components/AppLayout';
 import PremiumButton from '../components/PremiumButton';
@@ -25,6 +26,7 @@ import UpgradeModal from '../components/UpgradeModal';
 
 export default function CouponsPage() {
   const { user, isAuthReady } = useAuth();
+  const { features } = usePlanFeatures();
   const { 
     isUpgradeModalOpen, 
     upgradeFeature, 
@@ -232,7 +234,28 @@ export default function CouponsPage() {
         description="Crie códigos promocionais para datas especiais ou para fidelizar clientes. Você controla o valor e a validade."
       />
       <div className="max-w-5xl mx-auto px-6 py-8">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+        {!features.coupons ? (
+          <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-12 md:p-16 text-center max-w-2xl mx-auto mt-12 shadow-sm">
+            <div className="w-20 h-20 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-8 text-brand-terracotta shadow-sm">
+               <Tag size={32} />
+            </div>
+            <h2 className="text-3xl font-serif text-brand-ink mb-4">Cupons de desconto</h2>
+            <p className="text-sm text-brand-stone font-light leading-relaxed mb-10 max-w-md mx-auto">
+              Crie campanhas pontuais para incentivar retornos, preencher horários estratégicos e cuidar da relação com suas clientes.
+              <br /><br />
+              <span className="font-medium text-brand-ink">Disponível nos planos Essencial e Pro.</span>
+            </p>
+            <PremiumButton 
+              variant="terracotta" 
+              onClick={() => checkFeatureAccess('coupons')}
+              className="px-8 py-4"
+            >
+              Ver planos
+            </PremiumButton>
+          </div>
+        ) : (
+          <>
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <div className="flex items-center gap-3 mb-2">
               <div className="w-8 h-8 rounded-xl bg-brand-terracotta/10 flex items-center justify-center text-brand-terracotta">
@@ -402,6 +425,8 @@ export default function CouponsPage() {
               ))}
             </AnimatePresence>
           </div>
+        )}
+        </>
         )}
       </div>
 
