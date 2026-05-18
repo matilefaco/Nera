@@ -848,8 +848,6 @@ export default function OnboardingPage() {
     setServiceAreas(serviceAreas.filter((_, i) => i !== index));
   };
 
-  if (authLoading) return <AppLoadingScreen />;
-
   const qualityIssues = useMemo(() => {
     const issues = [];
 
@@ -886,6 +884,8 @@ export default function OnboardingPage() {
 
     return issues;
   }, [services, avatar, avatarSkipped, bio]);
+
+  if (authLoading) return <AppLoadingScreen />;
 
   const progress = (step / (TOTAL_STEPS + 1)) * 100;
 

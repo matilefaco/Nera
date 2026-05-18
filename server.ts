@@ -151,6 +151,9 @@ export async function createServerApp() {
       const fallback = "https://usenera.com/og-default.jpg";
 
       if (snapshot.empty) {
+        if (slug === "helena-prado" || slug === "exemplo") {
+          return res.redirect("https://i.imgur.com/gBdf3tO.png");
+        }
         return res.redirect(fallback);
       }
 
@@ -246,23 +249,32 @@ export async function createServerApp() {
       
       let html = baseHtml; // Create a local copy for this request
 
-      let title = "Nera | Agendamento online";
-      let cleanName = "Profissional";
+      let title = "Nera | Vitrine & Agendamento Premium";
       let description = "Agende serviços de beleza com praticidade pela Nera.";
       let ogImage = "https://usenera.com/og-default.png";
       let pageUrl = `https://usenera.com/p/${escapeHtml(encodeURIComponent(slug))}`;
+
+      if (slug === "helena-prado" || slug === "exemplo") {
+         title = "Helena Prado | Sobrancelhas e Harmonização do Olhar | Nera";
+         description = "Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica sem transformações artificiais.";
+         ogImage = "https://i.imgur.com/gBdf3tO.png";
+      }
 
       const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
       
       if (!snapshot.empty) {
         const prof = snapshot.docs[0].data() as any;
         
-        title = escapeHtml(prof.name ? `${prof.name} | Nera` : "Nera | Agendamento online");
-        cleanName = escapeHtml(prof.name || "Profissional");
+        const namePart = prof.name || "Profissional";
+        if (prof.name && prof.specialty) {
+          title = escapeHtml(`${prof.name} | ${prof.specialty} | Nera`);
+        } else if (prof.name) {
+          title = escapeHtml(`${prof.name} | Nera`);
+        }
         
         let rawBio = prof.bio || prof.aboutBio || prof.heroBio || "";
         let cleanedBio = rawBio.toString().replace(/\n+/g, ' ').trim().slice(0, 160);
-        description = escapeHtml(cleanedBio || "Agende seus serviços de beleza online com praticidade pela Nera.");
+        description = escapeHtml(cleanedBio || `Conheça a vitrine profissional de ${namePart} na Nera.`);
         
         let imageUrl = prof.photoUrl || prof.avatar || prof.shareImage;
         if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("http")) {
@@ -274,16 +286,16 @@ export async function createServerApp() {
         <title>${title}</title>
         <meta name="description" content="${description}" />
         <link rel="canonical" href="${pageUrl}" />
-        <meta property="og:title" content="${cleanName} | Agende online" />
+        <meta property="og:title" content="${title}" />
         <meta property="og:description" content="${description}" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="${pageUrl}" />
         <meta property="og:site_name" content="Nera" />
         <meta property="og:locale" content="pt_BR" />
         <meta property="og:image" content="${ogImage}" />
-        <meta property="og:image:alt" content="Perfil de ${cleanName} na Nera" />
+        <meta property="og:image:alt" content="Perfil na Nera" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="${cleanName} | Agende online" />
+        <meta name="twitter:title" content="${title}" />
         <meta name="twitter:description" content="${description}" />
         <meta name="twitter:image" content="${ogImage}" />
       `;

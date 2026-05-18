@@ -771,12 +771,12 @@ function PublicProfileContent() {
       }
     >
       <SEOHead
-        title={`${profile.name} | Nera`}
+        title={profile.specialty ? `${profile.name} | ${profile.specialty} | Nera` : `${profile.name} | Nera`}
         description={
           profile.bio ||
-          `Agende um horário com ${profile.name}, especialista em beleza.`
+          `Conheça a vitrine profissional de ${profile.name} na Nera.`
         }
-        image={profile.avatar}
+        image={profile.ogImageUrl || profile.avatar || "https://usenera.com/og-default.png"}
         url={`https://usenera.com/p/${profile.slug}`}
       />
       {/* Demo Badge */}
