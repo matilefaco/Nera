@@ -860,6 +860,11 @@ export default function ClientsPage() {
               
               {hasMore && (
                 <div className="pt-8 text-center">
+                  {(searchTerm || filterService || filterStatus !== 'all') && (
+                    <p className="text-[11px] text-brand-stone/70 mb-4 px-4 font-medium opacity-80">
+                      Exibindo resultados baseados nos registros já carregados. Carregue mais para ampliar a busca.
+                    </p>
+                  )}
                   <PremiumButton 
                     onClick={() => fetchClients(true)} 
                     variant="linen" 
@@ -874,8 +879,31 @@ export default function ClientsPage() {
           ) : (
             <div className="text-center py-24 bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist px-6">
               <Users size={40} className="text-brand-mist mx-auto mb-6 opacity-40" />
-              <p className="text-brand-stone font-serif italic text-lg mb-2">Nenhum resultado encontrado</p>
-              <p className="text-[10px] text-brand-stone/60 uppercase tracking-widest max-w-xs mx-auto">Sua base de clientes aparecerá aqui.</p>
+              {(searchTerm || filterService || filterStatus !== 'all') ? (
+                <>
+                  <p className="text-brand-stone font-serif italic text-lg mb-2">Nenhum resultado encontrado</p>
+                  <p className="text-[10px] text-brand-stone/60 uppercase tracking-widest max-w-xs mx-auto mb-6">
+                    {hasMore 
+                      ? "A busca exibe clientes já em memória. Carregue mais para procurar no histórico." 
+                      : "Sua busca não retornou clientes."}
+                  </p>
+                  {hasMore && (
+                    <PremiumButton 
+                      onClick={() => fetchClients(true)} 
+                      variant="linen" 
+                      className="text-[10px] py-3 px-8 flex items-center gap-2 mx-auto"
+                    >
+                      <ChevronDown size={14} />
+                      {loadingMore ? 'Carregando...' : 'Carregar mais clientes'}
+                    </PremiumButton>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-brand-stone font-serif italic text-lg mb-2">Nenhum cliente ainda</p>
+                  <p className="text-[10px] text-brand-stone/60 uppercase tracking-widest max-w-xs mx-auto">Sua base de clientes aparecerá aqui.</p>
+                </>
+              )}
             </div>
           )}
         </div>
