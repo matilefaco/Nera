@@ -2,8 +2,7 @@ import express from "express";
 import admin from "firebase-admin";
 import { sendPasswordResetEmail, sendVerificationEmail } from "../emails/sendEmail.js";
 import { logger, maskEmail } from "../utils/logger.js";
-import { PUBLIC_APP_URL } from "../utils.js";
-import { generateSlug, generateReferralCode } from "../../src/lib/utils.js";
+import { PUBLIC_APP_URL, generateSlug, generateReferralCode } from "../utils.js";
 
 const router = express.Router();
 

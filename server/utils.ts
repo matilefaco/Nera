@@ -172,6 +172,36 @@ export const aiRateLimit = new Map<string, { count: number, lastReset: number }>
 export const RATE_LIMIT_WINDOW = 60 * 1000;
 export const MAX_REQUESTS = 10;
 
+/**
+ * Generates a URL-safe slug from text.
+ */
+export function generateSlug(text: string) {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Generates a unique 6-character referral code based on name + random chars.
+ */
+export function generateReferralCode(name: string): string {
+  const cleanName = (name || 'NERA').trim().split(' ')[0].toUpperCase().replace(/[^A-Z]/g, '');
+  const prefix = cleanName.substring(0, 4);
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Avoid O, 0, I, 1 for clarity
+  let random = '';
+  const remainingLength = Math.max(2, 6 - prefix.length);
+  
+  for (let i = 0; i < remainingLength; i++) {
+    random += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  return (prefix + random).substring(0, 6);
+}
+
 // NVIDIA AI Helper
 export async function callNvidiaAI(messages: any[], options: { model?: string, temperature?: number, max_tokens?: number } = {}) {
   const model = options.model || "meta/llama-3.1-8b-instruct";

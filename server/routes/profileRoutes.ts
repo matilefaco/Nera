@@ -2,10 +2,52 @@ import express from "express";
 import { db, getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 import { isValidWhatsapp } from "../utils.js";
-import { PLAN_CONFIGS } from "../../src/constants/plans.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { logger, maskUid } from "../utils/logger.js";
 import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimiter.js";
+
+// Duplicated from src/constants/plans.ts to avoid src/ dependency on server
+const PLAN_CONFIGS: any = {
+  free: {
+    features: {
+      unlimitedBookings: false,
+      whatsappNotifications: false,
+      advancedDashboard: false,
+      waitlist: false,
+      antiNoShow: false,
+      coupons: false,
+      analytics: false,
+      reports: false,
+      referrals: false,
+    }
+  },
+  essencial: {
+    features: {
+      unlimitedBookings: true,
+      whatsappNotifications: false,
+      advancedDashboard: false,
+      waitlist: false,
+      antiNoShow: true,
+      coupons: false,
+      analytics: false,
+      reports: false,
+      referrals: false,
+    }
+  },
+  pro: {
+    features: {
+      unlimitedBookings: true,
+      whatsappNotifications: true,
+      advancedDashboard: true,
+      waitlist: true,
+      antiNoShow: true,
+      coupons: true,
+      analytics: true,
+      reports: true,
+      referrals: true,
+    }
+  }
+};
 
 const router = express.Router();
 

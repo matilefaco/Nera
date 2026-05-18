@@ -1,5 +1,16 @@
 import { getDb } from "../firebaseAdmin.js";
-import { PlanFeatures } from "../../src/types.js";
+
+interface PlanFeatures {
+  unlimitedBookings: boolean;
+  whatsappNotifications: boolean;
+  advancedDashboard: boolean;
+  waitlist: boolean;
+  antiNoShow: boolean;
+  coupons: boolean;
+  analytics: boolean;
+  reports: boolean;
+  referrals: boolean;
+}
 
 export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
   return async (req: any, res: any, next: any) => {

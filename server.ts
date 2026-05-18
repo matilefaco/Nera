@@ -124,19 +124,43 @@ export async function createServerApp() {
   const apiRouter = express.Router();
 
   // Specific routers
-  apiRouter.use("/auth", (await import("./server/routes/authRoutes.js")).default);
-  apiRouter.use("/ai", (await import("./server/routes/aiRoutes.js")).default);
-  apiRouter.use("/slug", publicLookupLimiter, (await import("./server/routes/slugRoutes.js")).default);
-  apiRouter.use("/health", (await import("./server/routes/healthRoutes.js")).default);
+  const [
+    authRoutes,
+    aiRoutes,
+    slugRoutes,
+    healthRoutes,
+    profileRoutes,
+    planRoutes,
+    calendarRoutes,
+    bookingRoutes,
+    notificationRoutes,
+    analyticsRoutes
+  ] = await Promise.all([
+    import("./server/routes/authRoutes.js"),
+    import("./server/routes/aiRoutes.js"),
+    import("./server/routes/slugRoutes.js"),
+    import("./server/routes/healthRoutes.js"),
+    import("./server/routes/profileRoutes.js"),
+    import("./server/routes/planRoutes.js"),
+    import("./server/routes/calendarRoutes.js"),
+    import("./server/routes/bookingRoutes.js"),
+    import("./server/routes/notificationRoutes.js"),
+    import("./server/routes/analyticsRoutes.js")
+  ]);
+
+  apiRouter.use("/auth", authRoutes.default);
+  apiRouter.use("/ai", aiRoutes.default);
+  apiRouter.use("/slug", publicLookupLimiter, slugRoutes.default);
+  apiRouter.use("/health", healthRoutes.default);
   apiRouter.use("/profile/reservation", publicLookupLimiter);
-  apiRouter.use("/profile", (await import("./server/routes/profileRoutes.js")).default);
-  apiRouter.use("/plans", (await import("./server/routes/planRoutes.js")).default);
-  apiRouter.use("/calendar", (await import("./server/routes/calendarRoutes.js")).default);
+  apiRouter.use("/profile", profileRoutes.default);
+  apiRouter.use("/plans", planRoutes.default);
+  apiRouter.use("/calendar", calendarRoutes.default);
 
   // Generic catch-all routers for remaining endpoints (mounting directly at root of apiRouter)
-  apiRouter.use(bookingLimiter, (await import("./server/routes/bookingRoutes.js")).default);
-  apiRouter.use((await import("./server/routes/notificationRoutes.js")).default);
-  apiRouter.use(analyticsLimiter, (await import("./server/routes/analyticsRoutes.js")).default);
+  apiRouter.use(bookingLimiter, bookingRoutes.default);
+  apiRouter.use(notificationRoutes.default);
+  apiRouter.use(analyticsLimiter, analyticsRoutes.default);
 
   app.use("/api", apiRouter);
 
