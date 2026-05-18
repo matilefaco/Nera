@@ -46,6 +46,8 @@ import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import { getPublicProfileUrl } from '../lib/env';
 
+import { ActivationChecklist } from '../components/ActivationChecklist';
+
 // --- SAFE HELPERS ---
 function safeString(value: unknown, fallback = ''): string {
   if (typeof value !== 'string') return fallback;
@@ -870,17 +872,21 @@ setUnconfirmedTomorrow(docs);
     return <DashboardSkeleton />;
   }
 
+  const isNewAccount = appointments.length === 0 && pendingCount === 0 && (!totalClientsCountFromSummaries || totalClientsCountFromSummaries === 0);
+
   return (
     <AppLayout activeRoute="dashboard">
       <PageErrorBoundary 
         title="Não foi possível carregar este painel." 
         message="Tivemos um contratempo ao gerar suas métricas. Recarregar costuma resolver."
       >
-      <FirstVisitTip 
-        pageKey="dashboard"
-        title="Sua central de operações"
-        description="Aqui você vê todos os agendamentos, receita e ações rápidas. Tudo que você precisa para o dia a dia está nesta página."
-      />
+      {!isNewAccount && (
+        <FirstVisitTip 
+          pageKey="dashboard"
+          title="Sua central de operações"
+          description="Aqui você vê todos os agendamentos, receita e ações rápidas. Tudo que você precisa para o dia a dia está nesta página."
+        />
+      )}
       <div className="p-6 md:p-12 pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-16 max-w-5xl mx-auto w-full space-y-10">
         
         {/* Avatar Skipped Reminder Banner */}
@@ -1079,7 +1085,23 @@ setUnconfirmedTomorrow(docs);
                   </div>
                 </div>
 
-                {!features.advancedDashboard ? (
+                {isNewAccount ? (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <div className="w-12 h-12 bg-[#FAF9F8] flex items-center justify-center rounded-full border border-brand-mist/60 text-brand-stone/50 mb-4">
+                      <TrendingUp size={20} strokeWidth={1.5} />
+                    </div>
+                    <p className="text-sm font-serif text-brand-ink mb-1">Sem dados suficientes ainda</p>
+                    <p className="text-[11px] text-brand-stone font-light mb-6 max-w-xs">
+                      Compartilhe sua vitrine para começar a acompanhar visitas, agendamentos e ver suas estatísticas crescerem.
+                    </p>
+                    <button 
+                      onClick={() => setIsShareModalOpen(true)}
+                      className="px-6 py-3 bg-brand-white text-brand-ink border border-brand-mist/60 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-colors shadow-sm flex items-center gap-2"
+                    >
+                      <Share2 size={14} /> Copiar link da vitrine
+                    </button>
+                  </div>
+                ) : !features.advancedDashboard ? (
                   // Essencial / Free View
                   <>
                     <div className="grid grid-cols-2 gap-x-6 gap-y-6">
@@ -1247,8 +1269,15 @@ setUnconfirmedTomorrow(docs);
         {/* HOJE SIMPLE VIEW */}
         {activeTab === "hoje" && (
           <div className="flex flex-col gap-8">
+            <ActivationChecklist 
+              profile={profile}
+              appointments={appointments}
+              services={services}
+              onShareClick={() => setIsShareModalOpen(true)}
+            />
+
             {/* Notificações Banner */}
-            {!isSubscribed && !pushBannerDismissed && (
+            {!isSubscribed && !pushBannerDismissed && !isNewAccount && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -1361,14 +1390,14 @@ setUnconfirmedTomorrow(docs);
                 animate={{ opacity: 1, scale: 1 }}
                 className="bg-[#FCFBF9] p-8 md:p-12 rounded-[40px] border border-brand-mist/40 shadow-sm relative overflow-hidden group mb-2 opacity-95"
               >
-                <div className="absolute top-0 right-0 w-64 h-64 bg-brand-linen rounded-full blur-3xl opacity-50 -mr-20 -mt-20 pointer-events-none transition-opacity group-hover:opacity-70" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-brand-white rounded-full blur-[80px] opacity-70 -mr-20 -mt-20 pointer-events-none transition-opacity group-hover:opacity-100" />
                 <div className="relative z-10 max-w-lg">
-                  <div className="w-16 h-16 bg-white border border-brand-mist/60 text-brand-stone rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-                    <Sparkles size={32} strokeWidth={1} />
+                  <div className="w-14 h-14 bg-white border border-brand-mist/60 text-brand-ink rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+                    <Home size={24} strokeWidth={1.5} />
                   </div>
-                  <h4 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Seu espaço está pronto.</h4>
-                  <p className="text-[13px] text-brand-stone font-light mb-8 leading-relaxed">
-                    Sua vitrine já pode receber agendamentos. Compartilhe seu link exclusivo para começar a formatar sua agenda.
+                  <h4 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3 leading-tight">Sua vitrine está pronta. <br/>Agora é hora de colocar em circulação.</h4>
+                  <p className="text-[13px] text-brand-stone font-light mb-8 leading-relaxed max-w-sm">
+                    Veja como sua vitrine aparece para uma cliente, copie o link oficial e envie para quem já conhece seu trabalho.
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-4">
@@ -1378,12 +1407,14 @@ setUnconfirmedTomorrow(docs);
                     >
                       <Share2 size={16} /> Divulgar vitrine
                     </button>
-                    <Link 
-                      to="/profile" 
-                      className="w-full sm:w-auto px-8 py-4 bg-white border border-brand-mist/60 text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all flex items-center justify-center gap-2 shadow-sm"
+                    <a 
+                      href={`/p/${profile?.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto px-8 py-4 bg-white border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all flex items-center justify-center gap-2 shadow-sm"
                     >
-                      Configurar perfil
-                    </Link>
+                      Ver minha vitrine
+                    </a>
                   </div>
                 </div>
               </motion.div>
@@ -1423,79 +1454,81 @@ setUnconfirmedTomorrow(docs);
             )}
 
             {/* Timeline de Hoje */}
-            <section className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-bold text-brand-stone uppercase tracking-[0.3em]">Agenda de Hoje</h3>
-              </div>
+            {!(isNewAccount && displayedConfirmedToday.length === 0) && (
+              <section className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10px] font-bold text-brand-stone uppercase tracking-[0.3em]">Agenda de Hoje</h3>
+                </div>
 
-              {displayedConfirmedToday.length > 0 ? (
-                <div className="space-y-4">
-                  {displayedConfirmedToday.map((appt) => (
-                    <div 
-                      key={appt.id} 
-                      className={cn(
-                        "bg-[#FCFBF9] px-5 py-4 md:px-6 md:py-5 rounded-[24px] border border-brand-mist/60 shadow-sm flex items-center justify-between transition-colors opacity-90",
-                        isCompletedStatus(appt.status) && "bg-transparent border-dashed shadow-none opacity-60"
-                      )}
-                    >
-                      <div className="flex items-center gap-4 md:gap-5 w-full">
-                        <div className="text-center min-w-[48px] shrink-0">
-                          <p className={cn("text-[17px] font-serif font-bold leading-none", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.time}</p>
-                        </div>
-                        <div className="h-8 w-px bg-brand-mist/40 shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.clientName}</h4>
-                            {isCompletedStatus(appt.status) && <CheckCircle2 size={12} className="text-brand-stone shrink-0" />}
-                          </div>
-                          <p className="text-[11px] text-brand-stone font-light truncate leading-tight pr-2 mt-0.5">{appt.serviceName}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                        {isConfirmedLikeStatus(appt.status) && isPastTime(appt.time) && (
-                          <button
-                            onClick={() => handleComplete(appt)}
-                            disabled={processingId === appt.id}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-brand-white border border-brand-mist/40 text-brand-ink rounded-full text-[9px] font-medium tracking-wide shadow-sm hover:bg-[#FAF9F8] transition-colors active:scale-95 whitespace-nowrap"
-                          >
-                            {processingId === appt.id ? "..." : "Finalizar"}
-                          </button>
+                {displayedConfirmedToday.length > 0 ? (
+                  <div className="space-y-4">
+                    {displayedConfirmedToday.map((appt) => (
+                      <div 
+                        key={appt.id} 
+                        className={cn(
+                          "bg-[#FCFBF9] px-5 py-4 md:px-6 md:py-5 rounded-[24px] border border-brand-mist/60 shadow-sm flex items-center justify-between transition-colors opacity-90",
+                          isCompletedStatus(appt.status) && "bg-transparent border-dashed shadow-none opacity-60"
                         )}
-                        <Link to="/agenda" className="p-2 text-brand-stone/60 hover:text-brand-ink transition-colors">
-                          <ChevronRight size={16} />
-                        </Link>
+                      >
+                        <div className="flex items-center gap-4 md:gap-5 w-full">
+                          <div className="text-center min-w-[48px] shrink-0">
+                            <p className={cn("text-[17px] font-serif font-bold leading-none", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.time}</p>
+                          </div>
+                          <div className="h-8 w-px bg-brand-mist/40 shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.clientName}</h4>
+                              {isCompletedStatus(appt.status) && <CheckCircle2 size={12} className="text-brand-stone shrink-0" />}
+                            </div>
+                            <p className="text-[11px] text-brand-stone font-light truncate leading-tight pr-2 mt-0.5">{appt.serviceName}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-1.5 shrink-0 pl-2">
+                          {isConfirmedLikeStatus(appt.status) && isPastTime(appt.time) && (
+                            <button
+                              onClick={() => handleComplete(appt)}
+                              disabled={processingId === appt.id}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-brand-white border border-brand-mist/40 text-brand-ink rounded-full text-[9px] font-medium tracking-wide shadow-sm hover:bg-[#FAF9F8] transition-colors active:scale-95 whitespace-nowrap"
+                            >
+                              {processingId === appt.id ? "..." : "Finalizar"}
+                            </button>
+                          )}
+                          <Link to="/agenda" className="p-2 text-brand-stone/60 hover:text-brand-ink transition-colors">
+                            <ChevronRight size={16} />
+                          </Link>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-[#FCFBF9] p-12 rounded-[40px] border border-brand-mist/40 border-dashed text-center flex flex-col items-center shadow-sm">
+                    <div className="w-12 h-12 bg-[#FAF9F8] flex items-center justify-center rounded-full border border-brand-mist/60 text-brand-stone/40 mb-4">
+                      <Clock size={20} strokeWidth={1} />
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-[#FCFBF9] p-12 rounded-[40px] border border-brand-mist/40 border-dashed text-center flex flex-col items-center shadow-sm">
-                  <div className="w-12 h-12 bg-[#FAF9F8] flex items-center justify-center rounded-full border border-brand-mist/60 text-brand-stone/40 mb-4">
-                    <Clock size={20} strokeWidth={1} />
+                    <h4 className="font-serif text-xl text-brand-ink mb-2">Sua agenda está livre hoje</h4>
+                    <p className="text-[13px] text-brand-stone font-light mb-8 max-w-xs mx-auto leading-relaxed">
+                      Acompanhe suas solicitações ou divulgue seu link para atrair novas clientes.
+                    </p>
+                    
+                    <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+                      <button 
+                        onClick={() => setIsShareModalOpen(true)}
+                        className="w-full py-3.5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
+                      >
+                        Divulgar online
+                      </button>
+                      <Link 
+                        to="/clients"
+                        className="w-full py-3.5 bg-brand-white text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all text-center border border-brand-mist/40 shadow-sm"
+                      >
+                        Ver carteira de clientes
+                      </Link>
+                    </div>
                   </div>
-                  <h4 className="font-serif text-xl text-brand-ink mb-2">Sua agenda está livre hoje</h4>
-                  <p className="text-[13px] text-brand-stone font-light mb-8 max-w-xs mx-auto leading-relaxed">
-                    Acompanhe suas solicitações ou divulgue seu link para atrair novas clientes.
-                  </p>
-                  
-                  <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
-                    <button 
-                      onClick={() => setIsShareModalOpen(true)}
-                      className="w-full py-3.5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
-                    >
-                      Divulgar online
-                    </button>
-                    <Link 
-                      to="/clients"
-                      className="w-full py-3.5 bg-brand-white text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all text-center border border-brand-mist/40 shadow-sm"
-                    >
-                      Ver carteira de clientes
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </section>
+                )}
+              </section>
+            )}
           </div>
         )}
 
