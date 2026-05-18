@@ -26,7 +26,7 @@ export const COLORS = {
   terracotta: '#A85C3A',
   parchment: '#F9F5F0',
   linen: '#F2EBE3',
-  stone: '#8A7060',
+  stone: '#5C4A3D', // Darkened for better contrast (was #8A7060)
   mist: '#E5DDD6',
   white: '#FDFAF7',
 };
@@ -60,9 +60,9 @@ export function buildEmailBase(options: EmailBaseOptions): string {
 
   // Badge styles
   const badgeColors = {
-    pending: { bg: '#FDF2F2', text: '#9B1C1C', border: '#FBD5D5' },
-    success: { bg: '#F3FAF7', text: '#03543F', border: '#DEF7EC' },
-    alert: { bg: '#FFF8F1', text: '#8A4B00', border: '#FFECCF' },
+    pending: { bg: '#FDF2F2', text: '#7E1313', border: '#FBD5D5' },
+    success: { bg: '#F3FAF7', text: '#024030', border: '#DEF7EC' },
+    alert: { bg: '#FFF3E3', text: '#6B3A00', border: '#FFECCF' },
     info: { bg: COLORS.linen, text: COLORS.ink, border: COLORS.mist },
   };
   const badgeStyle = badgeColors[badgeVariant];
@@ -139,7 +139,7 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                         <td>
                           <h1 style="color: ${heroText}; font-family: ${FONTS.serif}; font-size: 38px; line-height: 1.2; margin: 0; font-weight: normal;">
                             ${heroTitle}
-                            ${heroTitleItalic ? `<br><span style="font-style: italic; color: ${heroText}; opacity: 0.85;">${heroTitleItalic}</span>` : ''}
+                            ${heroTitleItalic ? `<br><span style="font-style: italic; color: ${heroText}; opacity: 0.95;">${heroTitleItalic}</span>` : ''}
                           </h1>
                         </td>
                       </tr>
@@ -266,8 +266,8 @@ export function buildEmailCard(items: { label: string; value: string; valueUrl?:
               return `
                 <tr>
                   <td style="padding-bottom: ${index === items.length - 1 ? '0' : '20px'};">
-                    <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; color: ${COLORS.stone}; margin-bottom: 4px; font-family: ${FONTS.sans};">${item.label}</font>
-                    <font style="display: block; font-size: 16px; color: ${COLORS.ink}; font-family: ${FONTS.serif}; line-height: 1.3;">${displayValue}</font>
+                    <font style="display: block; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.stone}; margin-bottom: 6px; font-family: ${FONTS.sans};">${item.label}</font>
+                    <font style="display: block; font-size: 16px; color: ${COLORS.ink}; font-family: ${FONTS.serif}; line-height: 1.4;">${displayValue}</font>
                   </td>
                 </tr>
               `;

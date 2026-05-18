@@ -18,7 +18,7 @@ export function buildConfirmationRequest24hEmail(data: ConfirmationRequest24hDat
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
       Oi, ${clientName}! Seu horário com <strong>${professionalName}</strong> é amanhã.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.6;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.6;">
       Confirme sua presença para garantirmos tudo certinho para você.
     </p>
 
@@ -69,7 +69,7 @@ export function buildConfirmationRequest24hEmail(data: ConfirmationRequest24hDat
                 <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: separate;">
                   <tr>
                     <td align="center" style="border: 1px solid #E5DDD6; border-radius: 9999px;">
-                      <a href="${cancelUrl}" target="_blank" style="font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; color: #8A7060; text-decoration: none; padding: 14px 20px; display: inline-block; text-transform: uppercase; letter-spacing: 0.1em;">
+                      <a href="${cancelUrl}" target="_blank" style="font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; color: #5C4A3D; text-decoration: none; padding: 14px 20px; display: inline-block; text-transform: uppercase; letter-spacing: 0.1em;">
                         Cancelar
                       </a>
                     </td>
@@ -82,7 +82,7 @@ export function buildConfirmationRequest24hEmail(data: ConfirmationRequest24hDat
       </tr>
     </table>
 
-    <p style="font-family: Arial, sans-serif; font-size: 12px; color: #8A7060; text-align: center; margin-top: 30px; font-style: italic; line-height: 1.5;">
+    <p style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; text-align: center; margin-top: 30px; font-style: italic; line-height: 1.5;">
       Se não puder comparecer, prefira reagendar a cancelar — isso ajuda <strong>${professionalName}</strong> a planejar melhor o dia.
     </p>
   `;

@@ -15,7 +15,7 @@ export function buildWelcomeEmail(data: WelcomeData): string {
       Sua vitrine profissional exclusiva já foi reservada. Agora, basta configurar seus serviços e horários para começar a receber seus primeiros agendamentos.
     </p>
 
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 32px; line-height: 1.7;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 32px; line-height: 1.7;">
       Construímos a Nera para ser a ferramenta que valoriza seu talento e simplifica sua gestão.
     </p>
 

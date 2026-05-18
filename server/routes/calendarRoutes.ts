@@ -167,7 +167,12 @@ router.get("/status", requireFirebaseAuth, async (req: AuthenticatedRequest, res
       enabled: !!integration?.enabled,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    logger.error("CALENDAR", "Failed to fetch status", { professionalId: maskUid(professionalId), error: err });
+    res.status(500).json({ 
+      error: "Erro ao carregar status do calendário", 
+      message: err.message || "Erro desconhecido",
+      connected: false 
+    });
   }
 });
 

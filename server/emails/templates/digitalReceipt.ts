@@ -27,7 +27,7 @@ export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px; font-weight: 500;">
       Olá, ${firstName}.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.7;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.7;">
       Seu atendimento com ${professionalName} foi finalizado. Abaixo, você encontra o registro dos serviços realizados e valores correspondentes.
     </p>
     

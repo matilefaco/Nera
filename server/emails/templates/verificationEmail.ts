@@ -11,7 +11,7 @@ export function buildVerificationEmail(data: VerificationEmailData): string {
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
       Sua conta está quase pronta.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.6;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.6;">
       Confirme seu e-mail para ativar sua agenda e sua vitrine profissional na Nera.
     </p>
 
@@ -32,7 +32,7 @@ export function buildVerificationEmail(data: VerificationEmailData): string {
     </table>
 
     <div style="margin-top: 35px; text-align: center;">
-      <p style="font-family: Arial, sans-serif; font-size: 12px; color: #8A7060; line-height: 1.6;">
+      <p style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; line-height: 1.6;">
         Se o botão acima não funcionar, copie e cole o link abaixo no seu navegador:<br/>
         <a href="${verificationUrl}" style="color: #18120E; word-break: break-all;">${verificationUrl}</a>
       </p>

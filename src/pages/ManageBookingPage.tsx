@@ -391,14 +391,16 @@ setBlockedSchedules(dayBlocked);
                     </div>
                     
                     <div className="grid grid-cols-1 gap-3">
-                      <a 
-                        href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Acabei de fazer um pedido de reserva no valor de ${formatCurrency(appointment.totalPrice || appointment.price)} para o dia ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}. Código: ${appointment.reservationCode || '-'}. Pode me confirmar se está tudo ok?`)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2"
-                      >
-                        <MessageCircle size={18} /> Falar com a profissional
-                      </a>
+                      {professional.plan === 'pro' && (
+                        <a 
+                          href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Acabei de fazer um pedido de reserva no valor de ${formatCurrency(appointment.totalPrice || appointment.price)} para o dia ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}. Código: ${appointment.reservationCode || '-'}. Pode me confirmar se está tudo ok?`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2"
+                        >
+                          <MessageCircle size={18} /> Falar com a profissional
+                        </a>
+                      )}
                       
                       <button 
                         onClick={() => setView('cancel')}
@@ -499,7 +501,7 @@ setBlockedSchedules(dayBlocked);
                 )}
 
                 {/* ALWAYS VISIBLE UNTIL CANCELLED: Talk to Pro (Only for confirmed/completed) */}
-                {!isCancelled && !isPending && (
+                {!isCancelled && !isPending && professional.plan === 'pro' && (
                   <a 
                     href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Gostaria de falar sobre minha reserva do dia ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}.`)}
                     target="_blank"

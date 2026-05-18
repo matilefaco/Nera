@@ -43,8 +43,8 @@ export function buildProfessionalNewBookingEmail(data: ProfessionalNewBookingDat
     <!-- Urgency Box -->
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 10px; margin-bottom: 30px;">
       <tr>
-        <td bgcolor="#FFF8F1" style="border: 1px solid #FFECCF; padding: 16px; text-align: center;">
-          <p style="font-family: ${FONTS.sans}; font-size: 13px; color: #8A4B00; margin: 0;">
+        <td bgcolor="#FFF3E3" style="border: 1px solid #FFECCF; padding: 16px; text-align: center;">
+          <p style="font-family: ${FONTS.sans}; font-size: 14px; color: #6B3A00; margin: 0; line-height: 1.5;">
             ⏱ <strong>Responda em até 2 horas.</strong> Clientes que não recebem resposta tendem a cancelar.
           </p>
         </td>
@@ -58,7 +58,7 @@ export function buildProfessionalNewBookingEmail(data: ProfessionalNewBookingDat
             <table role="presentation" border="0" cellpadding="0" cellspacing="0">
               <tr>
                 <td align="center">
-                  <a href="${agendaUrl || '#'}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 11px; color: ${COLORS.stone}; text-decoration: underline;">
+                  <a href="${agendaUrl || '#'}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 12px; font-weight: bold; color: ${COLORS.stone}; text-decoration: underline;">
                     Ou recusar pelo painel caso não tenha disponibilidade
                   </a>
                 </td>

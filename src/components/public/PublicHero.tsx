@@ -398,9 +398,11 @@ export const PublicHero = ({
                   >
                     {isAgendaFull ? 'Entrar na lista de espera' : 'Reservar agora'}
                   </PremiumButton>
-                  <a href={`https://wa.me/${profile.whatsapp?.replace(/\D/g, '')}`} target="_blank" className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">
-                    <MessageCircle size={14} /> Falar no WhatsApp
-                  </a>
+                  {profile.whatsapp && profile.plan === 'pro' && (
+                    <a href={`https://wa.me/${profile.whatsapp?.replace(/\D/g, '')}`} target="_blank" className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">
+                      <MessageCircle size={14} /> Falar no WhatsApp
+                    </a>
+                  )}
                 </div>
               </div>
             </motion.div>

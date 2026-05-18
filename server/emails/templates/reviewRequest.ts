@@ -22,7 +22,7 @@ export function buildReviewRequestEmail(data: ReviewRequestData): string {
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
       Você esteve com <strong>${professionalName}</strong> para <strong>${serviceName}</strong>.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.6;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.6;">
       Conta pra gente como foi — sua avaliação ajuda <strong>${professionalName}</strong> a receber mais clientes como você.
     </p>
 
@@ -45,7 +45,7 @@ export function buildReviewRequestEmail(data: ReviewRequestData): string {
       </tr>
       <tr>
         <td align="center" style="padding-top: 8px;">
-          <font style="font-family: Arial, sans-serif; font-size: 12px; color: #8A7060;">Toque para avaliar</font>
+          <font style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D;">Toque para avaliar</font>
         </td>
       </tr>
     </table>
@@ -57,7 +57,7 @@ export function buildReviewRequestEmail(data: ReviewRequestData): string {
     </div>
 
     <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #E5DDD6;">
-      <p style="font-family: Arial, sans-serif; font-size: 11px; color: #8A7060; font-style: italic; text-align: center;">
+      <p style="font-family: Arial, sans-serif; font-size: 11px; color: #5C4A3D; font-style: italic; text-align: center;">
         Sua avaliação é publicada anonimamente, a não ser que você escolha o contrário.
       </p>
     </div>

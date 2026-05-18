@@ -70,7 +70,7 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 25px; font-weight: 500;">
       Olá, ${clientName}.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 35px; line-height: 1.7;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 35px; line-height: 1.7;">
       Seu horário com <strong>${professionalName}</strong> foi confirmado. 
       Abaixo você encontra os detalhes para o seu atendimento.
     </p>
@@ -82,9 +82,9 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
     ])}
 
     <div style="margin-top: 30px; padding: 0 10px;">
-      <h4 style="font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Localização</h4>
+      <h4 style="font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Localização</h4>
       <div style="font-family: Arial, sans-serif; font-size: 14px; color: #18120E; line-height: 1.5;">
-        <div style="font-weight: 500;">${location}</div>
+        <div style="font-weight: 600; font-size: 15px;">${location}</div>
         ${fullAddress}
         ${mapsUrl ? `
           <div style="margin-top: 12px;">
@@ -98,8 +98,8 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
 
     ${prepInstructions ? `
       <div style="margin-top: 40px; padding: 25px; border: 1px solid ${COLORS.mist};">
-        <h4 style="font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Instruções</h4>
-        <p style="font-family: Arial, sans-serif; font-size: 13px; color: #8A7060; margin: 0; line-height: 1.6;">${prepInstructions}</p>
+        <h4 style="font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Instruções</h4>
+        <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin: 0; line-height: 1.6;">${prepInstructions}</p>
       </div>
     ` : ''}
 
@@ -143,8 +143,8 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
     </table>
 
     <div style="margin-top: 45px; text-align: center; padding-top: 30px; border-top: 1px solid ${COLORS.mist};">
-      <p style="font-family: Arial, sans-serif; font-size: 11px; color: ${COLORS.stone}; letter-spacing: 0.05em;">
-        Precisa reagendar? <a href="${manageUrl}" style="color: ${COLORS.stone}; text-decoration: underline;">Gerencie sua reserva</a>.
+      <p style="font-family: Arial, sans-serif; font-size: 12px; color: ${COLORS.stone}; letter-spacing: 0.05em;">
+        Precisa reagendar? <a href="${manageUrl}" style="color: ${COLORS.stone}; font-weight: bold; text-decoration: underline;">Gerencie sua reserva</a>.
       </p>
     </div>
   `;

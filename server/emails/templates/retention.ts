@@ -18,7 +18,7 @@ export function buildRetentionEmail(data: RetentionEmailData): string {
       Oi, ${firstName}!
     </p>
 
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.6;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.6;">
       Você esteve com <strong>${professionalName}</strong> para <strong>${serviceName}</strong> em ${lastServiceDate}.
       <br><br>
       Que tal marcar o próximo horário?
@@ -42,7 +42,7 @@ export function buildRetentionEmail(data: RetentionEmailData): string {
         <td align="center" style="padding-top: 12px;">
           <table role="presentation" border="0" cellpadding="0" cellspacing="0">
             <tr>
-              <td align="center" style="font-family: Arial, sans-serif; font-size: 11px; color: #8A7060;">
+              <td align="center" style="font-family: Arial, sans-serif; font-size: 11px; color: #5C4A3D;">
                 Reserve em menos de 1 minuto.
               </td>
             </tr>

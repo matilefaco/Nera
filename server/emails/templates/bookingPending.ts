@@ -31,7 +31,7 @@ export function buildBookingPendingEmail(data: BookingPendingData): string {
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 25px; font-weight: 500;">
       Olá, ${clientName}.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 35px; line-height: 1.7;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 35px; line-height: 1.7;">
       Seu pedido de agendamento com <strong>${professionalName}</strong> foi recebido. 
       Você receberá uma confirmação assim que o horário for garantido pela profissional.
     </p>

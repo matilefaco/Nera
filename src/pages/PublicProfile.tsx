@@ -985,7 +985,7 @@ function PublicProfileContent() {
                 <Instagram size={15} />
               </a>
             )}
-            {profile.whatsapp && (
+            {profile.whatsapp && profile.plan === 'pro' && (
               <a
                 href={buildWhatsappLink(profile.whatsapp)}
                 target="_blank"

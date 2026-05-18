@@ -667,7 +667,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
               <div className="flex flex-col gap-4">
                 <PremiumButton variant="terracotta" className="w-full py-6" onClick={handleRestoreDraft}>Continuar Reserva</PremiumButton>
                 <button onClick={handleClearDraft} className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:text-brand-ink transition-colors py-2">Começar novamente</button>
-                {clientPhone && (
+                {clientPhone && profile.plan === 'pro' && (
                   <div className="mt-6 pt-6 border-t border-brand-mist">
                     <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-4">Precisa de ajuda?</p>
                     <a href={buildWhatsappLink(profile.whatsapp, 'Olá! Estava iniciando um agendamento e gostaria de tirar uma dúvida.')} target="_blank" className="flex items-center justify-center gap-2 text-brand-ink font-medium text-xs hover:text-brand-terracotta transition-colors">
@@ -1226,21 +1226,23 @@ export default function BookingModal({ profile, services, onClose, open, initial
                   </div>
                 )}
 
-                <a 
-                  href={buildWhatsappLink(
-                    profile?.whatsapp || '', 
-                    generateBookingConfirmationMessage(
-                      selectedService?.name || '',
-                      selectedDate,
-                      selectedTime
-                    )
-                  )} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist sm:col-span-2"
-                >
-                  <MessageCircle size={14} /> Falar com a profissional
-                </a>
+                {profile.plan === 'pro' && (
+                  <a 
+                    href={buildWhatsappLink(
+                      profile?.whatsapp || '', 
+                      generateBookingConfirmationMessage(
+                        selectedService?.name || '',
+                        selectedDate,
+                        selectedTime
+                      )
+                    )} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist sm:col-span-2"
+                  >
+                    <MessageCircle size={14} /> Falar com a profissional
+                  </a>
+                )}
               </div>
               <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-6 md:p-8 mt-8 md:mt-12 text-center w-full">
                 <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm"><Heart size={24} className="fill-brand-terracotta/10" /></div>

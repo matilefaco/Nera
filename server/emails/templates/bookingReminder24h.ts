@@ -33,7 +33,7 @@ export function buildBookingReminder24hEmail(data: BookingReminderData): string 
     <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
       Só um aviso carinhoso: seu horário com <strong>${professionalName}</strong> é amanhã.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #8A7060; margin-bottom: 30px; line-height: 1.6;">
+    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.6;">
       Guarde um tempinho na sua agenda e cuide-se com calma.
     </p>
     
@@ -47,7 +47,7 @@ export function buildBookingReminder24hEmail(data: BookingReminderData): string 
     ${location.includes('Domicílio') ? `
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 10px; margin-bottom: 20px;">
         <tr>
-          <td style="font-family: Arial, sans-serif; font-size: 12px; color: #8A7060; padding: 12px; background-color: #FDFAF7; border: 1px solid #E5DDD6; border-radius: 8px;">
+          <td style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; padding: 12px; background-color: #FDFAF7; border: 1px solid #E5DDD6; border-radius: 8px;">
             📍 <strong>Confirme seu endereço com a profissional se necessário.</strong>
           </td>
         </tr>
@@ -77,7 +77,7 @@ export function buildBookingReminder24hEmail(data: BookingReminderData): string 
             <table role="presentation" border="0" cellpadding="0" cellspacing="0">
               <tr>
                 <td align="center" style="border: 1px solid #E5DDD6; padding: 14px 40px;">
-                  <a href="${whatsappUrl}" target="_blank" style="color: #8A7060; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; text-decoration: none; display: inline-block;">
+                  <a href="${whatsappUrl}" target="_blank" style="color: #5C4A3D; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; text-decoration: none; display: inline-block;">
                     Falar no WhatsApp
                   </a>
                 </td>
@@ -88,7 +88,7 @@ export function buildBookingReminder24hEmail(data: BookingReminderData): string 
       </table>
     </div>
 
-    <p style="font-family: Arial, sans-serif; font-size: 12px; color: #8A7060; font-style: italic; text-align: center; margin-top: 40px; border-top: 1px solid #E5DDD6; padding-top: 25px;">
+    <p style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; font-style: italic; text-align: center; margin-top: 40px; border-top: 1px solid #E5DDD6; padding-top: 25px;">
       ${professionalName} já está preparando tudo para o seu atendimento.
     </p>
   `;

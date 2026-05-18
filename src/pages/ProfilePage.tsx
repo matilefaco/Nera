@@ -271,9 +271,17 @@ export default function ProfilePage() {
           'Authorization': `Bearer ${token}`
         }
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error('Calendar status error:', errorData);
+        setGoogleCalendarConnected(false);
+        return;
+      }
+      
       const data = await res.json();
-      setGoogleCalendarConnected(data.connected);
-      setGoogleCalendarEnabled(data.enabled);
+      setGoogleCalendarConnected(!!data.connected);
+      setGoogleCalendarEnabled(!!data.enabled);
     } catch (err) {
       console.error('Error fetching calendar status:', err);
     }

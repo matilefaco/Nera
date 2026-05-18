@@ -17,7 +17,7 @@ import { generateSlug, getHumanError, generateReferralCode } from '../lib/utils'
 import Logo from '../components/Logo';
 
 export default function RegisterPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, profile } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -228,7 +228,7 @@ export default function RegisterPage() {
             </div>
             <h3 className="text-2xl font-serif font-normal text-brand-ink mb-4">Você já está conectada</h3>
             <p className="text-brand-stone text-sm mb-8 leading-relaxed font-light">
-              Para criar uma nova vitrine, você precisa sair da conta atual ({currentUser.displayName || currentUser.email}).
+              Para criar uma nova vitrine, você precisa sair da conta atual ({(profile?.name || currentUser.displayName || currentUser.email)}).
             </p>
             <div className="flex flex-col w-full gap-3">
               <button 

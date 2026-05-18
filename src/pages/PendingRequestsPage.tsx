@@ -143,7 +143,18 @@ export default function PendingRequestsPage() {
       const heldItem = confirmedId ? prev.find(p => p.id === confirmedId) : null;
       
       const currentIds = new Set(truePending.map(d => d.id));
-      const finalDocs = [...truePending].filter(req => req.id === confirmedId || !handledIds.includes(req.id));
+      const finalDocs = [...truePending].filter(req => {
+        // Se está com o overlay de sucesso (WhatsApp CTA) aberto, precisamos preservar o item
+        // mesmo que o Firestore já tenha removido ele do 'pending'
+        if (req.id === confirmedId) return true;
+        
+        // Se o item já foi processado nesta sessão (confirmado ou recusado), 
+        // removemos da lista local imediatamente para evitar "cards fantasmas" 
+        // que ainda constam como 'pending' no cache do Firestore
+        if (handledIds.includes(req.id)) return false;
+        
+        return true;
+      });
 
       if (heldItem && !currentIds.has(heldItem.id) && (heldItem.id === confirmedId || !handledIds.includes(heldItem.id))) {
         finalDocs.push(heldItem);
