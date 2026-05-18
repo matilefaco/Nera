@@ -32,7 +32,16 @@ export const api = onRequest(
     timeoutSeconds: 60,
     minInstances: 0,
     cors: false,
-    secrets: ["RESEND_API_KEY", "EMAIL_FROM", "EMAIL_REPLY_TO"],
+    secrets: [
+      "RESEND_API_KEY",
+      "EMAIL_FROM",
+      "EMAIL_REPLY_TO",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "STRIPE_PRICE_ESSENCIAL",
+      "STRIPE_PRICE_PRO",
+      "STRIPE_PORTAL_CONFIGURATION_ID"
+    ],
   },
   async (req: any, res: any) => {
     const isProdEnv = process.env.GCLOUD_PROJECT && process.env.FUNCTIONS_EMULATOR !== "true";
