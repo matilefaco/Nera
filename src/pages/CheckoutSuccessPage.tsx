@@ -1,43 +1,86 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { CheckCircle2, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { CheckCircle2, ArrowRight, Sparkles, Loader2, AlertCircle } from 'lucide-react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { cn } from '../lib/utils';
+import { notify } from '../lib/notify';
 
 export default function CheckoutSuccessPage() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [syncing, setSyncing] = useState(true);
   const [timedOut, setTimedOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sessionId = searchParams.get('session_id');
 
   useEffect(() => {
     if (profile?.plan && profile.plan !== 'free') {
       setSyncing(false);
       setTimedOut(false);
+      setError(null);
     }
   }, [profile]);
 
   useEffect(() => {
-    if (!syncing) return;
+    const confirmCheckout = async () => {
+      if (!sessionId || !user || !syncing) return;
+
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch('/api/plans/confirm-checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ sessionId })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          refreshProfile();
+        } else {
+           console.warn("Confirm checkout API failed:", data.error);
+           // We don't necessarily stop everything here, we let polling continue
+           // but if we want to show a specific error if it's a hard failure:
+           if (response.status === 403 || response.status === 404) {
+             setError(data.error);
+             setSyncing(false);
+           }
+        }
+      } catch (err) {
+        console.error("Error confirming checkout:", err);
+      }
+    };
+
+    if (sessionId && user && syncing) {
+      confirmCheckout();
+    }
+  }, [sessionId, user, refreshProfile, syncing]);
+
+  useEffect(() => {
+    if (!syncing || error) return;
 
     // Poll refreshProfile every 3 seconds
     const interval = setInterval(() => {
       refreshProfile();
     }, 3000);
 
-    // Timeout after 12 seconds if syncing still true
+    // Timeout after 15 seconds if syncing still true
     const timeout = setTimeout(() => {
       setTimedOut(true);
       setSyncing(false);
       clearInterval(interval);
-    }, 12000);
+    }, 15000);
 
     return () => {
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [syncing, refreshProfile]);
+  }, [syncing, refreshProfile, error]);
 
   const destination = profile?.onboardingCompleted ? '/dashboard' : '/onboarding';
 
@@ -51,6 +94,8 @@ export default function CheckoutSuccessPage() {
         <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8">
           {syncing ? (
             <Loader2 size={40} className="text-brand-terracotta animate-spin" />
+          ) : error ? (
+            <AlertCircle size={40} className="text-brand-terracotta" />
           ) : timedOut ? (
             <Sparkles size={40} className="text-brand-terracotta" />
           ) : (
@@ -59,12 +104,37 @@ export default function CheckoutSuccessPage() {
         </div>
 
         <h1 className="text-3xl font-serif text-brand-ink mb-4">
-          {syncing ? 'Verificando assinatura...' : timedOut ? 'Ativação em curso' : 'Assinatura ativada!'}
+          {syncing ? 'Verificando assinatura...' : error ? 'Algo deu errado' : timedOut ? 'Ativação em curso' : 'Assinatura ativada!'}
         </h1>
         
         <div className="text-brand-stone text-sm font-light leading-relaxed mb-10">
           {syncing ? (
             <p>Estamos confirmando seu teste de 15 dias com o Stripe. Isso levará apenas alguns instantes.</p>
+          ) : error ? (
+            <div className="space-y-3">
+              <div className="p-4 bg-brand-linen/60 rounded-[20px] text-xs space-y-2 border border-brand-mist/30">
+                <p>Recebemos sua tentativa de ativação, mas não conseguimos confirmar agora.</p>
+                <p className="font-semibold text-brand-ink">{error}</p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <button 
+                  onClick={() => {
+                    setError(null);
+                    setSyncing(true);
+                    setTimedOut(false);
+                  }}
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:text-brand-sienna"
+                >
+                  Tentar confirmar novamente
+                </button>
+                <a 
+                  href="mailto:suporte@nera.app" 
+                  className="text-[10px] font-bold uppercase tracking-widest text-brand-mist hover:text-brand-stone"
+                >
+                  Falar com suporte
+                </a>
+              </div>
+            </div>
           ) : timedOut ? (
             <div className="space-y-3">
               <div className="p-4 bg-brand-linen/60 rounded-[20px] text-xs space-y-2 border border-brand-mist/30">
@@ -89,14 +159,14 @@ export default function CheckoutSuccessPage() {
             to={destination}
             className={cn(
               "w-full h-14 flex items-center justify-center rounded-full text-xs font-bold uppercase tracking-[0.2em] transition-all group",
-              syncing 
+              (syncing && !error) 
                 ? "bg-brand-stone/10 text-brand-stone cursor-not-allowed" 
                 : "bg-brand-ink text-brand-white hover:bg-brand-ink/90 shadow-lg shadow-brand-ink/10"
             )}
-            onClick={(e) => syncing && e.preventDefault()}
+            onClick={(e) => (syncing && !error) && e.preventDefault()}
           >
             {syncing ? 'Sincronizando...' : profile?.onboardingCompleted ? 'Ir para meu painel' : 'Começar Onboarding'}
-            {!syncing && <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />}
+            {(!syncing || error) && <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />}
           </Link>
         </div>
 

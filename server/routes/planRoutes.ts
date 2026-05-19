@@ -86,7 +86,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       customer_email: email,
       client_reference_id: uid,
       payment_method_collection: "always",
-      success_url: `${PUBLIC_APP_URL}/checkout/success`,
+      success_url: `${PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: isUpgrade ? `${PUBLIC_APP_URL}/planos?canceled=true` : `${PUBLIC_APP_URL}/checkout/canceled`,
       metadata: {
         professionalId: uid,
@@ -673,6 +673,96 @@ router.post("/webhook", async (req, res) => {
   }
 
   res.json({ received: true });
+});
+
+/**
+ * CONFIRM CHECKOUT SESSIONS (Synchronous Activation)
+ */
+router.post("/confirm-checkout", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const uid = req.uid;
+  const { sessionId } = req.body;
+
+  if (!sessionId) {
+    return res.status(400).json({ error: "Missing sessionId" });
+  }
+
+  try {
+    const stripe = getStripe();
+    // Retrieve session with expanded data
+    const session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["subscription", "customer"],
+    });
+
+    // 1. Security Check: Metadata or client_reference_id must match caller UID
+    const sessionUid = session.client_reference_id || (session.metadata?.professionalId as string);
+    if (sessionUid !== uid) {
+      logger.warn("STRIPE", "Unauthorized attempt to confirm session", { uid, sessionUid, sessionId });
+      return res.status(403).json({ error: "Unauthorized. This checkout session does not belong to you." });
+    }
+
+    // 2. Validate Session Status
+    if (session.status !== 'complete' && session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+       logger.warn("STRIPE", "Checkout session not yet complete", { uid, status: session.status, paymentStatus: session.payment_status });
+       return res.status(400).json({ error: "Checkout session is not complete or paid." });
+    }
+
+    // 3. Extract Subscription Info
+    const subscription = session.subscription as Stripe.Subscription;
+    if (!subscription) {
+      return res.status(400).json({ error: "No subscription found in this session." });
+    }
+
+    // Status check for subscription
+    if (subscription.status !== 'active' && subscription.status !== 'trialing') {
+       return res.status(400).json({ error: `Subscription status is ${subscription.status}, expected active or trialing.` });
+    }
+
+    const plan = session.metadata?.plan || 'essencial';
+    const planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
+
+    // 4. Update Firestore Immediately
+    const userRef = db.collection('users').doc(uid);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "User profile not found." });
+    }
+
+    const updateData: any = {
+      plan: plan,
+      planRank: plan === 'pro' ? 2 : 1,
+      indexable: true,
+      stripeCustomerId: session.customer as string,
+      stripeSubscriptionId: subscription.id,
+      stripeSubscriptionStatus: subscription.status,
+      planExpiresAt: planExpiresAt,
+      trialUsed: true,
+      updatedAt: new Date().toISOString()
+    };
+
+    // If credits were used, reset them
+    if (session.metadata?.creditsUsed === 'true') {
+      updateData.credits = 0;
+    }
+
+    await userRef.update(updateData);
+
+    logger.info("STRIPE", "Checkout session confirmed synchronously", { uid, plan, sessionId });
+
+    return res.json({ 
+      success: true, 
+      plan, 
+      status: subscription.status 
+    });
+
+  } catch (err: any) {
+    logger.error("STRIPE", "Failed to confirm checkout session", { uid, sessionId, error: err.message });
+    return res.status(500).json({ 
+      error: "Failed to confirm checkout session", 
+      details: err.message 
+    });
+  }
 });
 
 /**
