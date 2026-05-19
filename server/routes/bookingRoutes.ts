@@ -56,17 +56,35 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
   }
 
   // Ensure start and end are valid strings (Express can return string | string[] | ParsedQs | ParsedQs[])
-  const startStr = typeof start === 'string' ? start : (Array.isArray(start) ? String(start[0]) : '');
-  const endStr = typeof end === 'string' ? end : (Array.isArray(end) ? String(end[0]) : '');
+  const startStr = typeof start === 'string' ? start.trim() : (Array.isArray(start) ? String(start[0]).trim() : '');
+  const endStr = typeof end === 'string' ? end.trim() : (Array.isArray(end) ? String(end[0]).trim() : '');
 
   if (!startStr || !endStr) {
     logger.warn("BOOKING", "occupied-slots blocked: missing or malformed ranges", { meta: { start, end } });
     return res.status(400).json({ error: "Datas de início e fim são obrigatórias", slots: [] });
   }
 
-  // Defensive length check for YYYY-MM-DD
-  if (startStr.length < 10 || endStr.length < 10) {
-    return res.status(400).json({ error: "Formato de data inválido. Use AAAA-MM-DD", slots: [] });
+  // 1.2 Format and range limit validation (prevent massive scans)
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRegex.test(startStr) || !dateRegex.test(endStr)) {
+    return res.status(400).json({ error: "Parâmetros de data inválidos. Utilize o formato AAAA-MM-DD.", slots: [] });
+  }
+
+  const startDate = new Date(startStr);
+  const endDate = new Date(endStr);
+
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return res.status(400).json({ error: "As datas fornecidas são inválidas.", slots: [] });
+  }
+
+  if (startStr > endStr) {
+    return res.status(400).json({ error: "A data de início deve ser menor ou igual à data de término.", slots: [] });
+  }
+
+  const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  if (diffDays > 180) {
+    return res.status(400).json({ error: "O intervalo máximo de consulta é de 180 dias.", slots: [] });
   }
 
   try {
@@ -74,29 +92,68 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
        throw new Error("Database connection unavailable during occupied-slots request");
     }
 
-    // 2. Optimized & Guarded Query (Uses single field to prevent composite index requirement)
-    const snapshot = await db.collection('appointments')
-      .where('professionalId', '==', professionalId)
-      .get();
+    // 1.3 Professional existence check
+    const userSnap = await db.collection("users").doc(professionalId).get();
+    if (!userSnap.exists) {
+      logger.warn("BOOKING", "occupied-slots: professional does not exist", { professionalId });
+      return res.status(404).json({ error: "Profissional não cadastrado ou não encontrado.", slots: [] });
+    }
+
+    // 2. High-Performance Query with Dynamic Fallback if Composite Index is missing
+    let snapshot;
+    try {
+      // Primary Optimized Query: Restricts the retrieval window in the database natively (Requires professionalId + date index)
+      snapshot = await db.collection('appointments')
+        .where('professionalId', '==', professionalId)
+        .where('date', '>=', startStr)
+        .where('date', '<=', endStr)
+        .get();
+    } catch (queryErr: any) {
+      const isIndexError = queryErr.message && (queryErr.message.includes('index') || queryErr.code === 'FAILED_PRECONDITION' || queryErr.code === 9);
+      if (isIndexError) {
+        logger.warn("BOOKING", "occupied-slots primary query failed (missing composite index) - Retrying with resilient single-field query", {
+          professionalId,
+          error: queryErr.message
+        });
+        // Resilient Fallback Query: Query on single field and rely entirely on in-memory mapping to filter dates
+        snapshot = await db.collection('appointments')
+          .where('professionalId', '==', professionalId)
+          .get();
+      } else {
+        throw queryErr;
+      }
+    }
 
     const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
     
-    // 3. Resilient Mapping & In-Memory filtering
+    // 3. Resilient Mapping, In-Memory filtering, and Sanitization of Corrupt Data
     const slots = snapshot.docs
       .map(doc => {
         const data = doc.data();
         if (!data) return null;
         
-        const date = data.date || '';
-        if (date < startStr || date > endStr) return null;
+        // Ensure string formats and trim whitespace
+        const date = typeof data.date === 'string' ? data.date.trim() : '';
+        const time = typeof data.time === 'string' ? data.time.trim() : '';
         
-        // Only include slots that are relevant for availability tracking
-        if (countingStatuses.includes(data.status)) {
+        // Exact range check guarantees validity even if fallback query was used
+        if (!date || date < startStr || date > endStr) return null;
+        if (!time) return null;
+        
+        // Guard against corrupted or NaN duration values
+        const rawDuration = data.duration || data.serviceDuration;
+        const durationValue = typeof rawDuration === 'number' ? rawDuration : (Number(rawDuration) || 60);
+        const finalDuration = isNaN(durationValue) || durationValue <= 0 ? 60 : durationValue;
+
+        const rawStatus = typeof data.status === 'string' ? data.status.trim() : 'pending';
+        
+        // Only include slots that are relevant for active booking/availability tracking
+        if (countingStatuses.includes(rawStatus)) {
           return {
             date,
-            time: data.time || '',
-            duration: Number(data.duration || data.serviceDuration || 60),
-            status: data.status
+            time,
+            duration: finalDuration,
+            status: rawStatus
           };
         }
         return null;
@@ -105,7 +162,7 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
 
     res.json({ slots });
   } catch (err: any) {
-    // 4. Global Catch-All (Prevents 500)
+    // 4. Global Catch-All (Prevents 500 crashes and guarantees formatted JSON output)
     logger.error("BOOKING", "Failed to fetch occupied slots - CRITICAL FAILSAFE triggered", { 
       requestId: req.requestId,
       professionalId,
@@ -116,17 +173,16 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
       code: err.code
     });
     
-    // Specific handling for common Firestore errors (like missing indexes)
+    // Specific informative message for common Firestore configuration errors
     if (err.message && (err.message.includes('index') || err.code === 'FAILED_PRECONDITION')) {
        return res.status(500).json({ 
          error: "Database configuration requires attention. Please contact Nera support.", 
-         slots: [] // Vital for frontend stability
+         slots: [] 
        });
     }
 
-    // Always return a valid JSON structure even on total failure
     res.status(500).json({ 
-      error: "Ocorreu um erro interno ao carregar horários. Tente novamente.", 
+      error: "Ocorreu um erro interno ao carregar os horários. Tente novamente.", 
       message: process.env.NODE_ENV === 'production' ? undefined : err.message,
       slots: [] 
     });

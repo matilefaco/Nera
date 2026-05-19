@@ -59,23 +59,61 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     return res.status(400).json({ error: "Missing required field: plan" });
   }
 
+  let userData: any = null;
   try {
-    const userDoc = await db.collection("users").doc(uid).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    const userData = userDoc.data();
-    
-    // Prevent double subscriptions
-    if (userData?.plan && userData.plan !== 'free') {
-      logger.warn("STRIPE", "Blocked attempt to create duplicate checkout session", { professionalId: maskUid(uid) });
-      return res.status(403).json({ error: "Você já possui uma assinatura ativa. Para alterar seu plano, entre em contato com o suporte." });
-    }
+    // 1. TRANSACTION LOCK: Enforces atomicity, avoiding duplicate creation requests across clicks, tabs, or connections.
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection("users").doc(uid);
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error("USER_NOT_FOUND");
+      }
+      userData = userDoc.data() || {};
+      
+      // Prevent double subscriptions
+      if (userData.plan && userData.plan !== 'free') {
+        throw new Error("ALREADY_SUBSCRIBED");
+      }
 
+      const now = Date.now();
+      const currentLock = userData.checkoutLock;
+      if (currentLock && (now - currentLock.timestamp) < 15000) {
+        throw new Error("ALREADY_PROCESSING");
+      }
+
+      // Set temporary checkout lock in database
+      transaction.update(userRef, {
+        checkoutLock: {
+          timestamp: now,
+          plan: plan
+        }
+      });
+    });
+  } catch (txnErr: any) {
+    if (txnErr.message === "USER_NOT_FOUND") {
+      return res.status(404).json({ error: "Usuária não encontrada em nosso sistema." });
+    }
+    if (txnErr.message === "ALREADY_SUBSCRIBED") {
+      logger.warn("STRIPE", "Blocked attempt to create duplicate checkout session", { professionalId: maskUid(uid) });
+      return res.status(403).json({ error: "Você já possui uma assinatura ativa. Para alterar seu plano, acesse o painel ou fale com o suporte." });
+    }
+    if (txnErr.message === "ALREADY_PROCESSING") {
+      logger.warn("STRIPE", "Checkout session creation already in progress", { professionalId: maskUid(uid) });
+      return res.status(429).json({ error: "Sua requisição de pagamento já está sendo processada. Aguarde alguns instantes." });
+    }
+    logger.error("STRIPE", "Transaction failed during create-checkout lock check", { professionalId: maskUid(uid), error: txnErr.message });
+    return res.status(500).json({ error: "Erro de processamento interno ao iniciar checkout." });
+  }
+
+  try {
     const email = userData?.email;
 
     if (!email) {
-       return res.status(400).json({ error: "User email not found" });
+       // Release lock since validation failed
+       await db.collection("users").doc(uid).update({
+         checkoutLock: admin.firestore.FieldValue.delete()
+       });
+       return res.status(400).json({ error: "E-mail da usuária não configurado no perfil." });
     }
 
     const stripe = getStripe();
@@ -86,6 +124,10 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
 
     if (!priceId) {
+      // Release lock since price ID is unconfigured
+      await db.collection("users").doc(uid).update({
+        checkoutLock: admin.firestore.FieldValue.delete()
+      });
       logger.error("STRIPE", "Price ID not configured", { professionalId: maskUid(uid), meta: { plan } });
       return res.status(400).json({ error: `O plano ${plan} não está configurado corretamente (Price ID ausente no ambiente). Por favor, contate o suporte.` });
     }
@@ -145,9 +187,18 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
 
     res.json({ checkoutUrl: session.url });
   } catch (err: any) {
+    // Release lock immediately on exception
+    try {
+      await db.collection("users").doc(uid).update({
+        checkoutLock: admin.firestore.FieldValue.delete()
+      });
+    } catch (lockErr: any) {
+      logger.error("STRIPE", "Failed to release checkoutLock on checkout error", { professionalId: maskUid(uid), error: lockErr.message });
+    }
+
     logger.error("STRIPE", "Failed to create checkout session", { requestId: req.requestId, error: err });
     res.status(500).json({ 
-      error: "Failed to create checkout session",
+      error: "Erro ao gerar a sessão de checkout no Stripe. Por favor, tente novamente de forma pausada.",
       details: err.message
     });
   }
@@ -160,13 +211,42 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
   const db = getDb();
   const uid = req.uid;
 
+  let userData: any = null;
   try {
-    const userDoc = await db.collection("users").doc(uid).get();
-    if (!userDoc.exists) {
+    // 1. TRANSACTION LOCK: Prevents concurrent portal creations (double clicks, rapid hits)
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection("users").doc(uid);
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error("USER_NOT_FOUND");
+      }
+      userData = userDoc.data() || {};
+
+      const now = Date.now();
+      const currentLock = userData.portalLock;
+      if (currentLock && (now - currentLock.timestamp) < 15000) {
+        throw new Error("ALREADY_PROCESSING");
+      }
+
+      transaction.update(userRef, {
+        portalLock: {
+          timestamp: now
+        }
+      });
+    });
+  } catch (txnErr: any) {
+    if (txnErr.message === "USER_NOT_FOUND") {
       return res.status(404).json({ error: "Usuária não encontrada em nosso sistema." });
     }
-    const userData = userDoc.data() || {};
-    
+    if (txnErr.message === "ALREADY_PROCESSING") {
+      logger.warn("STRIPE", "Portal access already in progress", { professionalId: maskUid(uid) });
+      return res.status(429).json({ error: "Já existe uma requisição para abrir o portal de faturas em andamento. Aguarde alguns instantes." });
+    }
+    logger.error("STRIPE", "Transaction failed during create-portal lock check", { professionalId: maskUid(uid), error: txnErr.message });
+    return res.status(500).json({ error: "Erro de processamento interno ao iniciar o portal de cobranças." });
+  }
+
+  try {
     const stripe = getStripe();
     let customerId = userData.stripeCustomerId;
 
@@ -199,6 +279,10 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
 
     // 2. DEFENSIVE GUARD: If after recovery attempts there is still no customerId, we are dealing with a local trial or free account
     if (!customerId) {
+      // Release dynamic lock on validation error
+      await db.collection("users").doc(uid).update({
+        portalLock: admin.firestore.FieldValue.delete()
+      });
       logger.warn("STRIPE", "User tried opening billing portal without stripeCustomerId", { userId: maskUid(uid) });
       return res.status(400).json({ 
         error: "Sua conta está no período de teste gratuito offline (Trial) ou plano Gratuito. No momento, você não possui faturas ou assinaturas cadastradas no processador de pagamentos (Stripe). Não se preocupe, nenhuma cobrança foi realizada!" 
@@ -236,6 +320,10 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
     }
 
     if (!stripeCustomer || (stripeCustomer as any).deleted) {
+      // Release dynamic lock
+      await db.collection("users").doc(uid).update({
+        portalLock: admin.firestore.FieldValue.delete()
+      });
       logger.warn("STRIPE", "Billing customer account not found or deleted on Stripe", { userId: maskUid(uid), customerId });
       return res.status(400).json({
         error: "Sua conta de cobrança não foi localizada no processador de pagamentos (Stripe). Por favor, contate nosso suporte para reconfigurar seu cadastro e redefinir sua assinatura."
@@ -305,12 +393,26 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
           userMessage = `Ocorreu uma limitação temporária no portal do Stripe: ${err2.message}. Por favor, fale com nosso suporte para receber atendimento especializado imediato.`;
         }
 
+        // Release dynamic lock
+        await db.collection("users").doc(uid).update({
+          portalLock: admin.firestore.FieldValue.delete()
+        });
+
         return res.status(400).json({ error: userMessage });
       }
     }
 
     res.json({ url: session.url });
   } catch (err: any) {
+    // Release dynamic lock immediately on exception
+    try {
+      await db.collection("users").doc(uid).update({
+        portalLock: admin.firestore.FieldValue.delete()
+      });
+    } catch (lockErr: any) {
+      logger.error("STRIPE", "Failed to release portalLock on portal error", { professionalId: maskUid(uid), error: lockErr.message });
+    }
+
     logger.error("STRIPE", "Failed to create portal session due to unhandled exception", { 
       requestId: req.requestId, 
       userId: maskUid(uid),
@@ -331,22 +433,58 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
   const db = getDb();
   const uid = req.uid;
 
+  let userData: any = null;
   try {
-    const userDoc = await db.collection("users").doc(uid).get();
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    const userData = userDoc.data();
-    
-    if (!userData?.stripeCustomerId) {
-      logger.warn("STRIPE", "User tried upgrading without stripeCustomerId", { uid });
-      return res.status(400).json({ error: "Você não possui uma assinatura ativa." });
-    }
+    // 1. TRANSACTION LOCK: Shields against concurrent upgrades (multiple clicks or concurrent sessions)
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection("users").doc(uid);
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists) {
+        throw new Error("USER_NOT_FOUND");
+      }
+      userData = userDoc.data() || {};
+      
+      if (!userData.stripeCustomerId) {
+        throw new Error("MISSING_STRIPE_CUSTOMER_ID");
+      }
 
-    if (userData.plan !== 'essencial') {
+      if (userData.plan !== 'essencial') {
+        throw new Error("INVALID_PLAN");
+      }
+
+      const now = Date.now();
+      const currentLock = userData.upgradeLock;
+      if (currentLock && (now - currentLock.timestamp) < 15000) {
+        throw new Error("ALREADY_PROCESSING");
+      }
+
+      // Apply temporary status lock on Firestore user document
+      transaction.update(userRef, {
+        upgradeLock: {
+          timestamp: now
+        }
+      });
+    });
+  } catch (txnErr: any) {
+    if (txnErr.message === "USER_NOT_FOUND") {
+      return res.status(404).json({ error: "Usuária não encontrada." });
+    }
+    if (txnErr.message === "MISSING_STRIPE_CUSTOMER_ID") {
+      logger.warn("STRIPE", "User tried upgrading without stripeCustomerId", { uid });
+      return res.status(400).json({ error: "Você não possui uma assinatura ativa vinculada ao Stripe." });
+    }
+    if (txnErr.message === "INVALID_PLAN") {
       return res.status(400).json({ error: "Seu plano atual não permite este tipo de atualização." });
     }
+    if (txnErr.message === "ALREADY_PROCESSING") {
+      logger.warn("STRIPE", "Upgrade direct to pro already in progress", { professionalId: maskUid(uid) });
+      return res.status(429).json({ error: "Seu upgrade já está sendo processado. Aguarde alguns instantes." });
+    }
+    logger.error("STRIPE", "Transaction failed during upgrade-to-pro lock check", { professionalId: maskUid(uid), error: txnErr.message });
+    return res.status(500).json({ error: "Erro de processamento interno ao iniciar upgrade." });
+  }
 
+  try {
     const stripe = getStripe();
     if (isDev) {
       logger.info("STRIPE", "Initiating direct upgrade to pro", { professionalId: maskUid(uid) });
@@ -355,6 +493,10 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
     const targetPriceId = process.env.STRIPE_PRICE_PRO;
 
     if (!targetPriceId) {
+      // Release status lock on unconfigured environment
+      await db.collection("users").doc(uid).update({
+        upgradeLock: admin.firestore.FieldValue.delete()
+      });
       logger.error("STRIPE", "STRIPE_PRICE_PRO not configured", { professionalId: maskUid(uid) });
       return res.status(400).json({ error: "O plano Pro não está configurado corretamente (Price ID ausente). Por favor, contate o suporte." });
     }
@@ -370,6 +512,10 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
     const activeSub = subscriptions.data.find(s => ['active', 'trialing', 'past_due', 'incomplete'].includes(s.status));
 
     if (!activeSub) {
+      // Release lock
+      await db.collection("users").doc(uid).update({
+        upgradeLock: admin.firestore.FieldValue.delete()
+      });
       logger.warn("STRIPE", "No valid subscription found for upgrade", { 
         professionalId: maskUid(uid), 
         customerId: userData.stripeCustomerId,
@@ -382,8 +528,15 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
     const currentItem = activeSub.items.data[0];
 
     if (!currentItem) {
+      // Release lock
+      await db.collection("users").doc(uid).update({
+        upgradeLock: admin.firestore.FieldValue.delete()
+      });
       return res.status(400).json({ error: "Assinatura encontrada mas sem itens válidos." });
     }
+
+    // 2. STRIPE IDEMPOTENCY KEY: guarantees Stripe subscription updates are strictly safe and won't double charge or double prorate
+    const stripeIdempotencyKey = `upgrade_${activeSub.id}_${targetPriceId}`;
 
     // Update the subscription
     await stripe.subscriptions.update(activeSub.id, {
@@ -398,16 +551,27 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
         upgradeSource: 'essencial-to-pro',
         upgradedAt: new Date().toISOString()
       }
+    }, {
+      idempotencyKey: stripeIdempotencyKey
     });
 
     // Removed optimistic update. Access will be granted via Stripe webhook (customer.subscription.updated)
     // confirmed through the system to ensure actual payment/verification.
     
-    logger.info("STRIPE", "Direct upgrade to pro initiated via Stripe API", { professionalId: maskUid(uid), subId: activeSub.id, targetPriceId });
+    logger.info("STRIPE", "Direct upgrade to pro initiated via Stripe API", { professionalId: maskUid(uid), subId: activeSub.id, targetPriceId, idempotencyKey: stripeIdempotencyKey });
     
     res.json({ success: true, message: "Seu plano está sendo atualizado. Isso pode levar alguns instantes." });
 
   } catch (err: any) {
+    // Release the upgradeLock immediately on error so user is not blocked
+    try {
+      await db.collection("users").doc(uid).update({
+        upgradeLock: admin.firestore.FieldValue.delete()
+      });
+    } catch (lockErr: any) {
+      logger.error("STRIPE", "Failed to release upgradeLock on upgrade error", { professionalId: maskUid(uid), error: lockErr.message });
+    }
+
     logger.error("STRIPE", "Failed to upgrade to pro", { requestId: req.requestId, error: err, errMessage: err.message });
     res.status(500).json({ 
       error: "Ocorreu um erro ao tentar atualizar o plano: " + err.message,
@@ -492,54 +656,58 @@ router.post("/webhook", async (req, res) => {
       const planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
 
       const userRef = db.collection('users').doc(userId);
-      const userDoc = await userRef.get();
       
-      if (!userDoc.exists) {
-        logger.error("STRIPE", "User not found in Firestore during checkout Completion", { professionalId: maskUid(userId), meta: { sessionId: session.id } });
-        // Maybe log to a failed_webhooks collection for manual recovery
-        return res.status(404).json({ error: 'User not found in system' });
-      }
+      await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+          throw new Error("USER_NOT_FOUND");
+        }
+        
+        const userData = userDoc.data() || {};
+        const creditsUsed = session.metadata?.creditsUsed === 'true';
 
-      if (isDev) {
-        logger.info("STRIPE", "Updating plan for user", { professionalId: maskUid(userId), meta: { plan } });
-      }
+        // Idempotency Guard: Skip if subscription is already processed and plan matches
+        if (userData.stripeSubscriptionId === session.subscription && userData.plan === plan) {
+          logger.info("STRIPE", "[StripeSync-Transaction] source=webhook-checkout-completed action=skipped_already_synced", { 
+            professionalId: maskUid(userId), 
+            subscriptionId: session.subscription 
+          });
+          return;
+        }
 
-      const userData = userDoc.data();
-      const creditsUsed = session.metadata?.creditsUsed === 'true';
+        if (isDev) {
+          logger.info("STRIPE", "Updating plan for user in transaction", { professionalId: maskUid(userId), meta: { plan } });
+        }
 
-      // Idempotency Guard: Skip if subscription is already processed and plan matches
-      if (userData?.stripeSubscriptionId === session.subscription && userData?.plan === plan) {
-        logger.info("STRIPE", "[StripeSync] source=webhook-checkout-completed action=skipped_already_synced", { 
-          professionalId: maskUid(userId), 
-          subscriptionId: session.subscription 
-        });
-        return res.json({ received: true, alreadySynced: true });
-      }
+        // Update User Plan - Mandatory Fields
+        const updateData: any = {
+          plan: plan,
+          indexable: true,
+          planRank: plan === 'pro' ? 2 : 1,
+          stripeCustomerId: session.customer,
+          stripeSubscriptionId: session.subscription,
+          stripeSubscriptionStatus: subscription.status, // trialing, active, etc.
+          planExpiresAt: planExpiresAt,
+          trialUsed: true,
+          lastStripeSyncAt: new Date().toISOString(),
+          stripeSyncSource: 'checkout_completed',
+          updatedAt: new Date().toISOString()
+        };
 
-      // Update User Plan - Mandatory Fields
-      const updateData: any = {
-        plan: plan,
-        indexable: true,
-        planRank: plan === 'pro' ? 2 : 1,
-        stripeCustomerId: session.customer,
-        stripeSubscriptionId: session.subscription,
-        stripeSubscriptionStatus: subscription.status, // trialing, active, etc.
-        planExpiresAt: planExpiresAt,
-        trialUsed: true,
-        lastStripeSyncAt: new Date().toISOString(),
-        stripeSyncSource: 'checkout_completed',
-        updatedAt: new Date().toISOString()
-      };
+        if (creditsUsed) {
+          updateData.credits = 0;
+        }
 
-      if (creditsUsed) {
-        updateData.credits = 0;
-      }
+        transaction.update(userRef, updateData);
+      });
 
-      await userRef.update(updateData);
-
-      logger.info("STRIPE", "User successfully upgraded", { professionalId: maskUid(userId), meta: { plan } });
+      logger.info("STRIPE", "User successfully upgraded via webhook", { professionalId: maskUid(userId), meta: { plan } });
 
     } catch (err: any) {
+      if (err.message === "USER_NOT_FOUND") {
+        logger.error("STRIPE", "User not found in Firestore during checkout Completion", { professionalId: maskUid(userId), meta: { sessionId: session.id } });
+        return res.status(404).json({ error: 'User not found in system' });
+      }
       logger.error("STRIPE", "Error processing checkout.session.completed", { requestId: req.requestId, professionalId: maskUid(userId), error: err });
       return res.status(500).json({ error: 'Internal processing error' });
     }
@@ -892,57 +1060,62 @@ router.post("/confirm-checkout", requireFirebaseAuth, async (req: AuthenticatedR
     const plan = session.metadata?.plan || 'essencial';
     const planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
 
-    // 4. Update Firestore Immediately
+    // 4. Update Firestore Transactionally to prevent webhook/confirm race condition
     const userRef = db.collection('users').doc(uid);
-    const userDoc = await userRef.get();
-    
-    if (!userDoc.exists) {
-      return res.status(404).json({ error: "User profile not found." });
-    }
+    let alreadySynced = false;
 
-    const userData = userDoc.data();
-    
-    // Idempotency Guard: If already synced with this subscription and plan, skip redundant write
-    if (userData?.stripeSubscriptionId === subscription.id && userData?.plan === plan) {
-      logger.info("STRIPE", "[StripeSync] source=confirm-checkout action=skipped_already_synced", { 
-        uid, 
-        subId: subscription.id 
+    try {
+      await db.runTransaction(async (transaction) => {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists) {
+          throw new Error("USER_NOT_FOUND");
+        }
+        const userData = userDoc.data() || {};
+
+        // Idempotency Guard inside transaction: If already synced, skip write
+        if (userData.stripeSubscriptionId === subscription.id && userData.plan === plan) {
+          logger.info("STRIPE", "[StripeSync-Transaction] source=confirm-checkout action=skipped_already_synced", { 
+            uid, 
+            subId: subscription.id 
+          });
+          alreadySynced = true;
+          return;
+        }
+
+        const updateData: any = {
+          plan: plan,
+          planRank: plan === 'pro' ? 2 : 1,
+          indexable: true,
+          stripeCustomerId: session.customer as string,
+          stripeSubscriptionId: subscription.id,
+          stripeSubscriptionStatus: subscription.status,
+          planExpiresAt: planExpiresAt,
+          trialUsed: true,
+          lastStripeSyncAt: new Date().toISOString(),
+          stripeSyncSource: 'confirm_checkout_sync',
+          updatedAt: new Date().toISOString()
+        };
+
+        if (session.metadata?.creditsUsed === 'true') {
+          updateData.credits = 0;
+        }
+
+        transaction.update(userRef, updateData);
       });
-      return res.json({ 
-        success: true, 
-        plan, 
-        status: subscription.status,
-        alreadySynced: true
-      });
+    } catch (txnErr: any) {
+      if (txnErr.message === "USER_NOT_FOUND") {
+        return res.status(404).json({ error: "User profile not found." });
+      }
+      throw txnErr;
     }
 
-    const updateData: any = {
-      plan: plan,
-      planRank: plan === 'pro' ? 2 : 1,
-      indexable: true,
-      stripeCustomerId: session.customer as string,
-      stripeSubscriptionId: subscription.id,
-      stripeSubscriptionStatus: subscription.status,
-      planExpiresAt: planExpiresAt,
-      trialUsed: true,
-      lastStripeSyncAt: new Date().toISOString(),
-      stripeSyncSource: 'confirm_checkout_sync',
-      updatedAt: new Date().toISOString()
-    };
-
-    // If credits were used, reset them
-    if (session.metadata?.creditsUsed === 'true') {
-      updateData.credits = 0;
-    }
-
-    await userRef.update(updateData);
-
-    logger.info("STRIPE", "Checkout session confirmed synchronously", { uid, plan, sessionId });
+    logger.info("STRIPE", "Checkout session confirmed synchronously", { uid, plan, sessionId, alreadySynced });
 
     return res.json({ 
       success: true, 
       plan, 
-      status: subscription.status 
+      status: subscription.status,
+      alreadySynced
     });
 
   } catch (err: any) {

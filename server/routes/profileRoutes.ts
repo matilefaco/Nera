@@ -2,6 +2,7 @@ import express from "express";
 import { db, getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 import { isValidWhatsapp, isDataUriImage } from "../utils.js";
+import { isNonPublicProfile } from "../utils/qualityFilter.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { logger, maskUid } from "../utils/logger.js";
 import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimiter.js";
@@ -238,8 +239,73 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       }
 
       // Set publication flags
-      const isFinishingOnboarding = filteredProfile.onboardingCompleted === true && !userData?.onboardingCompleted;
+      let isFinishingOnboarding = filteredProfile.onboardingCompleted === true && !userData?.onboardingCompleted;
       
+      let draftMessage: string | null = null;
+      let isPublished = filteredProfile.published !== false && (userData?.published !== false || isFinishingOnboarding);
+
+      const combinedData = { ...userData, ...filteredProfile };
+      const isTestProfileData = isNonPublicProfile(combinedData);
+
+      // Only perform strict publication validation if the profile is attempting to be published/indexable,
+      // or if it implicitly tries to publish during onboarding.
+      if (
+        filteredProfile.published === true || 
+        filteredProfile.indexable === true || 
+        isPublished ||
+        combinedData.published === true ||
+        combinedData.indexable === true ||
+        filteredProfile.onboardingCompleted === true
+      ) {
+        
+        const hasMinFields = combinedData.name && combinedData.name.trim().length >= 3 &&
+                             combinedData.slug && combinedData.slug.trim().length >= 3 &&
+                             combinedData.specialty &&
+                             combinedData.city;
+
+        let hasValidService = false;
+        if (Array.isArray(services) && services.length > 0) {
+           for (const svc of services) {
+              const sName = svc?.name?.toLowerCase().trim();
+              const isTestSvc = isNonPublicProfile({name: sName, slug: "valid", specialty: "valid", onboardingCompleted: true, indexable: true});
+              if (sName && sName.length >= 3 && !isTestSvc) {
+                  hasValidService = true;
+                  break;
+              }
+           }
+        } else if (!existingServicesSnap.empty) {
+           hasValidService = true;
+        }
+
+        if (isTestProfileData || !hasMinFields || !hasValidService) {
+           filteredProfile.published = false;
+           filteredProfile.indexable = false;
+           // We explicitly allow onboardingCompleted to remain true so the user is not trapped in an onboarding loop,
+           // but we force the profile into DRAFT mode because it failed quality checks.
+           isPublished = false;
+
+           if (isTestProfileData) {
+             draftMessage = "Esse perfil parece conter dados de teste (QA). Ele foi salvo como rascunho, mas não será publicado como vitrine real.";
+             logger.warn("PROFILE", "Test/QA profile prevented from publishing", { professionalId: maskUid(uid), cause: 'isTestProfileData' });
+           } else if (!hasMinFields) {
+             draftMessage = "Revise algumas informações antes de publicar sua vitrine (nome, especialidade e cidade são obrigatórios).";
+             logger.warn("PROFILE", "Incomplete profile prevented from publishing", { professionalId: maskUid(uid), cause: 'missingFields' });
+           } else if (!hasValidService) {
+             draftMessage = "Adicione pelo menos um serviço com nome válido, duração e preço para publicar a vitrine.";
+             logger.warn("PROFILE", "No valid services prevented from publishing", { professionalId: maskUid(uid), cause: 'noValidService' });
+           }
+        } else if (combinedData.onboardingCompleted) {
+           // Auto-recover published/indexable state if they fixed their profile and it now passes quality!
+           if (filteredProfile.published !== false) {
+             filteredProfile.published = true;
+             filteredProfile.indexable = !isNonPublicProfile(combinedData); // Safety indexable check
+             isPublished = true;
+           }
+        }
+      }
+      
+      let isFirstPublish = isPublished && !userData?.profilePublishedAt && !userData?.published;
+
       const missingDefaults: any = {};
       if (userData?.planRank === undefined) missingDefaults.planRank = 0;
       if (userData?.averageRating === undefined) missingDefaults.averageRating = 0;
@@ -248,8 +314,8 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       const finalProfileData = {
         ...filteredProfile,
         ...missingDefaults,
-        // Add publication timestamp if completing onboarding
-        ...(isFinishingOnboarding ? { profilePublishedAt: admin.firestore.FieldValue.serverTimestamp() } : {})
+        // Add publication timestamp if this is the first true publish
+        ...(isFirstPublish ? { profilePublishedAt: admin.firestore.FieldValue.serverTimestamp() } : {})
       };
 
       transaction.set(userRef, finalProfileData, { merge: true });
@@ -297,7 +363,18 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         }
       }
 
-      return { success: true, slug, published: isFinishingOnboarding };
+      return { 
+        success: true, 
+        slug, 
+        published: isFinishingOnboarding || isPublished,
+        draftMessage,
+        isTestProfile: !!draftMessage, 
+        finalState: {
+          published: filteredProfile.published,
+          indexable: filteredProfile.indexable,
+          onboardingCompleted: filteredProfile.onboardingCompleted
+        }
+      };
     });
 
     logger.info("PROFILE", "Transaction committed successfully", { professionalId: maskUid(uid) });
@@ -526,6 +603,14 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
 
     const userData = userDoc.data() || {};
 
+    const isTestProfileData = isNonPublicProfile(userData);
+
+    // If it is classified as a non-public/test/fake profile and is NOT the official 'helena-prado' demo, return secure 404
+    if (isTestProfileData && cleanSlug !== "helena-prado") {
+      logger.warn("PUBLIC_PROFILE", "Blocked access to non-public/test profile", { slug: cleanSlug });
+      return res.status(404).json({ error: "Perfil não encontrado." });
+    }
+
     // 4. Fetch extra public data to consolidate payload (Improves security and performance)
     const [servicesSnap, reviewsSnap, statsSnap] = await Promise.all([
       db.collection("services")
@@ -600,24 +685,7 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
 
     // P0 CRITICAL: Only expose WhatsApp if the plan is Pro
     if (sanitizedData.plan === 'pro') {
-      // Security: Do not expose real WhatsApp if the profile is a test profile/fake
-      const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
-      const BANNED_KEYWORDS = [
-        'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
-        'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined',
-        'qa', 'audit', 'regress', 'jajajsje', 'bubu', 'bebe', 'bebê', 'fsdf', 'asdasd', 'sadhduahsudhaus',
-        'testeeeee', 'joaquina princesa'
-      ];
-      const name = (userData.name || "").toLowerCase();
-      const email = (userData.email || "").toLowerCase();
-      const slugVal = (userData.slug || "").toLowerCase();
-
-      const isTestProfile = RESERVED_SLUGS.includes(slugVal) ||
-                            BANNED_KEYWORDS.some(k => slugVal.includes(k) || name.includes(k) || email.includes(k)) ||
-                            userData.indexable === false ||
-                            userData.onboardingCompleted !== true;
-
-      if (!isTestProfile) {
+      if (!isTestProfileData) {
         sanitizedData.whatsapp = userData.whatsapp;
       } else {
         // Safe dummy number for test profiles to prevent rendering breaks while keeping privacy
@@ -633,6 +701,14 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       if (userData.acceptsInstallments === true && hasCreditCard) {
         sanitizedData.acceptsInstallments = true;
       }
+    }
+
+    // Additional P1 protection: mask address or other details for demo (helena-prado) or any test files to not expose real info
+    if (isTestProfileData) {
+      if (sanitizedData.address) {
+        sanitizedData.address = "Endereço Demonstrativo, São Paulo - SP";
+      }
+      sanitizedData.instagram = "nera_demo";
     }
 
     return res.json(sanitizedData);
@@ -670,26 +746,11 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
     let professionals = snapshot.docs
       .map(doc => {
         const data = doc.data();
+        
+        // Strict quality filtering against any fake, test, QA, example or non-public profile
+        if (isNonPublicProfile(data)) return null;
+
         const name = (data.displayName || data.name || "").trim();
-        const cleanName = name.toLowerCase();
-        const slug = (data.slug || "").toLowerCase();
-        const email = (data.email || "").toLowerCase();
-
-        // 1. Minimum quality filters (on memory to avoid complex Firestore composite indexes for now)
-        if (!name || name.length < 3) return null;
-        
-        // 2. Purely numeric name check
-        if (/^\d+$/.test(name.replace(/\s/g, ''))) return null;
-
-        // 3. Banned keyword check (Name, Slug, Email)
-        const nameIsBanned = BANNED_KEYWORDS.some(k => cleanName.includes(k));
-        const slugIsBanned = BANNED_KEYWORDS.concat(['regress', 'audit', 'qa']).some(k => slug.includes(k));
-        const emailIsBanned = ['qa', 'test', 'audit'].some(k => email.includes(k));
-        
-        if (nameIsBanned || slugIsBanned || emailIsBanned) return null;
-
-        // 4. Incomplete profile check
-        if (!data.slug || !data.specialty) return null;
 
         // Sanitize: Return only what's needed for the directory card.
         return {

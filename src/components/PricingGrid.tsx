@@ -58,9 +58,9 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           ) : (
              <button 
                 onClick={() => onUpgrade?.('essencial')}
-                disabled={currentPlan === 'essencial' || loadingPlan === 'essencial' || currentPlan === 'pro'}
+                disabled={currentPlan === 'essencial' || !!loadingPlan || currentPlan === 'pro'}
                 className="btn-plan white-solid"
-                style={{ opacity: (currentPlan === 'essencial' || currentPlan === 'pro') ? 0.5 : 1 }}
+                style={{ opacity: (currentPlan === 'essencial' || currentPlan === 'pro' || !!loadingPlan) ? 0.5 : 1 }}
               >
                 {loadingPlan === 'essencial' ? 'Processando...' : currentPlan === 'essencial' ? 'Plano Ativado' : currentPlan === 'pro' ? 'Incluso no Pro' : 'Testar grátis por 15 dias'}
             </button>
@@ -95,9 +95,9 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
                   onUpgrade('pro');
                 }
               }}
-              disabled={currentPlan === 'pro' || loadingPlan === 'pro'}
+              disabled={currentPlan === 'pro' || !!loadingPlan}
               className="btn-plan terra-solid"
-              style={{ opacity: (currentPlan === 'pro') ? 0.5 : 1 }}
+              style={{ opacity: (currentPlan === 'pro' || !!loadingPlan) ? 0.5 : 1 }}
             >
               {loadingPlan === 'pro' ? 'Processando...' : currentPlan === 'pro' ? 'Plano Ativado' : currentPlan === 'essencial' ? 'Evoluir para Pro' : 'Assinar Pro'}
             </button>

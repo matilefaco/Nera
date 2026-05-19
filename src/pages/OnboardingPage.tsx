@@ -875,6 +875,10 @@ export default function OnboardingPage() {
         throw new Error(typeof responseBody === 'object' ? responseBody.error : responseBody);
       }
 
+      if (responseBody?.draftMessage) {
+        notify.info(responseBody.draftMessage, { duration: 6000 });
+      }
+
       setStep(4); // Advance to completion viewing step
     } catch (error: any) {
       notify.error(error);
@@ -894,7 +898,6 @@ export default function OnboardingPage() {
       }
       
       await saveProfilePartial(user.uid, { 
-        onboardingCompleted: true,
         onboardingStep: 3
       });
       navigate('/dashboard?tab=hoje');

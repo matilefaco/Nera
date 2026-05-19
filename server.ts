@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import cors from "cors";
 import { logger } from "./server/utils/logger.js";
+import { isNonPublicProfile } from "./server/utils/qualityFilter.js";
 import { formatSpecialtyLabel, getServiceLocationCopy } from "./src/lib/copy.js";
 
 declare module "express-serve-static-core" {
@@ -227,31 +228,11 @@ export async function createServerApp() {
         .limit(1000)
         .get();
 
-      const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
-      const BANNED_KEYWORDS = [
-        'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
-        'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined', 'helena-prado',
-        'qa', 'audit', 'regress', 'jajajsje', 'bubu', 'bebe', 'bebê', 'fsdf', 'asdasd', 'sadhduahsudhaus',
-        'testeeeee', 'joaquina princesa'
-      ];
-
       const professionalSlugs = snapshot.docs
         .map(doc => doc.data())
         .filter(data => {
-          const name = (data.displayName || data.name || "").toLowerCase();
-          const slug = (data.slug || "").toLowerCase();
-          const email = (data.email || "").toLowerCase();
-          
-          if (!slug || slug.length < 3) return false;
-          if (RESERVED_SLUGS.includes(slug)) return false;
-          
-          const nameIsBanned = BANNED_KEYWORDS.some(k => name.includes(k));
-          const slugIsBanned = BANNED_KEYWORDS.concat(['regress', 'audit', 'qa']).some(k => slug.includes(k));
-          const emailIsBanned = ['qa', 'test', 'audit'].some(k => email.includes(k));
-
-          if (nameIsBanned || slugIsBanned || emailIsBanned) return false;
-          
-          return true;
+          // Exclude any fake, test, QA, example or non-public profile using our centralized helper
+          return !isNonPublicProfile(data);
         })
         .map(data => `/p/${data.slug}`);
 
@@ -426,34 +407,13 @@ export async function createServerApp() {
 
       // Automatically determine indexability (P1 Test profiles check)
       let isIndexable = true;
-      const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
-      const BANNED_KEYWORDS = [
-        'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
-        'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined',
-        'qa', 'audit', 'regress', 'jajajsje', 'bubu', 'bebe', 'bebê', 'fsdf', 'asdasd', 'sadhduahsudhaus',
-        'testeeeee', 'joaquina princesa'
-      ];
-
-      const cleanSlug = slug.toLowerCase().trim();
-      if (RESERVED_SLUGS.includes(cleanSlug)) {
+      if (slug === 'helena-prado') {
         isIndexable = false;
-      }
-
-      const slugIsBanned = BANNED_KEYWORDS.some(k => cleanSlug.includes(k));
-      if (slugIsBanned) {
-        isIndexable = false;
-      }
-
-      if (snapshot.empty) {
+      } else if (snapshot.empty) {
         isIndexable = false;
       } else {
         const prof = snapshot.docs[0].data() as any;
-        if (prof.indexable === false || prof.onboardingCompleted !== true) {
-          isIndexable = false;
-        }
-        const name = (prof.name || "").toLowerCase();
-        const email = (prof.email || "").toLowerCase();
-        if (BANNED_KEYWORDS.some(k => name.includes(k) || email.includes(k))) {
+        if (isNonPublicProfile(prof)) {
           isIndexable = false;
         }
       }
@@ -631,7 +591,9 @@ export async function createServerApp() {
     "/agenda*",
     "/pedidos*",
     "/clients*",
+    "/clientes*",
     "/financeiro*",
+    "/billing*",
     "/services*",
     "/cupons*",
     "/avaliacoes*",

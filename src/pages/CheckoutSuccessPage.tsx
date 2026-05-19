@@ -17,6 +17,7 @@ export default function CheckoutSuccessPage() {
   const [error, setError] = useState<string | null>(null);
 
   const sessionId = searchParams.get('session_id');
+  const alreadyTriggeredRef = React.useRef(false);
 
   useEffect(() => {
     if (profile?.plan && profile.plan !== 'free') {
@@ -29,6 +30,8 @@ export default function CheckoutSuccessPage() {
   useEffect(() => {
     const confirmCheckout = async () => {
       if (!sessionId || !user || !syncing) return;
+      if (alreadyTriggeredRef.current) return;
+      alreadyTriggeredRef.current = true;
 
       try {
         const token = await user.getIdToken();
@@ -46,15 +49,18 @@ export default function CheckoutSuccessPage() {
           refreshProfile();
         } else {
            if (isDev) console.warn("Confirm checkout API failed:", data.error);
-           // We don't necessarily stop everything here, we let polling continue
-           // but if we want to show a specific error if it's a hard failure:
            if (response.status === 403 || response.status === 404) {
              setError(data.error);
              setSyncing(false);
+           } else {
+             // Allow retries for temporary server errors
+             alreadyTriggeredRef.current = false;
            }
         }
       } catch (err) {
         if (isDev) console.error("Error confirming checkout:", err);
+        // Allow retries for temporary network errors
+        alreadyTriggeredRef.current = false;
       }
     };
 

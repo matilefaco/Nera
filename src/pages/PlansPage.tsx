@@ -286,13 +286,15 @@ export default function PlansPage() {
                 <div className="p-6 pt-4 flex flex-col gap-3">
                   <button 
                     onClick={confirmUpgradeToPro}
-                    className="w-full py-4 bg-brand-ink text-brand-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-brand-stone transition-all"
+                    disabled={upgradeStatus === 'loading'}
+                    className="w-full py-4 bg-brand-ink text-brand-white rounded-full text-xs font-bold uppercase tracking-widest hover:bg-brand-stone transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Confirmar upgrade
+                    {upgradeStatus === 'loading' ? 'Processando...' : 'Confirmar upgrade'}
                   </button>
                   <button 
                     onClick={() => setShowUpgradeConfirmation(false)}
-                    className="w-full py-4 bg-transparent text-brand-stone rounded-full text-xs font-bold uppercase tracking-widest hover:text-brand-ink transition-all"
+                    disabled={upgradeStatus === 'loading'}
+                    className="w-full py-4 bg-transparent text-brand-stone rounded-full text-xs font-bold uppercase tracking-widest hover:text-brand-ink transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Agora não
                   </button>

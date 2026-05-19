@@ -504,13 +504,20 @@ export default function ProfilePage() {
           })
         });
 
+        const isJson = response.headers.get('content-type')?.includes('application/json');
+        const responseBody = isJson ? await response.json() : await response.text();
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Erro ao salvar perfil');
+          throw new Error(typeof responseBody === 'object' ? responseBody.error : responseBody);
+        }
+
+        if (responseBody?.draftMessage) {
+          notify.info(responseBody.draftMessage, { duration: 6000 });
+        } else {
+          notify.success('Perfil atualizado.');
         }
 
         if (isDev) console.log('[ProfileSave] Success');
-        notify.success('Perfil atualizado.');
         setSavedSnapshotString(currentSnapshotString);
         setShowSaveSuccess(true);
         setTimeout(() => setShowSaveSuccess(false), 3000);
