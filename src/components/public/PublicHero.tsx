@@ -329,16 +329,8 @@ export const PublicHero = ({
 
           <div className="relative z-0 mt-8 lg:mt-0">
             {(profile.plan === 'pro' || profile.professionalId === 'demo-helena-prado') && (
-              <div className="absolute -top-6 -right-2 md:-right-8 lg:-right-10 z-[60] pointer-events-none">
-                <div className="relative flex items-center justify-center w-[100px] h-[100px] md:w-[120px] md:h-[120px] bg-[var(--theme-primary,var(--color-brand-terracotta))] text-brand-white rounded-full premium-shadow overflow-hidden group border-2 border-brand-parchment lg:border-none shadow-xl">
-                  <svg className="absolute inset-1 w-[calc(100%-8px)] h-[calc(100%-8px)] pointer-events-none origin-center animate-[spin_20s_linear_infinite] opacity-90" viewBox="0 0 100 100">
-                    <path id="badgeTextPath" d="M 50, 50 m -34.5, 0 a 34.5,34.5 0 1,1 69,0 a 34.5,34.5 0 1,1 -69,0" fill="none" />
-                    <text fontSize="10.5" fontWeight="700" letterSpacing="0.2em" fill="currentColor" className="font-sans uppercase">
-                      <textPath href="#badgeTextPath" startOffset="0%">• VITRINE PRO NERA • EXPERIÊNCIA </textPath>
-                    </text>
-                  </svg>
-                  <Star size={24} className="text-brand-white relative z-10 fill-brand-white md:w-7 md:h-7" />
-                </div>
+              <div className="absolute top-6 right-6 md:top-8 md:right-8 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-brand-mist/50 z-20" aria-label="Vitrine PRO">
+                <ShieldCheck size={24} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
               </div>
             )}
              {profile.avatar ? (

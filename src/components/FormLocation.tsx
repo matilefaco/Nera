@@ -27,6 +27,7 @@ export interface FormLocationProps {
     accessibilityInfo?: string;
     isSafeLocation?: boolean;
     locationNotes?: string;
+    privacyMode?: string;
   };
   setStudioAddress?: (val: any) => void;
   

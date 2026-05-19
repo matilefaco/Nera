@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import './LandingPage.css';
 import PricingGrid from '../components/PricingGrid';
+import { ShowcaseSequence } from '../components/ShowcaseSequence';
 
 export default function LandingPage() {
   const navRef = useRef<HTMLElement>(null);
@@ -149,37 +150,10 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section id="how">
-        <div className="wrap">
-          <span className="label section-eyebrow-terra reveal">Como funciona</span>
-          <h2 className="how-h2 reveal">
-            Três passos.<br/>
-            <em>Uma nova realidade.</em>
-          </h2>
-          <div className="steps">
-            <div className="step reveal">
-              <div className="step-num">1</div>
-              <div className="step-body">
-                <h3 className="step-title"><em>Crie seu perfil</em> em minutos</h3>
-                <p className="step-desc">Fotos, serviços, preços e disponibilidade. Sua vitrine pública fica pronta para receber clientes antes de você terminar o café.</p>
-              </div>
-            </div>
-            <div className="step reveal rd1">
-              <div className="step-num">2</div>
-              <div className="step-body">
-                <h3 className="step-title">Clientes agendam <em>sozinhos</em></h3>
-                <p className="step-desc">Compartilhe seu link e pronto. Confirmações automáticas enviadas para você e para a cliente — sem nenhum esforço da sua parte.</p>
-              </div>
-            </div>
-            <div className="step reveal rd2">
-              <div className="step-num">3</div>
-              <div className="step-body">
-                <h3 className="step-title">Você só <em>atende e cresce</em></h3>
-                <p className="step-desc">Acompanhe resultados, fidelize clientes e tome decisões com dados reais. A nera cuida da operação. Você cuida da arte.</p>
-              </div>
-            </div>
-          </div>
+      {/* SHOWCASE / EXPERIENCE */}
+      <section id="showcase" className="py-24 sm:py-32 bg-[#FDFBF7]">
+        <div className="wrap reveal">
+          <ShowcaseSequence />
         </div>
       </section>
 
