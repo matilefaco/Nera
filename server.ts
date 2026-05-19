@@ -391,7 +391,11 @@ export async function createServerApp() {
 
       const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
       
-      if (!snapshot.empty) {
+      if (slug === 'helena-prado') {
+        title = "Helena Prado | Sobrancelhas e Harmonização do Olhar | Nera";
+        description = "Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica.";
+        ogImage = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop";
+      } else if (!snapshot.empty) {
         const prof = snapshot.docs[0].data() as any;
         
         const namePart = prof.name || "Profissional";

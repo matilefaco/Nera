@@ -161,73 +161,82 @@ export default function ProfilePage() {
   const [showCalendarDisconnectModal, setShowCalendarDisconnectModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  const buildSnapshot = (data: any) => {
+    return JSON.stringify({
+      name: data.name || '',
+      specialty: data.specialty || '',
+      bio: data.bio || '',
+      headline: data.headline || '',
+      city: data.city || '',
+      whatsapp: data.whatsapp || '',
+      instagram: data.instagram || '',
+      slug: data.slug || '',
+      neighborhood: data.neighborhood || '',
+      serviceMode: data.serviceMode || 'studio',
+      studioAddress: data.studioAddress || {
+        street: '',
+        number: '',
+        complement: '',
+        neighborhood: '',
+        city: '',
+        reference: '',
+        privacyMode: 'reveal_after_booking',
+        hasParking: false,
+        parkingInfo: '',
+        hasAccessibility: false,
+        accessibilityInfo: '',
+        isSafeLocation: false,
+        locationNotes: ''
+      },
+      serviceAreaType: data.serviceAreaType || 'city_wide',
+      travelFeeMode: data.travelFeeMode || 'none',
+      fixedTravelFee: typeof data.fixedTravelFee === 'string' ? data.fixedTravelFee : (data.fixedTravelFee?.toString() || ''),
+      pricingStrategy: data.pricingStrategy || 'none',
+      antiNoShowEnabled: data.antiNoShowEnabled || false,
+      advancePaymentRequired: data.advancePaymentRequired || false,
+      delayTolerance: data.delayTolerance ?? 0,
+      profileTheme: data.profileTheme?.variant || data.profileTheme || 'terracotta',
+      differentials: [...(data.differentials || [])].sort(),
+      yearsExperience: data.yearsExperience || '',
+      serviceStyle: [...(data.serviceStyle || [])].sort(),
+      serviceAreas: [...(data.serviceAreas || [])].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
+      workingDays: [...(data.workingDays || [1, 2, 3, 4, 5])].sort((a: any, b: any) => a - b),
+      startTime: data.startTime || '09:00',
+      endTime: data.endTime || '18:00',
+      paymentMethods: [...(data.paymentMethods || [])].sort(),
+      acceptsInstallments: data.acceptsInstallments || false
+    });
+  };
+
   useEffect(() => {
     if (profile?.uid && savedSnapshotString === null) {
-      const initialSnapshot = JSON.stringify({
-        name: profile.name || '',
-        specialty: profile.specialty || '',
-        bio: profile.bio || '',
-        headline: profile.headline || '',
-        city: profile.city || '',
-        whatsapp: profile.whatsapp || '',
-        instagram: profile.instagram || '',
-        slug: profile.slug || '',
-        neighborhood: profile.neighborhood || '',
-        serviceMode: profile.serviceMode || 'studio',
-        studioAddress: profile.studioAddress || {
-          street: '',
-          number: '',
-          complement: '',
-          neighborhood: '',
-          city: '',
-          reference: '',
-          privacyMode: 'reveal_after_booking',
-          hasParking: false,
-          parkingInfo: '',
-          hasAccessibility: false,
-          accessibilityInfo: '',
-          isSafeLocation: false,
-          locationNotes: ''
-        },
-        serviceAreaType: profile.serviceAreaType || 'city_wide',
-        travelFeeMode: profile.travelFeeMode || 'none',
-        fixedTravelFee: profile.fixedTravelFee?.toString() || '',
-        pricingStrategy: profile.pricingStrategy || 'none',
-        antiNoShowEnabled: profile.antiNoShowEnabled || false,
-        advancePaymentRequired: profile.advancePaymentRequired || false,
-        delayTolerance: profile.delayTolerance ?? 0,
-        profileTheme: profile.profileTheme?.variant || 'terracotta',
-        differentials: [...(profile.professionalIdentity?.differentials || [])].sort(),
-        serviceAreas: [...(profile.serviceAreas || [])].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
-        workingDays: [...(profile.workingHours?.workingDays || profile.workingDays || [1, 2, 3, 4, 5])].sort((a, b) => a - b),
-        startTime: profile.workingHours?.startTime || profile.startTime || '09:00',
-        endTime: profile.workingHours?.endTime || profile.endTime || '18:00',
-        paymentMethods: [...(profile.paymentMethods || [])].sort(),
-        yearsExperience: profile.professionalIdentity?.yearsExperience || '',
-        serviceStyle: [...(profile.professionalIdentity?.serviceStyle || [])].sort(),
+      const initialSnapshot = buildSnapshot({
+        ...profile,
+        differentials: profile.professionalIdentity?.differentials,
+        yearsExperience: profile.professionalIdentity?.yearsExperience,
+        serviceStyle: profile.professionalIdentity?.serviceStyle,
+        workingDays: profile.workingHours?.workingDays || profile.workingDays,
+        startTime: profile.workingHours?.startTime || profile.startTime,
+        endTime: profile.workingHours?.endTime || profile.endTime
       });
       setSavedSnapshotString(initialSnapshot);
     }
   }, [profile?.uid, savedSnapshotString, profile]);
 
   const currentSnapshotString = useMemo(() => {
-    return JSON.stringify({
+    return buildSnapshot({
       name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
       studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
-      advancePaymentRequired, delayTolerance, profileTheme: profileTheme.variant,
-      differentials: [...differentials].sort(),
-      yearsExperience,
-      serviceStyle: [...serviceStyle].sort(),
-      serviceAreas: [...serviceAreas].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
-      workingDays: [...workingDays].sort((a, b) => a - b),
-      startTime, endTime,
-      paymentMethods: [...paymentMethods].sort()
+      advancePaymentRequired, delayTolerance, profileTheme,
+      differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, paymentMethods,
+      acceptsInstallments
     });
   }, [
     name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
     studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
     advancePaymentRequired, delayTolerance, profileTheme.variant,
-    differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, paymentMethods
+    differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, paymentMethods,
+    acceptsInstallments
   ]);
 
   const hasUnsavedChanges = savedSnapshotString !== null && currentSnapshotString !== savedSnapshotString;

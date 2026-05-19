@@ -186,6 +186,92 @@ function PublicProfileContent() {
         return;
       }
 
+      // --- HELENA PRADO MOCK FALLBACK ---
+      if (slug === 'helena-prado') {
+        devLog(`[PublicProfile] Loading static Helena Prado demo`);
+        
+        const HELENA_MOCK = {
+          name: 'Helena Prado',
+          slug: 'helena-prado',
+          uid: 'demo-helena-prado',
+          professionalId: 'demo-helena-prado',
+          email: 'demo@usenera.com',
+          specialty: 'Sobrancelhas e Harmonização do Olhar',
+          city: 'São Paulo',
+          neighborhood: 'Jardins',
+          serviceMode: 'hybrid',
+          headline: 'Especialista em Design de Sobrancelhas Naturais',
+          bio: 'Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica sem transformações artificiais. Cada traço é pensado para valorizar o seu olhar de forma única e elegante.',
+          avatar: 'https://i.imgur.com/gBdf3tO.png',
+          coverImage: 'https://images.unsplash.com/photo-1600125867375-9c5ae5cf61ac?q=80&w=1200&auto=format&fit=crop',
+          professionalIdentity: {
+            yearsExperience: '8',
+            mainSpecialty: 'Design de Sobrancelhas',
+            subSpecialties: ['Brow Lamination', 'Micropigmentação Natural', 'Design com Henna'],
+            serviceStyle: ['Minimalista e Natural', 'Premium e Personalizado'],
+            differentials: ['Biossegurança rigorosa', 'Atendimento pontual', 'Produtos de alta performance']
+          },
+          profileTheme: {
+            variant: 'terracotta'
+          },
+          whatsapp: '5511999999999',
+          instagram: 'helenaprado.beauty',
+          indexable: false,
+          published: true,
+          plan: 'pro',
+          paymentMethods: ['pix', 'credit_card', 'debit_card'],
+          acceptsInstallments: false,
+          workingDays: [1, 2, 3, 4, 5],
+          startTime: '09:00',
+          endTime: '18:00',
+          serviceAreas: [],
+          studioAddress: {
+            street: 'Rua Oscar Freire',
+            number: '1234',
+            complement: 'Conj. 41',
+            neighborhood: 'Jardins',
+            city: 'São Paulo',
+            privacyMode: 'reveal_after_booking',
+            hasParking: true,
+            parkingInfo: 'Valet no local',
+            isSafeLocation: true
+          },
+          portfolio: [
+            { id: '1', url: 'https://i.imgur.com/O9b1cB9.png', category: 'Processo' },
+            { id: '2', url: 'https://i.imgur.com/pk8kE8K_d.webp?maxwidth=760&fidelity=grand', category: 'Resultado' },
+            { id: '3', url: 'https://i.imgur.com/D8hEvtH_d.webp?maxwidth=1520&fidelity=grand', category: 'Antes e Depois' }
+          ]
+        };
+        
+        const HELENA_SERVICES = [
+          { id: '1', name: 'Sobrancelhas Harmonizadas', price: 150, duration: 45, description: 'Sobrancelhas alinhadas ao seu rosto, com resultado natural e harmonioso que valoriza seu olhar.' },
+          { id: '2', name: 'Brow Lamination Premium', price: 280, duration: 60, description: 'Efeito de sobrancelhas cheias e disciplinadas, ideal para quem busca volume com elegância.' },
+          { id: '3', name: 'Micropigmentação Soft', price: 950, duration: 150, description: 'Preenchimento fio a fio ultra-realista para quem deseja acordar pronta todos os dias.' }
+        ];
+
+        const HELENA_REVIEWS = [
+          { id: '1', comment: 'Trabalho impecável! A Helena conseguiu manter a naturalidade que eu tanto queria.', firstName: 'Mariana', neighborhood: 'Pinheiros', rating: 5, createdAt: new Date().toISOString() },
+          { id: '2', comment: 'Profissional super atenciosa, o estúdio é lindo e o resultado superou minhas expectativas.', firstName: 'Beatriz', neighborhood: 'Vila Madalena', rating: 5, createdAt: new Date().toISOString() },
+          { id: '3', comment: 'Já fiz com várias outras pessoas, mas ninguém faz a harmonização como ela.', firstName: 'Carolina', neighborhood: 'Jardins', rating: 5, createdAt: new Date().toISOString() }
+        ];
+
+        const HELENA_STATS = {
+          rating: 5.0,
+          reviewCount: 42,
+          completedBookings: 180
+        };
+
+        if (isMounted) {
+          setProfile(HELENA_MOCK as unknown as UserProfile);
+          setServices(HELENA_SERVICES as any[]);
+          setReviews(HELENA_REVIEWS as any[]);
+          setStats(HELENA_STATS as any);
+          setLoading(false);
+        }
+        return;
+      }
+      // --- END MOCK ---
+
       try {
         devLog(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
         

@@ -1202,39 +1202,21 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
                     </button>
                   </div>
                 ) : !features.advancedDashboard ? (
-                  // Essencial / Free View
-                  <>
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-6">
-                      <div className="space-y-1">
-                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Visitas na vitrine</p>
-                        <div className="flex items-baseline gap-2">
-                          <p className="text-xl font-serif text-brand-ink">{growthMetrics.visits30d}</p>
-                          <span className="text-[8px] font-bold text-brand-stone bg-[#FAF9F8] border border-brand-mist/40 px-1.5 py-0.5 rounded">+{growthMetrics.visits7d} na semana</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone">Cliques em Reservar</p>
-                        <p className="text-xl font-serif text-brand-ink">{growthMetrics.clicksBook}</p>
-                      </div>
+                  // Essencial / Free View - Teaser (Blocked Growth)
+                  <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                    <div className="w-16 h-16 bg-[#FAF9F8] rounded-[20px] flex items-center justify-center text-brand-stone mb-6 border border-brand-mist/30 shadow-sm">
+                      <TrendingUp size={28} strokeWidth={1.5} />
                     </div>
-
-                    <div className="mt-2 bg-[#FAF9F8] border border-brand-mist/40 p-5 rounded-[24px] flex flex-col items-start gap-4">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-brand-mist/30 text-brand-stone/60">
-                        <Sparkles size={18} />
-                      </div>
-                      <div>
-                         <h4 className="text-sm font-serif text-brand-ink mb-1">Evolua para o Nera Pro</h4>
-                         <p className="text-[11px] text-brand-stone font-light leading-relaxed mb-4">
-                           Ao assinar você desbloqueia estatísticas da IA, converções e serviço favorito.
-                         </p>
-                         <Link to="/planos" className="inline-block">
-                           <PremiumButton variant="ink" className="text-[9px] py-2 px-5 flex items-center justify-center gap-2">
-                             Explorar recursos <ChevronRight size={12} />
-                           </PremiumButton>
-                         </Link>
-                      </div>
-                    </div>
-                  </>
+                    <h4 className="text-xl font-serif text-brand-ink mb-3 tracking-tight">Insights avançados da sua vitrine</h4>
+                    <p className="text-[13px] text-brand-stone font-light px-8 max-w-sm mx-auto mb-8 leading-relaxed">
+                      No PRO, você acompanha crescimento, desempenho e comportamento da sua agenda em tempo real.
+                    </p>
+                    <Link to="/planos" className="inline-block">
+                      <PremiumButton variant="ink" className="text-[10px] py-3.5 px-8 flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition-all">
+                        <Sparkles size={14} className="text-brand-terracotta" /> Conhecer PRO
+                      </PremiumButton>
+                    </Link>
+                  </div>
                 ) : (
                   // Pro View
                   <div className="flex flex-col gap-6">

@@ -372,6 +372,48 @@ export const FormLocation = ({
               </div>
 
               <div className="md:col-span-4 mt-2 bg-[#FAF9F8] p-3 rounded-xl border border-brand-mist/40">
+                <h4 className="text-[9px] font-bold uppercase tracking-widest text-brand-ink mb-3">Privacidade do Endereço</h4>
+                
+                <div className="flex flex-col gap-3 mb-6">
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <div className="relative flex items-center h-4 mt-0.5">
+                      <input
+                        type="radio"
+                        name="address_privacy"
+                        checked={studioAddress.privacyMode === 'public_full'}
+                        onChange={() => setStudioAddress({...studioAddress, privacyMode: 'public_full'})}
+                        className="peer appearance-none w-4 h-4 rounded-full border border-brand-mist checked:border-brand-terracotta transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
+                      />
+                      <div className="absolute text-brand-terracotta opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-1 top-1 w-2 h-2 rounded-full bg-brand-terracotta">
+                      </div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-brand-ink group-hover:text-brand-terracotta transition-colors">Sim, mostrar endereço completo</span>
+                      <p className="text-[10px] text-brand-stone font-light leading-tight">O endereço da rua e número ficarão visíveis para todos que visitarem sua vitrine.</p>
+                    </div>
+                  </label>
+                  
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <div className="relative flex items-center h-4 mt-0.5">
+                      <input
+                        type="radio"
+                        name="address_privacy"
+                        checked={studioAddress.privacyMode !== 'public_full'}
+                        onChange={() => setStudioAddress({...studioAddress, privacyMode: 'reveal_after_booking'})}
+                        className="peer appearance-none w-4 h-4 rounded-full border border-brand-mist checked:border-brand-terracotta transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
+                      />
+                      <div className="absolute text-brand-terracotta opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-1 top-1 w-2 h-2 rounded-full bg-brand-terracotta">
+                      </div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-brand-ink group-hover:text-brand-terracotta transition-colors">Não, mostrar apenas bairro e cidade</span>
+                      <p className="text-[10px] text-brand-stone font-light leading-tight">Esconde rua e número. O endereço completo só será revelado para clientes após finalizarem a reserva.</p>
+                    </div>
+                  </label>
+                </div>
+                
+                <div className="w-full h-px bg-brand-mist/40 mb-4" />
+
                 <h4 className="text-[9px] font-bold uppercase tracking-widest text-brand-ink mb-3">Estrutura e Diferenciais</h4>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">

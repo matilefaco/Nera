@@ -607,27 +607,42 @@ export default function BookingModal({ profile, services, onClose, open, initial
           return names[id] || id;
         });
 
-      const { bookingId, token, reservationCode: resCode } = await createBookingRequest({
-        professionalId: profile.uid,
-        professionalName: profile.name,
-        professionalWhatsapp: profile.whatsapp,
-        serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        duration: Number(selectedService.duration) || 60,
-        price: selectedService.price,
-        travelFee: selectedArea?.fee || 0,
-        totalPrice: totalPrice,
-        locationType: isHomeService ? 'home' : 'studio',
-        neighborhood: (isHomeService ? (addressNeighborhood.trim() || selectedArea?.name) : profile.neighborhood) || '',
-        address: structuredAddress,
-        clientName: clientName.trim(),
-        clientWhatsapp: clientPhone.replace(/\D/g, ''),
-        clientEmail: clientEmail.trim().toLowerCase(),
-        date: selectedDate,
-        time: selectedTime,
-        couponId: appliedCoupon?.id,
-        appliedCouponCode: appliedCoupon?.code,
-      });
+      let bookingId = '';
+      let token = '';
+      let resCode = '';
+
+      if (profile.professionalId === 'demo-helena-prado') {
+        // Simulate a delay
+        await new Promise(r => setTimeout(r, 1500));
+        bookingId = 'demo-booking-123';
+        token = 'demo-token';
+        resCode = 'HPRADO01';
+      } else {
+        const result = await createBookingRequest({
+          professionalId: profile.uid,
+          professionalName: profile.name,
+          professionalWhatsapp: profile.whatsapp,
+          serviceId: selectedService.id,
+          serviceName: selectedService.name,
+          duration: Number(selectedService.duration) || 60,
+          price: selectedService.price,
+          travelFee: selectedArea?.fee || 0,
+          totalPrice: totalPrice,
+          locationType: isHomeService ? 'home' : 'studio',
+          neighborhood: (isHomeService ? (addressNeighborhood.trim() || selectedArea?.name) : profile.neighborhood) || '',
+          address: structuredAddress,
+          clientName: clientName.trim(),
+          clientWhatsapp: clientPhone.replace(/\D/g, ''),
+          clientEmail: clientEmail.trim().toLowerCase(),
+          date: selectedDate,
+          time: selectedTime,
+          couponId: appliedCoupon?.id,
+          appliedCouponCode: appliedCoupon?.code,
+        });
+        bookingId = result.bookingId;
+        token = result.token;
+        resCode = result.reservationCode || '';
+      }
 
       setAppointmentId(bookingId);
       setAppointmentToken(token);
@@ -639,7 +654,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       // /api/public/create-booking endpoint.
 
       // If booking from waitlist, mark it as booked
-      if (waitlistEntry?.id) {
+      if (waitlistEntry?.id && profile.professionalId !== 'demo-helena-prado') {
         await markWaitlistAsBooked(waitlistEntry.id);
       }
 
@@ -703,6 +718,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
               <button onClick={onClose} className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors">
                 <X size={24} />
               </button>
+
+              {profile.professionalId === 'demo-helena-prado' && (
+                <div className="mb-6 p-4 bg-brand-linen/60 border border-brand-mist/50 rounded-2xl text-[11px] font-medium text-brand-stone text-center max-w-lg mx-auto">
+                  Você está visualizando uma <strong className="text-brand-ink">vitrine de demonstração oficial da Nera</strong>.
+                  <br/>O processo de reserva a seguir é apenas ilustrativo e não gerará compromissos reais.
+                </div>
+              )}
+
               {step === 1 && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
                   <BookingStep step={1} total={totalSteps} title="Escolha o serviço e horário" />
