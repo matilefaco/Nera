@@ -5,15 +5,21 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 
 export default function CheckoutSuccessPage() {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [syncing, setSyncing] = useState(true);
 
   useEffect(() => {
     if (profile?.plan && profile.plan !== 'free') {
       setSyncing(false);
+    } else {
+      // If still free, try to refresh every 3 seconds for a bit
+      const interval = setInterval(() => {
+        refreshProfile();
+      }, 3000);
+      return () => clearInterval(interval);
     }
-  }, [profile]);
+  }, [profile, refreshProfile]);
 
   useEffect(() => {
     // Timeout after 30 seconds if syncing still true

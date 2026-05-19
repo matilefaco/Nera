@@ -96,10 +96,21 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     if (plan === 'essencial' && !userData?.trialUsed) {
       sessionParams.subscription_data = {
         trial_period_days: 15,
+        metadata: {
+          professionalId: uid,
+          plan: 'essencial'
+        },
         trial_settings: {
           end_behavior: {
             missing_payment_method: "cancel"
           }
+        }
+      };
+    } else if (plan === 'pro') {
+      sessionParams.subscription_data = {
+        metadata: {
+          professionalId: uid,
+          plan: 'pro'
         }
       };
     }
@@ -460,11 +471,28 @@ router.post("/webhook", async (req, res) => {
         const userData = userDoc.data();
         const userId = userDoc.id;
 
-        await userDoc.ref.update({
+        const updateData: any = {
           planExpiresAt: newExpiry.toISOString(),
           updatedAt: new Date().toISOString()
-        });
-        logger.info("STRIPE", "Plan successfully renewed", { professionalId: maskUid(userId) });
+        };
+
+        // Fallback: If plan is still free or missing, update it from subscription
+        const priceId = subscription.items?.data?.[0]?.price?.id;
+        if (priceId && (!userData.plan || userData.plan === 'free')) {
+          const envPro = process.env.STRIPE_PRICE_PRO;
+          const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+
+          if (priceId === envPro) {
+            updateData.plan = 'pro';
+            updateData.planRank = 2;
+          } else if (priceId === envEssencial) {
+            updateData.plan = 'essencial';
+            updateData.planRank = 1;
+          }
+        }
+
+        await userDoc.ref.update(updateData);
+        logger.info("STRIPE", "Plan successfully renewed/synced", { professionalId: maskUid(userId) });
 
         // Handle Referral Reward (10 BRL)
         const referredBy = userData?.referredBy;
@@ -575,6 +603,15 @@ router.post("/webhook", async (req, res) => {
             updateData.plan = 'essencial';
             updateData.planRank = 1;
             updateData.indexable = true;
+          } else {
+            // Fallback to metadata if price IDs don't match exactly
+            const metaPlan = (subscription.metadata as any)?.plan;
+            if (metaPlan === 'pro' || metaPlan === 'essencial') {
+              updateData.plan = metaPlan;
+              updateData.planRank = metaPlan === 'pro' ? 2 : 1;
+              updateData.indexable = true;
+              logger.info("STRIPE", "Plan synced from subscription metadata", { professionalId: maskUid(userQuery.docs[0].id), plan: metaPlan });
+            }
           }
         }
 

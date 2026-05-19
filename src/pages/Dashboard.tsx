@@ -110,8 +110,18 @@ const appointmentsHistoryCache = new Map<string, AppointmentsCacheEntry>();
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const { features, plan, signupPlan } = usePlanFeatures();
+  const { refreshProfile } = useAuth();
   const [searchParams] = useSearchParams();
   
+  // Auto-sync if plan is free but we expect something else
+  useEffect(() => {
+    if (plan === 'free' && (signupPlan === 'essencial' || signupPlan === 'pro')) {
+      const timer = setTimeout(() => {
+        refreshProfile();
+      }, 5000); // Wait 5s for webhook to definitely finish
+      return () => clearTimeout(timer);
+    }
+  }, [plan, signupPlan, refreshProfile]);
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
     // 1. Check URL param first (priority)
     const tabParam = searchParams.get('tab');
