@@ -305,7 +305,7 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
     // Removed optimistic update. Access will be granted via Stripe webhook (customer.subscription.updated)
     // confirmed through the system to ensure actual payment/verification.
     
-    logger.info("STRIPE", "Direct upgrade to pro initiated via Stripe API", { professionalId: maskUid(uid), subId: sub.id, targetPriceId });
+    logger.info("STRIPE", "Direct upgrade to pro initiated via Stripe API", { professionalId: maskUid(uid), subId: activeSub.id, targetPriceId });
     
     res.json({ success: true, message: "Seu plano está sendo atualizado. Isso pode levar alguns instantes." });
 

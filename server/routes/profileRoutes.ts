@@ -184,7 +184,7 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         'instagram', 'whatsapp', 'slug', 'avatar', 'photoURL', 'coverImage',
         'portfolio', 'profileTheme', 'serviceMode', 'studioAddress', 
         'serviceAreaType', 'serviceAreas', 'travelFeeMode', 'fixedTravelFee', 
-        'pricingStrategy', 'workingHours', 'paymentMethods', 
+        'pricingStrategy', 'workingHours', 'paymentMethods', 'acceptsInstallments',
         'antiNoShowEnabled', 'advancePaymentRequired', 'delayTolerance', 
         'professionalIdentity', 'onboardingCompleted', 'onboardingStep',
         'published', 'indexable', 'avatarSkipped'
@@ -221,6 +221,14 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
 
       // Ensure UID is correct
       filteredProfile.uid = uid;
+
+      // Plan check for premium features
+      if (userPlan !== 'pro') {
+        if (filteredProfile.acceptsInstallments) {
+          logger.warn("PROFILE", "Blocked acceptsInstallments for non-pro user", { professionalId: maskUid(uid), plan: userPlan });
+          filteredProfile.acceptsInstallments = false;
+        }
+      }
 
       // WhatsApp validation on backend
       const whatsapp = filteredProfile.whatsapp;
@@ -584,6 +592,7 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       paymentMethods: userData.paymentMethods || [],
       instagram: userData.instagram,
       plan: userData.plan || 'free',
+      acceptsInstallments: false, // Default to false, will be gated below
       services: sanitizedServices,
       reviews: sanitizedReviews,
       stats: statsSnap.exists ? statsSnap.data() : null
@@ -592,6 +601,16 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
     // P0 CRITICAL: Only expose WhatsApp if the plan is Pro
     if (sanitizedData.plan === 'pro') {
       sanitizedData.whatsapp = userData.whatsapp;
+      
+      // P0: Only allow acceptsInstallments if plan is pro AND professional accepts credit card
+      const payments = (userData.paymentMethods || []).map((m: any) => String(m).toLowerCase().trim());
+      const hasCreditCard = payments.some((m: string) => 
+        ['credit_card', 'credito', 'crédito', 'cartao_credito', 'cartão de crédito', 'credit'].includes(m)
+      );
+      
+      if (userData.acceptsInstallments === true && hasCreditCard) {
+        sanitizedData.acceptsInstallments = true;
+      }
     }
 
     return res.json(sanitizedData);
