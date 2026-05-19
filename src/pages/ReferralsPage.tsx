@@ -19,6 +19,9 @@ interface ReferralRecord {
   plan: string;
 }
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export default function ReferralsPage() {
   const navigate = useNavigate();
   const { profile, isAuthReady } = useAuth();
@@ -31,20 +34,25 @@ export default function ReferralsPage() {
   const [copyAnim, setCopyAnim] = useState(false);
 
   useEffect(() => {
+    devLog('[Referrals] start');
     if (!isAuthReady) {
+      devLog('[Referrals] auth not ready, waiting');
       return;
     }
 
     if (!features.referrals) {
+      devLog('[Referrals] not available for this plan, loading=false');
       setLoading(false);
       return;
     }
 
     if (!profile?.referralCode) {
+      devLog('[Referrals] no referral code initially, loading=false');
       setLoading(false);
       return;
     }
 
+    devLog(`[Referrals] query start for code: ${profile.referralCode}`);
 
     let isMounted = true;
     let isCancelled = false;
@@ -78,7 +86,7 @@ export default function ReferralsPage() {
         clearTimeout(timeoutId);
         if (!isMounted || isCancelled) return;
         
-        console.error("[Referrals] error:", err);
+        if (isDev) console.error("[Referrals] error:", err);
         
         // Only show error UI if it was a real failure, not just empty
         if (err.name === 'AbortError') {

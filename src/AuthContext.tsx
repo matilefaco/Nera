@@ -20,6 +20,9 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => null,
 });
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -38,7 +41,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return data;
       }
     } catch (err) {
-      console.error('[AuthContext] Error refreshing profile:', err);
+      if (isDev) console.error('[AuthContext] Error refreshing profile:', err);
     }
     return null;
   };
@@ -52,7 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       const code = user.uid.slice(0, 8).toUpperCase();
       updateDoc(doc(db, 'users', user.uid), { referralCode: code })
-        .catch(err => console.error('[AuthContext] Error saving referralCode:', err));
+        .catch(err => { if (isDev) console.error('[AuthContext] Error saving referralCode:', err); });
     }
   }, [user, profile]);
 
@@ -62,7 +65,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Safety timeout to prevent infinite loading
     const safetyTimeout = setTimeout(() => {
       if (loading) {
-        console.warn('[AuthContext] Safety timeout reached. Forcing loading to false.');
+        if (isDev) console.warn('[AuthContext] Safety timeout reached. Forcing loading to false.');
         setLoading(false);
         setIsAuthReady(true);
       }
@@ -70,6 +73,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       try {
+        devLog('[Auth] onAuthStateChanged user uid / null:', currentUser?.uid || 'null');
         setUser(currentUser);
         setIsAuthReady(true);
         
@@ -88,6 +92,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Use onSnapshot for real-time updates without blocking
           unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
             try {
+              devLog('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());
               if (docSnap.exists()) {
                 const data = docSnap.data() as UserProfile;
                 setProfile({ ...data, uid: docSnap.id });
@@ -95,10 +100,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 setProfile(null);
               }
             } catch (err) {
-              console.error("Error in onSnapshot callback:", err);
+              if (isDev) console.error("Error in onSnapshot callback:", err);
             }
           }, (error) => {
-            console.error("[AuthContext] Error listening to profile:", error);
+            if (isDev) console.error("[AuthContext] Error listening to profile:", error);
           });
         } else {
           setProfile(null);
@@ -106,7 +111,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           clearTimeout(safetyTimeout);
         }
       } catch (err) {
-        console.error('[AuthContext] Error in onAuthStateChanged handler:', err);
+        if (isDev) console.error('[AuthContext] Error in onAuthStateChanged handler:', err);
         setLoading(false);
         setIsAuthReady(true);
       }

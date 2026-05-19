@@ -7,6 +7,8 @@ import { notify } from '../lib/notify';
 import PricingGrid from '../components/PricingGrid';
 import { AnimatePresence, motion } from 'motion/react';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function PlansPage() {
   const navigate = useNavigate();
   const { user, profile } = useAuth();
@@ -40,7 +42,7 @@ export default function PlansPage() {
       if (data.url) {
         window.location.href = data.url;
       } else {
-        console.error("Portal API Error Response:", data);
+        if (isDev) console.error("Portal API Error Response:", data);
         if (data.error && data.error.startsWith('Ocorreu um erro ao abrir o portal')) {
           notify.error(data.error); // shows the Stripe message directly
         } else {
@@ -48,7 +50,7 @@ export default function PlansPage() {
         }
       }
     } catch (err) {
-      console.error('Portal connection error:', err);
+      if (isDev) console.error('Portal connection error:', err);
       notify.error('Erro de conexão ao tentar gerenciar assinatura.');
     } finally {
       setLoadingPortal(false);
@@ -82,7 +84,7 @@ export default function PlansPage() {
       }
     } catch (err) {
       setUpgradeStatus('idle');
-      console.error('Upgrade error:', err);
+      if (isDev) console.error('Upgrade error:', err);
       notify.error('Não conseguimos concluir seu upgrade no momento. Nenhuma cobrança foi realizada.');
     } finally {
       setLoadingPlan(null);
@@ -121,10 +123,11 @@ export default function PlansPage() {
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else {
+        if (isDev) console.error('Checkout API Error:', data);
         notify.error(data.error || 'Erro ao iniciar checkout.');
       }
     } catch (err) {
-      console.error('Checkout error:', err);
+      if (isDev) console.error('Checkout error:', err);
       notify.error('Não foi possível conectar com o servidor de pagamentos.');
     } finally {
       setLoadingPlan(null);

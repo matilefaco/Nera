@@ -8,6 +8,8 @@ import { db, handleFirestoreError, OperationType } from '../firebase';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit } from 'firebase/firestore';
 import { notify } from '../lib/notify';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function SettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -95,7 +97,7 @@ export default function SettingsPage() {
           setHasRequested(true);
         }
       } catch (err) {
-        console.error('[Settings] Error checking deletion requests:', err);
+        if (isDev) console.error('[Settings] Error checking deletion requests:', err);
       }
     }
     checkExistingRequest();
@@ -135,7 +137,7 @@ export default function SettingsPage() {
       notify.success('Solicitação enviada.');
       setShowDeleteModal(false);
     } catch (err) {
-      console.error('[Settings] Error requesting deletion:', err);
+      if (isDev) console.error('[Settings] Error requesting deletion:', err);
       notify.error('Não conseguimos enviar sua solicitação agora. Tente novamente em alguns instantes.');
       handleFirestoreError(err, OperationType.CREATE, 'accountDeletionRequests');
     } finally {

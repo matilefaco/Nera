@@ -620,26 +620,32 @@ export const FormIdentity = ({
               </div>
               
               <div className="flex flex-wrap gap-2">
-                {['PIX', 'Cartão de Crédito', 'Cartão de Débito', 'Dinheiro', 'Transferência'].map(method => (
+                {[
+                  { id: 'pix', label: 'PIX' },
+                  { id: 'credito', label: 'Cartão de Crédito' },
+                  { id: 'debito', label: 'Cartão de Débito' },
+                  { id: 'dinheiro', label: 'Dinheiro' },
+                  { id: 'transferencia', label: 'Transferência' }
+                ].map(method => (
                   <button
-                    key={method}
+                    key={method.id}
                     type="button"
                     onClick={() => {
-                      if (paymentMethods.includes(method)) {
-                        setPaymentMethods(paymentMethods.filter(m => m !== method));
+                      if (paymentMethods.includes(method.id)) {
+                        setPaymentMethods(paymentMethods.filter(m => m !== method.id));
                       } else {
-                        setPaymentMethods([...paymentMethods, method]);
+                        setPaymentMethods([...paymentMethods, method.id]);
                       }
                     }}
                     className={cn(
                       "px-5 py-2.5 rounded-full text-[10px] font-bold tracking-wider transition-all duration-300 ease-out border uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-1",
-                      paymentMethods.includes(method)
+                      paymentMethods.includes(method.id)
                         ? "bg-brand-ink text-brand-white border-brand-ink shadow-md scale-[1.02]"
                         : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
                     )}
                   >
-                    {method}
-                    {paymentMethods.includes(method) && <CheckCircle2 size={12} className="inline ml-1.5" />}
+                    {method.label}
+                    {paymentMethods.includes(method.id) && <CheckCircle2 size={12} className="inline ml-1.5" />}
                   </button>
                 ))}
               </div>

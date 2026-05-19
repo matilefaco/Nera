@@ -39,6 +39,9 @@ const IDENTITY_DIFFERENTIALS = [
   'Experiência comprovada'
 ];
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
 
 const THEME_MOODS: Record<string, { label: string, subtitle: string }> = {
@@ -107,11 +110,15 @@ export default function ProfilePage() {
     studioAddress, setStudioAddress,
     serviceAreas, setServiceAreas,
     serviceAreaType, setServiceAreaType,
+    travelFeeMode, setTravelFeeMode,
+    fixedTravelFee, setFixedTravelFee,
     pricingStrategy, setPricingStrategy,
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,
     paymentMethods, setPaymentMethods,
+    yearsExperience, setYearsExperience,
+    serviceStyle, setServiceStyle,
     antiNoShowEnabled, setAntiNoShowEnabled,
     advancePaymentRequired, setAdvancePaymentRequired,
     delayTolerance, setDelayTolerance,
@@ -172,20 +179,30 @@ export default function ProfilePage() {
           neighborhood: '',
           city: '',
           reference: '',
-          privacyMode: 'reveal_after_booking'
+          privacyMode: 'reveal_after_booking',
+          hasParking: false,
+          parkingInfo: '',
+          hasAccessibility: false,
+          accessibilityInfo: '',
+          isSafeLocation: false,
+          locationNotes: ''
         },
         serviceAreaType: profile.serviceAreaType || 'city_wide',
+        travelFeeMode: profile.travelFeeMode || 'none',
+        fixedTravelFee: profile.fixedTravelFee?.toString() || '',
         pricingStrategy: profile.pricingStrategy || 'none',
         antiNoShowEnabled: profile.antiNoShowEnabled || false,
         advancePaymentRequired: profile.advancePaymentRequired || false,
-        delayTolerance: profile.delayTolerance ?? 15,
+        delayTolerance: profile.delayTolerance ?? 0,
         profileTheme: profile.profileTheme?.variant || 'terracotta',
         differentials: [...(profile.professionalIdentity?.differentials || [])].sort(),
         serviceAreas: [...(profile.serviceAreas || [])].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
         workingDays: [...(profile.workingHours?.workingDays || profile.workingDays || [1, 2, 3, 4, 5])].sort((a, b) => a - b),
         startTime: profile.workingHours?.startTime || profile.startTime || '09:00',
         endTime: profile.workingHours?.endTime || profile.endTime || '18:00',
-        paymentMethods: [...(profile.paymentMethods || [])].sort()
+        paymentMethods: [...(profile.paymentMethods || [])].sort(),
+        yearsExperience: profile.professionalIdentity?.yearsExperience || '',
+        serviceStyle: [...(profile.professionalIdentity?.serviceStyle || [])].sort(),
       });
       setSavedSnapshotString(initialSnapshot);
     }
@@ -194,9 +211,11 @@ export default function ProfilePage() {
   const currentSnapshotString = useMemo(() => {
     return JSON.stringify({
       name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
-      studioAddress, serviceAreaType, pricingStrategy, antiNoShowEnabled,
+      studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
       advancePaymentRequired, delayTolerance, profileTheme: profileTheme.variant,
       differentials: [...differentials].sort(),
+      yearsExperience,
+      serviceStyle: [...serviceStyle].sort(),
       serviceAreas: [...serviceAreas].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
       workingDays: [...workingDays].sort((a, b) => a - b),
       startTime, endTime,
@@ -204,9 +223,9 @@ export default function ProfilePage() {
     });
   }, [
     name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
-    studioAddress, serviceAreaType, pricingStrategy, antiNoShowEnabled,
+    studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
     advancePaymentRequired, delayTolerance, profileTheme.variant,
-    differentials, serviceAreas, workingDays, startTime, endTime, paymentMethods
+    differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, paymentMethods
   ]);
 
   const hasUnsavedChanges = savedSnapshotString !== null && currentSnapshotString !== savedSnapshotString;
@@ -222,6 +241,7 @@ export default function ProfilePage() {
         // Fallback: Fetch portfolio from sub-collection if array is empty
         const fetchPortfolio = async () => {
           try {
+            if (isDev) console.log('[Profile] Fetching portfolio sub-collection...');
             const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
             const q = query(portfolioRef, orderBy('createdAt', 'desc'));
             const snapshot = await getDocs(q);
@@ -230,9 +250,10 @@ export default function ProfilePage() {
               url: doc.data().imageUrl || doc.data().url,
               category: doc.data().category
             }));
+            if (isDev) console.log('[Profile] Portfolio items fetched from sub-collection:', items.length);
             if (items.length > 0) setPortfolio(items);
           } catch (err) {
-            console.error('[Profile] Error fetching portfolio:', err);
+            if (isDev) console.error('[Profile] Error fetching portfolio:', err);
           }
         };
         fetchPortfolio();
@@ -272,7 +293,7 @@ export default function ProfilePage() {
       
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        console.error('Calendar status error:', errorData);
+        if (isDev) console.error('Calendar status error:', errorData);
         setGoogleCalendarConnected(false);
         return;
       }
@@ -281,7 +302,7 @@ export default function ProfilePage() {
       setGoogleCalendarConnected(!!data.connected);
       setGoogleCalendarEnabled(!!data.enabled);
     } catch (err) {
-      console.error('Error fetching calendar status:', err);
+      if (isDev) console.error('Error fetching calendar status:', err);
     }
   };
 
@@ -378,9 +399,11 @@ export default function ProfilePage() {
     }
 
     setLoading(true);
+    if (isDev) console.log('[ProfileSave] Start');
 
     try {
       // 1. Sanitize Data
+      if (isDev) console.log('[ProfileSave] Validating and sanitizing payload');
       const sanitizedName = name.trim();
       const sanitizedSpecialty = specialty.trim();
       const sanitizedBio = bio.trim();
@@ -410,18 +433,26 @@ export default function ProfilePage() {
           neighborhood: (studioAddress.neighborhood || neighborhood.trim()).trim(),
           city: (studioAddress.city || sanitizedCity).trim(),
           reference: (studioAddress.reference || '').trim(),
-          privacyMode: studioAddress.privacyMode || 'reveal_after_booking'
+          privacyMode: studioAddress.privacyMode || 'reveal_after_booking',
+          hasParking: !!studioAddress.hasParking,
+          parkingInfo: (studioAddress.parkingInfo || '').trim(),
+          hasAccessibility: !!studioAddress.hasAccessibility,
+          accessibilityInfo: (studioAddress.accessibilityInfo || '').trim(),
+          isSafeLocation: !!studioAddress.isSafeLocation,
+          locationNotes: (studioAddress.locationNotes || '').trim()
         },
         whatsapp: sanitizedWhatsapp,
         instagram: instagram.trim(),
         slug: sanitizedSlug,
         serviceMode,
         serviceAreaType,
+        travelFeeMode,
+        fixedTravelFee: Number(fixedTravelFee) || 0,
         serviceAreas: sanitizedAreas,
         pricingStrategy,
         avatar,
         profileTheme,
-        paymentMethods: paymentMethods.length > 0 ? paymentMethods : undefined,
+        paymentMethods: paymentMethods.length > 0 ? paymentMethods : [],
         antiNoShowEnabled,
         advancePaymentRequired,
         delayTolerance,
@@ -433,14 +464,15 @@ export default function ProfilePage() {
         professionalIdentity: {
           mainSpecialty: sanitizedSpecialty,
           differentials: differentials,
-          yearsExperience: profile?.professionalIdentity?.yearsExperience || '3-5',
-          serviceStyle: profile?.professionalIdentity?.serviceStyle || [],
+          yearsExperience: yearsExperience || '3-5',
+          serviceStyle: serviceStyle,
           attendsAt: serviceMode as any
         },
         updatedAt: new Date().toISOString()
       };
 
       try {
+        if (isDev) console.log('[ProfileSave] Calling transactional save API...');
         if (!auth.currentUser) {
           notify.error("Sua sessão expirou. Entre novamente para salvar.");
           setLoading(false);
@@ -465,19 +497,21 @@ export default function ProfilePage() {
           throw new Error(errorData.error || 'Erro ao salvar perfil');
         }
 
+        if (isDev) console.log('[ProfileSave] Success');
         notify.success('Perfil atualizado.');
         setSavedSnapshotString(currentSnapshotString);
         setShowSaveSuccess(true);
         setTimeout(() => setShowSaveSuccess(false), 3000);
       } catch (err: any) {
-        console.error('[ProfileSave] Failed:', err);
+        if (isDev) console.error('[ProfileSave] Failed:', err);
         notify.error(err, 'Não foi possível salvar seu perfil agora.');
       }
     } catch (error: any) {
-      console.error('[ProfileSave] CRITICAL ERROR:', error);
+      if (isDev) console.error('[ProfileSave] CRITICAL ERROR:', error);
       notify.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);
+      if (isDev) console.log('[ProfileSave] Done');
     }
   };
 
@@ -533,7 +567,7 @@ export default function ProfilePage() {
         
         notify.success('Foto atualizada.');
       } catch (err: any) {
-        console.error('[Avatar] upload flow failed:', err);
+        if (isDev) console.error('[Avatar] upload flow failed:', err);
         notify.error('Não foi possível salvar a imagem agora.');
         // Revert preview on error
         setAvatarPreview(avatar);
@@ -570,30 +604,35 @@ export default function ProfilePage() {
         const localUrl = URL.createObjectURL(file);
         setPortfolio(prev => [{ id: tempId, url: localUrl, category: specialty || 'Geral', isUploading: true }, ...prev]);
       } catch (previewErr) {
-        console.error('[Portfolio] error creating preview:', previewErr);
+        if (isDev) console.error('[Portfolio] error creating preview:', previewErr);
       }
 
       let uniqueFilename = '';
       try {
+        if (isDev) console.log(`[Portfolio] Starting compression for ${file.name}`);
         // 2. Compression
         const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
         const compressed = await imageCompression(file, options);
+        if (isDev) console.log(`[Portfolio] Compression done. Original: ${file.size}, Compressed: ${compressed.size}`);
 
         // 3. Upload
         uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
         const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
+        if (isDev) console.log('[Portfolio] upload finished:', url);
 
         // 3b. AI Categorization
         let autoCategory = '';
         try {
           autoCategory = await analyzePortfolio({ imageUrl: url, specialty });
         } catch (catErr) {
-          console.warn('[Portfolio] AI Categorization failed:', catErr);
+          if (isDev) console.log('[Portfolio] AI Categorization failed:', catErr);
           // silencioso — categoria fica vazia se falhar
         }
         
         // 4. Persistence
+        if (isDev) console.log('[Portfolio] saving to Firestore');
         const docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
+        if (isDev) console.log('[Portfolio] saved successfully with ID:', docId);
         
         // Replace temp item with final item
         setPortfolio(prev => prev.map(item => 
@@ -624,7 +663,7 @@ export default function ProfilePage() {
         };
         
         console.error('[DIAGNÓSTICO OBRIGATÓRIO]', diag);
-        setDiagnosticInfo(diag);
+        if (isDev) setDiagnosticInfo(diag);
         
         let errorMessage = 'Não conseguimos enviar essa imagem. Tente novamente.';
         if (err.code === 'storage/unauthorized') {
@@ -658,12 +697,14 @@ export default function ProfilePage() {
 
     setDeletingId(id);
     try {
+      if (isDev) console.log('[Portfolio] removing from Firestore');
       await deletePortfolioItem(user.uid, itemToRemove as any);
+      if (isDev) console.log('[Portfolio] removed successfully');
       
       setPortfolio(prev => prev.filter(item => item.id !== id));
       notify.success('Galeria atualizada.');
     } catch (err) {
-      console.error('[Portfolio] Error removing:', err);
+      if (isDev) console.error('[Portfolio] Error removing:', err);
       notify.error('Não foi possível remover a imagem.');
     } finally {
       setDeletingId(null);
@@ -1258,6 +1299,10 @@ export default function ProfilePage() {
                 addArea={addArea}
                 removeArea={removeArea}
                 formatCurrency={formatCurrency}
+                travelFeeMode={travelFeeMode}
+                setTravelFeeMode={setTravelFeeMode}
+                fixedTravelFee={fixedTravelFee}
+                setFixedTravelFee={setFixedTravelFee}
                 errors={formErrors}
               />
             </div>
@@ -1325,8 +1370,8 @@ export default function ProfilePage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between py-3 border-b border-brand-mist/30">
                     <div>
-                      <p className="text-[13px] font-medium text-brand-ink mb-0.5">Lembrete 24h</p>
-                      <p className="text-[11px] text-brand-stone font-light">Enviar mensagem automática sugerindo confirmação.</p>
+                      <p className="text-[13px] font-medium text-brand-ink mb-0.5">Lembrete por e-mail 24h antes</p>
+                      <p className="text-[11px] text-brand-stone font-light">Envia um e-mail automático pedindo confirmação da cliente antes do atendimento.</p>
                     </div>
                     <button
                       type="button"
@@ -1347,29 +1392,34 @@ export default function ProfilePage() {
 
                   <div className="flex items-center justify-between py-3 border-b border-brand-mist/30">
                     <div>
-                      <p className="text-[13px] font-medium text-brand-ink mb-0.5">Sinal Antecipado</p>
-                      <p className="text-[11px] text-brand-stone font-light">Exigir pagamento parcial via Pix para reservar.</p>
+                      <p className="text-[13px] font-medium text-brand-ink mb-0.5 flex items-center gap-2">
+                        Sinal antecipado
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-brand-mist/60 text-brand-stone px-2 py-0.5 rounded-full">Em breve</span>
+                      </p>
+                      <p className="text-[11px] text-brand-stone font-light">Em breve: permita solicitar um pagamento parcial para confirmar a reserva.</p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setAdvancePaymentRequired(!advancePaymentRequired)}
+                      disabled
                       className={cn(
-                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 focus-visible:ring-offset-2 active:scale-[0.92] border",
-                        advancePaymentRequired
+                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 relative shrink-0 border opacity-50 cursor-not-allowed",
+                        false
                           ? "bg-brand-ink border-brand-ink"
-                          : "bg-brand-mist/30 border-brand-mist/40 hover:border-brand-mist/60"
+                          : "bg-brand-mist/30 border-brand-mist/40"
                       )}
                     >
                       <div className={cn(
-                        "absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shadow-[0_2px_4px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)]",
-                        advancePaymentRequired ? "left-[17px] shadow-[0_1px_3px_rgba(0,0,0,0.15),0_0_1px_rgba(0,0,0,0.1)]" : "left-[1px]"
+                        "absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)] transition-all",
+                        false ? "left-[17px]" : "left-[1px]"
                       )} />
                     </button>
                   </div>
 
                   <div className="pt-3">
-                    <p className="text-[13px] font-medium text-brand-ink mb-0.5">Tempo limite para atrasos</p>
-                    <p className="text-[11px] text-brand-stone font-light mb-3">Tolerância aceitável antes de liberar o horário.</p>
+                    <p className="text-[13px] font-medium text-brand-ink mb-0.5 flex items-center gap-2">
+                       Política de atraso
+                    </p>
+                    <p className="text-[11px] text-brand-stone font-light mb-3">Defina uma orientação para sua organização. A Nera ainda não libera horários automaticamente.</p>
                     <div className="flex flex-wrap gap-2">
                       {[0, 10, 15, 20].map(val => (
                         <button

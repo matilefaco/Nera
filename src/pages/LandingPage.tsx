@@ -57,8 +57,8 @@ export default function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <section id="hero" style={{ paddingLeft: '48px', paddingRight: '48px', maxWidth: 'none' }}>
-        <div className="wrap" style={{ paddingTop: 0, paddingBottom: 0 }}>
+      <section id="hero">
+        <div className="wrap">
           <div className="hero-bg-glyph">n</div>
           <div className="hero-inner">
 

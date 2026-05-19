@@ -42,6 +42,9 @@ interface FinancialAppointmentsCacheEntry {
 const FINANCIAL_CACHE_TTL_MS = 5 * 60 * 1000;
 const financialAppointmentsCache = new Map<string, FinancialAppointmentsCacheEntry>();
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export default function FinancialPage() {
   const { user, profile, isAuthReady } = useAuth();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -77,6 +80,7 @@ export default function FinancialPage() {
         const cached = financialAppointmentsCache.get(financialCacheKey);
         
         if (cached && Date.now() - cached.fetchedAt < FINANCIAL_CACHE_TTL_MS) {
+          if (isDev) console.log('[Financial] loaded from cache');
           if (isMounted && !isCancelled) {
             setAppointments(cached.data);
             setLoading(false);
@@ -95,6 +99,7 @@ export default function FinancialPage() {
           setTimeout(() => reject(new Error('timeout')), 8000)
         );
 
+        if (isDev) console.log('[Financial] fetch start');
         const snapshot = await Promise.race([
           getDocs(q),
           timeoutPromise
@@ -102,7 +107,9 @@ export default function FinancialPage() {
 
         if (!isMounted || isCancelled) return;
         
+        if (isDev) console.log(`[Financial] fetch success count=${snapshot.docs.length}`);
         if (snapshot.empty) {
+          if (isDev) console.log('[Financial] empty records');
         }
 
         const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
@@ -116,14 +123,16 @@ export default function FinancialPage() {
         if (!isMounted || isCancelled) return;
         
         if (err.message === 'timeout') {
+          if (isDev) console.log('[Financial] timeout');
         } else if (err.message && err.message.includes('index')) {
-          console.warn('[Financial] Firestore index required: appointments professionalId ASC, date ASC');
+          if (isDev) console.warn('[Financial] Firestore index required: appointments professionalId ASC, date ASC');
         } else {
-          console.error('[Financial] Failed to load financial appointments', err);
+          if (isDev) console.error('[Financial] Failed to load financial appointments', err);
         }
         setError(true);
       } finally {
         if (isMounted && !isCancelled) {
+          if (isDev) console.log('[Financial] finally loading=false');
           setLoading(false);
         }
       }

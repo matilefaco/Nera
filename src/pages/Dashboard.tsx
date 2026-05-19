@@ -86,7 +86,8 @@ function safeLocaleCompare(a?: string | null, b?: string | null): number {
 }
 // --------------------
 
-const isDev = import.meta.env.DEV;
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
 
 type DashboardTab = "hoje" | "crescimento" | "gestao";
 
@@ -131,7 +132,7 @@ export default function Dashboard() {
             refreshProfile();
           }
         } catch (err) {
-          console.error("Auto-reconcile failed:", err);
+          if (isDev) console.error("Auto-reconcile failed:", err);
         }
       };
 
@@ -177,6 +178,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (profile) {
+      devLog("[DASHBOARD PLAN DEBUG] uid:", user?.uid);
+      devLog("[DASHBOARD PLAN DEBUG] firestore plan:", profile.plan);
+      devLog("[DASHBOARD PLAN DEBUG] planRank:", profile.planRank);
+      devLog("[DASHBOARD PLAN DEBUG] planExpiresAt:", profile.planExpiresAt);
     }
   }, [profile, user]);
   
@@ -274,7 +279,7 @@ export default function Dashboard() {
         setTotalClientsCountFromSummaries(snap.data().count);
       }
     }).catch(err => {
-      console.error('Error fetching client summaries count:', err);
+      if (isDev) console.error('Error fetching client summaries count:', err);
     });
     return () => { isMounted = false; };
   }, [user]);
@@ -296,10 +301,10 @@ export default function Dashboard() {
         const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 setAlerts(docs);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
       }
     }, (error) => {
-      console.error('[Dashboard] Subscription error on qAlerts:', error);
+      if (isDev) console.error('[Dashboard] Subscription error on qAlerts:', error);
     });
 
     return () => {
@@ -312,7 +317,7 @@ setAlerts(docs);
     try {
       await updateDoc(doc(db, 'alerts', alertId), { read: true });
     } catch (err) {
-      console.error('Failed to mark alert as read:', err);
+      if (isDev) console.error('Failed to mark alert as read:', err);
     }
   };
 
@@ -342,10 +347,10 @@ setAlerts(docs);
         analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
         setAnalyticsEvents(docs);
       } catch (err) {
-        console.error("Error processing getDocs callback:", err);
+        if (isDev) console.error("Error processing getDocs callback:", err);
       }
     }).catch((error) => {
-      console.error('[Dashboard] Fetch error on qAnalytics:', error);
+      if (isDev) console.error('[Dashboard] Fetch error on qAnalytics:', error);
     });
     return () => { isMounted = false; };
   }, [user?.uid]);
@@ -396,10 +401,10 @@ const relevantToday = docs.filter(a => isRevenueStatus(a.status));
 setConfirmedToday(relevantToday);
 setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
       }
     }, (error) => {
-      console.error('[Dashboard] Subscription error on qToday:', error);
+      if (isDev) console.error('[Dashboard] Subscription error on qToday:', error);
     });
 
     // Query: Unconfirmed for tomorrow
@@ -420,10 +425,10 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
 setUnconfirmedTomorrow(docs);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
       }
     }, (error) => {
-      console.error('[Dashboard] Subscription error on qUnconfirmed:', error);
+      if (isDev) console.error('[Dashboard] Subscription error on qUnconfirmed:', error);
     });
 
     const todayNum = new Date();
@@ -466,11 +471,11 @@ setUnconfirmedTomorrow(docs);
           setAppointments(appointmentsData);
           // Metrics calculation moved to hook
         } catch (err) {
-          console.error("Error processing getDocs callback:", err);
+          if (isDev) console.error("Error processing getDocs callback:", err);
         }
       }).catch((error) => { 
         if (!isMounted) return;
-        console.error("Firestore getDocs error:", error); 
+        if (isDev) console.error("Firestore getDocs error:", error); 
         fetchValid = false;
       }).finally(() => {
         if (isMounted) {
@@ -496,10 +501,10 @@ setUnconfirmedTomorrow(docs);
         filteredDocs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setWaitlist(filteredDocs);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
       }
     }, (error) => {
-      console.error('[Dashboard] Subscription error on qWaitlist:', error);
+      if (isDev) console.error('[Dashboard] Subscription error on qWaitlist:', error);
     });
 
     // Query: Blocked Schedules
@@ -518,9 +523,9 @@ setUnconfirmedTomorrow(docs);
         });
         setBlockedSchedules(todayBlocked);
       } catch (err) {
-        console.error("Error processing getDocs callback:", err);
+        if (isDev) console.error("Error processing getDocs callback:", err);
       }
-    }).catch((error) => { console.error('[Dashboard] Fetch error on qBlocked:', error); });
+    }).catch((error) => { if (isDev) console.error('[Dashboard] Fetch error on qBlocked:', error); });
 
     // Query: Inactive clients from summaries
     const thirtyDaysAgo = new Date();
@@ -542,10 +547,10 @@ setUnconfirmedTomorrow(docs);
         setInactiveClientsCount(docs.length);
         setInactiveClients(docs);
       } catch (err) {
-        console.error("Error processing getDocs callback:", err);
+        if (isDev) console.error("Error processing getDocs callback:", err);
       }
     }).catch((error) => {
-      console.error('[Dashboard] Fetch error on qInactive:', error);
+      if (isDev) console.error('[Dashboard] Fetch error on qInactive:', error);
     });
 
     // Query: All services
@@ -594,9 +599,9 @@ setUnconfirmedTomorrow(docs);
           });
         setServices(uniqueServices);
       } catch (err) {
-        console.error("Error processing getDocs callback:", err);
+        if (isDev) console.error("Error processing getDocs callback:", err);
       }
-    }).catch((error) => { console.error("Firestore getDocs error:", error); });
+    }).catch((error) => { if (isDev) console.error("Firestore getDocs error:", error); });
 
     // Query: WhatsApp Logs
     const qWl = query(
@@ -612,10 +617,10 @@ setUnconfirmedTomorrow(docs);
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WhatsAppLog));
         setWhatsappLogs(docs);
       } catch (err) {
-        console.error("Error processing getDocs callback:", err);
+        if (isDev) console.error("Error processing getDocs callback:", err);
       }
     }).catch((error) => {
-      console.error('[Dashboard] Fetch error on qWl:', error);
+      if (isDev) console.error('[Dashboard] Fetch error on qWl:', error);
     });
 
     return () => {
@@ -713,7 +718,7 @@ setUnconfirmedTomorrow(docs);
         delete reset[id];
         return reset;
       });
-      console.error("[DASHBOARD FLOW ERROR]", error);
+      if (isDev) console.error("[DASHBOARD FLOW ERROR]", error);
       notify.error(error, 'Não foi possível concluir. Tente novamente.');
     } finally {
       setProcessingId(null);
@@ -776,7 +781,6 @@ setUnconfirmedTomorrow(docs);
     return displayedConfirmedToday.find(appt => {
       if (!isConfirmedLikeStatus(appt.status)) return false;
       if (!appt.time || typeof appt.time !== 'string' || !appt.time.includes(':')) {
-        if (import.meta.env.DEV) console.warn('Appointment without valid time found:', appt.id);
         return false;
       }
       const [h, m] = appt.time.split(':').map(Number);
@@ -840,16 +844,22 @@ setUnconfirmedTomorrow(docs);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
+      devLog("[PUSH UI] Notification supported:", "Notification" in window);
+      devLog("[PUSH UI] ServiceWorker supported:", "serviceWorker" in navigator);
+      devLog("[PUSH UI] PushManager supported:", "PushManager" in window);
       if ("Notification" in window) {
+        devLog("[PUSH UI] permission:", Notification.permission);
       }
     }
   }, []);
 
   const handleEnablePushNotifications = async () => {
     try {
+      devLog("[PUSH BUTTON] clicked");
       setIsPushLoading(true);
       
       const success = await requestPermission();
+      devLog("[PUSH BUTTON] requestPermission finished. Success:", success);
 
       if (success) {
       notify.success('Notificações ativadas.');
@@ -857,7 +867,7 @@ setUnconfirmedTomorrow(docs);
         notify.error('Notificações bloqueadas no navegador. Ative as permissões nas configurações do site.');
       }
     } catch (error: any) {
-      console.error("[PUSH BUTTON ERROR]", error);
+      if (isDev) console.error("[PUSH BUTTON ERROR]", error);
       // Not throwing here to allow finally block to run and clear loading
     } finally {
       setIsPushLoading(false);
@@ -904,7 +914,7 @@ setUnconfirmedTomorrow(docs);
       window.URL.revokeObjectURL(url);
       notify.success('Relatório gerado.');
     } catch (error: any) {
-      console.error("[REPORT ERROR]", error);
+      if (isDev) console.error("[REPORT ERROR]", error);
       notify.error(error, 'Erro ao baixar relatório. Tente novamente.');
     } finally {
       setIsReportLoading(false);

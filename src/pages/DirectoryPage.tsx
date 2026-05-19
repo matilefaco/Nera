@@ -106,7 +106,7 @@ export default function DirectoryPage() {
 
       {/* Header */}
       <header className="bg-brand-white border-b border-brand-mist sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <Link to="/">
             <Logo />
           </Link>
@@ -125,7 +125,7 @@ export default function DirectoryPage() {
 
         {/* Desktop Filter Bar */}
         <div className="hidden lg:block bg-brand-linen/50 border-t border-brand-mist/30 py-4">
-          <div className="max-w-7xl mx-auto px-6 flex items-center gap-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-6">
             <div className="flex-1 flex items-center gap-4">
               <div className="relative flex-1 max-w-xs">
                 <MapPin size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist" />
@@ -184,9 +184,9 @@ export default function DirectoryPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
         <div className="mb-12">
-          <h1 className="text-4xl font-serif text-brand-ink mb-2 italic">Descubra Excelência</h1>
+          <h1 className="text-[clamp(28px,8vw,36px)] font-serif text-brand-ink mb-2 italic">Descubra Excelência</h1>
           <p className="text-brand-stone text-sm font-light">As melhores profissionais da beleza, unidas pela Nera.</p>
         </div>
 
@@ -197,13 +197,17 @@ export default function DirectoryPage() {
             ))}
           </div>
         ) : professionals.length === 0 ? (
-          <div className="py-32 text-center flex flex-col items-center">
-            <div className="w-16 h-16 bg-[#FAF9F8] border border-brand-mist/60 rounded-full flex items-center justify-center mb-6">
-              <Sparkles size={24} strokeWidth={1.5} className="text-brand-stone/40" />
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="py-32 text-center flex flex-col items-center"
+          >
+            <div className="w-20 h-20 bg-brand-linen/30 border border-brand-mist/50 rounded-full flex items-center justify-center mb-8 shadow-inner">
+              <Sparkles size={28} strokeWidth={1} className="text-brand-stone/40" />
             </div>
-            <h2 className="text-xl font-serif text-brand-ink mb-2">Nenhum resultado encontrado</h2>
-            <p className="text-brand-stone text-[13px] font-light mb-8 max-w-xs mx-auto">
-              Não encontramos nenhum perfil com os filtros atuais.
+            <h2 className="text-2xl font-serif text-brand-ink mb-3 italic">A curadoria continua...</h2>
+            <p className="text-brand-stone text-[13px] font-light mb-10 max-w-[280px] mx-auto leading-relaxed">
+              Ainda não encontramos profissionais com esses filtros. Tente expandir sua busca para ver mais talentos.
             </p>
             <button 
               onClick={() => {
@@ -212,13 +216,13 @@ export default function DirectoryPage() {
                 setModeFilter('all');
                 setRatingFilter(0);
               }}
-              className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline"
+              className="bg-brand-ink text-brand-white px-8 py-3.5 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-xl shadow-brand-ink/10"
             >
-              Limpar todos os filtros
+              Ver todos os talentos
             </button>
-          </div>
+          </motion.div>
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <AnimatePresence>
               {professionals.map((pro, idx) => (
                 <motion.div

@@ -21,9 +21,13 @@ import RegisterPage from './pages/RegisterPage';
 
 function RouteLogger() {
   const location = useLocation();
+  const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
   React.useEffect(() => {
-    runtimeLogger.log('route_change', { path: location.pathname });
-  }, [location.pathname]);
+    if (isDev) {
+      runtimeLogger.log('route_change', { path: location.pathname });
+    }
+  }, [location.pathname, isDev]);
   return null;
 }
 import TermsPage from './pages/TermsPage';

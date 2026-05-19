@@ -49,37 +49,86 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
   const { professionalId } = req.params;
   const { start, end } = req.query;
 
-  if (!professionalId || !start || !end) {
-    return res.status(400).json({ error: "Missing professionalId, start or end date" });
+  // 1. Strict Validation of Inputs
+  if (!professionalId || typeof professionalId !== 'string' || professionalId === 'undefined' || professionalId === 'null') {
+    logger.warn("BOOKING", "occupied-slots blocked: invalid professionalId", { meta: { professionalId } });
+    return res.status(400).json({ error: "Identificador de profissional inválido", slots: [] });
+  }
+
+  // Ensure start and end are valid strings (Express can return string | string[] | ParsedQs | ParsedQs[])
+  const startStr = typeof start === 'string' ? start : (Array.isArray(start) ? String(start[0]) : '');
+  const endStr = typeof end === 'string' ? end : (Array.isArray(end) ? String(end[0]) : '');
+
+  if (!startStr || !endStr) {
+    logger.warn("BOOKING", "occupied-slots blocked: missing or malformed ranges", { meta: { start, end } });
+    return res.status(400).json({ error: "Datas de início e fim são obrigatórias", slots: [] });
+  }
+
+  // Defensive length check for YYYY-MM-DD
+  if (startStr.length < 10 || endStr.length < 10) {
+    return res.status(400).json({ error: "Formato de data inválido. Use AAAA-MM-DD", slots: [] });
   }
 
   try {
+    if (!db) {
+       throw new Error("Database connection unavailable during occupied-slots request");
+    }
+
+    // 2. Optimized & Guarded Query
     const snapshot = await db.collection('appointments')
       .where('professionalId', '==', professionalId)
-      .where('date', '>=', start)
-      .where('date', '<=', end)
+      .where('date', '>=', startStr)
+      .where('date', '<=', endStr)
       .get();
 
     const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
+    
+    // 3. Resilient Mapping
     const slots = snapshot.docs
       .map(doc => {
         const data = doc.data();
+        if (!data) return null;
+        
+        // Only include slots that are relevant for availability tracking
         if (countingStatuses.includes(data.status)) {
           return {
-            date: data.date,
-            time: data.time,
+            date: data.date || '',
+            time: data.time || '',
             duration: Number(data.duration || data.serviceDuration || 60),
             status: data.status
           };
         }
         return null;
       })
-      .filter(Boolean);
+      .filter((s: any) => s && s.date && s.time);
 
     res.json({ slots });
   } catch (err: any) {
-    logger.error("BOOKING", "Failed to fetch occupied slots", { error: err.message });
-    res.status(500).json({ error: "Internal server error" });
+    // 4. Global Catch-All (Prevents 500)
+    logger.error("BOOKING", "Failed to fetch occupied slots - CRITICAL FAILSAFE triggered", { 
+      requestId: req.requestId,
+      professionalId,
+      start: startStr,
+      end: endStr,
+      error: err.message,
+      stack: err.stack,
+      code: err.code
+    });
+    
+    // Specific handling for common Firestore errors (like missing indexes)
+    if (err.message && (err.message.includes('index') || err.code === 'FAILED_PRECONDITION')) {
+       return res.status(500).json({ 
+         error: "Database configuration requires attention. Please contact Nera support.", 
+         slots: [] // Vital for frontend stability
+       });
+    }
+
+    // Always return a valid JSON structure even on total failure
+    res.status(500).json({ 
+      error: "Ocorreu um erro interno ao carregar horários. Tente novamente.", 
+      message: process.env.NODE_ENV === 'production' ? undefined : err.message,
+      slots: [] 
+    });
   }
 });
 
@@ -831,6 +880,7 @@ router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
     const { appointmentId } = req.query;
     if (!appointmentId) return res.status(400).json({ error: "Missing appointmentId" });
 
+    process.stdout.write(`[FIRESTORE READ] Attempting to read appointments/${appointmentId}... `);
     const apptDoc = await db.collection('appointments').doc(appointmentId as string).get();
     
     if (!apptDoc.exists) {
@@ -855,6 +905,7 @@ router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
     if (!data?.token) result.reason += "Missing token. ";
     
     if (data?.professionalId) {
+      process.stdout.write(`[FIRESTORE READ] Attempting to read users/${data.professionalId}... `);
       const proDoc = await db.collection('users').doc(data.professionalId).get();
       if (proDoc.exists) {
                 result.professionalEmail = proDoc.data()?.email;
@@ -912,6 +963,7 @@ router.get("/run-confirmation-email", debugOnly, async (req, res) => {
         apptDoc = qToken.docs[0].data();
         response.firestoreDocFound = true;
         response.realDocumentId = qToken.docs[0].id;
+        process.stdout.write(`[DEBUG RUN] Found appointment by token: ${qToken.docs[0].id}\n`);
       }
     }
 
@@ -958,6 +1010,7 @@ router.get("/run-confirmation-email", debugOnly, async (req, res) => {
     
     const statusOk = (data?.status === 'confirmed' || data?.status === 'accepted');
     if (!statusOk) {
+      process.stdout.write(`[DEBUG RUN] Warning: Status is ${data?.status}\n`);
       response.statusWarning = `Status is ${data?.status}, expected confirmed/accepted`;
     }
     response.validationPassed = true;

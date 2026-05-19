@@ -17,6 +17,9 @@ class RuntimeDiagnostics {
   }
 
   log(type: RuntimeEvent['type'], details: any = {}) {
+    const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+    if (!isDev) return;
+
     const event: RuntimeEvent = {
       type,
       details,
@@ -36,7 +39,10 @@ class RuntimeDiagnostics {
   }
 
   dump() {
-    console.error("[RuntimeDiagnostics] Dump:", this.events);
+    const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+    if (isDev) {
+      console.error("[RuntimeDiagnostics] Dump:", this.events);
+    }
   }
 
   private save() {

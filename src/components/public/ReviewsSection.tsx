@@ -15,10 +15,10 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
   }
 
   return (
-    <section className="py-20 md:py-32 px-6 max-w-7xl mx-auto w-full">
+    <section className="py-20 md:py-32 px-4 sm:px-6 max-w-7xl mx-auto w-full">
       <div className="flex flex-col md:flex-row md:items-center gap-10 md:gap-16 mb-16 md:mb-24">
         <div className="flex items-baseline gap-4">
-          <span className="font-serif text-[80px] leading-none text-brand-ink">
+          <span className="font-serif text-[clamp(60px,15vw,80px)] leading-none text-brand-ink">
             {stats?.averageRating ? stats.averageRating.toFixed(1) : (reviews.length > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) : '')}
           </span>
           <div className="flex flex-col gap-2">
@@ -35,7 +35,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
 
         <div className="flex-1">
           <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-[var(--theme-accent,var(--color-brand-terracotta))] mb-4 block">Experiências Reais</span>
-          <h2 className="text-4xl md:text-5xl font-serif text-brand-ink">
+          <h2 className="text-[clamp(28px,8vw,36px)] md:text-5xl font-serif text-brand-ink">
             O que elas dizem sobre<br />
             o <em className="font-serif italic text-brand-stone">atendimento</em>
           </h2>
@@ -50,7 +50,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.1 }}
-            className="group bg-brand-white border border-brand-mist rounded-[40px] p-10 hover:border-brand-blush hover:shadow-2xl transition-all duration-500 flex flex-col justify-between"
+            className="group bg-brand-white border border-brand-mist rounded-[40px] p-6 sm:p-10 hover:border-brand-blush hover:shadow-2xl transition-all duration-500 flex flex-col justify-between"
           >
             <div>
               <div className="flex items-center justify-between mb-8">

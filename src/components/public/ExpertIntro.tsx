@@ -11,7 +11,7 @@ interface ExpertIntroProps {
 
 export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
   return (
-    <section className="py-16 md:py-24 px-6 bg-brand-white relative overflow-hidden">
+    <section className="py-16 md:py-24 px-4 sm:px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col items-center text-center space-y-8 md:space-y-10">
           {/* Text Content */}
@@ -30,7 +30,7 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
-                className="text-4xl md:text-5xl font-serif text-brand-ink leading-tight"
+                className="text-[clamp(28px,8vw,36px)] md:text-5xl font-serif text-brand-ink leading-tight"
               >
                 Excelência e <em className="italic">Precisão</em>
               </motion.h2>

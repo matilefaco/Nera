@@ -24,6 +24,9 @@ import { isCancelledStatus, isPendingStatus, isRevenueStatus, APPOINTMENT_STATUS
 import { getAvailableSlots } from '../lib/bookingUtils';
 import { notify } from '../lib/notify';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export default function ManageBookingPage() {
   const { id, token } = useParams<{ id?: string, token?: string }>();
   const navigate = useNavigate();
@@ -66,7 +69,7 @@ export default function ManageBookingPage() {
           } : null);
           notify.success('Presença confirmada com sucesso! ✨');
         } catch (err) {
-          console.error('[AUTO_ACTION] Error confirming presence:', err);
+          if (isDev) console.error('[AUTO_ACTION] Error confirming presence:', err);
           notify.error('Erro ao confirmar presença automaticamente.');
         } finally {
           setActionLoading(false);
@@ -96,12 +99,12 @@ export default function ManageBookingPage() {
       const lookupKey = token || id;
       if (!lookupKey) return;
 
-      console.log(`[BOOKING_MANAGEMENT] Fetching via API for: ${lookupKey}`);
+      if (isDev) console.log(`[BOOKING_MANAGEMENT] Fetching via API for: ${lookupKey}`);
       try {
         const response = await fetch(`/api/profile/reservation/${lookupKey}`);
         
         if (!response.ok) {
-          console.error('[BOOKING_MANAGEMENT] API fetch failed');
+          if (isDev) console.error('[BOOKING_MANAGEMENT] API fetch failed');
           setDiagnosticResults({
             token: lookupKey,
             apiStatus: response.status,
@@ -116,7 +119,7 @@ export default function ManageBookingPage() {
         const result = await response.json();
         
         if (!result.found || !result.appointment) {
-          console.error('[BOOKING_MANAGEMENT] API returned found: false');
+          if (isDev) console.error('[BOOKING_MANAGEMENT] API returned found: false');
           setErrorOccurred(true);
           setLoading(false);
           return;
@@ -130,7 +133,7 @@ export default function ManageBookingPage() {
         // Professional data is already included in the API response
         if (apptData.professional) {
           setProfessional(apptData.professional);
-          console.log(`[BOOKING_MANAGEMENT] Professional from API: ${apptData.professional.name}`);
+          if (isDev) console.log(`[BOOKING_MANAGEMENT] Professional from API: ${apptData.professional.name}`);
         } else {
           // Fallback fetch if professional not in API for some reason
           const proSnap = await getDoc(doc(db, 'users', apptData.professionalId));
@@ -151,7 +154,7 @@ export default function ManageBookingPage() {
 
         setLoading(false);
       } catch (error) {
-        console.error('[BOOKING_MANAGEMENT] API fetch error:', error);
+        if (isDev) console.error('[BOOKING_MANAGEMENT] API fetch error:', error);
         setErrorOccurred(true);
         setLoading(false);
       }
@@ -175,9 +178,9 @@ export default function ManageBookingPage() {
         const allAppts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
         setDayAppointments(allAppts.filter(a => ['pending', 'confirmed'].includes(a.status)));
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
       }
-    }, (error) => { console.error("Firestore onSnapshot error:", error); });
+    }, (error) => { if (isDev) console.error("Firestore onSnapshot error:", error); });
 
     const blockedRef = collection(db, 'blocked_schedules');
     const dayOfWeek = selectedDate ? new Date(selectedDate + 'T12:00:00').getDay() : null;
@@ -192,9 +195,9 @@ const dayBlocked = allBlocked.filter(b => {
           });
 setBlockedSchedules(dayBlocked);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
       }
-    }, (error) => { console.error("Firestore onSnapshot error:", error); });
+    }, (error) => { if (isDev) console.error("Firestore onSnapshot error:", error); });
 
     return () => {
       unsubAppts();
@@ -283,7 +286,7 @@ setBlockedSchedules(dayBlocked);
         <h2 className="text-2xl font-serif text-brand-ink mb-2">Ops! Reserva não encontrada</h2>
         <p className="text-sm text-brand-stone font-light italic mb-8">O link pode ter expirado ou a reserva foi removida.</p>
         
-        {(import.meta.env.DEV === true && typeof window !== 'undefined' && window.location.hostname.includes('localhost')) && diagnosticResults && (
+        {isDev && diagnosticResults && (
           <div className="w-full max-w-md bg-brand-linen/60 border border-brand-mist/50 p-6 rounded-[32px] mb-8 text-left space-y-4 overflow-hidden shadow-sm">
             <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone border-b border-brand-mist pb-2">Diagnostic Data (Admin/Dev)</p>
             <p className="text-[9px] font-mono text-brand-stone break-all">Slug tried: <span className="text-brand-terracotta">{diagnosticResults.token}</span></p>

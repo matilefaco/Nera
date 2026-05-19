@@ -95,7 +95,7 @@ export const PublicHero = ({
       <div className="absolute top-0 left-[48%] w-px h-full bg-gradient-to-b from-transparent via-brand-mist to-transparent hidden lg:block z-10 pointer-events-none" />
 
       {/* Content Side */}
-      <div className="flex flex-col justify-center px-6 md:px-16 pt-24 pb-16 lg:py-20 relative z-20 order-2 lg:order-1">
+      <div className="flex flex-col justify-center px-4 sm:px-8 md:px-16 pt-24 pb-16 lg:py-20 relative z-20 order-2 lg:order-1">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -108,9 +108,9 @@ export const PublicHero = ({
             </p>
           </div>
 
-          <h1 className="display-hero text-brand-ink">
+          <h1 className="display-hero text-brand-ink break-words overflow-hidden">
             {firstName}<br />
-            <em className="font-serif italic text-brand-stone">{lastName}</em>
+            <em className="font-serif italic text-brand-stone block md:inline">{lastName}</em>
           </h1>
 
           <div className="flex flex-col gap-4">
@@ -290,7 +290,7 @@ export const PublicHero = ({
       </div>
 
       {/* Visual Side */}
-      <div className="relative flex items-center justify-center p-8 md:p-16 lg:p-24 order-1 lg:order-2 bg-brand-parchment lg:bg-transparent min-h-[70vh] lg:min-h-screen">
+      <div className="relative flex items-center justify-center p-4 sm:p-8 md:p-16 lg:p-24 order-1 lg:order-2 bg-brand-parchment lg:bg-transparent min-h-[60vh] sm:min-h-[70vh] lg:min-h-screen">
         <motion.div
            initial={{ opacity: 0, scale: 0.95, y: 20 }}
            animate={{ opacity: 1, scale: 1, y: 0 }}

@@ -48,11 +48,11 @@
   }
 
   .display-hero {
-    @apply text-[56px] md:text-[96px] font-normal leading-[0.92] tracking-tighter;
+    @apply text-[clamp(40px,12vw,56px)] md:text-[96px] font-normal leading-[0.92] tracking-tighter;
   }
 
   .heading-section {
-    @apply text-[34px] md:text-[52px] font-normal leading-[1.08] tracking-tight;
+    @apply text-[clamp(28px,8vw,34px)] md:text-[52px] font-normal leading-[1.08] tracking-tight;
   }
 
   .body-text {

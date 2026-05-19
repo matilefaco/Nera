@@ -12,7 +12,7 @@ export function useProfileForm(profile: UserProfile | null) {
   const [paymentMethods, setPaymentMethods] = useState<string[]>(profile?.paymentMethods || []);
   const [antiNoShowEnabled, setAntiNoShowEnabled] = useState(profile?.antiNoShowEnabled || false);
   const [advancePaymentRequired, setAdvancePaymentRequired] = useState(profile?.advancePaymentRequired || false);
-  const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20 | 0>(profile?.delayTolerance ?? 15);
+  const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20 | 0>(profile?.delayTolerance ?? 0);
   const [slug, setSlug] = useState(profile?.slug || '');
   const [avatar, setAvatar] = useState(profile?.avatar || '');
   const [neighborhood, setNeighborhood] = useState(profile?.neighborhood || '');
@@ -24,12 +24,22 @@ export function useProfileForm(profile: UserProfile | null) {
     neighborhood: '',
     city: '',
     reference: '',
-    privacyMode: 'reveal_after_booking'
+    privacyMode: 'reveal_after_booking',
+    hasParking: false,
+    parkingInfo: '',
+    hasAccessibility: false,
+    accessibilityInfo: '',
+    isSafeLocation: false,
+    locationNotes: ''
   });
   const [serviceAreas, setServiceAreas] = useState<any[]>(profile?.serviceAreas || []);
   const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>(profile?.serviceAreaType || 'city_wide');
+  const [travelFeeMode, setTravelFeeMode] = useState<'none' | 'fixed'>(profile?.travelFeeMode || 'none');
+  const [fixedTravelFee, setFixedTravelFee] = useState<string>(profile?.fixedTravelFee?.toString() || '');
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>(profile?.pricingStrategy || 'none');
   const [differentials, setDifferentials] = useState<string[]>(profile?.professionalIdentity?.differentials || []);
+  const [yearsExperience, setYearsExperience] = useState<string>(profile?.professionalIdentity?.yearsExperience || '');
+  const [serviceStyle, setServiceStyle] = useState<string[]>(profile?.professionalIdentity?.serviceStyle || []);
   
   // Working Hours (Official format prioritized)
   const [workingDays, setWorkingDays] = useState<number[]>(profile?.workingHours?.workingDays || profile?.workingDays || [1, 2, 3, 4, 5]);
@@ -61,8 +71,12 @@ export function useProfileForm(profile: UserProfile | null) {
       if (profile.studioAddress) setStudioAddress(profile.studioAddress);
       if (profile.serviceAreas?.length) setServiceAreas(profile.serviceAreas);
       if (profile.serviceAreaType) setServiceAreaType(profile.serviceAreaType);
+      if (profile.travelFeeMode) setTravelFeeMode(profile.travelFeeMode);
+      if (profile.fixedTravelFee !== undefined) setFixedTravelFee(profile.fixedTravelFee.toString());
       if (profile.pricingStrategy) setPricingStrategy(profile.pricingStrategy);
       if (profile.professionalIdentity?.differentials?.length) setDifferentials(profile.professionalIdentity.differentials);
+      if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
+      if (profile.professionalIdentity?.serviceStyle?.length) setServiceStyle(profile.professionalIdentity.serviceStyle);
       
       const wh = profile.workingHours;
       if (wh) {
@@ -97,8 +111,12 @@ export function useProfileForm(profile: UserProfile | null) {
     studioAddress, setStudioAddress,
     serviceAreas, setServiceAreas,
     serviceAreaType, setServiceAreaType,
+    travelFeeMode, setTravelFeeMode,
+    fixedTravelFee, setFixedTravelFee,
     pricingStrategy, setPricingStrategy,
     differentials, setDifferentials,
+    yearsExperience, setYearsExperience,
+    serviceStyle, setServiceStyle,
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,

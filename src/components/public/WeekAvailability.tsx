@@ -20,7 +20,7 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
   if (!availability || availability.length === 0) return null;
 
   return (
-    <section className="py-12 md:py-20 px-6 bg-brand-linen/20">
+    <section className="py-12 md:py-20 px-4 sm:px-6 bg-brand-linen/20">
       <div className="max-w-7xl mx-auto w-full">
         <div className="text-center mb-8 md:mb-12 space-y-4">
           <motion.span 
@@ -36,7 +36,7 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-3xl md:text-4xl font-serif text-brand-ink"
+            className="text-[clamp(24px,7vw,32px)] md:text-4xl font-serif text-brand-ink"
           >
             Disponibilidade da semana
           </motion.h2>
@@ -51,7 +51,7 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
           </motion.p>
         </div>
 
-        <div className="flex overflow-x-auto pb-8 -mx-6 px-6 scrollbar-hide md:grid md:grid-cols-7 md:gap-4 md:overflow-visible">
+        <div className="flex overflow-x-auto pb-8 -mx-4 px-4 sm:-mx-6 sm:px-6 scrollbar-hide md:grid md:grid-cols-7 md:gap-4 md:overflow-visible">
           {availability.map((day, idx) => (
             <motion.button
               key={day.date}

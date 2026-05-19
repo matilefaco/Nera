@@ -8,6 +8,8 @@ import Logo from '../components/Logo';
 
 type ActionStatus = 'loading' | 'success' | 'error';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function AuthActionPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -27,7 +29,7 @@ export default function AuthActionPage() {
 
     if (mode === 'verifyEmail') {
       handleVerifyEmail(oobCode).catch(err => {
-        console.error('[AuthActionPage] Uncaught error in verification handler:', err);
+        if (isDev) console.error('[AuthActionPage] Uncaught error in verification handler:', err);
       });
     } else {
       setStatus('error');
@@ -45,7 +47,7 @@ export default function AuthActionPage() {
         await auth.currentUser.reload();
       }
     } catch (err: any) {
-      console.error('[AuthActionPage] Error applying action code:', err);
+      if (isDev) console.error('[AuthActionPage] Error applying action code:', err);
       setStatus('error');
       
       if (err.code === 'auth/expired-action-code') {

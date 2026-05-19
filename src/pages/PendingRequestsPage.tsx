@@ -24,6 +24,8 @@ import { usePendingAppointments } from '../contexts/PendingAppointmentsContext';
 import { Zap } from 'lucide-react';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function PendingRequestsPage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -56,7 +58,7 @@ export default function PendingRequestsPage() {
         notify.success('Notificações ativadas.');
       }
     } catch (error) {
-      console.error(error);
+      if (isDev) console.error(error);
     } finally {
       setIsPushLoading(false);
     }
@@ -123,11 +125,11 @@ export default function PendingRequestsPage() {
           setTruePending(docs);
           setLoading(false);
         } catch (err) {
-          console.error('[PendingRequestsPage] Error parsing snapshot callback:', err);
+          if (isDev) console.error('[PendingRequestsPage] Error parsing snapshot callback:', err);
         }
       },
       (error) => {
-        console.error('[PendingRequestsPage] Firestore onSnapshot error:', error);
+        if (isDev) console.error('[PendingRequestsPage] Firestore onSnapshot error:', error);
         setLoading(false);
       }
     );
@@ -268,7 +270,7 @@ export default function PendingRequestsPage() {
         setConfirmedId(null);
         setWhatsappCtaId(null);
       }
-      console.error("[PENDING FLOW ERROR]", error);
+      if (isDev) console.error("[PENDING FLOW ERROR]", error);
       notify.error(error.message || 'Não foi possível concluir. Tente novamente.');
     } finally {
       setProcessingId(null);

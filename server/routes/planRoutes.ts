@@ -19,6 +19,17 @@ function getStripe() {
     if (!key) {
       throw new Error("STRIPE_SECRET_KEY is missing in environment");
     }
+    
+    // Audit log for environment mode
+    const isTestMode = key.startsWith("sk_test");
+    logger.info("STRIPE", "Initializing Stripe SDK", { 
+      meta: { 
+        mode: isTestMode ? "test" : "live",
+        nodeEnv: process.env.NODE_ENV,
+        apiVersion: "2023-10-16"
+      } 
+    });
+
     stripeModule = new Stripe(key, {
       apiVersion: "2023-10-16" as any,
     });
@@ -250,21 +261,34 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
       return res.status(400).json({ error: "O plano Pro não está configurado corretamente (Price ID ausente). Por favor, contate o suporte." });
     }
 
+    // P0 FIX: Include 'trialing' and 'past_due' to allow upgrades for users in those states
     const subscriptions = await stripe.subscriptions.list({ 
       customer: userData.stripeCustomerId, 
-      status: 'active', 
-      limit: 1 
+      status: 'all', 
+      limit: 5
     });
 
-    if (subscriptions.data.length === 0) {
-      return res.status(400).json({ error: "Nenhuma assinatura ativa encontrada para atualizar." });
+    // Filter for active-ish subscriptions manually to be robust
+    const activeSub = subscriptions.data.find(s => ['active', 'trialing', 'past_due', 'incomplete'].includes(s.status));
+
+    if (!activeSub) {
+      logger.warn("STRIPE", "No valid subscription found for upgrade", { 
+        professionalId: maskUid(uid), 
+        customerId: userData.stripeCustomerId,
+        foundCount: subscriptions.data.length,
+        statuses: subscriptions.data.map(s => s.status)
+      });
+      return res.status(400).json({ error: "Nenhuma assinatura ativa encontrada para atualizar. Se você cancelou recentemente, aguarde o processamento ou contate o suporte." });
     }
 
-    const sub = subscriptions.data[0];
-    const currentItem = sub.items.data[0];
+    const currentItem = activeSub.items.data[0];
+
+    if (!currentItem) {
+      return res.status(400).json({ error: "Assinatura encontrada mas sem itens válidos." });
+    }
 
     // Update the subscription
-    await stripe.subscriptions.update(sub.id, {
+    await stripe.subscriptions.update(activeSub.id, {
       items: [{
         id: currentItem.id,
         price: targetPriceId,
@@ -272,7 +296,9 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
       proration_behavior: 'always_invoice', // Immediately invoice the difference
       metadata: {
         plan: 'pro',
-        professionalId: uid
+        professionalId: uid,
+        upgradeSource: 'essencial-to-pro',
+        upgradedAt: new Date().toISOString()
       }
     });
 
@@ -402,6 +428,8 @@ router.post("/webhook", async (req, res) => {
         stripeSubscriptionStatus: subscription.status, // trialing, active, etc.
         planExpiresAt: planExpiresAt,
         trialUsed: true,
+        lastStripeSyncAt: new Date().toISOString(),
+        stripeSyncSource: 'checkout_completed',
         updatedAt: new Date().toISOString()
       };
 
@@ -489,6 +517,8 @@ router.post("/webhook", async (req, res) => {
           const updateData: any = {
             planExpiresAt: newExpiry.toISOString(),
             stripeSubscriptionStatus: subscription.status,
+            lastStripeSyncAt: new Date().toISOString(),
+            stripeSyncSource: 'invoice_paid',
             updatedAt: new Date().toISOString()
           };
 
@@ -636,11 +666,21 @@ router.post("/webhook", async (req, res) => {
           stripeSubscriptionId: subscriptionId,
           stripeCustomerId: customerId,
           cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          lastStripeSyncAt: new Date().toISOString(),
+          stripeSyncSource: 'subscription_updated_webhook',
           updatedAt: new Date().toISOString()
         };
 
         if (subscription.current_period_end) {
           updateData.planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
+        }
+
+        // P0: If status is 'canceled' or 'unpaid', reset plan to 'free'
+        if (['canceled', 'unpaid', 'incomplete_expired'].includes(subscription.status)) {
+          updateData.plan = 'free';
+          updateData.planRank = 0;
+          updateData.indexable = false;
+          logger.info("STRIPE", "Access revoked via subscription.updated status", { professionalId: userId, status: subscription.status });
         }
 
         // Handle Plan Change from Stripe Portal (Upgrade/Downgrade)
@@ -787,6 +827,8 @@ router.post("/confirm-checkout", requireFirebaseAuth, async (req: AuthenticatedR
       stripeSubscriptionStatus: subscription.status,
       planExpiresAt: planExpiresAt,
       trialUsed: true,
+      lastStripeSyncAt: new Date().toISOString(),
+      stripeSyncSource: 'confirm_checkout_sync',
       updatedAt: new Date().toISOString()
     };
 
@@ -882,16 +924,41 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
       limit: 5
     });
     
-    // Also check trialing
+    // Also check trialing and past_due
     const trialing = await stripe.subscriptions.list({
       customer: customerId,
       status: 'trialing',
       limit: 1
     });
 
-    const allSubs = [...subscriptions.data, ...trialing.data];
+    const pastDue = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'past_due',
+      limit: 1
+    });
+
+    const allSubs = [...subscriptions.data, ...trialing.data, ...pastDue.data];
 
     if (allSubs.length === 0) {
+      // If no active, trialing or past_due subs, but user has premium, reset them
+      if (userData.plan && userData.plan !== 'free') {
+        const updateData = {
+          plan: 'free',
+          planRank: 0,
+          indexable: false,
+          stripeSubscriptionStatus: 'canceled_or_none',
+          lastStripeSyncAt: new Date().toISOString(),
+          stripeSyncSource: 'reconcile_reset',
+          updatedAt: new Date().toISOString()
+        };
+        await db.collection("users").doc(userId).update(updateData);
+        return res.status(200).json({
+          success: true,
+          message: "No active subscriptions found. Premium access revoked.",
+          customerId
+        });
+      }
+
       return res.status(200).json({
         success: false,
         message: "No active or trialing subscriptions found for this customer.",
@@ -899,9 +966,9 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
       });
     }
 
-    // 5. Determine Plan and Update DB
+    // 5. Determine Plan and Update DB - Use the most "active" subscription
     const sub = allSubs[0];
-    const priceId = sub.items.data[0].price.id;
+    const priceId = sub.items.data[0]?.price?.id;
     const envPro = process.env.STRIPE_PRICE_PRO;
     const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
 
@@ -933,23 +1000,18 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
       });
     }
 
-    // Idempotency Guard: skip if already synced
-    if (userData.stripeSubscriptionId === sub.id && userData.plan === plan && userData.stripeSubscriptionStatus === sub.status) {
-      return res.json({
-        success: true,
-        message: `Plan is already reconciled and matches Stripe (${plan.toUpperCase()})`,
-        alreadySynced: true
-      });
-    }
-
+    // Update Data
     const updateData: any = {
       plan,
       planRank,
       stripeCustomerId: customerId,
       stripeSubscriptionId: sub.id,
       stripeSubscriptionStatus: sub.status,
-      planExpiresAt: new Date(sub.current_period_end * 1000).toISOString(),
+      planExpiresAt: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+      lastStripeSyncAt: new Date().toISOString(),
+      stripeSyncSource: 'manual_reconcile',
       updatedAt: new Date().toISOString(),
+      indexable: true,
       trialUsed: sub.status === 'trialing' ? true : (userData.trialUsed || false)
     };
 

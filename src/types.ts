@@ -125,7 +125,7 @@ export interface UserProfile {
     accessibilityInfo?: string;
     isSafeLocation?: boolean;
     locationNotes?: string;
-    privacyMode?: 'public_full' | 'neighborhood_only';
+    privacyMode?: 'public_full' | 'neighborhood_only' | 'reveal_after_booking';
     googleMapsLink?: string;
   };
   

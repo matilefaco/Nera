@@ -174,47 +174,83 @@ export async function createServerApp() {
 
   app.use("/api", apiRouter);
 
-  // 6. Robots.txt and Sitemap.xml
+  // 6. Robots.txt and Sitemap.xml (Prioritized)
   app.get("/robots.txt", (req, res) => {
-    const robotsPath = path.join(process.cwd(), "public", "robots.txt");
-    if (fs.existsSync(robotsPath)) {
-      return res.sendFile(robotsPath);
-    }
-    res.status(404).send("Not Found");
+    const robots = [
+      "User-agent: *",
+      "Allow: /",
+      "Allow: /profissionais",
+      "Allow: /p/",
+      "Disallow: /dashboard",
+      "Disallow: /onboarding",
+      "Disallow: /settings",
+      "Disallow: /configuracoes",
+      "Disallow: /profile",
+      "Disallow: /agenda",
+      "Disallow: /pedidos",
+      "Disallow: /financeiro",
+      "Disallow: /services",
+      "Disallow: /cupons",
+      "Disallow: /avaliacoes",
+      "Disallow: /indicacoes",
+      "Disallow: /whatsapp-history",
+      "Disallow: /checkout",
+      "Disallow: /login",
+      "Disallow: /register",
+      "Disallow: /verificar-email",
+      "",
+      "Sitemap: https://usenera.com/sitemap.xml"
+    ].join("\n");
+    
+    res.setHeader("Content-Type", "text/plain");
+    res.send(robots);
   });
 
   app.get("/sitemap.xml", async (req, res) => {
     try {
       const db = firebaseAdmin.getDb();
-      if (!db) return res.status(500).send("DB not ready");
+      if (!db) return res.status(503).send("Database warming up. Please retry in a moment.");
 
       const baseUrl = "https://usenera.com";
       const staticPages = [
         "",
         "/profissionais",
-        "/sobre",
         "/termos",
         "/privacidade"
       ];
 
-      // Fetch indexable professionals
+      // Fetch indexable professionals - enforce quality filters at query level if possible
       const snapshot = await db.collection("users")
         .where("onboardingCompleted", "==", true)
         .where("indexable", "==", true)
+        .where("role", "==", "professional")
         .limit(1000)
         .get();
 
       const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
-      const BANNED_KEYWORDS = ['teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'asdf'];
+      const BANNED_KEYWORDS = [
+        'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
+        'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined', 'helena-prado',
+        'qa', 'audit', 'regress', 'jajajsje', 'bubu', 'bebe', 'bebê', 'fsdf', 'asdasd', 'sadhduahsudhaus',
+        'testeeeee', 'joaquina princesa'
+      ];
 
       const professionalSlugs = snapshot.docs
         .map(doc => doc.data())
         .filter(data => {
-          const name = (data.name || "").toLowerCase();
-          const slug = data.slug;
-          if (!slug) return false;
+          const name = (data.displayName || data.name || "").toLowerCase();
+          const slug = (data.slug || "").toLowerCase();
+          const email = (data.email || "").toLowerCase();
+          
+          if (!slug || slug.length < 3) return false;
           if (RESERVED_SLUGS.includes(slug)) return false;
-          if (BANNED_KEYWORDS.some(k => name.includes(k) || slug.includes(k))) return false;
+          
+          const nameIsBanned = BANNED_KEYWORDS.some(k => name.includes(k));
+          const slugIsBanned = BANNED_KEYWORDS.concat(['regress', 'audit', 'qa']).some(k => slug.includes(k));
+          const emailIsBanned = ['qa', 'test', 'audit'].some(k => email.includes(k));
+
+          if (nameIsBanned || slugIsBanned || emailIsBanned) return false;
+          
           return true;
         })
         .map(data => `/p/${data.slug}`);
@@ -234,10 +270,10 @@ export async function createServerApp() {
 
       xml += `</urlset>`;
 
-      res.setHeader("Content-Type", "text/xml");
-      res.send(xml);
+      res.setHeader("Content-Type", "application/xml");
+      res.status(200).send(xml);
     } catch (err) {
-      logger.error("SEO", "Failed to generate sitemap", { error: err });
+      logger.error("SEO", "Sitemap generation error", { error: err });
       res.status(500).send("Error generating sitemap");
     }
   });
@@ -536,8 +572,33 @@ export async function createServerApp() {
     }
   });
 
-  // 9. Private Routes Protection (noindex)
-  app.get(["/dashboard*", "/onboarding*", "/settings*", "/checkout*", "/success*", "/cancel*", "/referrals*", "/login", "/register"], async (req, res, next) => {
+  // 9. Private Routes Protection (Noindex)
+  app.get([
+    "/dashboard*", 
+    "/onboarding*", 
+    "/settings*", 
+    "/configuracoes*",
+    "/profile*", 
+    "/checkout*", 
+    "/success*", 
+    "/cancel*", 
+    "/referrals*", 
+    "/indicacoes*",
+    "/login*", 
+    "/register*",
+    "/agenda*",
+    "/pedidos*",
+    "/clients*",
+    "/financeiro*",
+    "/services*",
+    "/cupons*",
+    "/avaliacoes*",
+    "/whatsapp-history*",
+    "/verificar-email*",
+    "/trocar-senha*",
+    "/planos*",
+    "/plans*"
+  ], async (req, res, next) => {
     try {
       const indexPath = process.env.NODE_ENV === "production" 
         ? path.join(process.cwd(), "dist", "index.html")
@@ -553,6 +614,7 @@ export async function createServerApp() {
       }
       if (viteServer) html = await viteServer.transformIndexHtml(req.originalUrl, html);
       res.setHeader("Content-Type", "text/html");
+      res.setHeader("X-Robots-Tag", "noindex, nofollow"); // Extra security
       return res.send(html);
     } catch (err) {
       next();

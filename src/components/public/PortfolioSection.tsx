@@ -23,7 +23,7 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
     : portfolio.filter(item => item.category === activeCategory);
 
   return (
-    <section className="bg-brand-linen py-20 md:py-32 px-6 border-y border-brand-mist/50">
+    <section className="bg-brand-linen py-20 md:py-32 px-4 sm:px-6 border-y border-brand-mist/50">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-10 mb-10 md:mb-16">
           <div>

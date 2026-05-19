@@ -183,9 +183,11 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         'name', 'displayName', 'bio', 'specialty', 'city', 'neighborhood', 'headline',
         'instagram', 'whatsapp', 'slug', 'avatar', 'photoURL', 'coverImage',
         'portfolio', 'profileTheme', 'serviceMode', 'studioAddress', 
-        'serviceAreaType', 'serviceAreas', 'pricingStrategy', 'workingHours', 
-        'paymentMethods', 'antiNoShowEnabled', 'advancePaymentRequired', 
-        'delayTolerance', 'professionalIdentity', 'onboardingCompleted'
+        'serviceAreaType', 'serviceAreas', 'travelFeeMode', 'fixedTravelFee', 
+        'pricingStrategy', 'workingHours', 'paymentMethods', 
+        'antiNoShowEnabled', 'advancePaymentRequired', 'delayTolerance', 
+        'professionalIdentity', 'onboardingCompleted', 'onboardingStep',
+        'published', 'indexable', 'avatarSkipped'
       ];
 
       const filteredProfile: any = {};
@@ -611,7 +613,9 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
     // P0: Defensive filter list for test/fake accounts
     const BANNED_KEYWORDS = [
       'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
-      'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined', 'helena-prado'
+      'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined', 'helena-prado',
+      'qa', 'audit', 'regress', 'jajajsje', 'bubu', 'bebê', 'fsdf', 'asdasd', 'sadhduahsudhaus',
+      'testeeeee', '77777', 'joaquina princesa'
     ];
 
     // Basic query for directory - only published and indexable profiles
@@ -627,6 +631,8 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
         const data = doc.data();
         const name = (data.displayName || data.name || "").trim();
         const cleanName = name.toLowerCase();
+        const slug = (data.slug || "").toLowerCase();
+        const email = (data.email || "").toLowerCase();
 
         // 1. Minimum quality filters (on memory to avoid complex Firestore composite indexes for now)
         if (!name || name.length < 3) return null;
@@ -634,9 +640,12 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
         // 2. Purely numeric name check
         if (/^\d+$/.test(name.replace(/\s/g, ''))) return null;
 
-        // 3. Banned keyword check
-        const isBanned = BANNED_KEYWORDS.some(k => cleanName.includes(k));
-        if (isBanned) return null;
+        // 3. Banned keyword check (Name, Slug, Email)
+        const nameIsBanned = BANNED_KEYWORDS.some(k => cleanName.includes(k));
+        const slugIsBanned = BANNED_KEYWORDS.concat(['regress', 'audit', 'qa']).some(k => slug.includes(k));
+        const emailIsBanned = ['qa', 'test', 'audit'].some(k => email.includes(k));
+        
+        if (nameIsBanned || slugIsBanned || emailIsBanned) return null;
 
         // 4. Incomplete profile check
         if (!data.slug || !data.specialty) return null;

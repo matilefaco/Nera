@@ -3,9 +3,13 @@ import {createRoot} from 'react-dom/client';
 import App from './App';
 import './index.css';
 
-// Global error logger for main entry (Production Debug)
+// Global error logger - only verbose in non-production
+const isDev = window.location.hostname === 'localhost' || window.location.hostname.includes('ais-dev');
+
 window.addEventListener('error', (event) => {
-  console.error('[MAIN_ERROR]', event.error);
+  if (isDev) {
+    console.error('[MAIN_ERROR]', event.error);
+  }
 });
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -15,7 +19,9 @@ window.addEventListener('unhandledrejection', (event) => {
     event.preventDefault(); // suppress it locally
     return;
   }
-  console.error('[PROMISE_ERROR]', reason);
+  if (isDev) {
+    console.error('[PROMISE_ERROR]', reason);
+  }
 });
 
 const rootElement = document.getElementById('root');

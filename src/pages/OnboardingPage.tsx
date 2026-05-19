@@ -76,6 +76,9 @@ const EXPERIENCE_OPTIONS = [
   { label: '5+ anos', value: '5+' }
 ];
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export default function OnboardingPage() {
   const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -104,9 +107,14 @@ export default function OnboardingPage() {
     serviceMode, setServiceMode,
     studioAddress, setStudioAddress,
     serviceAreas, setServiceAreas,
+    serviceAreaType, setServiceAreaType,
+    travelFeeMode, setTravelFeeMode,
+    fixedTravelFee, setFixedTravelFee,
     pricingStrategy, setPricingStrategy,
     differentials: selectedDifferentials, setDifferentials: setSelectedDifferentials,
     paymentMethods, setPaymentMethods,
+    yearsExperience, setYearsExperience,
+    serviceStyle: selectedStyles, setServiceStyle: setSelectedStyles,
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,
@@ -178,6 +186,7 @@ export default function OnboardingPage() {
           city: city || ''
         });
         
+        devLog(`[SlugCheck] Requesting check for slug: ${cleanSlug}`);
         const res = await fetch(`/api/slug/check?${queryParams}`);
         
         // If the slug changed while the fetch was in progress, ignore result
@@ -187,7 +196,7 @@ export default function OnboardingPage() {
         try {
           data = await res.json();
         } catch(e) {
-          console.error('[SlugCheck] JSON parse error', e);
+          if (isDev) console.error('[SlugCheck] JSON parse error', e);
         }
         
         let finalStatus: 'available' | 'unavailable' | 'invalid' = 'invalid';
@@ -198,6 +207,12 @@ export default function OnboardingPage() {
             finalStatus = 'unavailable';
           }
         }
+
+        devLog("[SlugCheck]", {
+          status: res.status,
+          body: data,
+          finalStatus
+        });
 
         if (finalStatus === 'available') {
           setSlugStatus('available');
@@ -212,11 +227,15 @@ export default function OnboardingPage() {
           setSlugMessage(data.error || 'Não consegui verificar agora. Tente novamente.');
         }
       } catch (err) {
-        console.error('[SlugCheck] Caught error:', err);
+        if (isDev) console.error('[SlugCheck] Caught error:', err);
         // Only update if it's still the same slug
         if (slugCheckRef.current === cleanSlug) {
           const finalStatus = 'invalid';
-
+          devLog("[SlugCheck]", {
+            status: 'caught_error',
+            error: String(err),
+            finalStatus
+          });
           setSlugStatus(finalStatus);
           setSlugMessage('Erro de rede. Tente novamente.');
         }
@@ -227,9 +246,6 @@ export default function OnboardingPage() {
   }, [slug]);
 
   // Step 2: Service Mode Details
-  const [serviceAreaType, setServiceAreaType] = useState<'city_wide' | 'custom'>('city_wide');
-  const [travelFeeMode, setTravelFeeMode] = useState<'none' | 'fixed'>('none');
-  const [fixedTravelFee, setFixedTravelFee] = useState('');
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
@@ -254,10 +270,6 @@ export default function OnboardingPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [servicesErrors, setServicesErrors] = useState<any[]>([]);
 
-  // New Identity State
-  const [yearsExperience, setYearsExperience] = useState('3-5');
-  const [selectedStyles, setSelectedStyles] = useState<string[]>([]);
-  
   // Step 3: Schedule state extensions
   const [showBreak, setShowBreak] = useState(false);
   const [breakStart, setBreakStart] = useState('12:00');
@@ -289,6 +301,7 @@ export default function OnboardingPage() {
       fixedTravelFee,
       city,
       neighborhood,
+      studioAddress,
       instagram,
       workingDays,
       startTime,
@@ -303,7 +316,7 @@ export default function OnboardingPage() {
   }, [
     draftKey, isFinalizing, name, specialty, headline, bio, whatsapp, slug, instagram,
     paymentMethods, services, yearsExperience, selectedStyles, selectedDifferentials,
-    step, serviceMode, serviceAreaType, travelFeeMode, fixedTravelFee, city, neighborhood,
+    step, serviceMode, serviceAreaType, travelFeeMode, fixedTravelFee, city, neighborhood, studioAddress,
     workingDays, startTime, endTime, showBreak, breakStart, breakEnd
   ]);
 
@@ -338,6 +351,7 @@ export default function OnboardingPage() {
         if (draft.fixedTravelFee) setFixedTravelFee(draft.fixedTravelFee);
         if (draft.city && !city) setCity(draft.city);
         if (draft.neighborhood && !neighborhood) setNeighborhood(draft.neighborhood);
+        if (draft.studioAddress) setStudioAddress(draft.studioAddress);
         
         if (draft.workingDays?.length) setWorkingDays(draft.workingDays);
         if (draft.startTime) setStartTime(draft.startTime);
@@ -346,9 +360,10 @@ export default function OnboardingPage() {
         if (draft.breakStart) setBreakStart(draft.breakStart);
         if (draft.breakEnd) setBreakEnd(draft.breakEnd);
         
+        devLog('[Onboarding] Hydrated from local draft');
       }
     } catch (e) {
-      console.warn('[Onboarding] Failed to hydrate draft', e);
+      // Quiet fail on draft hydration
     }
     
     hasHydratedDraft.current = true;
@@ -356,7 +371,12 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (profile) {
-
+      devLog('[Onboarding] Profile snapshot received:', {
+        step: profile.onboardingStep,
+        completed: profile.onboardingCompleted,
+        isFinalizing,
+        currentStep: step
+      });
 
       // 1. If onboarding is already completed on server, App.tsx guard will handle redirect.
       if (profile.onboardingCompleted && !isFinalizing && step !== 4) { // step 4 is considered out of bounds, meaning done. Or we check 3. It used to be 5.
@@ -376,6 +396,8 @@ export default function OnboardingPage() {
         if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
         if (profile.professionalIdentity?.serviceStyle) setSelectedStyles(profile.professionalIdentity.serviceStyle);
         if (profile.portfolio && profile.portfolio.length > 0) setPortfolio(profile.portfolio as any);
+        if (profile.paymentMethods && profile.paymentMethods.length > 0) setPaymentMethods(profile.paymentMethods);
+        if (profile.studioAddress) setStudioAddress(profile.studioAddress);
         if (profile.onboardingStep !== undefined) {
           let safeStep = profile.onboardingStep;
           const currentName = profile.name || name;
@@ -424,6 +446,7 @@ export default function OnboardingPage() {
       });
 
       const data = await response.json();
+      devLog('[BioAI] Response payload:', data);
       
       if (!response.ok) {
         throw new Error(data.error || 'Erro na resposta do servidor.');
@@ -463,10 +486,11 @@ export default function OnboardingPage() {
       }
 
       if (!newBio || !newHeadline) {
-        console.error('[BioAI] Extraction failed or incomplete. Raw data:', data);
+        if (isDev) console.error('[BioAI] Extraction failed or incomplete. Raw data:', data);
         throw new Error('Não consegui preencher sua bio agora. Você pode escrever manualmente e tentar novamente.');
       }
 
+      devLog('[BioAI] Extracted:', { newBio, newHeadline });
 
       if (newBio) setBio(newBio);
       if (newHeadline) setHeadline(newHeadline);
@@ -504,10 +528,26 @@ export default function OnboardingPage() {
       serviceAreaType,
       travelFeeMode,
       fixedTravelFee: travelFeeMode === 'fixed' ? (Number(fixedTravelFee) || 0) : 0,
+      pricingStrategy,
       paymentMethods: paymentMethods as any,
       profileTheme: profileTheme || { variant: 'terracotta' },
       onboardingStep: nextStepNum,
       servicesDraft: services as any, // Save services temporarily before finalizing
+      studioAddress: {
+        street: (studioAddress.street || '').trim(),
+        number: (studioAddress.number || '').trim(),
+        complement: (studioAddress.complement || '').trim(),
+        neighborhood: (studioAddress.neighborhood || '').trim(),
+        city: (studioAddress.city || city || '').trim(),
+        reference: (studioAddress.reference || '').trim(),
+        privacyMode: (studioAddress.privacyMode || 'reveal_after_booking') as 'public_full' | 'neighborhood_only' | 'reveal_after_booking',
+        hasParking: !!studioAddress.hasParking,
+        parkingInfo: (studioAddress.parkingInfo || '').trim(),
+        hasAccessibility: !!studioAddress.hasAccessibility,
+        accessibilityInfo: (studioAddress.accessibilityInfo || '').trim(),
+        isSafeLocation: !!studioAddress.isSafeLocation,
+        locationNotes: (studioAddress.locationNotes || '').trim()
+      },
       workingHours: {
         startTime,
         endTime,
@@ -699,7 +739,7 @@ export default function OnboardingPage() {
 
       const activeServices = services.filter(s => s.name.trim() !== '');
       if (activeServices.length === 0) {
-        console.warn('[OnboardingSave] Validation failed: No active services');
+        devLog('[OnboardingSave] Validation failed: No active services');
         notify.error('Cadastre pelo menos um serviço antes de publicar.');
         return;
       }
@@ -739,7 +779,7 @@ export default function OnboardingPage() {
       neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
       slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       whatsapp: cleanWhatsapp(whatsapp),
-      paymentMethods: (paymentMethods.length > 0 ? paymentMethods : ['pix']) as any,
+      paymentMethods: paymentMethods as any,
       bio: bio.trim(),
       headline: headline.trim(),
       instagram: instagram.trim().replace('@', ''),
@@ -749,13 +789,21 @@ export default function OnboardingPage() {
       serviceAreaType,
       travelFeeMode,
       fixedTravelFee: travelFeeMode === 'fixed' ? (Number(fixedTravelFee) || 0) : 0,
+      pricingStrategy,
       studioAddress: {
         street: (studioAddress.street || '').trim(),
         number: (studioAddress.number || '').trim(),
         complement: (studioAddress.complement || '').trim(),
         neighborhood: (studioAddress.neighborhood || '').trim(),
         city: (studioAddress.city || city || '').trim(),
-        reference: (studioAddress.reference || '').trim()
+        reference: (studioAddress.reference || '').trim(),
+        privacyMode: (studioAddress.privacyMode || 'reveal_after_booking') as 'public_full' | 'neighborhood_only' | 'reveal_after_booking',
+        hasParking: !!studioAddress.hasParking,
+        parkingInfo: (studioAddress.parkingInfo || '').trim(),
+        hasAccessibility: !!studioAddress.hasAccessibility,
+        accessibilityInfo: (studioAddress.accessibilityInfo || '').trim(),
+        isSafeLocation: !!studioAddress.isSafeLocation,
+        locationNotes: (studioAddress.locationNotes || '').trim()
       },
       serviceAreas: serviceAreas.map(area => ({
         name: area.name.trim(),
@@ -938,6 +986,7 @@ export default function OnboardingPage() {
       }
 
       let uniqueFilename = '';
+      // 3. Upload
       try {
         // 2. Compression
         const options = {
@@ -946,22 +995,24 @@ export default function OnboardingPage() {
           useWebWorker: false
         };
         const compressedFile = await imageCompression(file, options);
+        devLog(`[Portfolio Onboarding] Compression done. Original: ${file.size}, Compressed: ${compressedFile.size}`);
         
         // 3. Upload
         uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
         const downloadUrl = await uploadImageToStorage(compressedFile, `portfolio/${user.uid}/${uniqueFilename}`);
+        devLog('[Portfolio Onboarding] upload finished:', downloadUrl);
         
         // 3b. AI Categorization
         let autoCategory = '';
         try {
           autoCategory = await analyzePortfolio({ imageUrl: downloadUrl, specialty });
         } catch (catErr) {
-          console.warn('[Portfolio Onboarding] AI Categorization failed:', catErr);
-          // silencioso — categoria fica vazia se falhar
+          // silently fail
         }
 
         // 4. Persistence
         const docId = await savePortfolioItem(user.uid, downloadUrl, autoCategory || specialty || 'Geral');
+        devLog('[Portfolio Onboarding] saved successfully with ID:', docId);
         
         // Update local state with real ID
         setPortfolio(prev => prev.map(item => 
@@ -991,8 +1042,10 @@ export default function OnboardingPage() {
             authEqualsStorageApp: auth.app === storage.app
         };
         
-        console.error('[DIAGNÓSTICO OBRIGATÓRIO]', diag);
-        setDiagnosticInfo(diag);
+        if (isDev) {
+            console.error('[DIAGNÓSTICO OBRIGATÓRIO]', diag);
+            setDiagnosticInfo(diag);
+        }
         
         let errorMessage = 'Não conseguimos enviar essa imagem. Tente novamente.';
         if (error.code === 'storage/unauthorized') {
@@ -1221,6 +1274,9 @@ export default function OnboardingPage() {
                 setSelectedBioStyle={setSelectedBioStyle}
                 paymentMethods={paymentMethods}
                 setPaymentMethods={setPaymentMethods}
+                differentials={selectedDifferentials}
+                setDifferentials={setSelectedDifferentials}
+                availableDifferentials={IDENTITY_DIFFERENTIALS}
                 whatsapp={whatsapp}
                 setWhatsapp={setWhatsapp}
                 showLabels={true}
@@ -1562,6 +1618,15 @@ export default function OnboardingPage() {
         </AnimatePresence>
       </main>
 
+      {/* Debug Overlay - Only visible during development/debugging if showDebugHUD is true */}
+      {process.env.NODE_ENV === 'development' && (window as any).showDebugHUD && (
+        <div className="fixed bottom-4 right-4 bg-brand-ink/90 text-brand-white p-4 rounded-2xl text-[8px] font-mono z-[100] border border-brand-mist/20 pointer-events-none opacity-50">
+          <p>STEP: {step}</p>
+          <p>FINALIZING: {isFinalizing ? 'YES' : 'NO'}</p>
+          <p>LOADING: {loading ? 'YES' : 'NO'}</p>
+          <p>PROFILE_COMPLETED: {profile?.onboardingCompleted ? 'YES' : 'NO'}</p>
+        </div>
+      )}
     </div>
   );
 }

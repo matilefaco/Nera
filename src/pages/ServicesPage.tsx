@@ -19,6 +19,8 @@ import { FirstVisitTip } from '../components/FirstVisitTip';
 import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { Skeleton } from '../components/ui/Skeleton';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function ServicesPage() {
   const { user, profile, isAuthReady } = useAuth();
   const [services, setServices] = useState<any[]>([]);
@@ -121,11 +123,11 @@ export default function ServicesPage() {
           clearTimeout(fallbackTimeout);
         }
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
         setIsInitialLoading(false);
       }
     }, (error) => { 
-        console.error("Firestore onSnapshot error:", error); 
+        if (isDev) console.error("Firestore onSnapshot error:", error); 
         if (isMounted) setIsInitialLoading(false);
     });
     
@@ -172,7 +174,7 @@ export default function ServicesPage() {
         notify.success('Descrição gerada com IA! ✨');
       }
     } catch (error: any) {
-      console.error('[AI Generation] Error:', error);
+      if (isDev) console.error('[AI Generation] Error:', error);
       fetch('/api/health/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,7 +184,9 @@ export default function ServicesPage() {
           error_stack: error.stack,
           source: 'ServicesPage generateAIDescription catch block',
         })
-      }).catch(e => console.error(e));
+      }).catch(e => {
+        if (isDev) console.error(e);
+      });
       notify.error(`Erro IA: ${error.message}`);
     } finally {
       setIsGeneratingAI(false);
@@ -235,7 +239,7 @@ export default function ServicesPage() {
       }
       closeModal();
     } catch (error: any) {
-      console.error('[SERVICE SAVE] failed:', error);
+      if (isDev) console.error('[SERVICE SAVE] failed:', error);
       const errorMessage = getHumanError(error) || 'Não foi possível salvar o serviço. Verifique os dados e tente novamente.';
       notify.error(errorMessage);
     } finally {
@@ -253,7 +257,7 @@ export default function ServicesPage() {
       setIsDeleteModalOpen(false);
       setServiceToDelete(null);
     } catch (error: any) {
-      console.error('[ServicesDelete] Error:', error);
+      if (isDev) console.error('[ServicesDelete] Error:', error);
       notify.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);

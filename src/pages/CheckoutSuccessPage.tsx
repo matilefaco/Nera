@@ -6,6 +6,8 @@ import { useAuth } from '../AuthContext';
 import { cn } from '../lib/utils';
 import { notify } from '../lib/notify';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function CheckoutSuccessPage() {
   const { profile, refreshProfile, user } = useAuth();
   const navigate = useNavigate();
@@ -43,7 +45,7 @@ export default function CheckoutSuccessPage() {
         if (data.success) {
           refreshProfile();
         } else {
-           console.warn("Confirm checkout API failed:", data.error);
+           if (isDev) console.warn("Confirm checkout API failed:", data.error);
            // We don't necessarily stop everything here, we let polling continue
            // but if we want to show a specific error if it's a hard failure:
            if (response.status === 403 || response.status === 404) {
@@ -52,7 +54,7 @@ export default function CheckoutSuccessPage() {
            }
         }
       } catch (err) {
-        console.error("Error confirming checkout:", err);
+        if (isDev) console.error("Error confirming checkout:", err);
       }
     };
 

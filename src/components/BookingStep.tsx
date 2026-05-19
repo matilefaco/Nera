@@ -25,7 +25,7 @@ export default function BookingStep({ step, total, title }: BookingStepProps) {
         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-terracotta block mb-1">
           Etapa {step} de {total}
         </span>
-        <h3 className="text-2xl font-serif text-brand-ink">{title}</h3>
+        <h3 className="text-[clamp(18px,6vw,24px)] font-serif text-brand-ink leading-tight">{title}</h3>
       </div>
     </div>
   );

@@ -20,6 +20,14 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
 
   const safeInitial = (profile?.name || 'N').trim().charAt(0).toUpperCase();
 
+  const formatSlugForStory = (slug: string) => {
+    if (!slug) return '';
+    if (slug.length <= 22) return `/${slug}`;
+    const firstPart = slug.substring(0, 9);
+    const lastPart = slug.substring(slug.length - 8);
+    return `/${firstPart}...${lastPart}`;
+  };
+
   const handleDownloadStoryCard = useCallback(async () => {
     if (!storyCardRef.current) return;
     
@@ -216,13 +224,18 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                   {/* 3. Link Sticker & Footer */}
                   <div className="relative z-10 flex flex-col items-center w-full gap-2.5 mt-auto mb-1">
                     {/* Link Sticker */}
-                    <div className="bg-white/95 px-3 py-2 rounded-full flex items-center justify-center gap-1.5 w-[92%] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] border border-[#EFECE8] shrink-0 transform hover:scale-[1.02] transition-transform">
-                      <div className="bg-brand-ink rounded-full w-[14px] h-[14px] flex items-center justify-center shrink-0">
-                         <Share2 size={7} className="text-white" strokeWidth={3} />
+                    <div className="bg-white/95 px-3 py-1.5 rounded-[12px] flex items-center justify-center gap-2 w-[92%] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] border border-[#EFECE8] shrink-0 transform hover:scale-[1.02] transition-transform">
+                      <div className="bg-brand-ink rounded-full w-[16px] h-[16px] flex items-center justify-center shrink-0">
+                         <Share2 size={8} className="text-white" strokeWidth={2.5} />
                       </div>
-                      <span className="text-[8px] font-bold text-brand-ink truncate tracking-tight">
-                        {profileUrl.replace('https://', '').replace('http://', '').replace('www.', '')}
-                      </span>
+                      <div className="flex flex-col items-start min-w-0 overflow-hidden text-left pt-[1px] pb-[1px]">
+                        <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.15em] leading-none mb-1">
+                          usenera.com/p
+                        </span>
+                        <span className="text-[8.5px] font-bold text-brand-ink w-full truncate tracking-tight leading-none mb-[1px]">
+                          {formatSlugForStory(profile.slug || '')}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Footer Signature */}

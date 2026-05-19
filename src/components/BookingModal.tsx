@@ -31,6 +31,9 @@ import BookingStep from './BookingStep';
 
 import { PLAN_CONFIGS, PlanType } from '../constants/plans';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export default function BookingModal({ profile, services, onClose, open, initialService, initialDate, waitlistEntry }: BookingModalProps) {
   const [step, setStep] = useState(1);
   const profilePlan = (profile?.plan || 'free') as PlanType;
@@ -55,7 +58,17 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [successDraft, setSuccessDraft] = useState<any>(null);
   const [bookingMode, setBookingMode] = useState<'studio' | 'home' | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [, forceUpdate] = useState({});
 
+  useEffect(() => {
+    // Poll for debug logs periodically when modal is open and in dev/ais mode
+    if (!(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-')))) return;
+    
+    const interval = setInterval(() => {
+      forceUpdate({});
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [appointmentToken, setAppointmentToken] = useState<string | null>(null);
   const [reservationCode, setReservationCode] = useState<string | null>(null);
@@ -253,6 +266,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
   const availableSlots = useMemo(() => {
     if (!profile?.workingHours || !selectedDate) {
+      if (isDev) console.log(`[Slots] Missing requirements for slot generation: workingHours=${!!profile?.workingHours}, selectedDate=${!!selectedDate}`);
       return [];
     }
     const duration = Number(selectedService?.duration) || 60;
@@ -263,6 +277,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
       appointments: dayAppointments,
       blockedSchedules
     });
+    if (isDev) console.log(`[Slots] generatedSlots count=${result.length} (after internal blocks/appts filtering)`);
     return result;
   }, [selectedDate, selectedService, profile, dayAppointments, blockedSchedules]);
 
@@ -418,6 +433,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
     let isMounted = true;
     setIsLoadingSlots(true);
     setSlotsLoadError(null);
+    if (isDev) console.log(`[Slots] start - Date: ${selectedDate}, Pro: ${profile?.uid}`);
+    if (isDev) console.log(`[Slots] selectedService ID:`, selectedService?.id);
+    if (isDev) console.log(`[Slots] serviceDuration:`, Number(selectedService?.duration));
+    if (isDev) console.log(`[Slots] businessHours/professional availability:`, profile?.workingHours);
 
     const fetchAvailabilityData = async () => {
       try {
@@ -426,15 +445,18 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
         // 1. Fetch Blocked Schedules (we fetch this every time the date changes to ensure we have the latest, though it fetches all for the pro)
         try {
+          if (isDev) console.log(`[Slots] blockedTimes query start`);
           const blockedRef = collection(db, 'blocked_schedules');
           const blockedSnap = await getDocs(query(blockedRef, where('professionalId', '==', profile.uid)));
           currentBlocked = blockedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+          if (isDev) console.log(`[Slots] blockedTimes query success count=${currentBlocked.length}`);
         } catch (err) {
-          console.error("[Slots] error actual= blockedTimes query:", err);
+          if (isDev) console.error("[Slots] error actual= blockedTimes query:", err);
         }
 
         // 2. Fetch Appointments
         try {
+          if (isDev) console.log(`[Slots] appointments query start`);
           const apptsRef = collection(db, 'appointments');
           const apptsQ = query(
             apptsRef, 
@@ -457,9 +479,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
           const allAppts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
           currentAppts = allAppts.filter(a => ['pending', 'confirmed', 'completed'].includes(a.status));
           
+          if (isDev) console.log(`[Slots] appointments query success count=${currentAppts.length}`);
         } catch (error) {
-          console.error(`[Slots] error actual= appointments query:`, error);
-          if (error instanceof Error && error.message === 'FIRESTORE_TIMEOUT') {
+          if (isDev) {
+            console.error(`[Slots] error actual= appointments query:`, error);
+            if (error instanceof Error && error.message === 'FIRESTORE_TIMEOUT') {
+               if (isDev) console.log(`[Slots] timeout`);
+            }
           }
           // Do not throw or block the UI, just fall back to base schedule without checking conflicts
           // so the user can at least see general availability
@@ -469,11 +495,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
         setBlockedSchedules(currentBlocked);
         setDayAppointments(currentAppts);
+        if (isDev) console.log(`[Slots] arrays set. currentAppts: ${currentAppts.length}, currentBlocked: ${currentBlocked.length}`);
       } catch (error) {
-        console.error(`[Slots] error actual= general fetch error:`, error);
+        if (isDev) console.error(`[Slots] error actual= general fetch error:`, error);
       } finally {
         if (isMounted) {
           setIsLoadingSlots(false);
+          if (isDev) console.log(`[Slots] finally setIsLoadingSlots(false)`);
         }
       }
     };
@@ -506,10 +534,12 @@ export default function BookingModal({ profile, services, onClose, open, initial
     setBookingAttempted(true);
     
     if (!profile?.uid || !selectedService?.id || (selectedService?.price ?? 0) < 0) {
-      console.error('[BOOKING_ERROR] Invalid service or profile data', { 
-        service: selectedService, 
-        profileId: profile?.uid 
-      });
+      if (isDev) {
+        console.error('[BOOKING_ERROR] Invalid service or profile data', { 
+          service: selectedService, 
+          profileId: profile?.uid 
+        });
+      }
       notify.error('Dados de agendamento incompletos ou inválidos.');
       return;
     }
@@ -618,6 +648,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
         setStep(4);
       }, 800);
     } catch (error: any) {
+      if (isDev) {
+        if (!(window as any).__BOOKING_DEBUG__) (window as any).__BOOKING_DEBUG__ = [];
+        (window as any).__BOOKING_DEBUG__.push(`[FATAL ERROR] ${error.message || error}`);
+      }
       handleBookingError(error);
     } finally {
       setBookingLoading(false);
@@ -664,7 +698,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
               animate={{ y: 0 }} 
               exit={{ y: "100%" }} 
               transition={{ type: "spring", damping: 25, stiffness: 200 }} 
-              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[90vh] overflow-y-auto no-scrollbar pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-12"
+              className="bg-brand-white w-full max-w-2xl rounded-t-[40px] md:rounded-[40px] p-6 sm:p-8 md:p-12 shadow-2xl relative max-h-[95dvh] md:max-h-[90vh] overflow-y-auto no-scrollbar pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-12"
             >
               <button onClick={onClose} className="absolute right-8 top-8 text-brand-stone hover:text-brand-ink transition-colors">
                 <X size={24} />
@@ -1016,6 +1050,32 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     </p>
                   </div>
 
+                  {/* DEBUG PANEL FOR MOBILE DEV/PREVIEW ONLY */}
+                  {(import.meta.env.DEV === true && typeof window !== 'undefined' && window.location.hostname.includes('localhost')) && step === 3 && (
+                    <div className="mb-10 p-4 bg-brand-linen rounded-2xl border border-brand-mist text-left">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-[9px] font-bold text-brand-stone uppercase tracking-widest">Debug Info (DEV ONLY)</h4>
+                        <button 
+                          onClick={() => { (window as any).__BOOKING_DEBUG__ = []; forceUpdate({}); }}
+                          className="text-[9px] text-brand-terracotta underline"
+                        >
+                          Limpar
+                        </button>
+                      </div>
+                      <div className="max-h-60 overflow-y-auto text-[9px] font-mono text-brand-ink space-y-1">
+                        {(window as any).__BOOKING_DEBUG__?.length > 0 ? (
+                          (window as any).__BOOKING_DEBUG__.map((log: string, i: number) => (
+                            <div key={i} className="border-b border-brand-mist/30 pb-2">
+                              <pre className="whitespace-pre-wrap">{log}</pre>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-brand-stone italic">Nenhum log capturado ainda. Toque em "Confirmar Agora".</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="hidden md:block">
                     <PremiumButton variant="terracotta" className="w-full py-7" onClick={handleBooking} loading={bookingLoading} loadingText="Confirmando...">
                       Confirmar Agendamento <Check size={18} className="ml-1" />
@@ -1034,7 +1094,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
             initial={{ y: 100, opacity: 0 }} 
             animate={{ y: 0, opacity: 1 }} 
             exit={{ y: 100, opacity: 0 }} 
-            className="fixed bottom-0 left-0 right-0 z-[250] md:hidden px-6 pt-16 pb-[calc(1.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-[rgba(255,255,255,1)] via-[rgba(255,255,255,0.95)] to-transparent pointer-events-none"
+            className="fixed bottom-0 left-0 right-0 z-[250] md:hidden px-4 sm:px-6 pt-16 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-[rgba(255,255,255,1)] via-[rgba(255,255,255,0.95)] to-transparent pointer-events-none"
           >
             <div className="pointer-events-auto">
               <PremiumButton 
@@ -1066,7 +1126,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
-            className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center p-8 text-center overflow-y-auto no-scrollbar pt-16 pb-32 md:justify-center md:pt-8 md:pb-8"
+            className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center p-6 sm:p-8 text-center overflow-y-auto no-scrollbar pt-16 pb-32 md:justify-center md:pt-8 md:pb-8"
           >
             <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", damping: 15 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"><Check size={48} /></motion.div>
             <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">{profile?.name.split(' ')[0]} recebeu seu pedido</h2>
@@ -1135,7 +1195,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     </div>
                   </div>
                   
-                  {/* Link de Gerenciamento da Reserva */}
+                  {/* Link de Gerenciamento - Temporário conforme pedido */}
                   {appointmentToken && (
                     <div className="mt-4 pt-4 border-t border-brand-mist/30">
                       <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-1">Link de Gerenciamento</span>

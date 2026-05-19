@@ -23,6 +23,9 @@ import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
 import { PageErrorBoundary } from '../components/PageErrorBoundary';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 const ClientNotes = ({
   client,
   onSave
@@ -54,7 +57,7 @@ const ClientNotes = ({
           }
         }
       } catch (err) {
-        console.error("Failed to load client note:", err);
+        if (isDev) console.error("Failed to load client note:", err);
       } finally {
         if (isMounted) setLoadingNotes(false);
       }
@@ -290,9 +293,9 @@ export default function ClientsPage() {
         return result;
       });
     } catch (err: any) {
-      console.error('[ClientsPage] Failed to load clients', err);
+      if (isDev) console.error('[ClientsPage] Failed to load clients', err);
       if (err.message && err.message.includes('index')) {
-        console.warn('[ClientsPage] Composite index required for client_summaries: professionalId ASC, lastAppointmentDate DESC.');
+        if (isDev) console.log('[ClientsPage] Composite index required for client_summaries: professionalId ASC, lastAppointmentDate DESC.');
       } else {
         notify.error('Erro ao carregar clientes. Tente novamente mais tarde.');
       }
@@ -451,7 +454,7 @@ export default function ClientsPage() {
       setClients([]);
       fetchClients(); // Refresh
     } catch (err) {
-      console.error('[Migration] Failed:', err);
+      if (isDev) console.error('[Migration] Failed:', err);
       notify.error('Falha na migração automática.');
     } finally {
       setIsMigrating(false);

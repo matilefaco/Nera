@@ -38,6 +38,9 @@ import UpgradeModal from '../components/UpgradeModal';
 import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { AgendaSkeleton } from '../components/ui/AgendaSkeleton';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 const blockedSchedulesCache = new Map<string, { data: any[], fetchedAt: number }>();
 
 export default function AgendaPage() {
@@ -105,7 +108,7 @@ export default function AgendaPage() {
             setHighlightedId(appointmentIdFromUrl);
           }
         } catch (err) {
-          console.error("Error fetching linked appointment:", err);
+          if (isDev) console.error("Error fetching linked appointment:", err);
         }
       };
       fetchAppt();
@@ -180,7 +183,7 @@ export default function AgendaPage() {
         notify.error('Nenhuma reserva encontrada com esse código.');
       }
     } catch (err) {
-      console.error('[RESERVATION SEARCH] Error:', err);
+      if (isDev) console.error('[RESERVATION SEARCH] Error:', err);
       notify.error('Erro ao buscar reserva.');
     } finally {
       setIsSearchingCode(false);
@@ -204,7 +207,7 @@ export default function AgendaPage() {
     getDocs(q).then(snap => {
       setServices(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }).catch(err => {
-      console.error("[AgendaPage] Failed to fetch services:", err);
+      if (isDev) console.error("[AgendaPage] Failed to fetch services:", err);
     });
   }, [user]);
 
@@ -274,15 +277,15 @@ export default function AgendaPage() {
         setAllAppointments(docs);
         setIsInitialLoading(false);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
         setIsInitialLoading(false);
       }
     }, (error) => {
-      console.error('[AgendaPage] Subscription error (allAppointments):', error);
+      if (isDev) console.error('[AgendaPage] Subscription error (allAppointments):', error);
       setIsInitialLoading(false);
       // Fallback: If missing index, try to gracefully fallback to manual filtering
       if (error.message.includes('index')) {
-        console.warn('[AgendaPage] Firestore index required: appointments professionalId ASC, date ASC');
+        if (isDev) console.log('[AgendaPage] Firestore index required: appointments professionalId ASC, date ASC');
         // Em produção, não exibir tela vermelha. Manter o estado seguro vazio ou dados anteriores.
       }
     });
@@ -311,7 +314,7 @@ export default function AgendaPage() {
       blockedSchedulesCache.set(user.uid, { data, fetchedAt: now });
       setAllBlockedSchedules(data);
     } catch (err) {
-      console.error("Error fetching blocked schedules:", err);
+      if (isDev) console.error("Error fetching blocked schedules:", err);
     }
   };
 
@@ -577,7 +580,7 @@ export default function AgendaPage() {
         delete reset[id];
         return reset;
       });
-      console.error("[AGENDA FLOW ERROR]", err);
+      if (isDev) console.error("[AGENDA FLOW ERROR]", err);
       notify.error(err, 'Não foi possível concluir. Tente novamente.');
     } finally {
       setLoading(null);

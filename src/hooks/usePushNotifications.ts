@@ -3,6 +3,7 @@ import { notify } from '../lib/notify';
 import { auth } from '../firebase';
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
 
 export function usePushNotifications() {
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -46,12 +47,12 @@ export function usePushNotifications() {
   async function requestPermission() {
     
     if (!isSupported) {
-      console.error("[PUSH] Web Push is not supported in this browser.");
+      if (isDev) console.error("[PUSH] Web Push is not supported in this browser.");
       throw new Error("Este navegador não suporta Web Push.");
     }
 
     if (!VAPID_PUBLIC_KEY) {
-      console.error("[PUSH] VITE_VAPID_PUBLIC_KEY is not defined.");
+      if (isDev) console.error("[PUSH] VITE_VAPID_PUBLIC_KEY is not defined.");
       throw new Error("VITE_VAPID_PUBLIC_KEY não configurada.");
     }
 
@@ -72,7 +73,7 @@ export function usePushNotifications() {
           await new Promise(resolve => setTimeout(resolve, 1000));
           registrations = await navigator.serviceWorker.getRegistrations();
         } catch (regErr) {
-          console.error("[PUSH] Falha ao registrar SW manualmente:", regErr);
+          if (isDev) console.error("[PUSH] Falha ao registrar SW manualmente:", regErr);
         }
       }
 
@@ -130,7 +131,7 @@ export function usePushNotifications() {
           setIsSubscribed(true);
           return true;
         } else {
-          console.error("[PUSH] Backend error saving subscription:", responseData);
+          if (isDev) console.error("[PUSH] Backend error saving subscription:", responseData);
           throw new Error(responseData.error || 'Permissão concedida, mas não foi possível salvar o dispositivo no servidor.');
         }
       } catch (err: any) {
@@ -140,7 +141,7 @@ export function usePushNotifications() {
         throw err;
       }
     } catch (error: any) {
-      console.error('[PUSH ERROR AT STEP]', error);
+      if (isDev) console.error('[PUSH ERROR AT STEP]', error);
       notify.error(`Erro ao ativar notificações: ${error.message}`);
       throw error;
     }

@@ -22,6 +22,8 @@ interface AppLayoutProps {
 
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes in ms
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -62,7 +64,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
       }
       navigate('/login');
     } catch (err) {
-      console.error('Logout failed:', err);
+      if (isDev) console.error('Logout failed:', err);
     }
   };
 

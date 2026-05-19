@@ -9,6 +9,9 @@ import { cn } from '../lib/utils';
 import { Appointment } from '../types';
 import { APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export default function BookingResponsePage() {
   const { appointmentId } = useParams();
   const [searchParams] = useSearchParams();
@@ -31,7 +34,7 @@ export default function BookingResponsePage() {
           }
         }
       } catch (error) {
-        console.error('Error fetching appointment:', error);
+        if (isDev) console.error('Error fetching appointment:', error);
         notify.error('Não foi possível carregar as informações agora.');
       } finally {
         setLoading(false);
@@ -52,7 +55,7 @@ export default function BookingResponsePage() {
     }
 
     setProcessing(true);
-    console.info("[CONFIRM FLOW]", {
+    devLog("[CONFIRM FLOW]", {
       appointmentId,
       mode: "backend_only",
       decision
@@ -92,7 +95,7 @@ export default function BookingResponsePage() {
       setResult(decision);
       notify.success(decision === APPOINTMENT_STATUS.CONFIRMED ? 'Reserva confirmada com sucesso.' : 'Reserva marcada como indisponível.');
     } catch (error: any) {
-      console.error("[RESPONSE FLOW ERROR]", error);
+      if (isDev) console.error("[RESPONSE FLOW ERROR]", error);
       notify.error(error.message || 'Não foi possível concluir. Tente novamente.');
     } finally {
       setProcessing(false);

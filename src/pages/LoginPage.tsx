@@ -78,7 +78,6 @@ export default function LoginPage() {
       await Promise.race([authPromise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
       const user = auth.currentUser;
       
-      
       // If user is not verified and logged in with password, redirect to verification
       if (user && !user.emailVerified && user.providerData.some(p => p.providerId === 'password')) {
         notify.info('Sua conta ainda não foi verificada. Verifique seu e-mail.');

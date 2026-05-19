@@ -2,6 +2,9 @@
 import { Appointment, WorkingHours, BlockedSchedule } from '../types';
 import { isRevenueStatus, isPendingStatus, isActiveSlotStatus } from '../constants/appointmentStatus';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export interface DayAvailability {
   availableSlots: string[];
   availableCount: number;
@@ -299,6 +302,7 @@ export function getNextAvailableSlot({
   let totalCounter = 0;
   const now = new Date();
   
+  devLog(`[BADGE NEXT SLOT] Starting search for next 14 days. duration=${serviceDuration}`);
 
   for (let i = 0; i < daysToLookAhead; i++) {
     const targetDate = new Date();
@@ -318,9 +322,12 @@ export function getNextAvailableSlot({
     
     // LOGS DE DEBUG RECURSIVOS (PEDIDO PELO USUÁRIO)
     if (i < 7) {
+      devLog(`[BADGE NEXT SLOT] date checked: ${dateStr}`);
+      devLog(`[BADGE NEXT SLOT] slots from getBookableSlotsForDate: ${slots.length}`);
     }
 
     if (slots.length > 0 && !firstSlot) {
+      devLog(`[BADGE NEXT SLOT] chosen: ${slots[0]} for date ${dateStr}`);
       firstSlot = { date: dateStr, time: slots[0] };
     }
   }

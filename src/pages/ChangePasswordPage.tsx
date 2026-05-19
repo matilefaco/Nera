@@ -7,6 +7,8 @@ import { auth } from '../firebase';
 import AppLayout from '../components/AppLayout';
 import { notify } from '../lib/notify';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export default function ChangePasswordPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -44,7 +46,7 @@ export default function ChangePasswordPage() {
         throw new Error('Sessão expirada. Entre novamente.');
       }
     } catch (err: any) {
-      console.error('Password update error:', err);
+      if (isDev) console.error('Password update error:', err);
       
       if (err.code === 'auth/requires-recent-login') {
         setError('Por segurança, entre novamente na sua conta e tente trocar a senha outra vez.');

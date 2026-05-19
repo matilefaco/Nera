@@ -1,6 +1,9 @@
 import { Service, PortfolioItem } from '../types';
 import { auth } from '../firebase';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 /**
  * AI Service to handle all intelligence features using NVIDIA API via backend proxy.
  */
@@ -37,6 +40,7 @@ export async function generateServiceDescription(params: {
       clearTimeout(timeoutId);
 
       const text = await response.text();
+      if (isDev) console.log(`[AI SERVICE] generateServiceDescription attempt ${attempt+1} status:`, response.status);
 
       let data;
       try {
@@ -55,7 +59,7 @@ export async function generateServiceDescription(params: {
       };
     } catch (error: any) {
       clearTimeout(timeoutId);
-      console.warn(`[AI SERVICE] generateServiceDescription attempt ${attempt+1} failed:`, error.message);
+      if (isDev) console.log(`[AI SERVICE] generateServiceDescription attempt ${attempt+1} failed:`, error.message);
       lastError = error;
       
       if (error.name === 'AbortError' || error.message.includes('timeout')) {
@@ -70,7 +74,7 @@ export async function generateServiceDescription(params: {
     }
   }
 
-  console.error('[AI SERVICE] generateServiceDescription failed completely:', lastError.message, lastError.stack, lastError);
+  if (isDev) console.error('[AI SERVICE] generateServiceDescription failed completely:', lastError.message, lastError.stack, lastError);
   
   return { description: 'Realça os cílios com leveza, mantendo um acabamento delicado e natural.', source: 'fallback', error: `${lastError.name}: ${lastError.message}` }; 
 }
@@ -94,7 +98,7 @@ export async function categorizeService(serviceName: string): Promise<string> {
     const data = await response.json();
     return data.category;
   } catch (error) {
-    console.warn('[AI SERVICE] NVIDIA failed for categorizeService, using local fallback');
+    if (isDev) console.log('[AI SERVICE] NVIDIA failed for categorizeService, using local fallback');
     // Local fallback logic (already in lib/copy.ts, but we keep it here as safety)
     return 'Outros'; 
   }
@@ -122,7 +126,7 @@ export async function analyzePortfolio(params: {
     const data = await response.json();
     return data.category;
   } catch (error) {
-    console.warn('[AI SERVICE] NVIDIA failed for analyzePortfolio, using local fallback');
+    if (isDev) console.log('[AI SERVICE] NVIDIA failed for analyzePortfolio, using local fallback');
     return 'Portfólio';
   }
 }
@@ -149,7 +153,7 @@ export async function categorizePortfolioItem(params: {
     const data = await response.json();
     return data.category;
   } catch (error) {
-    console.warn('[AI SERVICE] NVIDIA failed for categorizePortfolioItem, using local fallback');
+    if (isDev) console.log('[AI SERVICE] NVIDIA failed for categorizePortfolioItem, using local fallback');
     return 'Geral';
   }
 }

@@ -67,7 +67,7 @@ import { PaymentMethods } from "../components/public/PaymentMethods";
 import SEOHead from "../components/SEOHead";
 import { PublicProfileErrorBoundary } from "../components/public/PublicProfileErrorBoundary";
 
-const isDev = import.meta.env.DEV;
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
 import { Skeleton } from "../components/ui/Skeleton";
@@ -175,24 +175,24 @@ function PublicProfileContent() {
 
   useEffect(() => {
     let isMounted = true;
-    console.log(`[PublicProfile] effect started for slug: ${slug}`);
+    devLog(`[PublicProfile] effect started for slug: ${slug}`);
     
     const fetchData = async () => {
       if (!slug) {
-        console.log(`[PublicProfile] No slug, setting loading to false`);
+        devLog(`[PublicProfile] No slug, setting loading to false`);
         if (isMounted) setLoading(false);
         return;
       }
 
       try {
-        console.log(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
+        devLog(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
         
         // 1. Fetch sanitized profile from backend API
         const response = await fetch(`/api/profile/public-profile/${slug}`);
         
         if (!response.ok) {
           if (response.status === 404) {
-            console.log(`[PublicProfile] No user found for slug: ${slug}`);
+            devLog(`[PublicProfile] No user found for slug: ${slug}`);
             if (isMounted) {
               setLoading(false);
               setProfile(null);
@@ -201,7 +201,7 @@ function PublicProfileContent() {
           }
           
           if (response.status === 409) {
-             console.error(`[PublicProfile] High priority conflict for slug: ${slug}`);
+             if (isDev) console.error(`[PublicProfile] High priority conflict for slug: ${slug}`);
              if (isMounted) {
                setLoading(false);
                setProfile(null);
@@ -217,10 +217,10 @@ function PublicProfileContent() {
 
         if (!isMounted) return;
 
-        console.log(`[PublicProfile] Resolved user fetch completed via API. ProfessionalId: ${professionalId}`);
+        devLog(`[PublicProfile] Resolved user fetch completed via API. ProfessionalId: ${professionalId}`);
 
         if (isMounted) {
-          console.log(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
+          devLog(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
           setProfile(userData as UserProfile);
           
           if (userData.services) setServices(userData.services);
@@ -232,10 +232,10 @@ function PublicProfileContent() {
 
         // Growth Analytics: Log Visit
         logAnalyticsEvent(professionalId, "visit").catch((err) => {
-          console.log("[PublicProfile] Analytics error:", err);
+          devLog("[PublicProfile] Analytics error:", err);
         });
 
-        console.log(`[PublicProfile] Starting secondary background tasks`);
+        devLog(`[PublicProfile] Starting secondary background tasks`);
         // Parallel fetches for portfolio (since it's not and shouldn't be in the main payload for size reasons)
         Promise.allSettled([
             // Portfolio (Legacy & for completeness)
@@ -261,14 +261,14 @@ function PublicProfileContent() {
             })()
           ]);
       } catch (error: any) {
-        console.error("Critical error fetching public profile:", error);
+        if (isDev) console.error("Critical error fetching public profile:", error);
         if (error.message === "FIRESTORE_TIMEOUT") {
           if (isMounted) setLoadError('timeout');
         } else {
           notify.error("Não foi possível carregar as informações do perfil.");
         }
       } finally {
-        console.log(`[PublicProfile] finally block executed. isMounted: ${isMounted}`);
+        devLog(`[PublicProfile] finally block executed. isMounted: ${isMounted}`);
         if (isMounted) setLoading(false);
       }
     };
@@ -276,7 +276,7 @@ function PublicProfileContent() {
     fetchData();
 
     return () => {
-      console.log(`[PublicProfile] unmount cleanup executed for slug: ${slug}`);
+      devLog(`[PublicProfile] unmount cleanup executed for slug: ${slug}`);
       isMounted = false;
     };
   }, [slug, retryCount]);
@@ -415,9 +415,11 @@ function PublicProfileContent() {
           );
 
           if (verificationSlots.length === 0) {
-            console.error(
-              `[BADGE BUG] Badge attempted to show unavailable slot for ${result.date} ${result.time}. Agenda shows 0 slots.`,
-            );
+            if (isDev) {
+              console.error(
+                `[BADGE BUG] Badge attempted to show unavailable slot for ${result.date} ${result.time}. Agenda shows 0 slots.`,
+              );
+            }
             setNextSlot(null);
             setTotalWeeklySlots(0);
             setIsAgendaFull(true);

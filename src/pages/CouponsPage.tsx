@@ -25,6 +25,9 @@ import { FirstVisitTip } from '../components/FirstVisitTip';
 import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import UpgradeModal from '../components/UpgradeModal';
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const devLog = (...args: any[]) => isDev && console.log(...args);
+
 export default function CouponsPage() {
   const navigate = useNavigate();
   const { user, isAuthReady } = useAuth();
@@ -74,6 +77,7 @@ export default function CouponsPage() {
 
     loadingTimeout = setTimeout(() => {
       if (isMounted) {
+        if (isDev) console.log('[Coupons] timeout! forcing loading false');
         setError(true);
         setLoading(false);
       }
@@ -89,9 +93,11 @@ export default function CouponsPage() {
 
       try {
         if (snapshot.metadata.fromCache && snapshot.empty) {
+          if (isDev) console.log('[Coupons] from cache and empty, waiting for server');
           return;
         }
 
+        if (isDev) console.log(`[Coupons] success count=${snapshot.docs.length}`);
 
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
         
@@ -113,14 +119,14 @@ export default function CouponsPage() {
         setLoading(false);
         clearTimeout(loadingTimeout);
       } catch (err) {
-        console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error in onSnapshot callback:", err);
         if (isMounted) {
           setLoading(false);
           clearTimeout(loadingTimeout);
         }
       }
     }, (error) => { 
-      console.error("Firestore onSnapshot error:", error); 
+      if (isDev) console.error("Firestore onSnapshot error:", error); 
       if (isMounted) {
         setLoading(false);
         clearTimeout(loadingTimeout);
@@ -135,7 +141,7 @@ export default function CouponsPage() {
           setServices(sSnap.docs.map(d => ({ id: d.id, ...d.data() } as Service)));
         }
       } catch (err) {
-        console.error("Error fetching services:", err);
+        if (isDev) console.error("Error fetching services:", err);
       }
     };
 
@@ -185,7 +191,7 @@ export default function CouponsPage() {
       setIsModalOpen(false);
       resetForm();
     } catch (err) {
-      console.error('Error creating coupon:', err);
+      if (isDev) console.error('Error creating coupon:', err);
       notify.error('Erro ao criar cupom.');
     } finally {
       setIsCreating(false);

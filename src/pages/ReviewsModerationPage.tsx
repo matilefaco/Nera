@@ -15,6 +15,8 @@ interface Review {
   moderationStatus: 'pending' | 'approved' | 'rejected';
 }
 
+const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+
 export function ReviewsModerationPage() {
   const { user } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -50,7 +52,7 @@ export function ReviewsModerationPage() {
         setReviews(fetched);
       } catch (err: any) {
         if (!isMounted) return;
-        console.error("Error fetching pending reviews:", err);
+        if (isDev) console.error("Error fetching pending reviews:", err);
         setError("Não foi possível carregar as avaliações pendentes.");
       } finally {
         if (isMounted) setLoading(false);
@@ -79,7 +81,7 @@ export function ReviewsModerationPage() {
       
       setReviews(prev => prev.filter(r => r.id !== reviewId));
     } catch (err: any) {
-      console.error(err);
+      if (isDev) console.error(err);
       setError(err.message || 'Erro ao aprovar.');
     } finally {
       if (processingId === reviewId) setProcessingId(null);
@@ -103,7 +105,7 @@ export function ReviewsModerationPage() {
       
       setReviews(prev => prev.filter(r => r.id !== reviewId));
     } catch (err: any) {
-      console.error(err);
+      if (isDev) console.error(err);
       setError(err.message || 'Erro ao ocultar.');
     } finally {
       if (processingId === reviewId) setProcessingId(null);
