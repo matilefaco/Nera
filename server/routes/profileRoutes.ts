@@ -600,7 +600,29 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
 
     // P0 CRITICAL: Only expose WhatsApp if the plan is Pro
     if (sanitizedData.plan === 'pro') {
-      sanitizedData.whatsapp = userData.whatsapp;
+      // Security: Do not expose real WhatsApp if the profile is a test profile/fake
+      const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
+      const BANNED_KEYWORDS = [
+        'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
+        'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined',
+        'qa', 'audit', 'regress', 'jajajsje', 'bubu', 'bebe', 'bebê', 'fsdf', 'asdasd', 'sadhduahsudhaus',
+        'testeeeee', 'joaquina princesa'
+      ];
+      const name = (userData.name || "").toLowerCase();
+      const email = (userData.email || "").toLowerCase();
+      const slugVal = (userData.slug || "").toLowerCase();
+
+      const isTestProfile = RESERVED_SLUGS.includes(slugVal) ||
+                            BANNED_KEYWORDS.some(k => slugVal.includes(k) || name.includes(k) || email.includes(k)) ||
+                            userData.indexable === false ||
+                            userData.onboardingCompleted !== true;
+
+      if (!isTestProfile) {
+        sanitizedData.whatsapp = userData.whatsapp;
+      } else {
+        // Safe dummy number for test profiles to prevent rendering breaks while keeping privacy
+        sanitizedData.whatsapp = "5511999999999";
+      }
       
       // P0: Only allow acceptsInstallments if plan is pro AND professional accepts credit card
       const payments = (userData.paymentMethods || []).map((m: any) => String(m).toLowerCase().trim());

@@ -424,7 +424,42 @@ export async function createServerApp() {
         }
       }
 
+      // Automatically determine indexability (P1 Test profiles check)
+      let isIndexable = true;
+      const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
+      const BANNED_KEYWORDS = [
+        'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
+        'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined',
+        'qa', 'audit', 'regress', 'jajajsje', 'bubu', 'bebe', 'bebê', 'fsdf', 'asdasd', 'sadhduahsudhaus',
+        'testeeeee', 'joaquina princesa'
+      ];
+
+      const cleanSlug = slug.toLowerCase().trim();
+      if (RESERVED_SLUGS.includes(cleanSlug)) {
+        isIndexable = false;
+      }
+
+      const slugIsBanned = BANNED_KEYWORDS.some(k => cleanSlug.includes(k));
+      if (slugIsBanned) {
+        isIndexable = false;
+      }
+
+      if (snapshot.empty) {
+        isIndexable = false;
+      } else {
+        const prof = snapshot.docs[0].data() as any;
+        if (prof.indexable === false || prof.onboardingCompleted !== true) {
+          isIndexable = false;
+        }
+        const name = (prof.name || "").toLowerCase();
+        const email = (prof.email || "").toLowerCase();
+        if (BANNED_KEYWORDS.some(k => name.includes(k) || email.includes(k))) {
+          isIndexable = false;
+        }
+      }
+
       const metaTags = `
+        ${!isIndexable ? '<meta name="robots" content="noindex, nofollow" />' : ''}
         <title>${title}</title>
         <meta name="description" content="${description}" />
         <link rel="canonical" href="${pageUrl}" />
@@ -451,6 +486,9 @@ export async function createServerApp() {
         html = await viteServer.transformIndexHtml(req.originalUrl, html);
       }
 
+      if (!isIndexable) {
+        res.setHeader("X-Robots-Tag", "noindex, nofollow");
+      }
       res.setHeader("Content-Type", "text/html");
       return res.send(html);
     } catch (err) {

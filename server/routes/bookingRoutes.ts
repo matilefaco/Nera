@@ -74,25 +74,26 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
        throw new Error("Database connection unavailable during occupied-slots request");
     }
 
-    // 2. Optimized & Guarded Query
+    // 2. Optimized & Guarded Query (Uses single field to prevent composite index requirement)
     const snapshot = await db.collection('appointments')
       .where('professionalId', '==', professionalId)
-      .where('date', '>=', startStr)
-      .where('date', '<=', endStr)
       .get();
 
     const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
     
-    // 3. Resilient Mapping
+    // 3. Resilient Mapping & In-Memory filtering
     const slots = snapshot.docs
       .map(doc => {
         const data = doc.data();
         if (!data) return null;
         
+        const date = data.date || '';
+        if (date < startStr || date > endStr) return null;
+        
         // Only include slots that are relevant for availability tracking
         if (countingStatuses.includes(data.status)) {
           return {
-            date: data.date || '',
+            date,
             time: data.time || '',
             duration: Number(data.duration || data.serviceDuration || 60),
             status: data.status

@@ -87,17 +87,17 @@ export default function DirectoryPage() {
   }, [cityFilter, specialtyFilter, modeFilter, ratingFilter]);
 
   const seoTitle = cityFilter 
-    ? `Profissionais de Beleza em ${cityFilter} | Nera`
-    : "Melhores Profissionais de Beleza | Nera";
+    ? `Curadoria Nera em ${cityFilter} | Profissionais de Beleza`
+    : "Curadoria Nera | Seleção Exclusiva de Profissionais";
   
   const seoDescription = cityFilter
-    ? `Encontre as melhores profissionais de beleza em ${cityFilter}. Agende unhas, cílios, cabelo e muito mais com profissionais verificadas pela Nera.`
-    : "O diretório oficial das melhores profissionais independentes de beleza. Agende online com segurança e praticidade.";
+    ? `Descubra a seleção exclusiva da Curadoria Nera em ${cityFilter}. Vitrines verificadas que representam o mais alto padrão de excelência.`
+    : "Uma seleção editorial de profissionais independentes de beleza. Agende online com o selo de sofisticação, curadoria e excelência Nera.";
 
   const canonicalUrl = `${window.location.origin}/profissionais${cityFilter ? `?cidade=${encodeURIComponent(cityFilter)}` : ''}`;
 
   return (
-    <div className="min-h-screen bg-brand-parchment pb-20">
+    <div className="min-h-screen bg-[#FDFBF7] pb-20">
       <SEOHead 
         title={seoTitle}
         description={seoDescription}
@@ -124,7 +124,7 @@ export default function DirectoryPage() {
         </div>
 
         {/* Desktop Filter Bar */}
-        <div className="hidden lg:block bg-brand-linen/50 border-t border-brand-mist/30 py-4">
+        <div className="hidden lg:block bg-[#FCFBF9] border-t border-brand-mist/30 py-4">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-6">
             <div className="flex-1 flex items-center gap-4">
               <div className="relative flex-1 max-w-xs">
@@ -184,10 +184,13 @@ export default function DirectoryPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
-        <div className="mb-12">
-          <h1 className="text-[clamp(28px,8vw,36px)] font-serif text-brand-ink mb-2 italic">Descubra Excelência</h1>
-          <p className="text-brand-stone text-sm font-light">As melhores profissionais da beleza, unidas pela Nera.</p>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-16">
+        <div className="mb-12 border-b border-brand-mist/40 pb-8">
+          <p className="text-brand-terracotta font-medium tracking-[0.2em] text-[10px] uppercase mb-3">CONVITE À EXCLUSIVIDADE</p>
+          <h1 className="text-[clamp(32px,5vw,42px)] font-serif text-brand-ink mb-3 leading-tight tracking-tight">Curadoria Nera</h1>
+          <p className="text-brand-stone text-sm sm:text-base font-light max-w-2xl leading-relaxed">
+            Uma seleção editorial de profissionais independentes e vitrines digitais que representam o padrão absoluto de sofisticação, cuidado e excelência Nera.
+          </p>
         </div>
 
         {loading && page === 1 ? (
@@ -247,7 +250,7 @@ export default function DirectoryPage() {
                     )}
 
                     <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end">
-                      {pro.averageRating && pro.averageRating > 0 && (
+                      {!!(pro.averageRating && pro.averageRating > 0) && (
                         <div className="bg-brand-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/20 shadow-sm">
                           <div className="flex items-center gap-1 text-brand-terracotta">
                             <Star size={10} fill="currentColor" />

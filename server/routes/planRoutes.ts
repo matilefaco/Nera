@@ -22,6 +22,9 @@ function getStripe() {
     
     // Audit log for environment mode
     const isTestMode = key.startsWith("sk_test");
+    const isLiveMode = !isTestMode;
+    const isNotProd = process.env.NODE_ENV !== "production" || isDev;
+
     logger.info("STRIPE", "Initializing Stripe SDK", { 
       meta: { 
         mode: isTestMode ? "test" : "live",
@@ -29,6 +32,13 @@ function getStripe() {
         apiVersion: "2023-10-16"
       } 
     });
+
+    if (isLiveMode && isNotProd) {
+      logger.error("STRIPE", "BLOCKED: Stripe is in LIVE mode but running in non-production environment!", { 
+        meta: { nodeEnv: process.env.NODE_ENV } 
+      });
+      throw new Error("Segurança Nera: Chave LIVE do Stripe detectada em ambiente de desenvolvimento/homologação. Checkout bloqueado.");
+    }
 
     stripeModule = new Stripe(key, {
       apiVersion: "2023-10-16" as any,
@@ -153,74 +163,162 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
   try {
     const userDoc = await db.collection("users").doc(uid).get();
     if (!userDoc.exists) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "Usuária não encontrada em nosso sistema." });
     }
-    const userData = userDoc.data();
+    const userData = userDoc.data() || {};
     
-    if (!userData?.stripeCustomerId) {
-      logger.warn("STRIPE", "User tried opening portal without stripeCustomerId", { uid });
-      return res.status(400).json({ error: "Você não possui uma assinatura ativa." });
-    }
-
     const stripe = getStripe();
-    if (isDev) {
-      logger.info("STRIPE", "Initiating customer portal session", { professionalId: maskUid(uid) });
+    let customerId = userData.stripeCustomerId;
+
+    // 1. RECOVERY & SELF-HEALING: If customerId is missing in Firestore, lookup dynamically on Stripe by email
+    if (!customerId && userData.email) {
+      logger.info("STRIPE", "stripeCustomerId missing in Firestore. Attempting self-healing search on Stripe via email...", { 
+        userId: maskUid(uid), 
+        email: userData.email 
+      });
+      try {
+        const existingCustomers = await stripe.customers.list({ email: userData.email, limit: 1 });
+        if (existingCustomers.data.length > 0) {
+          customerId = existingCustomers.data[0].id;
+          await db.collection("users").doc(uid).update({ 
+            stripeCustomerId: customerId,
+            updatedAt: new Date().toISOString()
+          });
+          logger.info("STRIPE", "Successfully recovered and reconciled stripeCustomerId via email search.", { 
+            userId: maskUid(uid), 
+            customerId 
+          });
+        }
+      } catch (listErr: any) {
+        logger.error("STRIPE", "Failed to search Stripe customer by email", { 
+          userId: maskUid(uid), 
+          error: listErr.message 
+        });
+      }
     }
 
-    // Debug price IDs check (optional/logging)
-    const envPro = process.env.STRIPE_PRICE_PRO;
-    const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+    // 2. DEFENSIVE GUARD: If after recovery attempts there is still no customerId, we are dealing with a local trial or free account
+    if (!customerId) {
+      logger.warn("STRIPE", "User tried opening billing portal without stripeCustomerId", { userId: maskUid(uid) });
+      return res.status(400).json({ 
+        error: "Sua conta está no período de teste gratuito offline (Trial) ou plano Gratuito. No momento, você não possui faturas ou assinaturas cadastradas no processador de pagamentos (Stripe). Não se preocupe, nenhuma cobrança foi realizada!" 
+      });
+    }
 
+    // 3. DEFENSIVE CUSTOMER VALIDATION: Retrieve the customer to ensure they weren't deleted or belong to a deleted environment
+    let stripeCustomer;
     try {
-      const subscriptions = await stripe.subscriptions.list({ customer: userData.stripeCustomerId, status: 'active', limit: 1 });
-      if (subscriptions.data.length > 0) {
-        const sub = subscriptions.data[0];
-        const priceId = sub.items.data[0]?.price?.id;
-        
-        let planType = 'unknown';
-        if (priceId === envPro) planType = 'pro';
-        else if (priceId === envEssencial) planType = 'essencial';
-        
-        logger.info("STRIPE", "Customer subscription verified", { uid, subId: sub.id, priceId, planType });
+      stripeCustomer = await stripe.customers.retrieve(customerId);
+    } catch (retrieveErr: any) {
+      logger.warn("STRIPE", "Failed to retrieve billing customer from Stripe. Attempting email fallback...", { 
+        userId: maskUid(uid), 
+        customerId, 
+        error: retrieveErr.message 
+      });
+
+      // If key is stale but email is there, trigger self-handling lookup
+      if (userData.email) {
+        try {
+          const resCustomers = await stripe.customers.list({ email: userData.email, limit: 1 });
+          if (resCustomers.data.length > 0) {
+            customerId = resCustomers.data[0].id;
+            await db.collection("users").doc(uid).update({ 
+              stripeCustomerId: customerId,
+              updatedAt: new Date().toISOString()
+            });
+            stripeCustomer = resCustomers.data[0];
+            logger.info("STRIPE", "Stripe customer reconciled after stale lookup recovery.", { userId: maskUid(uid), customerId });
+          }
+        } catch (recoverErr: any) {
+          logger.error("STRIPE", "Stale customer lookup recovery failed.", { userId: maskUid(uid), error: recoverErr.message });
+        }
+      }
+    }
+
+    if (!stripeCustomer || (stripeCustomer as any).deleted) {
+      logger.warn("STRIPE", "Billing customer account not found or deleted on Stripe", { userId: maskUid(uid), customerId });
+      return res.status(400).json({
+        error: "Sua conta de cobrança não foi localizada no processador de pagamentos (Stripe). Por favor, contate nosso suporte para reconfigurar seu cadastro e redefinir sua assinatura."
+      });
+    }
+
+    if (isDev) {
+      logger.info("STRIPE", "Initiating customer portal session", { professionalId: maskUid(uid), customerId });
+    }
+
+    // 4. PRECISE DIAGNOSTICS & ALIGNMENT: Check their active/trialing/past_due subscriptions
+    let activeOrTrialSub = null;
+    let subscriptionStatus = 'unknown';
+    try {
+      const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 10 });
+      // Find active or trial subscriptions
+      activeOrTrialSub = subs.data.find(s => ['active', 'trialing', 'past_due', 'incomplete'].includes(s.status));
+      if (activeOrTrialSub) {
+        subscriptionStatus = activeOrTrialSub.status;
+        logger.info("STRIPE", "Customer subscription validated for portal", { 
+          userId: maskUid(uid), 
+          subId: activeOrTrialSub.id, 
+          status: subscriptionStatus 
+        });
       } else {
-        logger.warn("STRIPE", "No active subscription found for customer", { uid, customer: userData.stripeCustomerId });
+        logger.warn("STRIPE", "No active or trialing subscription found on Stripe for customer", { userId: maskUid(uid), customerId });
       }
     } catch (e: any) {
-      logger.error("STRIPE", "Error checking subscription price", { err: e.message });
+      logger.error("STRIPE", "Error checking subscription details for diagnostics", { error: e.message });
     }
 
     const params: any = {
-      customer: userData.stripeCustomerId,
+      customer: customerId,
       return_url: `${PUBLIC_APP_URL}/planos`,
     };
-
-    // Ignore STRIPE_PORTAL_CONFIGURATION_ID initially to use the Dashboard's default configuration
-    if (process.env.STRIPE_PORTAL_CONFIGURATION_ID && process.env.STRIPE_PORTAL_CONFIGURATION_ID !== 'undefined') {
-      logger.info("STRIPE", "Found STRIPE_PORTAL_CONFIGURATION_ID in env, but ignoring it to force Dashboard default configuration", { configurationId: process.env.STRIPE_PORTAL_CONFIGURATION_ID });
-    }
 
     let session;
     try {
       session = await stripe.billingPortal.sessions.create(params);
     } catch (err: any) {
-      if (err.message?.includes('configuration')) {
-        logger.warn("STRIPE", "Failed to create portal session with configuration, falling back", { uid, error: err.message });
-        delete params.configuration;
-        session = await stripe.billingPortal.sessions.create(params);
-      } else if (err.message?.includes('return_url')) {
-        logger.warn("STRIPE", "Failed to create portal session with return_url, falling back to default", { uid, error: err.message });
+      logger.warn("STRIPE", "Stripe Portal creation failed on primary request, trying defensive backup checks...", { 
+        userId: maskUid(uid), 
+        error: err.message 
+      });
+
+      // Backup attempt: make sure return_url is clean and try again
+      try {
         params.return_url = `${PUBLIC_APP_URL}/planos`;
         session = await stripe.billingPortal.sessions.create(params);
-      } else {
-        throw err;
+      } catch (err2: any) {
+        logger.error("STRIPE", "All portal session creation requests rejected by Stripe API", { 
+          userId: maskUid(uid), 
+          customerId, 
+          error: err2.message 
+        });
+        
+        // 5. DIAGNOSTIC Portuguese Feedback fallback to prevent generic server greyouts/unhelpful alerts
+        let userMessage = "Não foi possível abrir o portal de cobranças do Stripe no momento.";
+        
+        if (err2.message?.includes("No active subscription") || !activeOrTrialSub) {
+          userMessage = "Seu período de testes (Trial) do plano Essencial está ativo no sistema da Nera, mas o processador de pagamentos (Stripe) exige uma assinatura ou forma de pagamento ativa para permitir o gerenciamento via portal de faturas. Para upgrades ou alterações imediatas, fale direto com o nosso suporte.";
+        } else if (err2.message?.includes("payment") || subscriptionStatus === 'incomplete') {
+          userMessage = "Sua assinatura de testes (Trial) está pendente de uma forma de pagamento de teste. Caso precise cadastrar um cartão para concluir seu trial, solicite ajuda rápida por nosso suporte de atendimento.";
+        } else if (err2.message?.includes("configuration")) {
+          userMessage = "A configuração do portal de faturas do Stripe está temporariamente indisponível para este ambiente. Por favor, contate o suporte.";
+        } else {
+          userMessage = `Ocorreu uma limitação temporária no portal do Stripe: ${err2.message}. Por favor, fale com nosso suporte para receber atendimento especializado imediato.`;
+        }
+
+        return res.status(400).json({ error: userMessage });
       }
     }
 
     res.json({ url: session.url });
   } catch (err: any) {
-    logger.error("STRIPE", "Failed to create portal session", { requestId: req.requestId, error: err, errMessage: err.message });
+    logger.error("STRIPE", "Failed to create portal session due to unhandled exception", { 
+      requestId: req.requestId, 
+      userId: maskUid(uid),
+      error: err, 
+      errMessage: err.message 
+    });
     res.status(500).json({ 
-      error: "Ocorreu um erro ao abrir o portal: " + err.message,
+      error: "Ocorreu uma falha inesperada no servidor ao conectar com o processador de faturas: " + err.message,
       details: err.message
     });
   }

@@ -69,8 +69,10 @@ export default function LandingPage() {
             </div>
 
             <h1 className="hero-h1 fade-in d1">
-              Você responde<br/>
-              o dia inteiro.<br/>
+              Você responde{" "}
+              <br className="hidden sm:inline" />
+              o dia inteiro.{" "}
+              <br className="hidden sm:inline" />
               <em>E ainda perde cliente.</em>
             </h1>
 

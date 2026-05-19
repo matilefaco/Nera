@@ -196,14 +196,14 @@ export default function ProfilePage() {
       advancePaymentRequired: data.advancePaymentRequired || false,
       delayTolerance: data.delayTolerance ?? 0,
       profileTheme: data.profileTheme?.variant || data.profileTheme || 'terracotta',
-      differentials: [...(data.differentials || [])].sort(),
+      differentials: [...(Array.isArray(data.differentials) ? data.differentials : [])].sort(),
       yearsExperience: data.yearsExperience || '',
-      serviceStyle: [...(data.serviceStyle || [])].sort(),
-      serviceAreas: [...(data.serviceAreas || [])].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
-      workingDays: [...(data.workingDays || [1, 2, 3, 4, 5])].sort((a: any, b: any) => a - b),
+      serviceStyle: [...(Array.isArray(data.serviceStyle) ? data.serviceStyle : [])].sort(),
+      serviceAreas: [...(Array.isArray(data.serviceAreas) ? data.serviceAreas : [])].sort((a: any, b: any) => (a.name || '').localeCompare(b.name || '')),
+      workingDays: [...(Array.isArray(data.workingDays) ? data.workingDays : [1, 2, 3, 4, 5])].sort((a: any, b: any) => a - b),
       startTime: data.startTime || '09:00',
       endTime: data.endTime || '18:00',
-      paymentMethods: [...(data.paymentMethods || [])].sort(),
+      paymentMethods: [...(Array.isArray(data.paymentMethods) ? data.paymentMethods : [])].sort(),
       acceptsInstallments: data.acceptsInstallments || false
     });
   };
