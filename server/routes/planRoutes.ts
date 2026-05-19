@@ -72,6 +72,8 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     // Check for credits before creating session params
     const credits = userData?.credits || 0;
 
+    const isUpgrade = userData?.onboardingCompleted === true;
+
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       payment_method_types: ["card"],
       line_items: [
@@ -83,18 +85,20 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       mode: "subscription",
       customer_email: email,
       client_reference_id: uid,
-      payment_method_collection: "if_required",
+      payment_method_collection: "always",
       success_url: `${PUBLIC_APP_URL}/checkout/success`,
-      cancel_url: `${PUBLIC_APP_URL}/checkout/canceled`,
+      cancel_url: isUpgrade ? `${PUBLIC_APP_URL}/planos?canceled=true` : `${PUBLIC_APP_URL}/checkout/canceled`,
       metadata: {
         professionalId: uid,
         plan,
-        creditsUsed: credits >= 10 ? 'true' : 'false'
+        creditsUsed: credits >= 10 ? 'true' : 'false',
+        source: isUpgrade ? 'upgrade' : 'signup'
       },
       subscription_data: {
         metadata: {
           professionalId: uid,
-          plan
+          plan,
+          source: isUpgrade ? 'upgrade' : 'signup'
         }
       }
     };
@@ -103,11 +107,6 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       sessionParams.subscription_data = {
         ...sessionParams.subscription_data,
         trial_period_days: 15,
-        trial_settings: {
-          end_behavior: {
-            missing_payment_method: "cancel"
-          }
-        }
       };
     }
 

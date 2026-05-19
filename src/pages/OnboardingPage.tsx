@@ -8,7 +8,7 @@ import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } 
 import { 
   User, MapPin, Home, Building2, Briefcase, 
   Clock, DollarSign, Instagram, MessageCircle, 
-  CheckCircle2, ArrowRight, ArrowLeft, Sparkles,
+  CheckCircle2, ArrowRight, ArrowLeft, Sparkles, ShieldCheck,
   Camera, Plus, X, Globe, Copy, Share2, ExternalLink, AlertCircle, AlertTriangle
 } from 'lucide-react';
 import { notify } from '../lib/notify';
@@ -1104,6 +1104,66 @@ export default function OnboardingPage() {
   if (authLoading) return <AppLoadingScreen />;
 
   const progress = (step / (TOTAL_STEPS + 1)) * 100;
+
+  // Gate for users who selected a paid plan but haven't finished checkout
+  const needsVerification = (profile?.signupPlan === 'essencial' || profile?.signupPlan === 'pro') && profile?.plan === 'free';
+
+  if (needsVerification && !profile?.onboardingCompleted) {
+    return (
+      <div className="min-h-screen bg-brand-parchment flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-white rounded-[40px] p-10 shadow-xl border border-brand-mist space-y-8">
+          <div className="w-20 h-20 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto">
+            <ShieldCheck size={40} />
+          </div>
+          <div>
+            <h2 className="text-3xl font-serif text-brand-ink mb-3">Ative seu teste gratuito</h2>
+            <p className="text-brand-stone text-sm font-light leading-relaxed">
+              Você selecionou o plano <span className="font-semibold text-brand-terracotta capitalize">{profile?.signupPlan}</span>. Para começar seu teste de 15 dias e configurar sua vitrine, é necessário confirmar sua assinatura no Stripe.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <button 
+              onClick={async () => {
+                const planType = profile?.signupPlan as 'essencial' | 'pro';
+                try {
+                  const token = await user?.getIdToken();
+                  const response = await fetch('/api/plans/create-checkout', {
+                    method: 'POST',
+                    headers: { 
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ plan: planType })
+                  });
+                  const data = await response.json();
+                  if (data.checkoutUrl) {
+                    window.location.href = data.checkoutUrl;
+                  } else {
+                    notify.error(data.error || 'Erro ao iniciar checkout.');
+                  }
+                } catch (err) {
+                  notify.error('Erro de conexão ao iniciar checkout.');
+                }
+              }}
+              className="w-full bg-brand-terracotta text-brand-white py-5 rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all flex items-center justify-center gap-3"
+            >
+              Completar e Iniciar Trial <ArrowRight size={18} />
+            </button>
+            <button 
+              onClick={async () => {
+                const docRef = doc(db, 'users', user!.uid);
+                await updateDoc(docRef, { signupPlan: 'free' });
+                window.location.reload();
+              }}
+              className="w-full bg-transparent text-brand-stone py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:text-brand-ink transition-all"
+            >
+              Continuar com plano Gratuito
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-brand-parchment flex flex-col">

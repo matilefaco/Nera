@@ -259,8 +259,20 @@ export default function RegisterPage() {
 
         <div className="text-center mb-10">
           <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Crie sua presença profissional</h2>
-          {selectedPlan === 'essencial' || selectedPlan === 'pro' ? (
-            <p className="text-brand-stone text-sm font-light">Prepare-se para o próximo nível. <br/> Você selecionou o plano <span className="font-semibold text-brand-terracotta capitalize">{selectedPlan}</span>.</p>
+          {selectedPlan === 'essencial' ? (
+            <div className="space-y-1">
+              <p className="text-brand-stone text-sm font-light">
+                Comece seu teste gratuito de <span className="font-semibold text-brand-terracotta">15 dias</span> no plano Essencial.
+              </p>
+              <p className="text-[10px] text-brand-mist uppercase tracking-widest font-medium">Cartão obrigatório · Cancele quando quiser</p>
+            </div>
+          ) : selectedPlan === 'pro' ? (
+            <div className="space-y-1">
+              <p className="text-brand-stone text-sm font-light">
+                Prepare-se para o próximo nível com o plano <span className="font-semibold text-brand-terracotta capitalize">Pro</span>.
+              </p>
+              <p className="text-[10px] text-brand-mist uppercase tracking-widest font-medium">Acesso imediato · Cartão obrigatório</p>
+            </div>
           ) : (
             <p className="text-brand-stone text-sm font-light">Comece sua página de agendamento em minutos. <br/> Você começará no plano <span className="font-medium text-brand-terracotta">Gratuito</span>.</p>
           )}

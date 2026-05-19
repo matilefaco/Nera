@@ -39,6 +39,8 @@ export default function CheckoutSuccessPage() {
     };
   }, [syncing, refreshProfile]);
 
+  const destination = profile?.onboardingCompleted ? '/dashboard' : '/onboarding';
+
   return (
     <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center p-6">
       <motion.div 
@@ -62,7 +64,7 @@ export default function CheckoutSuccessPage() {
         
         <div className="text-brand-stone text-sm font-light leading-relaxed mb-10">
           {syncing ? (
-            <p>Estamos confirmando seu pagamento com o Stripe. Isso levará apenas alguns instantes.</p>
+            <p>Estamos confirmando seu teste de 15 dias com o Stripe. Isso levará apenas alguns instantes.</p>
           ) : timedOut ? (
             <div className="space-y-2">
               <p>O processamento está demorando um pouco mais que o esperado.</p>
@@ -70,10 +72,10 @@ export default function CheckoutSuccessPage() {
             </div>
           ) : (
             <p>
-              Parabéns! Sua conta foi atualizada com sucesso. 
+              Parabéns! Sua assinatura foi ativada com sucesso. 
               <span className="block mt-2 font-medium text-emerald-600">
                 <Sparkles size={14} className="inline mr-1" />
-                Tudo pronto!
+                Tudo pronto para começar!
               </span>
             </p>
           )}
@@ -81,7 +83,7 @@ export default function CheckoutSuccessPage() {
 
         <div className="space-y-4">
           <Link 
-            to="/dashboard"
+            to={destination}
             className={cn(
               "w-full h-14 flex items-center justify-center rounded-full text-xs font-bold uppercase tracking-[0.2em] transition-all group",
               syncing 
@@ -90,7 +92,7 @@ export default function CheckoutSuccessPage() {
             )}
             onClick={(e) => syncing && e.preventDefault()}
           >
-            {syncing ? 'Sincronizando...' : 'Ir para meu painel'}
+            {syncing ? 'Sincronizando...' : profile?.onboardingCompleted ? 'Ir para meu painel' : 'Começar Onboarding'}
             {!syncing && <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />}
           </Link>
         </div>

@@ -43,7 +43,9 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <div className="plan-tier">Essencial</div>
           <div className="plan-price">R$&nbsp;49</div>
           <div className="plan-period">por mês · cancele quando quiser</div>
-          <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)' }}>&nbsp;</p>
+          <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)' }}>
+            15 dias de teste grátis com cartão
+          </p>
           <ul className="plan-features">
             <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos ilimitados</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Experiência profissional por e-mail</li>
@@ -52,7 +54,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
             <li className="plan-feat"><span className="feat-bullet"></span>Histórico completo de clientes</li>
           </ul>
           {isLanding ? (
-            <Link to="/register?plan=essencial" className="btn-plan white-solid">Testar Essencial por 15 dias</Link>
+            <Link to="/register?plan=essencial" className="btn-plan white-solid">Ativar teste gratuito</Link>
           ) : (
              <button 
                 onClick={() => onUpgrade?.('essencial')}
@@ -60,7 +62,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
                 className="btn-plan white-solid"
                 style={{ opacity: (currentPlan === 'essencial' || currentPlan === 'pro') ? 0.5 : 1 }}
               >
-                {loadingPlan === 'essencial' ? 'Processando...' : currentPlan === 'essencial' ? 'Plano Ativado' : currentPlan === 'pro' ? 'Incluso no Pro' : 'Assinar Essencial'}
+                {loadingPlan === 'essencial' ? 'Processando...' : currentPlan === 'essencial' ? 'Plano Ativado' : currentPlan === 'pro' ? 'Incluso no Pro' : 'Testar grátis por 15 dias'}
             </button>
           )}
         </div>

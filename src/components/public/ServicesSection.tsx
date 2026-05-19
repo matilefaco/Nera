@@ -111,12 +111,14 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
                     {service.name || "Serviço"}
                   </h3>
 
-                  <p className={cn(
-                    "font-light leading-relaxed text-brand-stone line-clamp-2",
-                    isCompact ? "text-[11px] max-w-[200px] md:max-w-md" : "text-[13px] mb-6"
-                  )}>
-                    {service.description || "Nenhuma descrição disponível."}
-                  </p>
+                  {service.description && (
+                    <p className={cn(
+                      "font-light leading-relaxed text-brand-stone line-clamp-2",
+                      isCompact ? "text-[11px] max-w-[200px] md:max-w-md" : "text-[13px] mb-6"
+                    )}>
+                      {service.description}
+                    </p>
+                  )}
 
                   {isCompact && (
                     <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--theme-accent,var(--color-brand-terracotta))] mt-1">

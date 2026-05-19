@@ -6,7 +6,7 @@ import { cn, formatCurrency } from '../../lib/utils';
 import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
 import PremiumButton from '../PremiumButton';
 import { UserProfile, Service } from '../../types';
-import { getProfileHeroCopy, getServiceModeLabel } from '../../lib/copy';
+import { getProfileHeroCopy, getServiceModeLabel, formatSpecialtyLabel, getServiceLocationCopy } from '../../lib/copy';
 
 interface PublicHeroProps {
   profile: UserProfile;
@@ -117,7 +117,7 @@ export const PublicHero = ({
             <div className="flex items-center gap-4">
               <div className="w-8 h-px bg-[var(--theme-primary,var(--color-brand-terracotta))]" />
               <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-ink">
-                {profile.headline || profile.specialty}
+                {profile.headline || formatSpecialtyLabel(profile.specialty)}
               </span>
             </div>
 
@@ -174,45 +174,8 @@ export const PublicHero = ({
                 <MapPin size={14} className="text-[var(--theme-primary,var(--color-brand-terracotta))] shrink-0" />
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-ink">
-                    {profile.serviceMode === 'home' ? (
-                      `${getServiceModeLabel(profile.serviceMode)} • ${profile.city}`
-                    ) : (
-                      <>
-                        {profile.studioAddress?.privacyMode === 'public_full' ? (
-                          <>Estúdio em {profile.studioAddress.street}, {profile.studioAddress.number}</>
-                        ) : (
-                          <>{getServiceModeLabel(profile.serviceMode)} em {profile.studioAddress?.neighborhood || profile.neighborhood || profile.city}</>
-                        )}
-                        {profile.serviceMode === 'hybrid' && ' (Inclui Domicílio)'}
-                      </>
-                    )}
+                    {getServiceLocationCopy(profile)}
                   </span>
-                  {(profile.serviceMode === 'studio' || profile.serviceMode === 'hybrid') && (
-                    <span className="text-[9px] font-medium text-brand-stone/80 uppercase tracking-widest pl-0">
-                      {profile.studioAddress?.privacyMode === 'public_full' ? (
-                        <>{profile.studioAddress.neighborhood}, {profile.studioAddress.city}</>
-                      ) : (
-                        profile.studioAddress?.reference && (
-                          <>{(() => {
-                            const ref = profile.studioAddress.reference.trim();
-                            const lRef = ref.toLowerCase();
-                            if (lRef.startsWith('próximo') || lRef.startsWith('perto') || lRef.startsWith('ao lado')) return ref;
-                            const prefix = (lRef.startsWith('à') || lRef.startsWith('a ')) ? 'Próximo ' : 'Próximo à ';
-                            return `${prefix}${ref}`;
-                          })()}</>
-                        )
-                      )}
-                    </span>
-                  )}
-                  {profile.serviceMode !== 'studio' && (
-                    <span className="text-[9px] font-medium text-brand-stone/60 uppercase tracking-widest">
-                      {profile.serviceAreaType === 'city_wide' ? (
-                        'Atende em toda a cidade'
-                      ) : profile.serviceAreas && profile.serviceAreas.length > 0 ? (
-                        `Atende em: ${profile.serviceAreas.slice(0, 2).map(a => a.name).join(', ')}${profile.serviceAreas.length > 2 ? ` e +${profile.serviceAreas.length - 2} bairros` : ''}`
-                      ) : null}
-                    </span>
-                  )}
                 </div>
               </div>
               
@@ -293,7 +256,7 @@ export const PublicHero = ({
           ) : null}
 
           <p className="body-text text-brand-stone max-w-sm">
-            {heroBio || profile.bio || (profile.specialty ? `Especialista em ${profile.specialty} com foco em excelência e bem-estar.` : 'Atendimento personalizado com foco em resultados de alta qualidade.')}
+            {heroBio || profile.bio || (profile.specialty ? `${formatSpecialtyLabel(profile.specialty)} com foco em excelência e bem-estar.` : 'Atendimento personalizado com foco em resultados de alta qualidade.')}
           </p>
 
           <div className="flex flex-col gap-3">

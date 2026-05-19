@@ -36,6 +36,7 @@ import {
   buildWhatsappLink,
   splitSmartBio,
 } from "../lib/utils";
+import { formatSpecialtyLabel } from "../lib/copy";
 import { getTheme } from "../lib/themes";
 import { notify } from "../lib/notify";
 import Logo from "../components/Logo";
@@ -763,7 +764,7 @@ function PublicProfileContent() {
       }
     >
       <SEOHead
-        title={profile.specialty ? `${profile.name} | ${profile.specialty} | Nera` : `${profile.name} | Nera`}
+        title={profile.specialty ? `${profile.name} | ${formatSpecialtyLabel(profile.specialty)} | Nera` : `${profile.name} | Nera`}
         description={
           profile.bio ||
           `Conheça a vitrine profissional de ${profile.name} na Nera.`
@@ -970,7 +971,7 @@ function PublicProfileContent() {
               Início
             </Link>
             <Link
-              to="/profissional"
+              to="/register"
               className="text-[9px] font-medium uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
             >
               Seja uma Profissional
