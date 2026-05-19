@@ -160,6 +160,11 @@ export interface UserProfile {
   plan?: 'free' | 'essencial' | 'pro';
   signupPlan?: 'free' | 'essencial' | 'pro';
   planExpiresAt?: string; // ISO date
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeSubscriptionStatus?: string;
+  cancelAtPeriodEnd?: boolean;
+  trialUsed?: boolean;
   trialStartedAt?: string;
   referralCode?: string; // código único de indicação
   referredBy?: string;   // código de quem indicou este usuário

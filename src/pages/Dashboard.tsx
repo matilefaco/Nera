@@ -999,25 +999,15 @@ setUnconfirmedTomorrow(docs);
                   "text-[9px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded flex items-center hover:opacity-80 transition-opacity",
                   plan === 'pro' || plan === 'essencial' 
                     ? "text-brand-ink bg-brand-linen border border-brand-mist/50" 
-                    : (signupPlan === 'essencial' || signupPlan === 'pro')
-                      ? "text-brand-terracotta bg-brand-linen border border-brand-terracotta/30"
-                      : "text-brand-stone bg-brand-mist/10 border border-brand-mist/30"
+                    : "text-brand-stone bg-brand-mist/10 border border-brand-mist/30"
                 )}>
                   {plan === 'pro' && 'Plano Pro'}
                   {plan === 'essencial' && 'Plano Essencial'}
-                  {plan === 'free' && (signupPlan === 'essencial' || signupPlan === 'pro') && (
-                    <span className="flex items-center gap-1">
-                      {signupPlan} <span className="opacity-60 text-[8px]">· teste pendente</span>
-                    </span>
-                  )}
-                  {plan === 'free' && (!signupPlan || signupPlan === 'free') && 'Plano Gratuito'}
+                  {plan === 'free' && 'Plano Gratuito'}
                 </Link>
                 {plan === 'free' && (
-                  <Link to="/planos" className={cn(
-                    "text-[10px] hover:underline transition-colors font-medium relative top-[-1px]",
-                    (signupPlan === 'essencial' || signupPlan === 'pro') ? "text-brand-terracotta" : "text-brand-terracotta hover:text-brand-sienna"
-                  )}>
-                    {(signupPlan === 'essencial' || signupPlan === 'pro') ? 'Ativar Teste Grátis' : 'Upgrade'}
+                  <Link to="/planos" className="text-[10px] text-brand-terracotta hover:text-brand-sienna transition-colors font-medium relative top-[-1px]">
+                    Upgrade
                   </Link>
                 )}
                 <span className="text-brand-mist text-[10px] hidden sm:inline">|</span>

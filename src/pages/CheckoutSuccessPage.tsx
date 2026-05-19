@@ -3,32 +3,41 @@ import { motion } from 'motion/react';
 import { CheckCircle2, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { cn } from '../lib/utils';
 
 export default function CheckoutSuccessPage() {
   const { profile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const [syncing, setSyncing] = useState(true);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     if (profile?.plan && profile.plan !== 'free') {
       setSyncing(false);
-    } else {
-      // If still free, try to refresh every 3 seconds for a bit
-      const interval = setInterval(() => {
-        refreshProfile();
-      }, 3000);
-      return () => clearInterval(interval);
+      setTimedOut(false);
     }
-  }, [profile, refreshProfile]);
+  }, [profile]);
 
   useEffect(() => {
-    // Timeout after 30 seconds if syncing still true
-    const timeout = setTimeout(() => {
-      setSyncing(false);
-    }, 30000);
+    if (!syncing) return;
 
-    return () => clearTimeout(timeout);
-  }, []);
+    // Poll refreshProfile every 3 seconds
+    const interval = setInterval(() => {
+      refreshProfile();
+    }, 3000);
+
+    // Timeout after 45 seconds if syncing still true
+    const timeout = setTimeout(() => {
+      setTimedOut(true);
+      setSyncing(false);
+      clearInterval(interval);
+    }, 45000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [syncing, refreshProfile]);
 
   return (
     <div className="min-h-screen bg-[#FDFCFB] flex items-center justify-center p-6">
@@ -38,33 +47,51 @@ export default function CheckoutSuccessPage() {
         className="max-w-md w-full bg-white rounded-[32px] p-10 shadow-[0_32px_64px_rgba(0,0,0,0.05)] border border-brand-stone/10 text-center"
       >
         <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8">
-          <CheckCircle2 size={40} className="text-emerald-500" />
+          {syncing ? (
+            <Loader2 size={40} className="text-brand-terracotta animate-spin" />
+          ) : timedOut ? (
+            <Sparkles size={40} className="text-brand-terracotta" />
+          ) : (
+            <CheckCircle2 size={40} className="text-emerald-500" />
+          )}
         </div>
 
-        <h1 className="text-3xl font-serif text-brand-ink mb-4">Assinatura ativada!</h1>
+        <h1 className="text-3xl font-serif text-brand-ink mb-4">
+          {syncing ? 'Verificando assinatura...' : timedOut ? 'Quase lá!' : 'Assinatura ativada!'}
+        </h1>
         
-        <p className="text-brand-stone text-sm font-light leading-relaxed mb-10">
-          Parabéns! Sua conta foi atualizada com sucesso. 
+        <div className="text-brand-stone text-sm font-light leading-relaxed mb-10">
           {syncing ? (
-            <span className="block mt-2 font-medium text-brand-terracotta flex items-center justify-center gap-2">
-              <Loader2 size={14} className="animate-spin" />
-              Sincronizando seu plano...
-            </span>
+            <p>Estamos confirmando seu pagamento com o Stripe. Isso levará apenas alguns instantes.</p>
+          ) : timedOut ? (
+            <div className="space-y-2">
+              <p>O processamento está demorando um pouco mais que o esperado.</p>
+              <p className="font-medium text-brand-terracotta">Seu acesso será liberado automaticamente em alguns minutos.</p>
+            </div>
           ) : (
-            <span className="block mt-2 font-medium text-emerald-600">
-              <Sparkles size={14} className="inline mr-1" />
-              Tudo pronto!
-            </span>
+            <p>
+              Parabéns! Sua conta foi atualizada com sucesso. 
+              <span className="block mt-2 font-medium text-emerald-600">
+                <Sparkles size={14} className="inline mr-1" />
+                Tudo pronto!
+              </span>
+            </p>
           )}
-        </p>
+        </div>
 
         <div className="space-y-4">
           <Link 
             to="/dashboard"
-            className="w-full h-14 flex items-center justify-center bg-brand-ink text-brand-white rounded-full text-xs font-bold uppercase tracking-[0.2em] hover:bg-brand-ink/90 transition-all group"
+            className={cn(
+              "w-full h-14 flex items-center justify-center rounded-full text-xs font-bold uppercase tracking-[0.2em] transition-all group",
+              syncing 
+                ? "bg-brand-stone/10 text-brand-stone cursor-not-allowed" 
+                : "bg-brand-ink text-brand-white hover:bg-brand-ink/90 shadow-lg shadow-brand-ink/10"
+            )}
+            onClick={(e) => syncing && e.preventDefault()}
           >
-            Ir para meu painel
-            <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+            {syncing ? 'Sincronizando...' : 'Ir para meu painel'}
+            {!syncing && <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />}
           </Link>
         </div>
 

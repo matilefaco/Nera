@@ -91,26 +91,22 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
         plan,
         creditsUsed: credits >= 10 ? 'true' : 'false'
       },
+      subscription_data: {
+        metadata: {
+          professionalId: uid,
+          plan
+        }
+      }
     };
 
     if (plan === 'essencial' && !userData?.trialUsed) {
       sessionParams.subscription_data = {
+        ...sessionParams.subscription_data,
         trial_period_days: 15,
-        metadata: {
-          professionalId: uid,
-          plan: 'essencial'
-        },
         trial_settings: {
           end_behavior: {
             missing_payment_method: "cancel"
           }
-        }
-      };
-    } else if (plan === 'pro') {
-      sessionParams.subscription_data = {
-        metadata: {
-          professionalId: uid,
-          plan: 'pro'
         }
       };
     }
@@ -275,6 +271,10 @@ router.post("/upgrade-to-pro", requireFirebaseAuth, async (req: AuthenticatedReq
         price: targetPriceId,
       }],
       proration_behavior: 'always_invoice', // Immediately invoice the difference
+      metadata: {
+        plan: 'pro',
+        professionalId: uid
+      }
     });
 
     // Removed optimistic update. Access will be granted via Stripe webhook (customer.subscription.updated)
@@ -345,21 +345,22 @@ router.post("/webhook", async (req, res) => {
 
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
-    const userId = session.client_reference_id;
+    const userId = session.client_reference_id || (session.metadata?.professionalId as string);
     const plan = session.metadata?.plan || 'pro'; 
 
     if (isDev) {
-      logger.info("STRIPE", "Processing checkout.session.completed", { professionalId: maskUid(userId!), meta: { plan } });
+      logger.info("STRIPE", "Processing checkout.session.completed", { professionalId: maskUid(userId!), meta: { plan, sessionId: session.id } });
     }
 
     if (!userId) {
-      logger.warn("STRIPE", "Missing client_reference_id in session", { requestId: req.requestId });
-      return res.status(400).json({ error: 'Missing client_reference_id' });
+      logger.error("STRIPE", "Critical: Missing userId in session (no client_reference_id or metadata.professionalId)", { requestId: req.requestId, sessionId: session.id });
+      return res.status(400).json({ error: 'Missing userId identification' });
     }
 
     if (!session.subscription) {
-      logger.error("STRIPE", "Missing subscription in checkout session", { requestId: req.requestId, meta: { sessionId: maskToken(session.id) } });
-      return res.status(400).json({ error: "Missing subscription" });
+      // Possible if it's a one-time payment or skipped, but we expect subscription mode
+      logger.warn("STRIPE", "Missing subscription in checkout session", { requestId: req.requestId, meta: { sessionId: maskToken(session.id) } });
+      return res.json({ received: true, warning: 'No subscription found in session' });
     }
 
     try {
@@ -371,8 +372,9 @@ router.post("/webhook", async (req, res) => {
       const userDoc = await userRef.get();
       
       if (!userDoc.exists) {
-        logger.warn("STRIPE", "User context not found during checkout completion", { professionalId: maskUid(userId) });
-        return res.status(404).json({ error: 'User not found' });
+        logger.error("STRIPE", "User not found in Firestore during checkout Completion", { professionalId: maskUid(userId), meta: { sessionId: session.id } });
+        // Maybe log to a failed_webhooks collection for manual recovery
+        return res.status(404).json({ error: 'User not found in system' });
       }
 
       if (isDev) {
@@ -382,13 +384,14 @@ router.post("/webhook", async (req, res) => {
       const userData = userDoc.data();
       const creditsUsed = session.metadata?.creditsUsed === 'true';
 
-      // Update User Plan
+      // Update User Plan - Mandatory Fields
       const updateData: any = {
         plan: plan,
         indexable: true,
         planRank: plan === 'pro' ? 2 : 1,
         stripeCustomerId: session.customer,
         stripeSubscriptionId: session.subscription,
+        stripeSubscriptionStatus: subscription.status, // trialing, active, etc.
         planExpiresAt: planExpiresAt,
         trialUsed: true,
         updatedAt: new Date().toISOString()
@@ -473,6 +476,7 @@ router.post("/webhook", async (req, res) => {
 
         const updateData: any = {
           planExpiresAt: newExpiry.toISOString(),
+          stripeSubscriptionStatus: subscription.status,
           updatedAt: new Date().toISOString()
         };
 
@@ -488,6 +492,13 @@ router.post("/webhook", async (req, res) => {
           } else if (priceId === envEssencial) {
             updateData.plan = 'essencial';
             updateData.planRank = 1;
+          } else {
+            // Fallback to metadata
+            const metaPlan = (subscription.metadata as any)?.plan;
+            if (metaPlan === 'pro' || metaPlan === 'essencial') {
+              updateData.plan = metaPlan;
+              updateData.planRank = metaPlan === 'pro' ? 2 : 1;
+            }
           }
         }
 
@@ -567,13 +578,24 @@ router.post("/webhook", async (req, res) => {
     const subscription = event.data.object as Stripe.Subscription;
     const subscriptionId = subscription.id;
     const customerId = subscription.customer;
+    const professionalIdFromMeta = (subscription.metadata as any)?.professionalId;
 
-    logger.info("STRIPE", "Received customer.subscription.updated", { requestId: req.requestId, meta: { subscriptionId: maskToken(subscriptionId) } });
+    logger.info("STRIPE", "Received customer.subscription.updated", { requestId: req.requestId, meta: { subscriptionId: maskToken(subscriptionId), professionalIdFromMeta } });
 
     try {
       let userQuery = await db.collection('users').where('stripeSubscriptionId', '==', subscriptionId).limit(1).get();
+      
       if (userQuery.empty) {
         userQuery = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+      }
+
+      if (userQuery.empty && professionalIdFromMeta) {
+        const docRef = db.collection('users').doc(professionalIdFromMeta);
+        const docSnap = await docRef.get();
+        if (docSnap.exists) {
+          // Wrap it in a pseudo-QuerySnapshot structure to reuse logic below
+          userQuery = { empty: false, docs: [docSnap] } as any;
+        }
       }
 
       if (!userQuery.empty) {
@@ -585,8 +607,8 @@ router.post("/webhook", async (req, res) => {
           updatedAt: new Date().toISOString()
         };
 
-        if ((subscription as any).current_period_end) {
-          updateData.currentPeriodEnd = new Date((subscription as any).current_period_end * 1000).toISOString();
+        if (subscription.current_period_end) {
+          updateData.planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
         }
 
         // Handle Plan Change from Stripe Portal (Upgrade/Downgrade)
@@ -616,9 +638,9 @@ router.post("/webhook", async (req, res) => {
         }
 
         await userQuery.docs[0].ref.update(updateData);
-        logger.info("STRIPE", "Subscription sync updated", { professionalId: maskUid(userQuery.docs[0].id) });
+        logger.info("STRIPE", "Subscription sync updated", { professionalId: maskUid(userQuery.docs[0].id), status: subscription.status });
       } else {
-        logger.warn("STRIPE", "Customer for subscription.updated not found in system", { meta: { customerId: maskToken(customerId as string) } });
+        logger.warn("STRIPE", "Customer for subscription.updated not found in system", { meta: { customerId: maskToken(customerId as string), subscriptionId } });
       }
     } catch (err: any) {
       logger.error("STRIPE", "Error processing customer.subscription.updated", { requestId: req.requestId, error: err });
@@ -652,6 +674,147 @@ router.post("/webhook", async (req, res) => {
   }
 
   res.json({ received: true });
+});
+
+/**
+ * ADMIN: RECONCILE USER PLAN WITH STRIPE
+ * Securely fixes users that have paid but are still "free"
+ */
+router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const callerUid = req.uid;
+  const { targetUid, targetEmail } = req.body;
+
+  try {
+    // 1. Verify caller is Admin
+    const callerDoc = await db.collection("users").doc(callerUid!).get();
+    if (!callerDoc.exists || callerDoc.data()?.role !== 'admin') {
+      logger.warn("ADMIN", "Unauthorized attempt to reconcile user", { callerUid });
+      return res.status(403).json({ error: "Unauthorized. Admin role required." });
+    }
+
+    if (!targetUid && !targetEmail) {
+      return res.status(400).json({ error: "Missing targetUid or targetEmail" });
+    }
+
+    // 2. Find Target User
+    let userDoc: admin.firestore.DocumentSnapshot | null = null;
+    if (targetUid) {
+      userDoc = await db.collection("users").doc(targetUid).get();
+    } else if (targetEmail) {
+      const snap = await db.collection("users").where("email", "==", targetEmail.toLowerCase().trim()).limit(1).get();
+      if (!snap.empty) userDoc = snap.docs[0];
+    }
+
+    if (!userDoc || !userDoc.exists) {
+      return res.status(404).json({ error: "Target user not found" });
+    }
+
+    const userData = userDoc.data()!;
+    const userId = userDoc.id;
+    const email = userData.email;
+    let customerId = userData.stripeCustomerId;
+
+    const stripe = getStripe();
+
+    // 3. Find Customer in Stripe if not in DB
+    if (!customerId && email) {
+      const customers = await stripe.customers.list({ email: email, limit: 1 });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+      }
+    }
+
+    if (!customerId) {
+      return res.status(404).json({ 
+        error: "Stripe customer not found for this user",
+        details: "No stripeCustomerId in DB and no matching email in Stripe."
+      });
+    }
+
+    // 4. Find Active Subscriptions
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+      limit: 5
+    });
+    
+    // Also check trialing
+    const trialing = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'trialing',
+      limit: 1
+    });
+
+    const allSubs = [...subscriptions.data, ...trialing.data];
+
+    if (allSubs.length === 0) {
+      return res.status(200).json({
+        success: false,
+        message: "No active or trialing subscriptions found for this customer.",
+        customerId
+      });
+    }
+
+    // 5. Determine Plan and Update DB
+    const sub = allSubs[0];
+    const priceId = sub.items.data[0].price.id;
+    const envPro = process.env.STRIPE_PRICE_PRO;
+    const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+
+    let plan: 'pro' | 'essencial' | 'free' = 'free';
+    let planRank = 0;
+
+    if (envPro && priceId === envPro) {
+      plan = 'pro';
+      planRank = 2;
+    } else if (envEssencial && priceId === envEssencial) {
+      plan = 'essencial';
+      planRank = 1;
+    } else {
+      // Fallback to metadata
+      const metaPlan = (sub.metadata as any)?.plan;
+      if (metaPlan === 'pro' || metaPlan === 'essencial') {
+        plan = metaPlan;
+        planRank = metaPlan === 'pro' ? 2 : 1;
+      }
+    }
+
+    if (plan === 'free') {
+      return res.status(200).json({
+        success: false,
+        message: "Active subscription found but Price ID or Metadata did not match known plans.",
+        priceId,
+        metadata: sub.metadata,
+        customerId
+      });
+    }
+
+    const updateData: any = {
+      plan,
+      planRank,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: sub.id,
+      stripeSubscriptionStatus: sub.status,
+      planExpiresAt: new Date(sub.current_period_end * 1000).toISOString(),
+      updatedAt: new Date().toISOString(),
+      trialUsed: sub.status === 'trialing' ? true : (userData.trialUsed || false)
+    };
+
+    await db.collection("users").doc(userId).update(updateData);
+
+    logger.info("ADMIN", "Manual reconcile success", { userId: maskUid(userId), plan, callerUid: maskUid(callerUid!) });
+
+    return res.json({
+      success: true,
+      message: `User plan reconciled to ${plan.toUpperCase()}`,
+      updatedFields: updateData
+    });
+
+  } catch (err: any) {
+    logger.error("ADMIN", "Reconcile failed", { error: err.message, callerUid: maskUid(callerUid!) });
+    return res.status(500).json({ error: "Internal server error", details: err.message });
+  }
 });
 
 // Helper for status
