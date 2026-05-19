@@ -340,7 +340,7 @@ const MockupConfirm = () => (
          </div>
          <div className="flex justify-between items-start mb-3">
            <span className="text-brand-white text-[13px] font-medium bg-white/10 px-2.5 py-1 rounded-md">11:00 - 12:00</span>
-           <span className="text-[9px] text-brand-terracotta uppercase font-bold tracking-[0.2em] mt-1 pr-1 opacity-90">A Chegar</span>
+           <span className="text-[9px] text-brand-terracotta uppercase font-bold tracking-[0.2em] mt-1 pr-1 opacity-90">Próxima</span>
          </div>
          <span className="font-serif text-[20px] mb-0.5">Mariana Silva</span>
          <span className="text-[13px] text-brand-white/70 italic font-serif">Brow Lamination</span>
