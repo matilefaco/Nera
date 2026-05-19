@@ -47,3 +47,45 @@ export const userProfileSchema = z.object({
   services: z.array(serviceSchema).optional(),
   workingHours: workingHoursSchema.optional(),
 });
+
+/**
+ * Heuristic to detect fake/test/garbage content
+ */
+export const isSanitizedContent = (text: string | null | undefined): boolean => {
+  if (!text) return true;
+  const t = text.toLowerCase().trim();
+  if (t.length === 0) return true;
+
+  // 1. Common garbage keywords
+  const garbageKeywords = [
+    'teste', 'testando', 'testeee', 'fake', 'lorem', 'ipsum', 
+    'asdf', 'qwer', 'zxcv', 'oieee', 'oioioi', 'blabla', 
+    'sdasd', 'aaaaa', '7777', '9999', 'audit', 'regress', 'dummy'
+  ];
+  if (garbageKeywords.some(k => t.includes(k))) return false;
+
+  // 2. Repetitive characters (e.g., "testeeeee", "!!!!") - 5 or more same chars
+  if (/(.)\1{4,}/.test(t)) return false;
+
+  // 3. Random keyboard mash (long words without vowels)
+  const words = t.split(/\s+/);
+  for (const word of words) {
+    // Only check if it's long enough to be a mash
+    if (word.length > 6 && !/[aeiouyáéíóúàèìòùâêîôûãõäëïöü]/.test(word)) {
+      return false;
+    }
+  }
+
+  // 4. Repeated numbers
+  if (/^(\d)\1{4,}$/.test(t)) return false;
+
+  return true;
+};
+
+/**
+ * Mask garbage names for display in sensitive areas like Agenda
+ */
+export const sanitizeDisplayName = (name: string | null | undefined, fallback: string = 'Cliente'): string => {
+  if (!name || !isSanitizedContent(name)) return fallback;
+  return name.trim();
+};

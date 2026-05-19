@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Star, Award, Users, ShieldCheck } from 'lucide-react';
 import { UserProfile } from '../../types';
+import { isSanitizedContent } from '../../lib/validation';
 
 interface ExpertIntroProps {
   profile: UserProfile;
@@ -41,7 +42,9 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
                 transition={{ delay: 0.2 }}
                 className="text-brand-stone font-light leading-relaxed max-w-2xl mx-auto italic text-lg"
               >
-                {customBio || profile.bio || 'Dedicada a realçar sua melhor versão com naturalidade.'}
+                {((customBio || profile.bio) && isSanitizedContent(customBio || profile.bio)) 
+                  ? (customBio || profile.bio) 
+                  : 'Dedicada a realçar sua melhor versão com naturalidade.'}
               </motion.p>
             </div>
 

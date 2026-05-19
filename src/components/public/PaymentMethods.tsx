@@ -1,34 +1,23 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { CreditCard, Wallet, Banknote, Landmark, CheckCircle2 } from 'lucide-react';
+import { getNormalizedPaymentMethods, PAYMENT_METHOD_LABELS, PaymentMethodId } from '../../lib/payment';
 
 interface PaymentMethodsProps {
   className?: string;
   professionalName?: string;
   paymentMethods?: string[];
+  acceptsInstallments?: boolean;
 }
 
-const PAYMENT_LABELS: Record<string, string> = {
-  pix: 'Pix',
-  credito: 'Crédito',
-  credit: 'Crédito',
-  debito: 'Débito',
-  debit: 'Débito',
-  dinheiro: 'Dinheiro',
-  cash: 'Dinheiro',
-  transferencia: 'Transferência',
-  transfer: 'Transferência'
-};
+export function PaymentMethods({ className, professionalName, paymentMethods, acceptsInstallments }: PaymentMethodsProps) {
+  const normalizedMethods = getNormalizedPaymentMethods(paymentMethods);
+  
+  const methods = normalizedMethods.length > 0 
+    ? normalizedMethods.map(m => PAYMENT_METHOD_LABELS[m as PaymentMethodId] || m)
+    : ['Pix', 'Crédito', 'Débito', 'Dinheiro'];
 
-export function PaymentMethods({ className, professionalName, paymentMethods }: PaymentMethodsProps) {
-  const methods = paymentMethods && paymentMethods.length > 0 
-    ? paymentMethods.map(m => ({ name: PAYMENT_LABELS[m.toLowerCase()] || m }))
-    : [
-        { name: 'Pix' },
-        { name: 'Crédito' },
-        { name: 'Débito' },
-        { name: 'Dinheiro' },
-      ];
+  const hasCreditCard = normalizedMethods.includes('credit_card');
 
   return (
     <section className={`py-8 md:py-12 px-6 bg-brand-white border-y border-brand-mist/20 ${className}`}>
@@ -39,9 +28,9 @@ export function PaymentMethods({ className, professionalName, paymentMethods }: 
         </div>
 
         <div className="flex flex-wrap justify-center items-center gap-3 md:gap-4">
-          {methods.map((method, i) => (
+          {methods.map((name, i) => (
             <motion.div 
-              key={method.name}
+              key={name}
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
@@ -49,15 +38,18 @@ export function PaymentMethods({ className, professionalName, paymentMethods }: 
               className="flex items-center px-5 py-2.5 bg-brand-parchment/30 rounded-full border border-brand-mist/40 transition-colors hover:border-brand-terracotta/20"
             >
               <CheckCircle2 size={10} className="text-brand-terracotta mr-2 opacity-50" />
-              <span className="text-[9px] font-bold uppercase tracking-widest text-brand-ink/80">{method.name}</span>
+              <span className="text-[9px] font-bold uppercase tracking-widest text-brand-ink/80">{name}</span>
             </motion.div>
           ))}
           
-          <div className="h-4 w-px bg-brand-mist mx-2 hidden md:block" />
-          
-          <div className="flex items-center gap-1.5 px-4 py-2 bg-brand-linen/40 rounded-full border border-brand-mist/50">
-            <span className="text-[8px] font-bold uppercase tracking-widest text-brand-terracotta/70">Parcelamento disponível no cartão</span>
-          </div>
+          {acceptsInstallments && hasCreditCard && (
+            <>
+              <div className="h-4 w-px bg-brand-mist mx-1 md:mx-2 hidden md:block" />
+              <div className="flex items-center gap-1.5 px-4 py-2 bg-brand-linen/40 rounded-full border border-brand-mist/50">
+                <span className="text-[8px] font-bold uppercase tracking-widest text-brand-terracotta/70">Parcelamento disponível no cartão</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </section>

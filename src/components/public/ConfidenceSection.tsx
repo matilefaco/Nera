@@ -38,8 +38,8 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
     <section className="py-16 md:py-24 px-4 sm:px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-10 md:mb-16">
-          <span className="label-text text-[var(--theme-accent,var(--color-brand-terracotta))]/60 mb-4 block">Segurança e Qualidade</span>
-          <h2 className="text-[clamp(24px,7vw,32px)] font-serif text-brand-ink mb-4">Por que escolher a Nera?</h2>
+          <span className="label-text text-[var(--theme-accent,var(--color-brand-terracotta))]/60 mb-4 block">Experiência e Qualidade</span>
+          <h2 className="text-[clamp(24px,7vw,32px)] font-serif text-brand-ink mb-4">Compromisso com o seu Bem-estar</h2>
           <div className="w-12 h-1 bg-brand-linen mx-auto rounded-full" />
         </div>
 
@@ -65,7 +65,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
 
         <div className="mt-10 md:mt-16 p-6 sm:p-8 bg-brand-linen/10 rounded-[40px] border border-brand-mist/50 text-center">
           <p className="text-[10px] text-brand-stone font-medium uppercase tracking-[0.2em] italic">
-            "Na Nera, você agenda com praticidade. Informações organizadas e atendimento de alto padrão."
+            "Sua reserva é nossa prioridade. Informações organizadas e atendimento de alto padrão."
           </p>
         </div>
       </div>

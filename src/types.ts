@@ -84,7 +84,8 @@ export interface UserProfile {
   neighborhood?: string;
   
   instagram?: string; // Official social link
-  paymentMethods?: ('pix' | 'credito' | 'debito' | 'dinheiro' | 'transferencia')[];
+  paymentMethods?: string[];
+  acceptsInstallments?: boolean;
   
   // Anti No-Show Settings
   antiNoShowEnabled?: boolean;

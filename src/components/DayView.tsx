@@ -4,6 +4,7 @@ import { Clock, Lock, Info, Plus, AlertCircle, Zap, Calendar as CalendarIcon, Ch
 import { cn, formatLocalDate, formatDateKey, getTodayLocale } from '../lib/utils';
 import { Appointment } from '../types';
 import { isConfirmedLikeStatus, isCompletedStatus, isPendingStatus } from '../constants/appointmentStatus';
+import { sanitizeDisplayName } from '../lib/validation';
 
 interface DayViewProps {
   appointments: Appointment[];
@@ -234,7 +235,7 @@ export default function DayView({
                       <div className="flex-1 min-w-0 pr-6 sm:pr-8">
                         <div className="flex items-center justify-between gap-2 overflow-hidden mb-0.5 sm:mb-1">
                           <p className="text-[14px] sm:text-[15px] font-bold truncate tracking-tight pr-1">
-                            {app.clientName}
+                            {sanitizeDisplayName(app.clientName, 'Reserva')}
                           </p>
                           <p className={cn(
                             "text-[10px] sm:text-[11px] font-mono shrink-0 font-medium",

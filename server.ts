@@ -665,9 +665,21 @@ export async function createServerApp() {
     app.use(viteServer.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, {
+        maxAge: '1y',
+        immutable: true,
+        setHeaders: (res, path) => {
+          if (path.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'public, no-cache');
+          }
+        }
+    }));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.sendFile(path.join(distPath, 'index.html'), {
+         headers: {
+           'Cache-Control': 'public, no-cache'
+         }
+      });
     });
   }
 

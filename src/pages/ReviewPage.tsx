@@ -6,12 +6,12 @@ import {
   updateDoc, addDoc, getDoc, setDoc, increment 
 } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Star, CheckCircle2, Sparkles, AlertCircle, 
+import { Star, CheckCircle2, Sparkles, AlertCircle, 
   ChevronRight, Heart, MessageSquare, ShieldCheck, User
 } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { formatCurrency, cn } from '../lib/utils';
+import { isSanitizedContent } from '../lib/validation';
 import Logo from '../components/Logo';
 import AppLoadingScreen from '../components/AppLoadingScreen';
 import { UserProfile, Appointment } from '../types';
@@ -134,6 +134,11 @@ export default function ReviewPage() {
     e.preventDefault();
     if (rating === 0) {
       notify.error('Por favor, deixe sua avaliação.');
+      return;
+    }
+
+    if (comment.trim() && !isSanitizedContent(comment)) {
+      notify.error('Por favor, escreva um comentário mais detalhado e real sobre sua experiência.');
       return;
     }
 

@@ -44,51 +44,43 @@ export const formatSpecialtyLabel = (specialty: string = "") => {
   const s = specialty.toLowerCase().trim();
   
   const mappings: Record<string, string> = {
-    'maquiadora': "Especialista em maquiagem",
-    'maquiagem': "Especialista em maquiagem",
-    'make': "Especialista em maquiagem",
-    'nail designer': "Especialista em unhas",
-    'manicure': "Especialista em unhas",
-    'pedicure': "Especialista em pés e mãos",
-    'pés e mãos': "Especialista em unhas",
-    'design de unhas': "Especialista em unhas",
-    'designer de sobrancelhas': "Especialista em sobrancelhas",
-    'sobrancelhas': "Especialista em sobrancelhas",
-    'lash designer': "Especialista em cílios",
-    'lash': "Especialista em cílios",
-    'extensionista de cílios': "Especialista em cílios",
-    'cílios': "Especialista em cílios",
-    'micropigmentadora': "Especialista em micropigmentação",
-    'micropigmentação': "Especialista em micropigmentação",
-    'micro': "Especialista em micropigmentação",
-    'esteticista': "Especialista em estética",
-    'estética': "Especialista em estética",
-    'cabeleireira': "Especialista em cabelos",
-    'cabelo': "Especialista em cabelos",
-    'hair': "Especialista em cabelos",
-    'terapeuta capilar': "Especialista em tratamentos capilares",
-    'massoterapeuta': "Especialista em massoterapia",
-    'massagem': "Especialista em massoterapia",
-    'bronzeamento': "Especialista em bronzeamento",
-    'bronze': "Especialista em bronzeamento",
-    'depiladora': "Especialista em depilação",
-    'depilação': "Especialista em depilação",
-    'body piercing': "Especialista em body piercing",
-    'piercing': "Especialista em body piercing"
+    'maquiadora': "Maquiadora",
+    'maquiagem': "Maquiadora",
+    'make': "Maquiadora",
+    'nail designer': "Nail Designer",
+    'manicure': "Manicure & Pedicure",
+    'pedicure': "Manicure & Pedicure",
+    'pés e mãos': "Manicure & Pedicure",
+    'design de unhas': "Nail Designer",
+    'designer de sobrancelhas': "Designer de Sobrancelhas",
+    'sobrancelhas': "Designer de Sobrancelhas",
+    'lash designer': "Lash Designer",
+    'lash': "Lash Designer",
+    'extensionista de cílios': "Extensionista de Cílios",
+    'cílios': "Lash Designer",
+    'micropigmentadora': "Micropigmentadora",
+    'micropigmentação': "Micropigmentadora",
+    'micro': "Micropigmentadora",
+    'esteticista': "Esteticista",
+    'estética': "Esteticista",
+    'cabeleireira': "Cabeleireira",
+    'cabelo': "Cabeleireira",
+    'hair': "Hair Stylist",
+    'terapeuta capilar': "Terapeuta Capilar",
+    'massoterapeuta': "Massoterapeuta",
+    'massagem': "Massoterapeuta",
+    'bronzeamento': "Especialista em Bronzeamento",
+    'bronze': "Especialista em Bronzeamento",
+    'depiladora': "Depiladora",
+    'depilação': "Depiladora",
+    'body piercing': "Body Piercer",
+    'piercing': "Body Piercer"
   };
 
   if (mappings[s]) return mappings[s];
   
-  // If it's already "Especialista em...", return as is
-  if (s.startsWith('especialista em')) return specialty;
-  
-  // For person titles like "lash designer", sometimes people use uppercase or variations 
-  // that don't match exactly. The mappings cover most.
-  
-  // If it's plural or has "a" at the end, it's often a person title.
-  // But to be safe and follow instructions:
-  // "Se a especialidade não estiver mapeada: Usar fallback neutro"
-  return "Profissional de beleza";
+  // Capitalize if not mapped
+  return specialty.charAt(0).toUpperCase() + specialty.slice(1);
 };
 
 /**
@@ -119,17 +111,13 @@ export const getProfileHeroCopy = (specialty: string = "", id: string = "") => {
   const formatted = formatSpecialtyLabel(specialty);
   
   if (formatted === "Profissional de beleza") {
-    return { main: "Especialista em", accent: "Beleza" };
+    return { main: "Estética &", accent: "Bem-estar" };
   }
   
-  if (formatted.startsWith("Especialista em ")) {
-    return { 
-      main: "Especialista em", 
-      accent: formatted.replace("Especialista em ", "") 
-    };
-  }
-
-  return { main: "Profissional de", accent: "Beleza" };
+  return { 
+    main: "Referência em", 
+    accent: formatted 
+  };
 };
 
 /**

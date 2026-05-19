@@ -1,8 +1,8 @@
-import React from 'react';
-import { motion } from 'motion/react';
 import { Star, MapPin, Calendar } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Review } from '../../types';
 import { getRelativeDate } from '../../lib/utils';
+import { isSanitizedContent } from '../../lib/validation';
 
 interface ReviewsSectionProps {
   reviews: Review[];
@@ -10,7 +10,9 @@ interface ReviewsSectionProps {
 }
 
 export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
-  if (reviews.length === 0) {
+  const filteredReviews = reviews.filter(r => isSanitizedContent(r.comment));
+  
+  if (filteredReviews.length === 0) {
     return null;
   }
 
@@ -19,7 +21,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
       <div className="flex flex-col md:flex-row md:items-center gap-10 md:gap-16 mb-16 md:mb-24">
         <div className="flex items-baseline gap-4">
           <span className="font-serif text-[clamp(60px,15vw,80px)] leading-none text-brand-ink">
-            {stats?.averageRating ? stats.averageRating.toFixed(1) : (reviews.length > 0 ? (reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length).toFixed(1) : '')}
+            {stats?.averageRating ? stats.averageRating.toFixed(1) : (filteredReviews.length > 0 ? (filteredReviews.reduce((acc, r) => acc + r.rating, 0) / filteredReviews.length).toFixed(1) : '')}
           </span>
           <div className="flex flex-col gap-2">
             <div className="flex gap-1 text-[var(--theme-primary,var(--color-brand-terracotta))]">
@@ -28,7 +30,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
               ))}
             </div>
             <span className="text-[11px] font-bold uppercase tracking-widest text-brand-stone opacity-60">
-              {Math.max(stats?.totalReviews || 0, reviews.length)} avaliações
+              {Math.max(stats?.totalReviews || 0, filteredReviews.length)} avaliações
             </span>
           </div>
         </div>
@@ -43,7 +45,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {reviews.map((review, i) => (
+        {filteredReviews.map((review, i) => (
           <motion.div
             key={review.id}
             initial={{ opacity: 0, y: 20 }}
@@ -78,7 +80,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
               </div>
               <div>
                 <div className="text-[13px] font-semibold text-brand-ink">
-                  {review.publicDisplayMode === 'named' ? (review.firstName || 'Cliente Nera') : 'Cliente Nera'}
+                  {review.publicDisplayMode === 'named' ? (review.firstName || 'Cliente') : 'Cliente'}
                 </div>
                 {(review.locationLabel || review.neighborhood) && (
                   <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-50 mt-1">

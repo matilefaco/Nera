@@ -11,11 +11,12 @@ import {
   CalendarCheck2, AlertCircle, Info, Share2, Search
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn, cleanWhatsapp } from '../lib/utils';
+import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn, cleanWhatsapp, isFakeContent } from '../lib/utils';
 import { isPendingStatus, isCancelledStatus, isConfirmedLikeStatus, isCompletedStatus, isActiveSlotStatus, isInactiveStatus } from '../constants/appointmentStatus';
 import { getAvailableSlots as getAvailableSlotsOld, getDayAvailability } from '../lib/bookingUtils';
 import { getAvailableSlots, IntelligentFit } from '../utils/scheduleSuggestions';
 import PremiumButton from '../components/PremiumButton';
+import ShareVitrineModal from '../components/ShareVitrineModal';
 import { notify } from '../lib/notify';
 import { Appointment } from '../types';
 import Logo from '../components/Logo';
@@ -82,6 +83,7 @@ export default function AgendaPage() {
   
   const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [isFabOpen, setIsFabOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [showNavTip, setShowNavTip] = useState(() => {
     return localStorage.getItem('nera_agenda_nav_tip_dismissed') !== 'true';
   });
@@ -266,7 +268,8 @@ export default function AgendaPage() {
 
     const unsubAll = onSnapshot(q, (snapshot) => {
       try {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any))
+          .filter(a => !isFakeContent(a.clientName));
         // Sort in memory to avoid complex index requirements while keeping standard behavior
         docs.sort((a, b) => {
           if (a.date === b.date) {
@@ -918,7 +921,7 @@ export default function AgendaPage() {
               </div>
               <div className="flex gap-2.5">
                 <button 
-                   onClick={() => setIsFabOpen(true)}
+                   onClick={() => setIsShareModalOpen(true)}
                    className="flex-1 py-3.5 bg-brand-ink/95 backdrop-blur-sm text-brand-white rounded-[18px] text-[10px] font-semibold uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-all duration-300 hover:bg-brand-terracotta hover:shadow-[0_8px_16px_-4px_rgba(202,106,86,0.3)] active:scale-[0.98]"
                 >
                   <Share2 size={13} strokeWidth={1.5} className="text-white/80 transition-colors" /> Divulgar agenda
@@ -953,6 +956,12 @@ export default function AgendaPage() {
           )}
         </div>
       </div>
+
+      <ShareVitrineModal 
+        isOpen={isShareModalOpen} 
+        onClose={() => setIsShareModalOpen(false)} 
+        profile={profile} 
+      />
 
       {/* 6. BOTÃO FLUTUANTE FIXO (FAB) */}
       <div className="fixed bottom-[calc(92px+env(safe-area-inset-bottom))] right-5 z-[100] md:bottom-12 md:right-12">

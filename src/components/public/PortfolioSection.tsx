@@ -9,9 +9,10 @@ interface PortfolioSectionProps {
   portfolio: PortfolioItem[];
   onBookingClick: () => void;
   specialty?: string;
+  professionalName?: string;
 }
 
-export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: PortfolioSectionProps) => {
+export const PortfolioSection = ({ portfolio, onBookingClick, specialty, professionalName }: PortfolioSectionProps) => {
   const [activeCategory, setActiveCategory] = useState('all');
 
   if (portfolio.length === 0) return null;
@@ -82,7 +83,7 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty }: Portf
               >
                  <img
                   src={item.url}
-                  alt={item.category || "Trabalho de Helena Prado"}
+                  alt={item.category || `Trabalho de ${professionalName || 'Beleza'}`}
                   className="w-full h-full object-cover filter saturate-[0.8] group-hover:saturate-100 group-hover:scale-105 transition-all duration-700"
                   referrerPolicy="no-referrer"
                   loading="lazy"

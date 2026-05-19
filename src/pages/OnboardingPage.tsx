@@ -26,6 +26,7 @@ import { userProfileSchema, serviceSchema } from '../lib/validation';
 import { z } from 'zod';
 import { useProfileForm } from '../hooks/useProfileForm';
 import { APP_URL, getPublicProfileUrl } from '../lib/env';
+import { getNormalizedPaymentMethods } from '../lib/payment';
 
 type ServiceMode = 'home' | 'studio' | 'hybrid';
 
@@ -113,6 +114,7 @@ export default function OnboardingPage() {
     pricingStrategy, setPricingStrategy,
     differentials: selectedDifferentials, setDifferentials: setSelectedDifferentials,
     paymentMethods, setPaymentMethods,
+    acceptsInstallments, setAcceptsInstallments,
     yearsExperience, setYearsExperience,
     serviceStyle: selectedStyles, setServiceStyle: setSelectedStyles,
     workingDays, setWorkingDays,
@@ -529,7 +531,8 @@ export default function OnboardingPage() {
       travelFeeMode,
       fixedTravelFee: travelFeeMode === 'fixed' ? (Number(fixedTravelFee) || 0) : 0,
       pricingStrategy,
-      paymentMethods: paymentMethods as any,
+      paymentMethods: getNormalizedPaymentMethods(paymentMethods) as any,
+      acceptsInstallments,
       profileTheme: profileTheme || { variant: 'terracotta' },
       onboardingStep: nextStepNum,
       servicesDraft: services as any, // Save services temporarily before finalizing
@@ -779,7 +782,8 @@ export default function OnboardingPage() {
       neighborhood: (studioAddress.neighborhood || neighborhood).trim(),
       slug: slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-'),
       whatsapp: cleanWhatsapp(whatsapp),
-      paymentMethods: paymentMethods as any,
+      paymentMethods: getNormalizedPaymentMethods(paymentMethods) as any,
+      acceptsInstallments,
       bio: bio.trim(),
       headline: headline.trim(),
       instagram: instagram.trim().replace('@', ''),
@@ -1268,12 +1272,14 @@ export default function OnboardingPage() {
                 setHeadline={setHeadline}
                 bio={bio}
                 setBio={setBio}
+                paymentMethods={paymentMethods}
+                setPaymentMethods={setPaymentMethods}
+                acceptsInstallments={acceptsInstallments}
+                setAcceptsInstallments={setAcceptsInstallments}
                 onGenerateBio={generateIdentityContent}
                 isGeneratingBio={isGeneratingContent}
                 selectedBioStyle={selectedBioStyle}
                 setSelectedBioStyle={setSelectedBioStyle}
-                paymentMethods={paymentMethods}
-                setPaymentMethods={setPaymentMethods}
                 differentials={selectedDifferentials}
                 setDifferentials={setSelectedDifferentials}
                 availableDifferentials={IDENTITY_DIFFERENTIALS}

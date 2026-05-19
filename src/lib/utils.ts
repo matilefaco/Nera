@@ -27,6 +27,33 @@ export function generateSlug(text: string) {
 }
 
 /**
+ * Detects obvious test/trash content in strings to maintain a premium feel.
+ */
+export function isFakeContent(text: string | null | undefined): boolean {
+  if (!text) return false;
+  const t = text.toLowerCase().trim();
+  
+  // Nomes ou textos lixo comuns citados em auditoria
+  const trashKeywords = [
+    'teste', 'test', 'testando', 
+    'fsdfdsfsd', 'sadhduahsudhaus', 
+    'oieeee', 'otimaaaa', 'oieeeee', 'otimaaaaa',
+    'asdasd', 'qwerty', 'zxcv'
+  ];
+  
+  if (trashKeywords.some(kw => t.includes(kw))) return true;
+  
+  // Repeticão excessiva de caracteres (ex: "aaaaaaa", "!!!!!!!")
+  const excessiveRepetition = /(.)\1{4,}/.test(t);
+  if (excessiveRepetition) return true;
+
+  // Texto muito curto e sem sentido (ex: "a", "as", ".")
+  if (t.length < 2 && !/^[0-9]$/.test(t)) return true;
+  
+  return false;
+}
+
+/**
  * Recursively removes undefined fields from an object or array.
  */
 export function removeUndefinedDeep(value: any): any {

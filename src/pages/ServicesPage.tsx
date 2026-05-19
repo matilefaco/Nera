@@ -354,7 +354,7 @@ export default function ServicesPage() {
                 <div className="flex justify-between items-start mb-6 sm:mb-8 relative z-10 gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0 pr-2">
                     <h3 className="text-lg sm:text-xl font-serif text-brand-ink mb-1.5 sm:mb-2 group-hover:text-brand-terracotta transition-colors leading-snug">{service.name}</h3>
-                    <p className="text-brand-stone text-xs sm:text-sm font-light leading-relaxed line-clamp-2">{service.description || 'Nenhuma descrição adicionada.'}</p>
+                    <p className="text-brand-stone text-xs sm:text-sm font-light leading-relaxed line-clamp-2">{service.description || 'Consulte detalhes no dia do atendimento.'}</p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-1 shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-2xl border border-brand-mist/30">
                     <button onClick={() => openEdit(service)} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all">
@@ -382,7 +382,7 @@ export default function ServicesPage() {
                 <List size={32} strokeWidth={1.5} />
               </div>
               <h3 className="text-2xl font-serif font-normal text-brand-ink mb-3">Nenhum serviço cadastrado ainda</h3>
-              <p className="text-brand-stone text-sm font-light mb-10 max-w-xs mx-auto text-balance">Eles aparecerão aqui e na sua vitrine assim que você os adicionar.</p>
+              <p className="text-brand-stone text-sm font-light mb-10 max-w-xs mx-auto text-balance">Personalize sua vitrine adicionando os serviços que você oferece.</p>
               <button 
                 onClick={() => setIsModalOpen(true)}
                 className="bg-brand-ink text-brand-white px-10 py-5 rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"

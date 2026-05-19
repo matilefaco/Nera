@@ -40,6 +40,8 @@ export interface FormIdentityProps {
   
   paymentMethods?: string[];
   setPaymentMethods?: (val: string[]) => void;
+  acceptsInstallments?: boolean;
+  setAcceptsInstallments?: (val: boolean) => void;
   
   title?: string;
   subtitle?: string;
@@ -99,6 +101,8 @@ export const FormIdentity = ({
   availableDifferentials = [],
   paymentMethods,
   setPaymentMethods,
+  acceptsInstallments,
+  setAcceptsInstallments,
   title,
   subtitle,
   showLabels = true,
@@ -621,34 +625,56 @@ export const FormIdentity = ({
               
               <div className="flex flex-wrap gap-2">
                 {[
-                  { id: 'pix', label: 'PIX' },
-                  { id: 'credito', label: 'Cartão de Crédito' },
-                  { id: 'debito', label: 'Cartão de Débito' },
-                  { id: 'dinheiro', label: 'Dinheiro' },
-                  { id: 'transferencia', label: 'Transferência' }
+                  { id: 'pix', label: 'Pix' },
+                  { id: 'credit_card', label: 'Cartão de Crédito' },
+                  { id: 'debit_card', label: 'Cartão de Débito' },
+                  { id: 'cash', label: 'Dinheiro' },
+                  { id: 'bank_transfer', label: 'Transferência' }
                 ].map(method => (
                   <button
                     key={method.id}
                     type="button"
                     onClick={() => {
-                      if (paymentMethods.includes(method.id)) {
-                        setPaymentMethods(paymentMethods.filter(m => m !== method.id));
+                      if (!setPaymentMethods) return;
+                      const current = paymentMethods || [];
+                      if (current.includes(method.id)) {
+                        setPaymentMethods(current.filter(m => m !== method.id));
                       } else {
-                        setPaymentMethods([...paymentMethods, method.id]);
+                        setPaymentMethods([...current, method.id]);
                       }
                     }}
                     className={cn(
                       "px-5 py-2.5 rounded-full text-[10px] font-bold tracking-wider transition-all duration-300 ease-out border uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-1",
-                      paymentMethods.includes(method.id)
+                      (paymentMethods || []).includes(method.id)
                         ? "bg-brand-ink text-brand-white border-brand-ink shadow-md scale-[1.02]"
                         : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
                     )}
                   >
                     {method.label}
-                    {paymentMethods.includes(method.id) && <CheckCircle2 size={12} className="inline ml-1.5" />}
+                    {(paymentMethods || []).includes(method.id) && <CheckCircle2 size={12} className="inline ml-1.5" />}
                   </button>
                 ))}
               </div>
+
+              {setAcceptsInstallments && (paymentMethods || []).some(m => ['credit_card', 'credito', 'crédito'].includes(m)) && (
+                <div className="pt-2 animate-in fade-in slide-in-from-top-2">
+                  <label className="flex items-center gap-3 cursor-pointer group w-fit">
+                    <div className="relative flex items-center justify-center">
+                      <input 
+                        type="checkbox" 
+                        checked={acceptsInstallments} 
+                        onChange={(e) => setAcceptsInstallments(e.target.checked)}
+                        className="peer appearance-none w-5 h-5 rounded-lg border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all"
+                      />
+                      <CheckCircle2 size={12} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Ofereço parcelamento no cartão</span>
+                      <p className="text-[9px] text-brand-stone/60 font-light leading-none">Ative apenas se você possui maquininha ou link que parcela.</p>
+                    </div>
+                  </label>
+                </div>
+              )}
               <FormError message={errors.paymentMethods} />
             </div>
           )}

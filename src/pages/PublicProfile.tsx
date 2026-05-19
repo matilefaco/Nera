@@ -35,14 +35,16 @@ import {
   cn,
   buildWhatsappLink,
   splitSmartBio,
+  isFakeContent
 } from "../lib/utils";
 import { formatSpecialtyLabel } from "../lib/copy";
 import { getTheme } from "../lib/themes";
 import { notify } from "../lib/notify";
 import Logo from "../components/Logo";
 import PremiumButton from "../components/PremiumButton";
-import BookingModal from "../components/BookingModal";
-import WaitlistModal from "../components/WaitlistModal";
+// Lazy components
+const BookingModal = React.lazy(() => import("../components/BookingModal"));
+const WaitlistModal = React.lazy(() => import("../components/WaitlistModal"));
 import { UserProfile, Service, Review, Appointment } from "../types";
 
 import {
@@ -224,7 +226,10 @@ function PublicProfileContent() {
           setProfile(userData as UserProfile);
           
           if (userData.services) setServices(userData.services);
-          if (userData.reviews) setReviews(userData.reviews);
+          if (userData.reviews) {
+            const cleanReviews = (userData.reviews as Review[]).filter(r => !isFakeContent(r.comment) && !isFakeContent(r.firstName));
+            setReviews(cleanReviews);
+          }
           if (userData.stats) setStats(userData.stats);
           
           setLoading(false); 
@@ -631,6 +636,7 @@ function PublicProfileContent() {
       />
       <PortfolioSection
         portfolio={profile.portfolio || []}
+        professionalName={profile.name}
         specialty={
           profile.professionalIdentity?.mainSpecialty || profile.specialty
         }
@@ -646,6 +652,7 @@ function PublicProfileContent() {
       <PaymentMethods 
         professionalName={profile.name} 
         paymentMethods={profile.paymentMethods}
+        acceptsInstallments={profile.acceptsInstallments}
       />
       <WeekAvailability
         availability={weeklyAvailability}
@@ -709,34 +716,32 @@ function PublicProfileContent() {
         </section>
       )}
       </div>
-      <footer className="bg-brand-white border-t border-brand-mist py-10 md:py-14 px-6 text-center">
-        <div className="max-w-7xl mx-auto flex flex-col items-center gap-7">
-          <div className="text-[12px] font-normal tracking-[0.4em] uppercase text-brand-stone opacity-40">
-            Nera
-          </div>
-          <div className="flex flex-wrap justify-center gap-8">
+      <footer className="bg-brand-parchment border-t border-brand-mist/30 py-12 md:py-16 px-6 text-center">
+        <div className="max-w-7xl mx-auto flex flex-col items-center gap-8">
+          <div className="flex flex-wrap justify-center gap-10">
             <Link
               to="/"
-              className="text-[9px] font-medium uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:text-brand-ink transition-colors"
             >
               Início
             </Link>
             <Link
               to="/register"
-              className="text-[9px] font-medium uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone hover:text-brand-ink transition-colors"
             >
               Seja uma Profissional
             </Link>
           </div>
-          <div className="flex gap-4">
+          
+          <div className="flex gap-5">
             {profile.instagram && (
               <a
                 href={`https://instagram.com/${profile.instagram.replace("@", "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-9 h-9 rounded-full border border-brand-mist flex items-center justify-center text-brand-stone hover:text-brand-terracotta transition-all"
+                className="w-10 h-10 rounded-full border border-brand-mist/60 flex items-center justify-center text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta transition-all"
               >
-                <Instagram size={15} />
+                <Instagram size={16} />
               </a>
             )}
             {profile.whatsapp && profile.plan === 'pro' && (
@@ -744,35 +749,41 @@ function PublicProfileContent() {
                 href={buildWhatsappLink(profile.whatsapp)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-9 h-9 rounded-full border border-brand-mist flex items-center justify-center text-brand-stone hover:text-brand-terracotta transition-all"
+                className="w-10 h-10 rounded-full border border-brand-mist/60 flex items-center justify-center text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta transition-all"
               >
-                <MessageCircle size={15} />
+                <MessageCircle size={16} />
               </a>
             )}
           </div>
-          <p className="text-[8px] uppercase tracking-[0.15em] text-brand-stone opacity-30 mt-4">
-            © {new Date().getFullYear()} {profile.name} · Powered by Nera
-          </p>
+          
+          <div className="pt-8 border-t border-brand-mist/20 w-full max-w-xs mx-auto">
+            <p className="text-[9px] uppercase tracking-[0.2em] text-brand-stone/40 leading-loose">
+              © {new Date().getFullYear()} {profile.name}<br />
+              <span className="opacity-60">Personal Beauty Experience · Powered by Nera</span>
+            </p>
+          </div>
         </div>
       </footer>
-      <BookingModal
-        profile={profile}
-        services={services}
-        open={isBookingModalOpen}
-        onClose={() => {
-          setIsBookingModalOpen(false);
-          setSelectedInitialDate(null);
-        }}
-        initialService={preSelectedService}
-        initialDate={selectedInitialDate}
-        waitlistEntry={activeWaitlistEntry}
-      />
-      <WaitlistModal
-        profile={profile}
-        services={services}
-        open={isWaitlistOpen}
-        onClose={() => setIsWaitlistOpen(false)}
-      />
+      <React.Suspense fallback={null}>
+        <BookingModal
+          profile={profile}
+          services={services}
+          open={isBookingModalOpen}
+          onClose={() => {
+            setIsBookingModalOpen(false);
+            setSelectedInitialDate(null);
+          }}
+          initialService={preSelectedService}
+          initialDate={selectedInitialDate}
+          waitlistEntry={activeWaitlistEntry}
+        />
+        <WaitlistModal
+          profile={profile}
+          services={services}
+          open={isWaitlistOpen}
+          onClose={() => setIsWaitlistOpen(false)}
+        />
+      </React.Suspense>
     </div>
   );
 }

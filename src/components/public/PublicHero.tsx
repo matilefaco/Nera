@@ -4,6 +4,7 @@ import { notify } from '../../lib/notify';
 import { ShieldCheck, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award, MessageCircle } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
+import { isSanitizedContent } from '../../lib/validation';
 import PremiumButton from '../PremiumButton';
 import { UserProfile, Service } from '../../types';
 import { getProfileHeroCopy, getServiceModeLabel, formatSpecialtyLabel, getServiceLocationCopy } from '../../lib/copy';
@@ -256,7 +257,9 @@ export const PublicHero = ({
           ) : null}
 
           <p className="body-text text-brand-stone max-w-sm">
-            {heroBio || profile.bio || (profile.specialty ? `${formatSpecialtyLabel(profile.specialty)} com foco em excelência e bem-estar.` : 'Atendimento personalizado com foco em resultados de alta qualidade.')}
+            {((heroBio || profile.bio) && isSanitizedContent(heroBio || profile.bio))
+              ? (heroBio || profile.bio)
+              : (profile.specialty ? `${formatSpecialtyLabel(profile.specialty)} com foco em excelência e bem-estar.` : 'Atendimento personalizado com foco em resultados de alta qualidade.')}
           </p>
 
           <div className="flex flex-col gap-3">
@@ -266,7 +269,7 @@ export const PublicHero = ({
                 variant="terracotta"
                 className="px-10 py-5 text-[10px] tracking-[0.22em] shadow-xl"
               >
-                {isAgendaFull && hasWaitlistFeature ? 'Entrar na lista de espera' : 'Agendar horário'}
+                {isAgendaFull && hasWaitlistFeature ? 'Entrar na lista de prioridade' : 'Reservar minha experiência'}
                 <ChevronRight size={14} className="ml-2" />
               </PremiumButton>
 
@@ -283,7 +286,7 @@ export const PublicHero = ({
               )}
             </div>
             <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-40 ml-2">
-              Leva menos de 30 segundos
+              Confirmação instantânea
             </p>
           </div>
         </motion.div>
@@ -313,6 +316,7 @@ export const PublicHero = ({
                 alt={profile.name}
                 className="w-full aspect-[3/4] object-cover rounded-[48px_48px_48px_12px] shadow-2xl filter saturate-[0.85] hover:saturate-100 transition-[filter] duration-1000"
                 referrerPolicy="no-referrer"
+                loading="eager"
               />
             ) : (
               <div className="w-full aspect-[3/4] rounded-[48px_48px_48px_12px] shadow-2xl bg-gradient-to-br from-[#A85C3A] to-[#C47A5A] flex items-center justify-center relative overflow-hidden group border border-brand-mist/20">

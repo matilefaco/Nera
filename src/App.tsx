@@ -14,10 +14,41 @@ import { AppErrorBoundary } from './components/AppErrorBoundary';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { runtimeLogger } from './lib/runtimeDiagnostics';
 
-// Pages (to be created)
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
+// Pages (Lazy Loaded for performance)
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
+const TermsPage = React.lazy(() => import('./pages/TermsPage'));
+const PrivacyPage = React.lazy(() => import('./pages/PrivacyPage'));
+const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
+const ChangePasswordPage = React.lazy(() => import('./pages/ChangePasswordPage'));
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const ServicesPage = React.lazy(() => import('./pages/ServicesPage'));
+const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
+const ClientsPage = React.lazy(() => import('./pages/ClientsPage'));
+const PlansPage = React.lazy(() => import('./pages/PlansPage'));
+const AgendaPage = React.lazy(() => import('./pages/AgendaPage'));
+const PublicProfile = React.lazy(() => import('./pages/PublicProfile'));
+const OnboardingPage = React.lazy(() => import('./pages/OnboardingPage'));
+const ReviewPage = React.lazy(() => import('./pages/ReviewPage'));
+const BookingResponsePage = React.lazy(() => import('./pages/BookingResponsePage'));
+const VerifyEmailPage = React.lazy(() => import('./pages/VerifyEmailPage'));
+const AuthActionPage = React.lazy(() => import('./pages/AuthActionPage'));
+const PendingRequestsPage = React.lazy(() => import('./pages/PendingRequestsPage'));
+const ManageBookingPage = React.lazy(() => import('./pages/ManageBookingPage'));
+const CouponsPage = React.lazy(() => import('./pages/CouponsPage'));
+const WhatsAppSimulator = React.lazy(() => import('./pages/WhatsAppSimulator'));
+const DirectoryPage = React.lazy(() => import('./pages/DirectoryPage'));
+const CheckoutSuccessPage = React.lazy(() => import('./pages/CheckoutSuccessPage'));
+const CheckoutCanceledPage = React.lazy(() => import('./pages/CheckoutCanceledPage'));
+const ReferralsPage = React.lazy(() => import('./pages/ReferralsPage'));
+const WhatsAppHistoryPage = React.lazy(() => import('./pages/WhatsAppHistoryPage'));
+const FinancialPage = React.lazy(() => import('./pages/FinancialPage'));
+
+// Special handling for named export
+const ReviewsModerationPage = React.lazy(() => 
+  import('./pages/ReviewsModerationPage').then(m => ({ default: m.ReviewsModerationPage }))
+);
 
 function RouteLogger() {
   const location = useLocation();
@@ -30,33 +61,6 @@ function RouteLogger() {
   }, [location.pathname, isDev]);
   return null;
 }
-import TermsPage from './pages/TermsPage';
-import PrivacyPage from './pages/PrivacyPage';
-import SettingsPage from './pages/SettingsPage';
-import ChangePasswordPage from './pages/ChangePasswordPage';
-import Dashboard from './pages/Dashboard';
-import ServicesPage from './pages/ServicesPage';
-import ProfilePage from './pages/ProfilePage';
-import ClientsPage from './pages/ClientsPage';
-import PlansPage from './pages/PlansPage';
-import AgendaPage from './pages/AgendaPage';
-import PublicProfile from './pages/PublicProfile';
-import OnboardingPage from './pages/OnboardingPage';
-import ReviewPage from './pages/ReviewPage';
-import BookingResponsePage from './pages/BookingResponsePage';
-import VerifyEmailPage from './pages/VerifyEmailPage';
-import AuthActionPage from './pages/AuthActionPage';
-import PendingRequestsPage from './pages/PendingRequestsPage';
-import ManageBookingPage from './pages/ManageBookingPage';
-import CouponsPage from './pages/CouponsPage';
-import WhatsAppSimulator from './pages/WhatsAppSimulator';
-import DirectoryPage from './pages/DirectoryPage';
-import CheckoutSuccessPage from './pages/CheckoutSuccessPage';
-import CheckoutCanceledPage from './pages/CheckoutCanceledPage';
-import ReferralsPage from './pages/ReferralsPage';
-import WhatsAppHistoryPage from './pages/WhatsAppHistoryPage';
-import FinancialPage from './pages/FinancialPage';
-import { ReviewsModerationPage } from './pages/ReviewsModerationPage';
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
@@ -116,9 +120,10 @@ export default function App() {
             <RouteLogger />
             <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
               <AppErrorBoundary>
-                <Routes>
-                {/* ... routes ... */}
-                <Route path="/" element={<LandingPage />} />
+                <React.Suspense fallback={<AppLoadingScreen />}>
+                  <Routes>
+                  {/* ... routes ... */}
+                  <Route path="/" element={<LandingPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/privacidade" element={<PrivacyPage />} />
@@ -225,6 +230,7 @@ export default function App() {
                 </div>
               } />
                 </Routes>
+              </React.Suspense>
               </AppErrorBoundary>
               <Toaster 
                 position="top-center" 

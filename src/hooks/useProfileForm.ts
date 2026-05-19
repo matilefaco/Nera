@@ -10,6 +10,7 @@ export function useProfileForm(profile: UserProfile | null) {
   const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || '');
   const [instagram, setInstagram] = useState(profile?.instagram || '');
   const [paymentMethods, setPaymentMethods] = useState<string[]>(profile?.paymentMethods || []);
+  const [acceptsInstallments, setAcceptsInstallments] = useState(profile?.acceptsInstallments || false);
   const [antiNoShowEnabled, setAntiNoShowEnabled] = useState(profile?.antiNoShowEnabled || false);
   const [advancePaymentRequired, setAdvancePaymentRequired] = useState(profile?.advancePaymentRequired || false);
   const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20 | 0>(profile?.delayTolerance ?? 0);
@@ -59,6 +60,7 @@ export function useProfileForm(profile: UserProfile | null) {
       if (profile.whatsapp) setWhatsapp(profile.whatsapp);
       if (profile.instagram) setInstagram(profile.instagram);
       if (profile.paymentMethods?.length) setPaymentMethods(profile.paymentMethods);
+      if (profile.acceptsInstallments !== undefined) setAcceptsInstallments(profile.acceptsInstallments);
       if (profile.antiNoShowEnabled !== undefined) setAntiNoShowEnabled(profile.antiNoShowEnabled);
       if (profile.advancePaymentRequired !== undefined) setAdvancePaymentRequired(profile.advancePaymentRequired);
       if (profile.delayTolerance !== undefined) setDelayTolerance(profile.delayTolerance);
@@ -101,6 +103,7 @@ export function useProfileForm(profile: UserProfile | null) {
     whatsapp, setWhatsapp,
     instagram, setInstagram,
     paymentMethods, setPaymentMethods,
+    acceptsInstallments, setAcceptsInstallments,
     antiNoShowEnabled, setAntiNoShowEnabled,
     advancePaymentRequired, setAdvancePaymentRequired,
     delayTolerance, setDelayTolerance,

@@ -22,6 +22,7 @@ import { FormLocation } from '../components/FormLocation';
 import { analyzePortfolio } from '../services/aiService';
 import { useProfileForm } from '../hooks/useProfileForm';
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import { getNormalizedPaymentMethods } from '../lib/payment';
 import UpgradeModal from '../components/UpgradeModal';
 import PremiumButton from '../components/PremiumButton';
 import SilentConfirmModal from '../components/SilentConfirmModal';
@@ -117,6 +118,7 @@ export default function ProfilePage() {
     startTime, setStartTime,
     endTime, setEndTime,
     paymentMethods, setPaymentMethods,
+    acceptsInstallments, setAcceptsInstallments,
     yearsExperience, setYearsExperience,
     serviceStyle, setServiceStyle,
     antiNoShowEnabled, setAntiNoShowEnabled,
@@ -452,7 +454,8 @@ export default function ProfilePage() {
         pricingStrategy,
         avatar,
         profileTheme,
-        paymentMethods: paymentMethods.length > 0 ? paymentMethods : [],
+        paymentMethods: getNormalizedPaymentMethods(paymentMethods) as any,
+        acceptsInstallments,
         antiNoShowEnabled,
         advancePaymentRequired,
         delayTolerance,
@@ -1319,10 +1322,10 @@ export default function ProfilePage() {
                 <div className="flex flex-wrap gap-2 px-2">
                   {[
                     { id: 'pix', label: 'Pix' },
-                    { id: 'credito', label: 'Cartão de Crédito' },
-                    { id: 'debito', label: 'Cartão de Débito' },
-                    { id: 'dinheiro', label: 'Dinheiro' },
-                    { id: 'transferencia', label: 'Transferência' }
+                    { id: 'credit_card', label: 'Cartão de Crédito' },
+                    { id: 'debit_card', label: 'Cartão de Débito' },
+                    { id: 'cash', label: 'Dinheiro' },
+                    { id: 'bank_transfer', label: 'Transferência' }
                   ].map(m => (
                     <button
                       key={m.id}
@@ -1341,6 +1344,26 @@ export default function ProfilePage() {
                     </button>
                   ))}
                 </div>
+                
+                {paymentMethods.some(m => ['credit_card', 'credito', 'crédito'].includes(m)) && (
+                  <div className="px-4 py-2 animate-in fade-in slide-in-from-top-2">
+                    <label className="flex items-center gap-3 cursor-pointer group w-fit">
+                      <div className="relative flex items-center justify-center">
+                        <input 
+                          type="checkbox" 
+                          checked={acceptsInstallments} 
+                          onChange={(e) => setAcceptsInstallments(e.target.checked)}
+                          className="peer appearance-none w-5 h-5 rounded-lg border border-brand-mist checked:bg-brand-terracotta checked:border-brand-terracotta transition-all"
+                        />
+                        <CheckCircle2 size={12} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Ofereço parcelamento no cartão</span>
+                        <p className="text-[9px] text-brand-stone/60 font-light leading-none">Exibido na vitrine se selecionado cartão de crédito.</p>
+                      </div>
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           </section>
