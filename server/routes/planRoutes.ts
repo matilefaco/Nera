@@ -685,21 +685,26 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
   const { targetUid, targetEmail } = req.body;
 
   try {
-    // 1. Verify caller is Admin
+    // 1. Verify caller is Admin OR targeting themselves
     const callerDoc = await db.collection("users").doc(callerUid!).get();
-    if (!callerDoc.exists || callerDoc.data()?.role !== 'admin') {
-      logger.warn("ADMIN", "Unauthorized attempt to reconcile user", { callerUid });
-      return res.status(403).json({ error: "Unauthorized. Admin role required." });
+    const isAdmin = callerDoc.exists && callerDoc.data()?.role === 'admin';
+    const isSelf = targetUid === callerUid;
+
+    if (!isAdmin && !isSelf) {
+      logger.warn("ADMIN", "Unauthorized attempt to reconcile user", { callerUid, targetUid });
+      return res.status(403).json({ error: "Unauthorized. Admin role required or must be yourself." });
     }
 
-    if (!targetUid && !targetEmail) {
+    if (!targetUid && !targetEmail && !isSelf) {
       return res.status(400).json({ error: "Missing targetUid or targetEmail" });
     }
 
+    const effectiveTargetUid = targetUid || callerUid;
+
     // 2. Find Target User
     let userDoc: admin.firestore.DocumentSnapshot | null = null;
-    if (targetUid) {
-      userDoc = await db.collection("users").doc(targetUid).get();
+    if (effectiveTargetUid) {
+      userDoc = await db.collection("users").doc(effectiveTargetUid).get();
     } else if (targetEmail) {
       const snap = await db.collection("users").where("email", "==", targetEmail.toLowerCase().trim()).limit(1).get();
       if (!snap.empty) userDoc = snap.docs[0];

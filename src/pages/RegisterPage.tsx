@@ -13,7 +13,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { User as UserIcon, Mail, Lock, ArrowRight, Sparkles, LogOut, Gift } from 'lucide-react';
 import { useAuth } from '../AuthContext';
 import { notify } from '../lib/notify';
-import { generateSlug, getHumanError, generateReferralCode } from '../lib/utils';
+import { generateSlug, getHumanError, generateReferralCode, cn } from '../lib/utils';
 import Logo from '../components/Logo';
 
 export default function RegisterPage() {
@@ -24,12 +24,12 @@ export default function RegisterPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [manualReferralCode, setManualReferralCode] = useState(searchParams.get('ref') || '');
-  const selectedPlan = searchParams.get('plan');
+  const [activePlan, setActivePlan] = useState<'free' | 'essencial' | 'pro'>((searchParams.get('plan') as any) || 'free');
 
-    const handlePostRegisterCheckout = async (user: User, email: string) => {
-    if (!selectedPlan || (selectedPlan !== 'essencial' && selectedPlan !== 'pro')) {
+  const handlePostRegisterCheckout = async (user: User, email: string) => {
+    if (activePlan === 'free') {
       navigate('/onboarding');
       return;
     }
@@ -43,7 +43,7 @@ export default function RegisterPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          plan: selectedPlan,
+          plan: activePlan,
           professionalId: user.uid,
           email: email,
         }),
@@ -84,24 +84,24 @@ export default function RegisterPage() {
       const userReferralCode = generateReferralCode(user.displayName || 'PROFISSIONAL');
       
       try {
-        await setDoc(doc(db, 'users', user.uid), {
-          uid: user.uid,
-          name: user.displayName,
-          email: user.email,
-          slug,
-          specialty: '',
-          bio: '',
-          location: '',
-          whatsapp: '',
-          avatar: user.photoURL || '',
-          onboardingCompleted: false,
-          referredBy: manualReferralCode || null,
-          referralCode: userReferralCode,
-          credits: 0,
-          plan: 'free',
-          signupPlan: (selectedPlan === 'essencial' || selectedPlan === 'pro') ? selectedPlan : 'free',
-          createdAt: new Date().toISOString()
-        }, { merge: true });
+          await setDoc(doc(db, 'users', user.uid), {
+            uid: user.uid,
+            name: user.displayName,
+            email: user.email,
+            slug,
+            specialty: '',
+            bio: '',
+            location: '',
+            whatsapp: '',
+            avatar: user.photoURL || '',
+            onboardingCompleted: false,
+            referredBy: manualReferralCode || null,
+            referralCode: userReferralCode,
+            credits: 0,
+            plan: 'free',
+            signupPlan: activePlan,
+            createdAt: new Date().toISOString()
+          }, { merge: true });
       } catch (firestoreError: any) {
         console.error('[SIGNUP FLOW] Firestore profile creation failed:', firestoreError);
         handleFirestoreError(firestoreError, OperationType.WRITE, `users/${user.uid}`);
@@ -147,7 +147,7 @@ export default function RegisterPage() {
           email,
           password,
           referredBy: manualReferralCode,
-          plan: selectedPlan
+          plan: activePlan
         }),
       });
 
@@ -189,7 +189,7 @@ export default function RegisterPage() {
       }
       
       // 3. Handle Plan Checkout if applicable
-      if (user && (selectedPlan === 'essencial' || selectedPlan === 'pro')) {
+      if (user && activePlan !== 'free') {
         await handlePostRegisterCheckout(user, email);
         return;
       }
@@ -229,7 +229,7 @@ export default function RegisterPage() {
       <motion.div 
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-2xl relative"
+        className="w-full max-w-xl bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-2xl relative"
       >
         {currentUser && !loading && (
           <div className="absolute inset-0 z-50 bg-brand-white/95 backdrop-blur-sm rounded-[40px] flex flex-col items-center justify-center p-10 text-center">
@@ -257,25 +257,79 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <div className="text-center mb-10">
-          <h2 className="text-3xl font-serif font-normal text-brand-ink mb-2">Crie sua presença profissional</h2>
-          {selectedPlan === 'essencial' ? (
-            <div className="space-y-1">
-              <p className="text-brand-stone text-sm font-light">
-                Comece seu teste gratuito de <span className="font-semibold text-brand-terracotta">15 dias</span> no plano Essencial.
-              </p>
-              <p className="text-[10px] text-brand-mist uppercase tracking-widest font-medium">Cartão obrigatório · Cancele quando quiser</p>
+        <div className="text-center mb-8">
+          <h2 className="text-3xl font-serif font-normal text-brand-ink mb-3">Crie sua presença profissional</h2>
+          <p className="text-brand-stone text-sm font-light">
+            Comece no Gratuito ou teste o Essencial por 15 dias. Você pode mudar de plano quando quiser.
+          </p>
+        </div>
+
+        {/* Plan Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-10">
+          {/* FREE */}
+          <button
+            type="button"
+            onClick={() => setActivePlan('free')}
+            className={cn(
+              "flex flex-col p-4 rounded-[24px] border transition-all text-left group",
+              activePlan === 'free' 
+                ? "bg-brand-linen border-brand-ink ring-1 ring-brand-ink" 
+                : "bg-white border-brand-mist hover:border-brand-stone"
+            )}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-stone group-hover:text-brand-ink transition-colors">Gratuito</span>
             </div>
-          ) : selectedPlan === 'pro' ? (
-            <div className="space-y-1">
-              <p className="text-brand-stone text-sm font-light">
-                Prepare-se para o próximo nível com o plano <span className="font-semibold text-brand-terracotta capitalize">Pro</span>.
-              </p>
-              <p className="text-[10px] text-brand-mist uppercase tracking-widest font-medium">Acesso imediato · Cartão obrigatório</p>
+            <p className="text-[11px] text-brand-stone font-light leading-snug mb-3">Para criar sua vitrine e começar no seu ritmo.</p>
+            <div className="mt-auto pt-2 border-t border-brand-mist/50">
+              <span className="text-lg font-serif text-brand-ink">R$0</span>
             </div>
-          ) : (
-            <p className="text-brand-stone text-sm font-light">Comece sua página de agendamento em minutos. <br/> Você começará no plano <span className="font-medium text-brand-terracotta">Gratuito</span>.</p>
-          )}
+          </button>
+
+          {/* ESSENCIAL */}
+          <button
+            type="button"
+            onClick={() => setActivePlan('essencial')}
+            className={cn(
+              "flex flex-col p-4 rounded-[24px] border transition-all text-left group relative overflow-hidden",
+              activePlan === 'essencial' 
+                ? "bg-brand-linen bg-[#F8F5F2] border-brand-terracotta ring-1 ring-brand-terracotta" 
+                : "bg-white border-brand-mist hover:border-brand-stone"
+            )}
+          >
+            <div className="absolute top-0 right-0 bg-brand-terracotta text-white text-[8px] font-bold uppercase tracking-tighter px-2 py-1 rounded-bl-lg">
+              15 dias grátis
+            </div>
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta">Essencial</span>
+            </div>
+            <p className="text-[11px] text-brand-stone font-light leading-snug mb-3">Agenda ilimitada, bloqueios de horário e experiência profissional por e-mail.</p>
+            <div className="mt-auto pt-2 border-t border-brand-mist/50">
+              <span className="text-lg font-serif text-brand-ink">R$49<span className="text-[10px] text-brand-stone">/mês</span></span>
+              <p className="text-[8px] text-brand-mist uppercase tracking-widest font-medium mt-1 leading-none">Cartão obrigatório · cancele quando quiser</p>
+            </div>
+          </button>
+
+          {/* PRO */}
+          <button
+            type="button"
+            onClick={() => setActivePlan('pro')}
+            className={cn(
+              "flex flex-col p-4 rounded-[24px] border transition-all text-left group",
+              activePlan === 'pro' 
+                ? "bg-brand-linen border-brand-ink ring-1 ring-brand-ink" 
+                : "bg-white border-brand-mist hover:border-brand-stone"
+            )}
+          >
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">Pro</span>
+            </div>
+            <p className="text-[11px] text-brand-stone font-light leading-snug mb-3">Para crescer com WhatsApp, lista de espera, cupons e recursos avançados.</p>
+            <div className="mt-auto pt-2 border-t border-brand-mist/50">
+              <span className="text-lg font-serif text-brand-ink">R$89<span className="text-[10px] text-brand-stone">/mês</span></span>
+              <p className="text-[8px] text-brand-mist uppercase tracking-widest font-medium mt-1 leading-none">Plano completo da Nera</p>
+            </div>
+          </button>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-5 mb-10">
@@ -357,7 +411,11 @@ export default function RegisterPage() {
             disabled={loading || !acceptedTerms}
             className="w-full bg-brand-terracotta text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-sienna transition-all flex items-center justify-center gap-3 disabled:opacity-50 mt-4"
           >
-            {loading ? 'Preparando seu perfil...' : 'Criar meu perfil'} <ArrowRight size={18} />
+            {loading ? 'Preparando seu perfil...' : 
+              activePlan === 'essencial' ? 'Ativar teste do Essencial' :
+              activePlan === 'pro' ? 'Começar como Pro' :
+              'Criar conta grátis'
+            } <ArrowRight size={18} />
           </button>
         </form>
 

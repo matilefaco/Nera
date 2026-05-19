@@ -26,12 +26,12 @@ export default function CheckoutSuccessPage() {
       refreshProfile();
     }, 3000);
 
-    // Timeout after 45 seconds if syncing still true
+    // Timeout after 12 seconds if syncing still true
     const timeout = setTimeout(() => {
       setTimedOut(true);
       setSyncing(false);
       clearInterval(interval);
-    }, 45000);
+    }, 12000);
 
     return () => {
       clearInterval(interval);
@@ -59,16 +59,19 @@ export default function CheckoutSuccessPage() {
         </div>
 
         <h1 className="text-3xl font-serif text-brand-ink mb-4">
-          {syncing ? 'Verificando assinatura...' : timedOut ? 'Quase lá!' : 'Assinatura ativada!'}
+          {syncing ? 'Verificando assinatura...' : timedOut ? 'Ativação em curso' : 'Assinatura ativada!'}
         </h1>
         
         <div className="text-brand-stone text-sm font-light leading-relaxed mb-10">
           {syncing ? (
             <p>Estamos confirmando seu teste de 15 dias com o Stripe. Isso levará apenas alguns instantes.</p>
           ) : timedOut ? (
-            <div className="space-y-2">
-              <p>O processamento está demorando um pouco mais que o esperado.</p>
-              <p className="font-medium text-brand-terracotta">Seu acesso será liberado automaticamente em alguns minutos.</p>
+            <div className="space-y-3">
+              <div className="p-4 bg-brand-linen/60 rounded-[20px] text-xs space-y-2 border border-brand-mist/30">
+                <p>O processamento está demorando um pouco mais que o esperado.</p>
+                <p className="font-semibold text-brand-ink">Estamos finalizando sua ativação. Seu acesso será liberado automaticamente em instantes.</p>
+              </div>
+              <p className="text-[11px] text-brand-stone/60 italic">Você já pode seguir para o seu painel enquanto terminamos.</p>
             </div>
           ) : (
             <p>

@@ -12,7 +12,7 @@ import {
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp, Heart,
   ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
-  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info, Ticket, Gift
+  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info, Ticket, Gift, Loader2
 } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { 
@@ -115,13 +115,44 @@ export default function Dashboard() {
   
   // Auto-sync if plan is free but we expect something else
   useEffect(() => {
-    if (plan === 'free' && (signupPlan === 'essencial' || signupPlan === 'pro')) {
-      const timer = setTimeout(() => {
+    if (plan === 'free' && signupPlan && signupPlan !== 'free') {
+      const reconcile = async () => {
+        try {
+          const token = await user?.getIdToken();
+          const res = await fetch('/api/plans/reconcile-user', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ targetUid: user?.uid })
+          });
+          const data = await res.json();
+          if (data.success) {
+            refreshProfile();
+          }
+        } catch (err) {
+          console.error("Auto-reconcile failed:", err);
+        }
+      };
+
+      // Try reconcile once after 5s
+      const timer = setTimeout(reconcile, 5000);
+      
+      // Also poll every 10s for 3 times
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
         refreshProfile();
-      }, 5000); // Wait 5s for webhook to definitely finish
-      return () => clearTimeout(timer);
+        if (attempts >= 3) clearInterval(interval);
+      }, 10000);
+
+      return () => {
+        clearTimeout(timer);
+        clearInterval(interval);
+      };
     }
-  }, [plan, signupPlan, refreshProfile]);
+  }, [plan, signupPlan, refreshProfile, user]);
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
     // 1. Check URL param first (priority)
     const tabParam = searchParams.get('tab');
@@ -912,6 +943,49 @@ setUnconfirmedTomorrow(docs);
       )}
       <div className="p-6 md:p-12 pb-[calc(140px+env(safe-area-inset-bottom))] md:pb-16 max-w-5xl mx-auto w-full space-y-10">
         
+        {/* Sync Pending Banner */}
+        {plan === 'free' && signupPlan && signupPlan !== 'free' && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-brand-linen/80 border border-brand-mist/50 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-stone shrink-0">
+                <Loader2 size={20} className="animate-spin text-brand-terracotta" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-brand-ink leading-tight">Ativação em processamento</p>
+                <p className="text-[10px] text-brand-stone font-light italic">Estamos sincronizando sua assinatura <span className="capitalize font-medium">{signupPlan}</span> com o Stripe.</p>
+              </div>
+            </div>
+            <button 
+              onClick={async () => {
+                const token = await user?.getIdToken();
+                notify.info('Verificando status no Stripe...');
+                const res = await fetch('/api/plans/reconcile-user', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ targetUid: user?.uid })
+                });
+                const data = await res.json();
+                if (data.success) {
+                  notify.success('Assinatura ativada com sucesso!');
+                  refreshProfile();
+                } else {
+                  notify.error('Ainda não identificamos o pagamento. Se você já concluiu no Stripe, aguarde alguns instantes.');
+                }
+              }}
+              className="px-4 py-2 bg-white border border-brand-mist/60 rounded-full text-[9px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-linen transition-all shrink-0 whitespace-nowrap"
+            >
+              Atualizar Assinatura
+            </button>
+          </motion.div>
+        )}
+
         {/* Avatar Skipped Reminder Banner */}
         {profile?.avatarSkipped && !profile?.avatar && (
           <motion.div 
