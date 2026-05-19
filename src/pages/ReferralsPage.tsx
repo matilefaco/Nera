@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Users, Gift, ArrowLeft, Calendar, CheckCircle2, Clock } from 'lucide-react';
+import { Users, Gift, ArrowLeft, Calendar, CheckCircle2, Clock, AlertCircle, MessageCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
@@ -14,7 +14,7 @@ import PremiumButton from '../components/PremiumButton';
 interface ReferralRecord {
   id: string;
   name: string;
-  email: string;
+  specialty?: string;
   createdAt: string;
   plan: string;
 }
@@ -55,6 +55,9 @@ export default function ReferralsPage() {
     let isCancelled = false;
 
     async function fetchReferrals() {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
       try {
         setLoading(true);
         setError(false);
@@ -63,8 +66,12 @@ export default function ReferralsPage() {
         const response = await fetch('/api/profile/referrals', {
           headers: {
             'Authorization': `Bearer ${token}`
-          }
+          },
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+
         if (!response.ok) throw new Error(`API_ERROR_${response.status}`);
         
         const docs = await response.json();
@@ -73,13 +80,23 @@ export default function ReferralsPage() {
 
         setReferrals(docs);
       } catch (err: any) {
+        clearTimeout(timeoutId);
         if (!isMounted || isCancelled) return;
+        
         console.error("[Referrals] error:", err);
-        setError(true);
+        
+        // Only show error UI if it was a real failure, not just empty
+        if (err.name === 'AbortError') {
+          setError(true);
+        } else if (err.message.includes('API_ERROR_')) {
+          setError(true);
+        } else {
+          // Fallback
+          setError(true);
+        }
         setReferrals([]);
       } finally {
         if (isMounted && !isCancelled) {
-          console.log('[Referrals] finally loading=false');
           setLoading(false);
         }
       }
@@ -188,12 +205,12 @@ export default function ReferralsPage() {
 
         {error ? (
           <div className="bg-brand-parchment rounded-[40px] border border-brand-mist p-16 text-center">
-            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-mist shadow-sm">
-               <Clock size={32} />
+            <div className="w-16 h-16 bg-brand-white rounded-full flex items-center justify-center mx-auto mb-6 text-brand-terracotta shadow-sm">
+               <AlertCircle size={32} />
             </div>
             <h3 className="text-xl font-serif text-brand-ink mb-2 italic">Carregamento Lento</h3>
             <p className="text-xs text-brand-stone font-light max-w-xs mx-auto mb-8">
-              A conexão está lenta. Nossos servidores demoraram mais que o esperado.
+              A conexão está lenta ou houve um erro de processamento. Tente novamente em alguns instantes.
             </p>
             <button 
               onClick={() => setRetryCount(c => c + 1)}
@@ -218,70 +235,100 @@ export default function ReferralsPage() {
             ))}
           </div>
         ) : referrals.length === 0 ? (
-          <div className="bg-[#FCFBF9] rounded-[40px] border border-dashed border-brand-mist/60 p-16 text-center">
-            <div className="w-16 h-16 bg-[#FAF9F8] border border-brand-mist/60 rounded-full flex items-center justify-center mx-auto mb-6 text-brand-stone/40 shadow-sm">
-              <Users size={24} strokeWidth={1.5} />
+          <div className="bg-white rounded-[40px] border border-brand-mist p-16 text-center shadow-sm">
+            <div className="w-20 h-20 bg-brand-linen/40 text-brand-stone/30 rounded-full flex items-center justify-center mx-auto mb-8">
+              <Users size={32} strokeWidth={1} />
             </div>
-            <h3 className="text-xl font-serif text-brand-ink mb-2">Ainda não há indicações</h3>
-            <p className="text-[13px] text-brand-stone font-light max-w-xs mx-auto mb-8">
-              Convites para novas profissionais aparecerão aqui.
+            <h3 className="text-2xl font-serif text-brand-ink mb-3">Sua primeira indicação começa aqui</h3>
+            <p className="text-sm text-brand-stone font-light max-w-xs mx-auto mb-10 leading-relaxed">
+              Quando outra profissional criar uma conta usando seu código, ela aparecerá aqui automaticamente. Indicações ativas geram créditos para sua conta.
             </p>
-            <button 
-              onClick={handleCopy}
-              className="inline-flex items-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
-            >
-              {copyAnim ? <CheckCircle2 size={14} className="text-green-400" /> : <Gift size={14} />}
-              {copyAnim ? 'Copiado!' : 'Copiar meu código'}
-            </button>
+            
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button 
+                onClick={handleCopy}
+                className="inline-flex items-center justify-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
+              >
+                {copyAnim ? <CheckCircle2 size={14} className="text-green-400" /> : <Gift size={14} />}
+                {copyAnim ? 'Link Copiado!' : 'Copiar Link'}
+              </button>
+              <button 
+                onClick={() => {
+                  const url = encodeURIComponent(referralLink);
+                  window.open(`https://wa.me/?text=${encodeURIComponent(`Oie! Descobri a Nera, uma plataforma incrível para vitrine e agendamento. Se cadastre pelo meu link: ${referralLink}`)}`, '_blank');
+                }}
+                className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-sm"
+              >
+                <MessageCircle size={14} />
+                Compartilhar no WhatsApp
+              </button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
             <div className="hidden sm:grid grid-cols-4 px-6 text-[9px] font-bold uppercase tracking-widest text-brand-stone">
               <div className="col-span-2">Profissional</div>
               <div>Data</div>
-              <div>Status</div>
+              <div>Status & Recompensa</div>
             </div>
 
-            {referrals.map((referral, idx) => (
-              <motion.div 
-                key={referral.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="bg-brand-white border border-brand-mist p-5 sm:p-6 rounded-3xl"
-              >
-                <div className="flex flex-col sm:grid sm:grid-cols-4 w-full items-start sm:items-center gap-4 sm:gap-0">
-                  <div className="sm:col-span-2 flex items-center gap-4 w-full min-w-0">
-                    <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-ink font-serif italic text-lg shrink-0">
-                      {referral.name.charAt(0)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-bold text-brand-ink uppercase tracking-tight truncate">{referral.name}</h4>
-                      <p className="text-[10px] text-brand-stone font-light truncate">{referral.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-brand-stone">
-                    <Calendar size={14} />
-                    <span className="text-[11px] font-medium">{new Date(referral.createdAt).toLocaleDateString('pt-BR')}</span>
-                  </div>
-
-                  <div>
-                    {referral.plan !== 'free' ? (
-                      <div className="flex items-center gap-2 text-green-600 bg-green-50 px-3 py-1.5 rounded-full w-fit border border-green-100">
-                        <CheckCircle2 size={12} />
-                        <span className="text-[9px] font-bold uppercase tracking-widest">Ativa (R$ 10)</span>
+            {referrals.map((referral, idx) => {
+              const firstName = referral.name.split(' ')[0];
+              const isPaid = referral.plan !== 'free';
+              
+              const statusLabel = referral.plan === 'pro' ? 'Assinatura ativa' : 
+                                 referral.plan === 'essencial' ? 'Trial ativo' : 
+                                 'Cadastro iniciado';
+              
+              return (
+                <motion.div 
+                  key={referral.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="bg-brand-white border border-brand-mist p-5 rounded-[24px] shadow-sm"
+                >
+                  <div className="flex flex-col sm:grid sm:grid-cols-4 w-full items-start sm:items-center gap-4 sm:gap-0">
+                    <div className="sm:col-span-2 flex items-center gap-4 w-full min-w-0">
+                      <div className="w-10 h-10 bg-brand-linen rounded-full flex items-center justify-center text-brand-ink font-serif italic text-lg shrink-0">
+                        {referral.name.charAt(0)}
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-brand-stone bg-brand-linen px-3 py-1.5 rounded-full w-fit border border-brand-mist/50">
-                        <Clock size={12} />
-                        <span className="text-[9px] font-bold uppercase tracking-widest">Pendente</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-bold text-brand-ink uppercase tracking-tight truncate">{firstName}</h4>
+                          <span className="w-1 h-1 rounded-full bg-brand-mist" />
+                          <span className="text-[10px] text-brand-stone font-light truncate">{referral.specialty || 'Profissional'}</span>
+                        </div>
+                        <p className="text-[9px] text-brand-stone/60 uppercase tracking-widest mt-1">{statusLabel}</p>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="flex items-center gap-2 text-brand-stone">
+                      <Calendar size={14} />
+                      <span className="text-[11px] font-medium">{new Date(referral.createdAt).toLocaleDateString('pt-BR')}</span>
+                    </div>
+
+                    <div>
+                      {isPaid ? (
+                        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full w-fit border border-emerald-100">
+                          <div className="flex items-center gap-1.5">
+                            <CheckCircle2 size={12} />
+                            <span className="text-[9px] font-bold uppercase tracking-widest whitespace-nowrap">Crédito liberado</span>
+                          </div>
+                          <span className="w-px h-3 bg-emerald-200 mx-1" />
+                          <span className="text-[9px] font-bold uppercase tracking-widest">+R$ 10</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-brand-stone bg-brand-linen/60 px-3 py-1.5 rounded-full w-fit border border-brand-mist/50">
+                          <Clock size={12} />
+                          <span className="text-[9px] font-bold uppercase tracking-widest">Aguardando ativação</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              );
+            })}
           </div>
         )}
 

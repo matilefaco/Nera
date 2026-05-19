@@ -602,7 +602,7 @@ router.get("/referrals", requireFirebaseAuth, async (req: AuthenticatedRequest, 
       return {
         id: doc.id,
         name: data.name || 'Nova Profissional',
-        email: data.email || '',
+        specialty: data.specialty || '',
         createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : new Date().toISOString(),
         plan: data.plan || 'free'
       };
