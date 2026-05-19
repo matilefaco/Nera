@@ -383,6 +383,15 @@ router.post("/webhook", async (req, res) => {
       const userData = userDoc.data();
       const creditsUsed = session.metadata?.creditsUsed === 'true';
 
+      // Idempotency Guard: Skip if subscription is already processed and plan matches
+      if (userData?.stripeSubscriptionId === session.subscription && userData?.plan === plan) {
+        logger.info("STRIPE", "[StripeSync] source=webhook-checkout-completed action=skipped_already_synced", { 
+          professionalId: maskUid(userId), 
+          subscriptionId: session.subscription 
+        });
+        return res.json({ received: true, alreadySynced: true });
+      }
+
       // Update User Plan - Mandatory Fields
       const updateData: any = {
         plan: plan,
@@ -473,36 +482,43 @@ router.post("/webhook", async (req, res) => {
         const userData = userDoc.data();
         const userId = userDoc.id;
 
-        const updateData: any = {
-          planExpiresAt: newExpiry.toISOString(),
-          stripeSubscriptionStatus: subscription.status,
-          updatedAt: new Date().toISOString()
-        };
+        const needsUpdate = userData.planExpiresAt !== newExpiry.toISOString() || 
+                           userData.stripeSubscriptionStatus !== subscription.status;
 
-        // Fallback: If plan is still free or missing, update it from subscription
-        const priceId = subscription.items?.data?.[0]?.price?.id;
-        if (priceId && (!userData.plan || userData.plan === 'free')) {
-          const envPro = process.env.STRIPE_PRICE_PRO;
-          const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+        if (needsUpdate) {
+          const updateData: any = {
+            planExpiresAt: newExpiry.toISOString(),
+            stripeSubscriptionStatus: subscription.status,
+            updatedAt: new Date().toISOString()
+          };
 
-          if (priceId === envPro) {
-            updateData.plan = 'pro';
-            updateData.planRank = 2;
-          } else if (priceId === envEssencial) {
-            updateData.plan = 'essencial';
-            updateData.planRank = 1;
-          } else {
-            // Fallback to metadata
-            const metaPlan = (subscription.metadata as any)?.plan;
-            if (metaPlan === 'pro' || metaPlan === 'essencial') {
-              updateData.plan = metaPlan;
-              updateData.planRank = metaPlan === 'pro' ? 2 : 1;
+          // Fallback: If plan is still free or missing, update it from subscription
+          const priceId = subscription.items?.data?.[0]?.price?.id;
+          if (priceId && (!userData.plan || userData.plan === 'free')) {
+            const envPro = process.env.STRIPE_PRICE_PRO;
+            const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+
+            if (priceId === envPro) {
+              updateData.plan = 'pro';
+              updateData.planRank = 2;
+            } else if (priceId === envEssencial) {
+              updateData.plan = 'essencial';
+              updateData.planRank = 1;
+            } else {
+              // Fallback to metadata
+              const metaPlan = (subscription.metadata as any)?.plan;
+              if (metaPlan === 'pro' || metaPlan === 'essencial') {
+                updateData.plan = metaPlan;
+                updateData.planRank = metaPlan === 'pro' ? 2 : 1;
+              }
             }
           }
-        }
 
-        await userDoc.ref.update(updateData);
-        logger.info("STRIPE", "Plan successfully renewed/synced", { professionalId: maskUid(userId) });
+          await userDoc.ref.update(updateData);
+          logger.info("STRIPE", "[StripeSync] source=webhook-invoice-paid action=synced_plan_expiry", { professionalId: maskUid(userId) });
+        } else {
+          logger.info("STRIPE", "[StripeSync] source=webhook-invoice-paid action=skipped_redundant_update", { professionalId: maskUid(userId) });
+        }
 
         // Handle Referral Reward (10 BRL)
         const referredBy = userData?.referredBy;
@@ -598,6 +614,23 @@ router.post("/webhook", async (req, res) => {
       }
 
       if (!userQuery.empty) {
+        const userDoc = userQuery.docs[0];
+        const userData = userDoc.data();
+        const userId = userDoc.id;
+
+        const currentExpiry = userData.planExpiresAt;
+        const newExpiryStr = subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toISOString() : null;
+
+        // Idempotency: check if update is actually needed
+        const hasStatusChange = userData.stripeSubscriptionStatus !== subscription.status;
+        const hasExpiryChange = newExpiryStr && currentExpiry !== newExpiryStr;
+        const hasCancelChange = userData.cancelAtPeriodEnd !== subscription.cancel_at_period_end;
+        
+        if (!hasStatusChange && !hasExpiryChange && !hasCancelChange) {
+           logger.info("STRIPE", "[StripeSync] source=webhook-subscription-updated action=skipped_redundant_update", { professionalId: maskUid(userId) });
+           return res.json({ received: true });
+        }
+
         const updateData: any = {
           stripeSubscriptionStatus: subscription.status,
           stripeSubscriptionId: subscriptionId,
@@ -727,6 +760,22 @@ router.post("/confirm-checkout", requireFirebaseAuth, async (req: AuthenticatedR
     
     if (!userDoc.exists) {
       return res.status(404).json({ error: "User profile not found." });
+    }
+
+    const userData = userDoc.data();
+    
+    // Idempotency Guard: If already synced with this subscription and plan, skip redundant write
+    if (userData?.stripeSubscriptionId === subscription.id && userData?.plan === plan) {
+      logger.info("STRIPE", "[StripeSync] source=confirm-checkout action=skipped_already_synced", { 
+        uid, 
+        subId: subscription.id 
+      });
+      return res.json({ 
+        success: true, 
+        plan, 
+        status: subscription.status,
+        alreadySynced: true
+      });
     }
 
     const updateData: any = {
@@ -881,6 +930,15 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
         priceId,
         metadata: sub.metadata,
         customerId
+      });
+    }
+
+    // Idempotency Guard: skip if already synced
+    if (userData.stripeSubscriptionId === sub.id && userData.plan === plan && userData.stripeSubscriptionStatus === sub.status) {
+      return res.json({
+        success: true,
+        message: `Plan is already reconciled and matches Stripe (${plan.toUpperCase()})`,
+        alreadySynced: true
       });
     }
 

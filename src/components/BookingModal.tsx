@@ -13,7 +13,7 @@ import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, Waitli
 import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage, formatDateKey, getTodayLocale } from '../lib/utils';
 import { getAvailableSlots, canBookSlot } from '../lib/bookingUtils';
 import { notify } from '../lib/notify';
-import { SERVICE_MODES, getServiceModeShortLabel } from '../lib/copy';
+import { SERVICE_MODES, getServiceModeShortLabel, getBookingNotificationCopy } from '../lib/copy';
 import PremiumButton from './PremiumButton';
 import WaitlistModal from './WaitlistModal';
 
@@ -1037,7 +1037,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                   <div className="bg-brand-linen/30 border border-brand-mist rounded-3xl p-6 mb-10">
                     <p className="text-[10px] text-brand-stone font-light text-center leading-relaxed">
                       Ao confirmar, seu pedido será enviado para aprovação da profissional.
-                      Você receberá as atualizações por e-mail e WhatsApp.
+                      {getBookingNotificationCopy(profile.plan, !!profile.whatsapp).notification}
                     </p>
                   </div>
 
@@ -1122,7 +1122,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
             <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", damping: 15 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"><Check size={48} /></motion.div>
             <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">{profile?.name.split(' ')[0]} recebeu seu pedido</h2>
             <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
-              Você receberá a confirmação e atualizações do agendamento por e-mail.
+              {getBookingNotificationCopy(profile.plan, !!profile.whatsapp).notification}
               <span className="block mt-2 text-[10px] text-brand-stone italic">
                 Verifique sua caixa de entrada e spam ✨
               </span>

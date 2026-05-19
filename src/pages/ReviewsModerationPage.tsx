@@ -139,12 +139,12 @@ export function ReviewsModerationPage() {
             ))}
           </div>
         ) : reviews.length === 0 ? (
-          <div className="bg-white rounded-3xl p-12 text-center border border-dashed border-brand-mist/60 shadow-sm flex flex-col items-center">
-            <div className="w-16 h-16 bg-[#FAF9F8] rounded-full flex items-center justify-center mx-auto mb-4 text-brand-stone/40 border border-brand-mist/40">
-              <Check size={24} strokeWidth={1.5} />
+          <div className="bg-white rounded-[40px] border border-dashed border-brand-mist/60 py-20 px-8 text-center shadow-sm flex flex-col items-center">
+            <div className="w-16 h-16 bg-[#FAF9F8] rounded-2xl flex items-center justify-center mx-auto mb-6 text-brand-stone/40 border border-brand-mist/40 shadow-sm">
+              <Star size={24} strokeWidth={1} />
             </div>
-            <h3 className="text-xl font-serif text-brand-ink mb-2">Ainda não há avaliações</h3>
-            <p className="text-[13px] text-brand-stone font-light">As avaliações recebidas aparecerão aqui.</p>
+            <h3 className="text-xl font-serif text-brand-ink mb-1 italic text-pretty">Nenhuma avaliação pendente</h3>
+            <p className="text-[11px] text-brand-stone font-light max-w-xs mx-auto leading-relaxed uppercase tracking-widest">As avaliações das suas clientes aparecerão aqui assim que forem enviadas.</p>
           </div>
         ) : (
           <div className="space-y-6">

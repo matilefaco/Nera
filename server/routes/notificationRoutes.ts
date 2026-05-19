@@ -746,7 +746,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
           horario: assignedTime,
           servicoNome: serviceName || 'serviço',
           tempoExpira: expiresInHours || 2,
-          linkAgendar: `${baseUrl}/p/exemplo?waitlist_invite=true&booking_id=${bookingId}`
+          linkAgendar: `${baseUrl}/p/${payload.professionalSlug || 'perfil'}?waitlist_invite=true&booking_id=${bookingId}`
         });
         
         await sendWhatsAppMeta(clientWhatsapp, msg, {

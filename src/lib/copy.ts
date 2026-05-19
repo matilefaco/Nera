@@ -40,46 +40,96 @@ export const getServiceModeDescription = (mode?: string) => {
  * Formats a specialty into a more natural sounding string.
  */
 export const formatSpecialtyLabel = (specialty: string = "") => {
-  if (!specialty) return "";
+  if (!specialty) return "Profissional de beleza";
   const s = specialty.toLowerCase().trim();
   
-  if (s === 'maquiadora') return "Especialista em maquiagem";
-  if (s === 'nail designer') return "Especialista em unhas";
-  if (s === 'designer de sobrancelhas') return "Especialista em sobrancelhas";
-  if (s === 'manicure') return "Especialista em unhas";
-  if (s === 'pedicure') return "Especialista em unhas";
-  if (s === 'esteticista') return "Especialista em estética";
-  if (s === 'cabeleireira') return "Especialista em cabelos";
+  const mappings: Record<string, string> = {
+    'maquiadora': "Especialista em maquiagem",
+    'maquiagem': "Especialista em maquiagem",
+    'make': "Especialista em maquiagem",
+    'nail designer': "Especialista em unhas",
+    'manicure': "Especialista em unhas",
+    'pedicure': "Especialista em pés e mãos",
+    'pés e mãos': "Especialista em unhas",
+    'design de unhas': "Especialista em unhas",
+    'designer de sobrancelhas': "Especialista em sobrancelhas",
+    'sobrancelhas': "Especialista em sobrancelhas",
+    'lash designer': "Especialista em cílios",
+    'lash': "Especialista em cílios",
+    'extensionista de cílios': "Especialista em cílios",
+    'cílios': "Especialista em cílios",
+    'micropigmentadora': "Especialista em micropigmentação",
+    'micropigmentação': "Especialista em micropigmentação",
+    'micro': "Especialista em micropigmentação",
+    'esteticista': "Especialista em estética",
+    'estética': "Especialista em estética",
+    'cabeleireira': "Especialista em cabelos",
+    'cabelo': "Especialista em cabelos",
+    'hair': "Especialista em cabelos",
+    'terapeuta capilar': "Especialista em tratamentos capilares",
+    'massoterapeuta': "Especialista em massoterapia",
+    'massagem': "Especialista em massoterapia",
+    'bronzeamento': "Especialista em bronzeamento",
+    'bronze': "Especialista em bronzeamento",
+    'depiladora': "Especialista em depilação",
+    'depilação': "Especialista em depilação",
+    'body piercing': "Especialista em body piercing",
+    'piercing': "Especialista em body piercing"
+  };
+
+  if (mappings[s]) return mappings[s];
   
   // If it's already "Especialista em...", return as is
   if (s.startsWith('especialista em')) return specialty;
   
-  return `Especialista em ${specialty}`;
+  // For person titles like "lash designer", sometimes people use uppercase or variations 
+  // that don't match exactly. The mappings cover most.
+  
+  // If it's plural or has "a" at the end, it's often a person title.
+  // But to be safe and follow instructions:
+  // "Se a especialidade não estiver mapeada: Usar fallback neutro"
+  return "Profissional de beleza";
 };
 
 /**
  * Returns dynamic copywriting for the hero section based on the professional's specialty.
  */
 export const getProfileHeroCopy = (specialty: string = "", id: string = "") => {
-  const s = specialty.toLowerCase();
+  const s = specialty.toLowerCase().trim();
   
   if (s.includes('unha') || s.includes('manicure') || s.includes('pedicure') || s.includes('nail')) {
     return { main: "Transformando mãos em", accent: "arte" };
   }
-  if (s.includes('sobrancelha') || s.includes('brow') || s.includes('olhar')) {
+  if (s.includes('sobrancelha') || s.includes('brow') || s.includes('olhar') || s.includes('micropigmentadora')) {
     return { main: "Design que valoriza o seu", accent: "olhar" };
   }
   if (s.includes('cílios') || s.includes('lash') || s.includes('extensão')) {
     return { main: "O segredo de um", accent: "olhar marcante" };
   }
-  if (s.includes('cabelo') || s.includes('hair') || s.includes('penteado')) {
+  if (s.includes('cabelo') || s.includes('hair') || s.includes('penteado') || s.includes('cabeleireira')) {
     return { main: "Expressando sua essência através dos", accent: "fios" };
   }
-  if (s.includes('maquiagem') || s.includes('make') || s.includes('estética')) {
+  if (s.includes('maquiagem') || s.includes('make') || s.includes('maquiadora')) {
     return { main: "Sua beleza autêntica", accent: "realçada" };
   }
+  if (s.includes('estética') || s.includes('esteticista')) {
+    return { main: "A ciência do cuidado", accent: "com você" };
+  }
   
-  return { main: "Especialista em", accent: specialty || "Beleza" };
+  const formatted = formatSpecialtyLabel(specialty);
+  
+  if (formatted === "Profissional de beleza") {
+    return { main: "Especialista em", accent: "Beleza" };
+  }
+  
+  if (formatted.startsWith("Especialista em ")) {
+    return { 
+      main: "Especialista em", 
+      accent: formatted.replace("Especialista em ", "") 
+    };
+  }
+
+  return { main: "Profissional de", accent: "Beleza" };
 };
 
 /**
@@ -87,34 +137,44 @@ export const getProfileHeroCopy = (specialty: string = "", id: string = "") => {
  */
 export const getServiceLocationCopy = (profile: any) => {
   const { serviceMode, serviceAreaType, city, neighborhood, studioAddress, serviceAreas } = profile;
-  const areaLabel = neighborhood || city || "";
+  
+  const hasNeighborhood = !!neighborhood && neighborhood.trim() !== "";
+  const hasCity = !!city && city.trim() !== "";
+  const locationLabel = hasNeighborhood ? neighborhood : (hasCity ? city : "");
   
   if (serviceMode === 'studio') {
     if (studioAddress?.privacyMode === 'public_full' && studioAddress?.street) {
-      return `Estúdio em ${studioAddress.street}, ${studioAddress.number}`;
+      const streetPart = `${studioAddress.street}${studioAddress.number ? `, ${studioAddress.number}` : ""}`;
+      return `Estúdio em ${streetPart}`;
     }
-    return `Atende em estúdio em ${areaLabel}`;
+    if (hasNeighborhood) return `Estúdio em ${neighborhood}`;
+    if (hasCity) return `Atende no estúdio em ${city}`;
+    return `Atende no estúdio`;
   }
   
   if (serviceMode === 'home') {
-    if (serviceAreaType === 'city_wide') {
-      return `Atende em domicílio em toda a cidade`;
-    }
-    if (serviceAreas && serviceAreas.length > 0) {
-       return `Atende em domicílio nos bairros selecionados`;
-    }
-    return `Atende em domicílio em ${areaLabel}`;
+    const isCityWide = serviceAreaType === 'city_wide';
+    const hasSelectedAreas = serviceAreas && serviceAreas.length > 0;
+
+    if (isCityWide) return `Atende em domicílio em toda a cidade`;
+    if (hasSelectedAreas) return `Atende em domicílio nos bairros selecionados`;
+    if (hasCity) return `Atende em domicílio em ${city}`;
+    return `Atende em domicílio`;
   }
   
   if (serviceMode === 'hybrid') {
-    const base = "Atende em estúdio e em domicílio";
-    if (serviceAreaType === 'city_wide') {
-      return `${base} em toda a cidade`;
+    const isCityWide = serviceAreaType === 'city_wide';
+    const hasSelectedAreas = serviceAreas && serviceAreas.length > 0;
+
+    if (isCityWide) return `Atende em estúdio e em domicílio em toda a cidade`;
+    if (hasSelectedAreas) return `Atende em estúdio e em domicílio nos bairros selecionados`;
+    
+    if (hasNeighborhood) {
+      return `Estúdio em ${neighborhood} e atendimento em domicílio`;
     }
-    if (serviceAreas && serviceAreas.length > 0) {
-      return `${base} nos bairros selecionados`;
-    }
-    return `${base} em ${areaLabel}`;
+    
+    if (hasCity) return `Atende em estúdio e em domicílio em ${city}`;
+    return `Atende em estúdio e em domicílio`;
   }
   
   return "";
@@ -131,4 +191,36 @@ export const categorizeService = (name: string): string => {
   if (n.includes('cabelo') || n.includes('corte') || n.includes('escova') || n.includes('mecha') || n.includes('color') || n.includes('hair')) return 'Cabelo';
   if (n.includes('limpeza') || n.includes('pele') || n.includes('facial') || n.includes('massagem') || n.includes('facial') || n.includes('corpo') || n.includes('estética')) return 'Estética';
   return 'Outros';
+};
+
+/**
+ * Returns the correct notification and professional awareness copy based on plan and WhatsApp availability.
+ */
+export const getBookingNotificationCopy = (plan: string = 'free', hasWhatsApp: boolean = false) => {
+  const isPro = plan === 'pro';
+  const isEssencial = plan === 'essencial';
+  
+  const data = {
+    notification: "Você receberá atualizações por e-mail.",
+    professional: "A profissional será avisada sobre sua solicitação."
+  };
+
+  if (isPro) {
+    if (hasWhatsApp) {
+      data.notification = "Você receberá atualizações por e-mail e WhatsApp.";
+    } else {
+      data.notification = "Você receberá atualizações por e-mail.";
+    }
+    data.professional = "A profissional acompanha sua solicitação em tempo real.";
+    return data;
+  }
+
+  if (isEssencial) {
+    data.notification = "Você receberá confirmação e atualizações por e-mail.";
+    data.professional = "A profissional acompanha sua solicitação pela Nera.";
+    return data;
+  }
+
+  // Free (default)
+  return data;
 };

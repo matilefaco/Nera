@@ -82,8 +82,8 @@ export default function LandingPage() {
                 <span>Começar grátis</span>
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </Link>
-              <Link to="/p/helena-prado" className="btn-ghost">
-                Ver vitrine de exemplo →
+              <Link to="/profissionais" className="btn-ghost">
+                Conhecer profissionais →
               </Link>
             </div>
 

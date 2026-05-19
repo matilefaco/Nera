@@ -900,8 +900,8 @@ export default function ClientsPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-brand-stone font-serif italic text-lg mb-2">Nenhum cliente ainda</p>
-                  <p className="text-[10px] text-brand-stone/60 uppercase tracking-widest max-w-xs mx-auto">Sua base de clientes aparecerá aqui.</p>
+                  <p className="text-xl font-serif text-brand-ink mb-1 italic">Tudo pronto para começar</p>
+                  <p className="text-[10px] text-brand-stone font-light max-w-xs mx-auto uppercase tracking-widest leading-relaxed">As clientes que reservarem com você aparecerão aqui.</p>
                 </>
               )}
             </div>

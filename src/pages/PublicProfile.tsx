@@ -70,151 +70,6 @@ import { PublicProfileErrorBoundary } from "../components/public/PublicProfileEr
 const isDev = import.meta.env.DEV;
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
-// --- Static Mock Data for Example Profile ---
-const MOCK_PROFILE: UserProfile = {
-  uid: "mock-helena",
-  name: "Helena Prado",
-  email: "helena@exemplo.com",
-  whatsapp: "11999999999",
-  slug: "helena-prado",
-  avatar: "https://i.imgur.com/gBdf3tO.png",
-  bio: "Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica sem transformações artificiais. Cada traço é pensado para valorizar o seu olhar de forma única e elegante.",
-  headline: "Especialista em Design de Sobrancelhas Naturais",
-  specialty: "Sobrancelhas e Harmonização do Olhar",
-  city: "São Paulo",
-  neighborhood: "Jardins",
-  serviceMode: "hybrid",
-  workingHours: {
-    startTime: "09:00",
-    endTime: "19:00",
-    workingDays: [1, 2, 3, 4, 5, 6],
-  },
-  professionalIdentity: {
-    mainSpecialty: "Design de Sobrancelhas",
-    subSpecialties: [
-      "Brow Lamination",
-      "Micropigmentação Natural",
-      "Design com Henna",
-    ],
-    yearsExperience: "8",
-    serviceStyle: ["Minimalista e Natural", "Premium e Personalizado"],
-    differentials: [
-      "Biossegurança rigorosa",
-      "Atendimento pontual",
-      "Produtos de alta performance",
-    ],
-    attendsAt: "hybrid",
-  },
-  portfolio: [
-    {
-      id: "1",
-      url: "https://i.imgur.com/O9b1cB9.png", // processo
-      category: "Processo",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "2",
-      url: "https://i.imgur.com/pk8kE8K_d.webp?maxwidth=760&fidelity=grand", // close resultado
-      category: "Resultado",
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "3",
-      url: "https://i.imgur.com/D8hEvtH_d.webp?maxwidth=1520&fidelity=grand", // antes/depois
-      category: "Antes e Depois",
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  services: [], // Placeholder, fetched separately in mock logic
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-};
-
-const MOCK_SERVICES: Service[] = [
-  {
-    id: "s1",
-    name: "Sobrancelhas Harmonizadas",
-    price: 150,
-    duration: 45,
-    description:
-      "Sobrancelhas alinhadas ao seu rosto, com resultado natural e harmonioso que valoriza seu olhar.",
-  },
-  {
-    id: "s2",
-    name: "Brow Lamination Premium",
-    price: 280,
-    duration: 60,
-    description:
-      "Efeito de sobrancelhas cheias e disciplinadas, ideal para quem busca volume com elegância.",
-  },
-  {
-    id: "s3",
-    name: "Micropigmentação Soft",
-    price: 950,
-    duration: 150,
-    description:
-      "Preenchimento fio a fio ultra-realista para quem deseja acordar pronta todos os dias.",
-  },
-];
-
-const MOCK_REVIEWS: Review[] = [
-  {
-    id: "r1",
-    bookingId: "b1",
-    professionalId: "mock-helena",
-    serviceId: "s1",
-    serviceName: "Design",
-    rating: 5,
-    tags: ["Excelência", "Pontualidade"],
-    comment:
-      "A Helena é uma verdadeira artista. Minhas sobrancelhas nunca ficaram tão harmoniosas e naturais. Ela realmente entende como valorizar o olhar.",
-    publicDisplayMode: "named",
-    publicApproved: true,
-    firstName: "Mariana",
-    neighborhood: "Pinheiros",
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // há 2 dias
-  },
-  {
-    id: "r2",
-    bookingId: "b2",
-    professionalId: "mock-helena",
-    serviceId: "s2",
-    serviceName: "Lamination",
-    rating: 5,
-    tags: ["Ambiente Acolhedor", "Biossegurança"],
-    comment:
-      "Experiência impecável. O design valorizou muito meu rosto sem parecer nada artificial. O ambiente é super relaxante e profissional.",
-    publicDisplayMode: "named",
-    publicApproved: true,
-    firstName: "Beatriz",
-    neighborhood: "Vila Madalena",
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // há 1 semana
-  },
-  {
-    id: "r3",
-    bookingId: "b3",
-    professionalId: "mock-helena",
-    serviceId: "s3",
-    serviceName: "Micropigmentação",
-    rating: 5,
-    tags: ["Excelência", "Resultado Natural"],
-    comment:
-      "Finalmente encontrei alguém que respeita o formato natural das minhas sobrancelhas. Me sinto muito mais confiante e a recuperação foi super rápida.",
-    publicDisplayMode: "named",
-    publicApproved: true,
-    firstName: "Carolina",
-    neighborhood: "Jardins",
-    createdAt: new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString(), // há 3 semanas
-  },
-];
-
-const MOCK_STATS = {
-  averageRating: 4.9,
-  totalReviews: 48,
-  totalCompletedBookings: 156,
-  topTags: ["Excelência", "Pontualidade", "Ambiente Acolhedor"],
-};
-
 import { Skeleton } from "../components/ui/Skeleton";
 
 const PublicProfileSkeleton = () => (
@@ -329,18 +184,6 @@ function PublicProfileContent() {
         return;
       }
 
-      if (slug === "helena-prado" || slug === "exemplo") {
-        setTimeout(() => {
-          if (!isMounted) return;
-          setProfile(MOCK_PROFILE);
-          setServices(MOCK_SERVICES);
-          setReviews(MOCK_REVIEWS);
-          setStats(MOCK_STATS);
-          setLoading(false);
-        }, 500);
-        return;
-      }
-
       try {
         console.log(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
         
@@ -383,11 +226,9 @@ function PublicProfileContent() {
         }
 
         // Growth Analytics: Log Visit
-        if (slug !== "helena-prado" && slug !== "exemplo") {
-          logAnalyticsEvent(professionalId, "visit").catch((err) => {
-            console.log("[PublicProfile] Analytics error:", err);
-          });
-        }
+        logAnalyticsEvent(professionalId, "visit").catch((err) => {
+          console.log("[PublicProfile] Analytics error:", err);
+        });
 
         console.log(`[PublicProfile] Starting secondary background parallel fetches`);
         // Secondary fetches should be silent, independent, and parallel
@@ -738,12 +579,6 @@ function PublicProfileContent() {
           >
             Voltar para o início
           </Link>
-          <Link
-            to="/p/helena-prado"
-            className="w-full sm:w-auto bg-brand-white text-brand-ink border border-brand-mist px-10 py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all"
-          >
-            Ver perfil de exemplo
-          </Link>
         </div>
       </div>
     );
@@ -772,31 +607,6 @@ function PublicProfileContent() {
         image={profile.ogImageUrl || profile.avatar || "https://usenera.com/og-default.png"}
         url={`https://usenera.com/p/${profile.slug}`}
       />
-      {/* Demo Badge */}
-      {(slug === "helena-prado" || slug === "exemplo") && (
-        <div className="fixed top-5 left-0 right-0 z-[200] flex justify-center pointer-events-none px-4">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="bg-brand-linen/90 backdrop-blur-xl border border-brand-mist/60 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.08)] rounded-full p-1.5 pl-5 pr-1.5 pointer-events-auto flex items-center gap-4 max-w-full overflow-hidden"
-          >
-            <span className="flex items-center gap-2.5">
-              <Sparkles size={13} className="text-brand-terracotta" />
-              <span className="font-serif text-brand-espresso text-[13px] font-medium tracking-wide whitespace-nowrap">
-                Vitrine de Demonstração
-              </span>
-            </span>
-            <Link
-              to="/register"
-              className="bg-brand-white hover:bg-brand-terracotta text-brand-ink hover:text-brand-white transition-all duration-300 rounded-full px-4 py-2 text-[9px] uppercase tracking-[0.15em] font-bold whitespace-nowrap flex items-center gap-1.5 border border-brand-mist/50"
-            >
-              <span className="hidden sm:inline">Crie seu perfil</span> grátis
-              <ArrowRight size={10} />
-            </Link>
-          </motion.div>
-        </div>
-      )}
       <AnimatePresence>
         {scrolledPastHero &&
           !showInterestPopup &&
@@ -812,9 +622,7 @@ function PublicProfileContent() {
             >
               <button
                 onClick={() => {
-                  if (profile && profile.uid !== "mock-helena") {
-                    logAnalyticsEvent(profile.uid, "click_book_sticky");
-                  }
+                  logAnalyticsEvent(profile.uid, "click_book_sticky");
                   if (urgencyInfo?.isAgendaFull && features?.waitlist) {
                     setIsWaitlistOpen(true);
                   } else {
@@ -868,11 +676,7 @@ function PublicProfileContent() {
       <ExpertIntro
         profile={profile}
         stats={stats}
-        customBio={
-          profile.slug === "helena-prado" || profile.slug === "exemplo"
-            ? "Cada atendimento é personalizado, respeitando o formato do seu rosto e seu estilo. Meu objetivo é realçar sua beleza natural com leveza, sem exageros, criando um resultado elegante e duradouro."
-            : aboutBio
-        }
+        customBio={aboutBio}
       />
       <PortfolioSection
         portfolio={profile.portfolio || []}
@@ -895,9 +699,7 @@ function PublicProfileContent() {
       <WeekAvailability
         availability={weeklyAvailability}
         onSelectDate={(date) => {
-          if (profile && profile.uid !== "mock-helena") {
-            logAnalyticsEvent(profile.uid, "week_calendar_click");
-          }
+          logAnalyticsEvent(profile.uid, "week_calendar_click");
           const day = weeklyAvailability.find((d) => d.date === date);
           if (day?.status === "full" && features?.waitlist) {
             setIsWaitlistOpen(true);
@@ -916,9 +718,7 @@ function PublicProfileContent() {
           <FinalCTA
             profile={profile}
             onBookingClick={() => {
-              if (profile && profile.uid !== "mock-helena") {
-                logAnalyticsEvent(profile.uid, "click_book_final");
-              }
+              logAnalyticsEvent(profile.uid, "click_book_final");
               setIsBookingModalOpen(true);
             }}
             completedBookings={stats?.totalCompletedBookings}

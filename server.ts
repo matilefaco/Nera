@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import cors from "cors";
 import { logger } from "./server/utils/logger.js";
+import { formatSpecialtyLabel, getServiceLocationCopy } from "./src/lib/copy.js";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -173,7 +174,75 @@ export async function createServerApp() {
 
   app.use("/api", apiRouter);
 
-  // 6. Root-level OG Proxy
+  // 6. Robots.txt and Sitemap.xml
+  app.get("/robots.txt", (req, res) => {
+    const robotsPath = path.join(process.cwd(), "public", "robots.txt");
+    if (fs.existsSync(robotsPath)) {
+      return res.sendFile(robotsPath);
+    }
+    res.status(404).send("Not Found");
+  });
+
+  app.get("/sitemap.xml", async (req, res) => {
+    try {
+      const db = firebaseAdmin.getDb();
+      if (!db) return res.status(500).send("DB not ready");
+
+      const baseUrl = "https://usenera.com";
+      const staticPages = [
+        "",
+        "/profissionais",
+        "/sobre",
+        "/termos",
+        "/privacidade"
+      ];
+
+      // Fetch indexable professionals
+      const snapshot = await db.collection("users")
+        .where("onboardingCompleted", "==", true)
+        .where("indexable", "==", true)
+        .limit(1000)
+        .get();
+
+      const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
+      const BANNED_KEYWORDS = ['teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'asdf'];
+
+      const professionalSlugs = snapshot.docs
+        .map(doc => doc.data())
+        .filter(data => {
+          const name = (data.name || "").toLowerCase();
+          const slug = data.slug;
+          if (!slug) return false;
+          if (RESERVED_SLUGS.includes(slug)) return false;
+          if (BANNED_KEYWORDS.some(k => name.includes(k) || slug.includes(k))) return false;
+          return true;
+        })
+        .map(data => `/p/${data.slug}`);
+
+      const allPages = [...staticPages, ...professionalSlugs];
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+      
+      allPages.forEach(page => {
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}${page}</loc>\n`;
+        xml += `    <changefreq>${page === "" ? "daily" : "weekly"}</changefreq>\n`;
+        xml += `    <priority>${page === "" ? "1.0" : page.startsWith("/p/") ? "0.8" : "0.6"}</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      xml += `</urlset>`;
+
+      res.setHeader("Content-Type", "text/xml");
+      res.send(xml);
+    } catch (err) {
+      logger.error("SEO", "Failed to generate sitemap", { error: err });
+      res.status(500).send("Error generating sitemap");
+    }
+  });
+
+  // 7. Root-level OG Proxy
   app.get("/og/p/:slugWithExt", async (req, res) => {
     try {
       const slug = req.params.slugWithExt.replace(/\.(jpg|jpeg|png)$/i, "");
@@ -184,9 +253,6 @@ export async function createServerApp() {
       const fallback = "https://usenera.com/og-default.jpg";
 
       if (snapshot.empty) {
-        if (slug === "helena-prado" || slug === "exemplo") {
-          return res.redirect("https://i.imgur.com/gBdf3tO.png");
-        }
         return res.redirect(fallback);
       }
 
@@ -287,27 +353,30 @@ export async function createServerApp() {
       let ogImage = "https://usenera.com/og-default.png";
       let pageUrl = `https://usenera.com/p/${escapeHtml(encodeURIComponent(slug))}`;
 
-      if (slug === "helena-prado" || slug === "exemplo") {
-         title = "Helena Prado | Sobrancelhas e Harmonização do Olhar | Nera";
-         description = "Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica sem transformações artificiais.";
-         ogImage = "https://i.imgur.com/gBdf3tO.png";
-      }
-
       const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
       
       if (!snapshot.empty) {
         const prof = snapshot.docs[0].data() as any;
         
         const namePart = prof.name || "Profissional";
+        const specialtyLabel = formatSpecialtyLabel(prof.specialty);
         if (prof.name && prof.specialty) {
-          title = escapeHtml(`${prof.name} | ${prof.specialty} | Nera`);
+          title = escapeHtml(`${prof.name} | ${specialtyLabel} | Nera`);
         } else if (prof.name) {
           title = escapeHtml(`${prof.name} | Nera`);
         }
         
+        const locationCopy = getServiceLocationCopy(prof);
         let rawBio = prof.bio || prof.aboutBio || prof.heroBio || "";
-        let cleanedBio = rawBio.toString().replace(/\n+/g, ' ').trim().slice(0, 160);
-        description = escapeHtml(cleanedBio || `Conheça a vitrine profissional de ${namePart} na Nera.`);
+        let cleanedBio = rawBio.toString().replace(/\n+/g, " ").trim();
+        
+        if (cleanedBio) {
+          description = escapeHtml(cleanedBio.slice(0, 160));
+        } else {
+          const specialty = formatSpecialtyLabel(prof.specialty);
+          const locationPart = locationCopy ? `${locationCopy}. ` : (prof.city ? `em ${prof.city}. ` : "");
+          description = escapeHtml(`${specialty} ${locationPart}Agende seu horário com praticidade na Nera.`);
+        }
         
         let imageUrl = prof.photoUrl || prof.avatar || prof.shareImage;
         if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("http")) {
@@ -428,7 +497,108 @@ export async function createServerApp() {
     }
   });
 
-  // 8. Vite/Static serving
+  // 8. Public Directory SSR
+  app.get("/profissionais", publicLookupLimiter, async (req, res, next) => {
+    try {
+      const indexPath = process.env.NODE_ENV === "production" 
+        ? path.join(process.cwd(), "dist", "index.html")
+        : path.join(process.cwd(), "index.html");
+
+      if (!fs.existsSync(indexPath)) return next();
+      
+      let html = getCachedIndexHtml(indexPath);
+      const title = "Diretório de Profissionais | Nera";
+      const description = "Encontre as melhores profissionais de beleza: especialistas em cílios, sobrancelhas, unhas e muito mais no diretório oficial da Nera.";
+      const pageUrl = "https://usenera.com/profissionais";
+      const ogImage = "https://usenera.com/og-default.png";
+
+      const metaTags = `
+        <title>${title}</title>
+        <meta name="description" content="${description}" />
+        <link rel="canonical" href="${pageUrl}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${description}" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="${pageUrl}" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta name="twitter:card" content="summary_large_image" />
+      `;
+
+      if (html.includes("</head>")) {
+        html = html.replace(/<title>.*?<\/title>/i, "");
+        html = html.replace("</head>", `${metaTags}\n</head>`);
+      }
+      if (viteServer) html = await viteServer.transformIndexHtml(req.originalUrl, html);
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      next();
+    }
+  });
+
+  // 9. Private Routes Protection (noindex)
+  app.get(["/dashboard*", "/onboarding*", "/settings*", "/checkout*", "/success*", "/cancel*", "/referrals*", "/login", "/register"], async (req, res, next) => {
+    try {
+      const indexPath = process.env.NODE_ENV === "production" 
+        ? path.join(process.cwd(), "dist", "index.html")
+        : path.join(process.cwd(), "index.html");
+
+      if (!fs.existsSync(indexPath)) return next();
+      
+      let html = getCachedIndexHtml(indexPath);
+      const metaTags = `<meta name="robots" content="noindex, nofollow" />`;
+
+      if (html.includes("</head>")) {
+        html = html.replace("</head>", `${metaTags}\n</head>`);
+      }
+      if (viteServer) html = await viteServer.transformIndexHtml(req.originalUrl, html);
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      next();
+    }
+  });
+
+  // 10. Homepage SSR
+  app.get("/", async (req, res, next) => {
+    try {
+      const indexPath = process.env.NODE_ENV === "production" 
+        ? path.join(process.cwd(), "dist", "index.html")
+        : path.join(process.cwd(), "index.html");
+
+      if (!fs.existsSync(indexPath)) return next();
+      
+      let html = getCachedIndexHtml(indexPath);
+      const title = "nera — agenda e presença para profissionais de beleza";
+      const description = "Agendamentos, vitrine profissional e presença digital para profissionais de beleza que levam o próprio trabalho a sério.";
+      const pageUrl = "https://usenera.com/";
+      const ogImage = "https://usenera.com/og-default.png";
+
+      const metaTags = `
+        <title>${title}</title>
+        <meta name="description" content="${description}" />
+        <link rel="canonical" href="${pageUrl}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${description}" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="${pageUrl}" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta name="twitter:card" content="summary_large_image" />
+      `;
+
+      if (html.includes("</head>")) {
+        html = html.replace(/<title>.*?<\/title>/i, "");
+        html = html.replace("</head>", `${metaTags}\n</head>`);
+      }
+      if (viteServer) html = await viteServer.transformIndexHtml(req.originalUrl, html);
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      next();
+    }
+  });
+
+  // 11. Vite/Static serving
   if (viteServer) {
     app.use(viteServer.middlewares);
   } else {

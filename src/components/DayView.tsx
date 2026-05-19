@@ -117,18 +117,18 @@ export default function DayView({
         <motion.div 
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="py-14 md:py-20 text-center bg-brand-linen/20 rounded-[32px] border border-dashed border-brand-mist/50 flex flex-col items-center gap-4 mt-2 mb-6 mx-2"
+          className="py-16 md:py-24 text-center bg-white rounded-[40px] border border-dashed border-brand-mist/50 flex flex-col items-center gap-4 mt-2 mb-6 mx-2 shadow-sm"
         >
-          <div className="w-12 h-12 bg-brand-white rounded-[18px] flex items-center justify-center text-brand-mist/60 shadow-sm">
-            <Zap size={24} />
+          <div className="w-14 h-14 bg-[#FAF9F8] rounded-2xl flex items-center justify-center text-brand-stone/40 border border-brand-mist/30 shadow-sm">
+            <Zap size={24} strokeWidth={1} />
           </div>
-          <div className="space-y-2">
-            <p className="text-base font-serif text-brand-ink italic text-pretty">Hoje está leve.</p>
-            <p className="text-[11px] text-brand-stone font-light px-8 leading-relaxed">Sua agenda está livre. Clientes podem reservar pelo seu link ou você pode adicionar manualmente.</p>
+          <div className="space-y-1">
+            <p className="text-xl font-serif text-brand-ink italic text-pretty">A sua agenda está livre hoje</p>
+            <p className="text-[11px] text-brand-stone font-light px-12 leading-relaxed uppercase tracking-widest max-w-sm mx-auto">Tudo pronto para receber novas clientes ou agendamentos manuais.</p>
           </div>
           <button 
             onClick={() => onSelectSlot("09:00")}
-            className="mt-4 px-8 py-4 min-h-[48px] bg-brand-ink text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md focus:ring-4 ring-brand-ink/20 focus:outline-none"
+            className="mt-6 px-10 py-4.5 min-h-[48px] bg-brand-ink text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md focus:ring-4 ring-brand-ink/20 focus:outline-none"
           >
             Adicionar Reserva
           </button>

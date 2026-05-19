@@ -328,7 +328,7 @@ export const PublicHero = ({
                 <span className="font-signature text-3xl text-brand-ink/70 leading-none">{firstName}</span>
                 <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.25em] text-[var(--theme-accent,var(--color-brand-terracotta))]">
                   <div className="w-1 h-1 rounded-full bg-current" />
-                  {profile.city} • {profile.neighborhood}
+                  {profile.neighborhood || profile.city}
                 </div>
               </div>
 

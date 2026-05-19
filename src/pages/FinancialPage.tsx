@@ -293,13 +293,13 @@ export default function FinancialPage() {
         </header>
 
         {monthlyGroups.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center bg-[#FCFBF9] rounded-[40px] border border-dashed border-brand-mist/60 shadow-sm">
-            <div className="w-16 h-16 bg-[#FAF9F8] rounded-full flex items-center justify-center text-brand-stone/40 mb-6 border border-brand-mist/40">
+          <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-[40px] border border-dashed border-brand-mist/50 shadow-sm px-6">
+            <div className="w-16 h-16 bg-[#FAF9F8] rounded-2xl flex items-center justify-center text-brand-stone/40 mb-6 border border-brand-mist/40 shadow-sm">
               <DollarSign size={24} strokeWidth={1.5} />
             </div>
-            <h3 className="text-xl font-serif text-brand-ink mb-2 px-2">Ainda não há lançamentos</h3>
-            <p className="text-[13px] text-brand-stone font-light leading-relaxed px-4">
-              Seu faturamento aparecerá aqui conforme suas clientes agendarem.
+            <h3 className="text-xl font-serif text-brand-ink mb-1 italic">Seu financeiro em um só lugar</h3>
+            <p className="text-[11px] text-brand-stone font-light leading-relaxed max-w-sm px-4 uppercase tracking-widest">
+              Seu faturamento aparecerá aqui conforme os agendamentos forem acontecendo.
             </p>
           </div>
         ) : (

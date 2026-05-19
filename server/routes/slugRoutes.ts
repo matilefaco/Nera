@@ -29,6 +29,15 @@ router.get("/check", async (req, res) => {
     const currentUid = typeof uidParam === "string" ? uidParam : null;
     const cityStr = typeof cityParam === "string" ? cityParam.toLowerCase().trim().replace(/[^a-z0-9]/g, '-') : '';
 
+    // 0. Reserved slugs check
+    const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
+    if (RESERVED_SLUGS.includes(cleanSlug)) {
+      return res.status(400).json({ 
+        available: false, 
+        error: "Este endereço está reservado. Escolha outro link." 
+      });
+    }
+
     // 1. Validation
     const slugRegex = /^[a-z0-9-]+$/;
     if (cleanSlug.length < 3 || cleanSlug.length > 50) {

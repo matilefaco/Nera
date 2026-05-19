@@ -1187,19 +1187,17 @@ setUnconfirmedTomorrow(docs);
                 </div>
 
                 {isNewAccount ? (
-                  <div className="flex flex-col items-center justify-center py-6 text-center">
-                    <div className="w-12 h-12 bg-[#FAF9F8] flex items-center justify-center rounded-full border border-brand-mist/60 text-brand-stone/50 mb-4">
-                      <TrendingUp size={20} strokeWidth={1.5} />
+                  <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
+                    <div className="w-14 h-14 bg-[#FAF9F8] rounded-2xl flex items-center justify-center text-brand-stone/30 mb-5 border border-brand-mist/20">
+                      <TrendingUp size={24} strokeWidth={1} />
                     </div>
-                    <p className="text-sm font-serif text-brand-ink mb-1">Sem dados suficientes ainda</p>
-                    <p className="text-[11px] text-brand-stone font-light mb-6 max-w-xs">
-                      Compartilhe sua vitrine para começar a acompanhar visitas, agendamentos e ver suas estatísticas crescerem.
-                    </p>
+                    <p className="text-sm font-serif text-brand-ink mb-1 italic">Sua vitrine está pronta para prosperar</p>
+                    <p className="text-[10px] text-brand-stone font-light px-8 max-w-xs mx-auto mb-8 uppercase tracking-widest leading-relaxed">Os dados de crescimento aparecerão aqui conforme as primeiras clientes reservarem.</p>
                     <button 
                       onClick={() => setIsShareModalOpen(true)}
-                      className="px-6 py-3 bg-brand-white text-brand-ink border border-brand-mist/60 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-colors shadow-sm flex items-center gap-2"
+                      className="bg-brand-ink text-brand-white px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md focus:ring-4 ring-brand-ink/10 flex items-center gap-2"
                     >
-                      <Share2 size={14} /> Copiar link da vitrine
+                      <Share2 size={14} /> Compartilhar meu link
                     </button>
                   </div>
                 ) : !features.advancedDashboard ? (
@@ -1489,30 +1487,30 @@ setUnconfirmedTomorrow(docs);
               <motion.div 
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="bg-[#FCFBF9] p-8 md:p-12 rounded-[40px] border border-brand-mist/40 shadow-sm relative overflow-hidden group mb-2 opacity-95"
+                className="bg-[#FCFBF9] p-8 md:p-12 rounded-[40px] border border-dashed border-brand-mist shadow-sm relative overflow-hidden group mb-2 opacity-95 text-center flex flex-col items-center"
               >
                 <div className="absolute top-0 right-0 w-64 h-64 bg-brand-white rounded-full blur-[80px] opacity-70 -mr-20 -mt-20 pointer-events-none transition-opacity group-hover:opacity-100" />
                 <div className="relative z-10 max-w-lg">
-                  <div className="w-14 h-14 bg-white border border-brand-mist/60 text-brand-ink rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-                    <Home size={24} strokeWidth={1.5} />
+                  <div className="w-14 h-14 bg-white border border-brand-mist/60 text-brand-ink rounded-2xl flex items-center justify-center mb-6 shadow-sm mx-auto">
+                    <Sparkles size={24} strokeWidth={1.5} className="text-brand-terracotta/80" />
                   </div>
-                  <h4 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3 leading-tight">Sua vitrine está pronta. <br/>Agora é hora de colocar em circulação.</h4>
-                  <p className="text-[13px] text-brand-stone font-light mb-8 leading-relaxed max-w-sm">
-                    Veja como sua vitrine aparece para uma cliente, copie o link oficial e envie para quem já conhece seu trabalho.
+                  <h4 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3 leading-tight italic">Sua vitrine está pronta.</h4>
+                  <p className="text-[13px] text-brand-stone font-light mb-8 leading-relaxed max-w-sm mx-auto">
+                    Tudo pronto para começar seus atendimentos. Agora é hora de colocar sua página em circulação.
                   </p>
                   
-                  <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <button 
                       onClick={() => setIsShareModalOpen(true)} 
-                      className="w-full sm:w-auto px-8 py-4 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-10 py-4.5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md flex items-center justify-center gap-2"
                     >
-                      <Share2 size={16} /> Divulgar vitrine
+                      <Share2 size={16} /> Compartilhar Link
                     </button>
                     <a 
                       href={`/p/${profile?.slug}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full sm:w-auto px-8 py-4 bg-white border border-brand-mist text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all flex items-center justify-center gap-2 shadow-sm"
+                      className="w-full sm:w-auto px-10 py-4.5 bg-brand-parchment border border-brand-mist text-brand-ink rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-2 shadow-sm"
                     >
                       Ver minha vitrine
                     </a>
@@ -1604,26 +1602,26 @@ setUnconfirmedTomorrow(docs);
                   </div>
                 ) : (
                   <div className="bg-[#FCFBF9] p-12 rounded-[40px] border border-brand-mist/40 border-dashed text-center flex flex-col items-center shadow-sm">
-                    <div className="w-12 h-12 bg-[#FAF9F8] flex items-center justify-center rounded-full border border-brand-mist/60 text-brand-stone/40 mb-4">
-                      <Clock size={20} strokeWidth={1} />
+                    <div className="w-14 h-14 bg-[#FAF9F8] rounded-2xl flex items-center justify-center text-brand-stone/40 mb-6 border border-brand-mist/30">
+                      <Calendar size={24} strokeWidth={1} />
                     </div>
-                    <h4 className="font-serif text-xl text-brand-ink mb-2">Sua agenda está livre hoje</h4>
-                    <p className="text-[13px] text-brand-stone font-light mb-8 max-w-xs mx-auto leading-relaxed">
-                      Acompanhe suas solicitações ou divulgue seu link para atrair novas clientes.
+                    <h4 className="font-serif text-xl md:text-2xl text-brand-ink mb-1 italic">Sua próxima reserva aparecerá aqui</h4>
+                    <p className="text-[11px] text-brand-stone font-light max-w-xs mx-auto mb-10 leading-relaxed uppercase tracking-widest">
+                      A sua agenda está pronta para receber novas clientes.
                     </p>
                     
-                    <div className="flex flex-col gap-3 w-full max-w-xs mx-auto">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mx-auto justify-center">
                       <button 
                         onClick={() => setIsShareModalOpen(true)}
-                        className="w-full py-3.5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
+                        className="w-full sm:w-auto px-10 py-4 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md focus:ring-4 ring-brand-ink/20"
                       >
-                        Divulgar online
+                        Atrair Clientes
                       </button>
                       <Link 
-                        to="/clients"
-                        className="w-full py-3.5 bg-brand-white text-brand-ink rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-[#FAF9F8] transition-all text-center border border-brand-mist/40 shadow-sm"
+                        to="/clientes"
+                        className="w-full sm:w-auto px-10 py-4 bg-brand-parchment text-brand-ink border border-brand-mist/40 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all text-center shadow-sm"
                       >
-                        Ver carteira de clientes
+                        Ver Clientes
                       </Link>
                     </div>
                   </div>

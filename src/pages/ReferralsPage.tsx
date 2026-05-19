@@ -235,19 +235,19 @@ export default function ReferralsPage() {
             ))}
           </div>
         ) : referrals.length === 0 ? (
-          <div className="bg-white rounded-[40px] border border-brand-mist p-16 text-center shadow-sm">
-            <div className="w-20 h-20 bg-brand-linen/40 text-brand-stone/30 rounded-full flex items-center justify-center mx-auto mb-8">
-              <Users size={32} strokeWidth={1} />
+          <div className="bg-white rounded-[40px] border border-dashed border-brand-mist/60 py-20 px-8 text-center shadow-sm">
+            <div className="w-16 h-16 bg-brand-linen/40 text-brand-stone/30 rounded-2xl flex items-center justify-center mx-auto mb-8 border border-brand-mist/20">
+              <Gift size={28} strokeWidth={1} />
             </div>
-            <h3 className="text-2xl font-serif text-brand-ink mb-3">Sua primeira indicação começa aqui</h3>
-            <p className="text-sm text-brand-stone font-light max-w-xs mx-auto mb-10 leading-relaxed">
-              Quando outra profissional criar uma conta usando seu código, ela aparecerá aqui automaticamente. Indicações ativas geram créditos para sua conta.
+            <h3 className="text-2xl font-serif text-brand-ink mb-2 italic">Sua primeira indicação começa aqui</h3>
+            <p className="text-[11px] text-brand-stone font-light max-w-xs mx-auto mb-10 leading-relaxed uppercase tracking-widest">
+              Indique outras profissionais e ganhe créditos quando elas se tornarem clientes da Nera.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button 
                 onClick={handleCopy}
-                className="inline-flex items-center justify-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-sm"
+                className="inline-flex items-center justify-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md"
               >
                 {copyAnim ? <CheckCircle2 size={14} className="text-green-400" /> : <Gift size={14} />}
                 {copyAnim ? 'Link Copiado!' : 'Copiar Link'}
@@ -257,7 +257,7 @@ export default function ReferralsPage() {
                   const url = encodeURIComponent(referralLink);
                   window.open(`https://wa.me/?text=${encodeURIComponent(`Oie! Descobri a Nera, uma plataforma incrível para vitrine e agendamento. Se cadastre pelo meu link: ${referralLink}`)}`, '_blank');
                 }}
-                className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-sm"
+                className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md"
               >
                 <MessageCircle size={14} />
                 Compartilhar no WhatsApp

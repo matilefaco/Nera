@@ -15,7 +15,7 @@ import { db } from '../firebase';
 import { UserProfile } from '../types';
 import Logo from '../components/Logo';
 import { formatCurrency, cn } from '../lib/utils';
-import { SERVICE_MODES as SERVICE_MODE_COPY } from '../lib/copy';
+import { SERVICE_MODES as SERVICE_MODE_COPY, formatSpecialtyLabel, getServiceLocationCopy } from '../lib/copy';
 import SEOHead from '../components/SEOHead';
 
 const SPECIALTIES = [
@@ -222,7 +222,7 @@ export default function DirectoryPage() {
             <AnimatePresence>
               {professionals.map((pro, idx) => (
                 <motion.div
-                  key={pro.uid}
+                  key={pro.slug}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx % 4 * 0.1 }}
@@ -236,7 +236,7 @@ export default function DirectoryPage() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-brand-ink/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     
-                    {pro.planRank && pro.planRank >= 1 && (
+                    {pro.isVerified && (
                       <div className="absolute top-4 left-4 bg-brand-terracotta text-white text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 backdrop-blur-sm bg-opacity-90">
                         <Star size={8} fill="currentColor" /> Verificada
                       </div>
@@ -258,12 +258,12 @@ export default function DirectoryPage() {
                   <div className="p-6">
                     <div className="mb-4">
                       <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-terracotta mb-1">
-                        {pro.professionalIdentity?.mainSpecialty || pro.specialty}
+                        {formatSpecialtyLabel(pro.professionalIdentity?.mainSpecialty || pro.specialty)}
                       </p>
                       <h3 className="text-xl font-serif text-brand-ink italic truncate">{pro.name}</h3>
                       <div className="flex items-center gap-1 text-brand-stone text-[10px] mt-1">
-                        <MapPin size={10} />
-                        <span className="truncate">{pro.neighborhood}, {pro.city}</span>
+                        <MapPin size={10} className="shrink-0" />
+                        <span className="truncate">{getServiceLocationCopy(pro)}</span>
                       </div>
                     </div>
 

@@ -19,6 +19,7 @@ import { doc, getDoc, collection, query, where, onSnapshot, getDocs, limit } fro
 import { Appointment, UserProfile, Service } from '../types';
 import PremiumButton from '../components/PremiumButton';
 import { formatCurrency, formatLocalDate, buildWhatsappLink, cn, getTodayLocale } from '../lib/utils';
+import { getBookingNotificationCopy } from '../lib/copy';
 import { isCancelledStatus, isPendingStatus, isRevenueStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { getAvailableSlots } from '../lib/bookingUtils';
 import { notify } from '../lib/notify';
@@ -386,7 +387,7 @@ setBlockedSchedules(dayBlocked);
                     <div className="p-6 bg-brand-linen/40 rounded-3xl border border-brand-mist/50">
                       <p className="text-sm text-brand-ink font-serif mb-2">Pedido recebido</p>
                       <p className="text-xs text-brand-stone font-light leading-relaxed italic">
-                        A profissional ainda vai confirmar seu horário. Você receberá um aviso quando houver resposta.
+                        {getBookingNotificationCopy(professional?.plan, !!professional?.whatsapp).professional}
                       </p>
                     </div>
                     

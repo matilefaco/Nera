@@ -1,0 +1,22 @@
+User-agent: *
+Allow: /
+Allow: /profissionais
+Allow: /p/
+Allow: /sobre
+Allow: /termos
+Allow: /privacidade
+
+Disallow: /dashboard/
+Disallow: /onboarding/
+Disallow: /settings/
+Disallow: /checkout/
+Disallow: /api/
+Disallow: /admin/
+Disallow: /login
+Disallow: /register
+Disallow: /success
+Disallow: /cancel
+Disallow: /referrals
+Disallow: /reconcile
+
+Sitemap: https://usenera.com/sitemap.xml

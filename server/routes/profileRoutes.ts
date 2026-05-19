@@ -104,6 +104,12 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
     return res.status(400).json({ error: "UID e Slug são obrigatórios." });
   }
 
+  // P0: Reserve demo and system slugs
+  const RESERVED_SLUGS = ['helena-prado', 'exemplo', 'admin', 'nera', 'suporte', 'ajuda', 'beta'];
+  if (RESERVED_SLUGS.includes(slug)) {
+    return res.status(400).json({ error: "Este endereço está reservado. Escolha outro link." });
+  }
+
   try {
     logger.info("PROFILE", "Starting transaction", { professionalId: maskUid(uid), meta: { slug } });
     const db = getDb();
@@ -343,6 +349,17 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
     const proData = proDoc.exists ? proDoc.data() : null;
 
     // Return sanitized data for client
+    const professionalData = proData ? {
+      name: proData.name,
+      slug: proData.slug,
+      plan: proData.plan || 'free'
+    } : null;
+
+    // P0 CRITICAL: Only expose WhatsApp if the professional is Pro
+    if (professionalData && professionalData.plan === 'pro') {
+      (professionalData as any).whatsapp = proData.whatsapp;
+    }
+
     const safeAppointmentData = {
       id: appointmentId,
       manageSlug: appointmentData.manageSlug,
@@ -363,11 +380,7 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
       rescheduledAt: appointmentData.rescheduledAt,
       previousDate: appointmentData.previousDate,
       previousTime: appointmentData.previousTime,
-      professional: proData ? {
-        name: proData.name,
-        slug: proData.slug,
-        whatsapp: proData.whatsapp
-      } : null
+      professional: professionalData
     };
 
     res.json({
@@ -487,7 +500,7 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
     const userData = userDoc.data() || {};
 
     // 4. Sanitize data - Return ONLY what's needed for the public profile
-    const sanitizedData = {
+    const sanitizedData: any = {
       uid: uid,
       name: userData.name,
       displayName: userData.displayName || userData.businessName || userData.name,
@@ -507,10 +520,14 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       profileTheme: userData.profileTheme,
       paymentMethods: userData.paymentMethods || [],
       instagram: userData.instagram,
-      whatsapp: userData.whatsapp,
       plan: userData.plan || 'free',
       onboardingCompleted: userData.onboardingCompleted
     };
+
+    // P0 CRITICAL: Only expose WhatsApp if the plan is Pro
+    if (sanitizedData.plan === 'pro') {
+      sanitizedData.whatsapp = userData.whatsapp;
+    }
 
     return res.json(sanitizedData);
   } catch (err: any) {
@@ -521,55 +538,83 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
 
 /**
  * GET /api/profile/public-directory
- * Returns a list of professionals for the directory page, sanitized.
+ * Returns a list of professionals for the directory page, sanitized and filtered.
  */
 router.get("/public-directory", publicReadLimiter, async (req, res) => {
   try {
     const db = getDb();
     if (!db) throw new Error("Database not connected");
 
-    // Basic query for directory
-    // We remove orderBy from firestore to avoid missing documents that lack planRank or averageRating.
-    // Memory sort is fine since we apply a limit.
+    // P0: Defensive filter list for test/fake accounts
+    const BANNED_KEYWORDS = [
+      'teste', 'test', 'shitley', 'pilonha', '77777', 'exemplo', 'fake', 'provisorio',
+      'asdf', 'qwerty', '12345', 'nenhum', 'vazio', 'null', 'undefined', 'helena-prado'
+    ];
+
+    // Basic query for directory - only published and indexable profiles
     let q: admin.firestore.Query = db.collection("users")
       .where("onboardingCompleted", "==", true)
+      .where("indexable", "==", true)
       .limit(100); 
 
     const snapshot = await q.get();
-    let professionals = snapshot.docs.map(doc => {
-      const data = doc.data();
-      // Sanitize: Return only what's needed for the directory card
-      return {
-        uid: doc.id,
-        name: data.name,
-        slug: data.slug,
-        avatar: data.avatar || data.photoUrl,
-        specialty: data.specialty,
-        city: data.city,
-        neighborhood: data.neighborhood,
-        averageRating: data.averageRating || 0,
-        totalReviews: data.totalReviews || 0,
-        planRank: data.planRank || 0,
-        serviceMode: data.serviceMode,
-        professionalIdentity: {
-          mainSpecialty: data.professionalIdentity?.mainSpecialty,
-          differentials: data.professionalIdentity?.differentials
-        }
-      };
-    });
+    
+    let professionals = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        const name = (data.displayName || data.name || "").trim();
+        const cleanName = name.toLowerCase();
 
-    // Memory sort: planRank desc, then averageRating desc
+        // 1. Minimum quality filters (on memory to avoid complex Firestore composite indexes for now)
+        if (!name || name.length < 3) return null;
+        
+        // 2. Purely numeric name check
+        if (/^\d+$/.test(name.replace(/\s/g, ''))) return null;
+
+        // 3. Banned keyword check
+        const isBanned = BANNED_KEYWORDS.some(k => cleanName.includes(k));
+        if (isBanned) return null;
+
+        // 4. Incomplete profile check
+        if (!data.slug || !data.specialty) return null;
+
+        // Sanitize: Return only what's needed for the directory card.
+        return {
+          name: name,
+          slug: data.slug,
+          avatar: data.avatar || data.photoUrl,
+          specialty: data.specialty || '',
+          city: data.city || '',
+          neighborhood: data.neighborhood || '',
+          averageRating: data.averageRating || 0,
+          totalReviews: data.totalReviews || 0,
+          isVerified: (data.planRank || 0) >= 1,
+          serviceMode: data.serviceMode,
+          professionalIdentity: {
+            mainSpecialty: data.professionalIdentity?.mainSpecialty,
+            differentials: data.professionalIdentity?.differentials
+          },
+          // Temporary field for sorting, will be removed before sending
+          _planRank: data.planRank || 0
+        };
+      })
+      .filter((p): p is any => p !== null);
+
+    // Memory sort: _planRank desc, then averageRating desc
     professionals.sort((a, b) => {
-      if (b.planRank !== a.planRank) {
-        return b.planRank - a.planRank;
+      if (b._planRank !== a._planRank) {
+        return b._planRank - a._planRank;
       }
       return b.averageRating - a.averageRating;
     });
 
-    // Limit to 40 after sorting
-    professionals = professionals.slice(0, 40);
+    // Limit to 40 after sorting and remove the temporary sort field
+    const finalResults = professionals.slice(0, 40).map(p => {
+      const { _planRank, ...rest } = p;
+      return rest;
+    });
 
-    res.json(professionals);
+    res.json(finalResults);
   } catch (err: any) {
     logger.error("PUBLIC_DIRECTORY", "Error fetching directory", { error: err.message });
     res.status(500).json({ error: "Erro ao carregar diretório." });

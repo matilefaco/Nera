@@ -131,6 +131,7 @@ export interface UserProfile {
   indexable?: boolean;
   published?: boolean;
   planRank?: number;
+  isVerified?: boolean;
   averageRating?: number;
   totalReviews?: number;
   topTags?: string[];
