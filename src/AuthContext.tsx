@@ -70,10 +70,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       try {
-        console.log('[Auth] onAuthStateChanged user uid / null:', currentUser?.uid || 'null');
         setUser(currentUser);
         setIsAuthReady(true);
-        console.log('[Auth] isAuthReady true');
         
         if (unsubscribeProfile) {
           unsubscribeProfile();
@@ -90,7 +88,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Use onSnapshot for real-time updates without blocking
           unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
             try {
-              console.log('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());
               if (docSnap.exists()) {
                 const data = docSnap.data() as UserProfile;
                 setProfile({ ...data, uid: docSnap.id });

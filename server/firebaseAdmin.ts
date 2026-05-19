@@ -32,14 +32,12 @@ export const initFirebase = async () => {
         projectId,
         storageBucket: "ai-studio-applet-webapp-bb725.firebasestorage.app"
       });
-      console.log(`[FIREBASE ADMIN] Initialized with projectId: ${projectId} and storageBucket`);
     }
 
     // Using the (default) database instance
     db = getFirestore();
     defaultDb = db;
     storageBucket = admin.storage().bucket();
-    console.log(`[NERA FIRESTORE] Initialized with database: (default)`);
   } catch (err: any) {
     console.error("[FIREBASE ADMIN] Critical Initialization Error:", err.message);
   }

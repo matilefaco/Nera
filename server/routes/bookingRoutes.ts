@@ -831,7 +831,6 @@ router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
     const { appointmentId } = req.query;
     if (!appointmentId) return res.status(400).json({ error: "Missing appointmentId" });
 
-    process.stdout.write(`[FIRESTORE READ] Attempting to read appointments/${appointmentId}... `);
     const apptDoc = await db.collection('appointments').doc(appointmentId as string).get();
     
     if (!apptDoc.exists) {
@@ -856,7 +855,6 @@ router.get("/debug-confirmation-email", debugOnly, async (req, res) => {
     if (!data?.token) result.reason += "Missing token. ";
     
     if (data?.professionalId) {
-      process.stdout.write(`[FIRESTORE READ] Attempting to read users/${data.professionalId}... `);
       const proDoc = await db.collection('users').doc(data.professionalId).get();
       if (proDoc.exists) {
                 result.professionalEmail = proDoc.data()?.email;
@@ -914,7 +912,6 @@ router.get("/run-confirmation-email", debugOnly, async (req, res) => {
         apptDoc = qToken.docs[0].data();
         response.firestoreDocFound = true;
         response.realDocumentId = qToken.docs[0].id;
-        process.stdout.write(`[DEBUG RUN] Found appointment by token: ${qToken.docs[0].id}\n`);
       }
     }
 
@@ -961,7 +958,6 @@ router.get("/run-confirmation-email", debugOnly, async (req, res) => {
     
     const statusOk = (data?.status === 'confirmed' || data?.status === 'accepted');
     if (!statusOk) {
-      process.stdout.write(`[DEBUG RUN] Warning: Status is ${data?.status}\n`);
       response.statusWarning = `Status is ${data?.status}, expected confirmed/accepted`;
     }
     response.validationPassed = true;

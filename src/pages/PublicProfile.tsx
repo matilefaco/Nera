@@ -68,7 +68,6 @@ import SEOHead from "../components/SEOHead";
 import { PublicProfileErrorBoundary } from "../components/public/PublicProfileErrorBoundary";
 
 const isDev = import.meta.env.DEV;
-const devLog = (...args: any[]) => isDev && console.log(...args);
 
 import { Skeleton } from "../components/ui/Skeleton";
 
@@ -175,24 +174,20 @@ function PublicProfileContent() {
 
   useEffect(() => {
     let isMounted = true;
-    console.log(`[PublicProfile] effect started for slug: ${slug}`);
     
     const fetchData = async () => {
       if (!slug) {
-        console.log(`[PublicProfile] No slug, setting loading to false`);
         if (isMounted) setLoading(false);
         return;
       }
 
       try {
-        console.log(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
         
         // 1. Fetch sanitized profile from backend API
         const response = await fetch(`/api/profile/public-profile/${slug}`);
         
         if (!response.ok) {
           if (response.status === 404) {
-            console.log(`[PublicProfile] No user found for slug: ${slug}`);
             if (isMounted) {
               setLoading(false);
               setProfile(null);
@@ -217,20 +212,16 @@ function PublicProfileContent() {
 
         if (!isMounted) return;
 
-        console.log(`[PublicProfile] Resolved user fetch completed via API. UID: ${professionalId}`);
 
         if (isMounted) {
-          console.log(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
           setProfile(userData as UserProfile);
           setLoading(false); 
         }
 
         // Growth Analytics: Log Visit
         logAnalyticsEvent(professionalId, "visit").catch((err) => {
-          console.log("[PublicProfile] Analytics error:", err);
         });
 
-        console.log(`[PublicProfile] Starting secondary background parallel fetches`);
         // Secondary fetches should be silent, independent, and parallel
         Promise.allSettled([
             // 1. Services
@@ -319,7 +310,6 @@ function PublicProfileContent() {
           notify.error("Não foi possível carregar as informações do perfil.");
         }
       } finally {
-        console.log(`[PublicProfile] finally block executed. isMounted: ${isMounted}`);
         if (isMounted) setLoading(false);
       }
     };
@@ -327,7 +317,6 @@ function PublicProfileContent() {
     fetchData();
 
     return () => {
-      console.log(`[PublicProfile] unmount cleanup executed for slug: ${slug}`);
       isMounted = false;
     };
   }, [slug, retryCount]);
@@ -361,7 +350,6 @@ function PublicProfileContent() {
           }
         }
       } catch (e) {
-        devLog("Waitlist check failed", e);
       }
     }
     checkWaitlist();
@@ -372,7 +360,6 @@ function PublicProfileContent() {
       if (!profile?.uid || !profile?.workingHours || services.length === 0)
         return;
 
-      devLog(`[NEXT_SLOT] Starting calculation for pro: ${profile.uid}`);
 
       try {
         const now = new Date();
@@ -461,7 +448,6 @@ function PublicProfileContent() {
             blockedSchedules,
           });
 
-          devLog(
             `[BADGE DEBUG] Final Verification for ${result.date}: ${verificationSlots.length} slots found.`,
           );
 
@@ -473,7 +459,6 @@ function PublicProfileContent() {
             setTotalWeeklySlots(0);
             setIsAgendaFull(true);
           } else {
-            devLog(
               `[BADGE DEBUG] Success: Badge showing confirmed slot ${result.time} on ${result.date}`,
             );
             setNextSlot({ date: result.date, time: result.time });
@@ -481,14 +466,11 @@ function PublicProfileContent() {
             setIsAgendaFull(result.totalWeeklySlots === 0);
           }
         } else {
-          devLog(`[BADGE DEBUG] No slots found in the next 14 days`);
           setTotalWeeklySlots(0);
           setIsAgendaFull(true);
         }
 
-        devLog(`[NEXT_SLOT] Calculation finished.`);
       } catch (e) {
-        devLog("[NEXT_SLOT] Failed to find availability data:", e);
       }
     };
 

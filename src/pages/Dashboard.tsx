@@ -87,7 +87,6 @@ function safeLocaleCompare(a?: string | null, b?: string | null): number {
 // --------------------
 
 const isDev = import.meta.env.DEV;
-const devLog = (...args: any[]) => isDev && console.log(...args);
 
 type DashboardTab = "hoje" | "crescimento" | "gestao";
 
@@ -178,10 +177,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (profile) {
-      devLog("[DASHBOARD PLAN DEBUG] uid:", user?.uid);
-      devLog("[DASHBOARD PLAN DEBUG] firestore plan:", profile.plan);
-      devLog("[DASHBOARD PLAN DEBUG] planRank:", profile.planRank);
-      devLog("[DASHBOARD PLAN DEBUG] planExpiresAt:", profile.planExpiresAt);
     }
   }, [profile, user]);
   
@@ -845,22 +840,16 @@ setUnconfirmedTomorrow(docs);
 
   useEffect(() => {
     if (import.meta.env.DEV) {
-      console.log("[PUSH UI] Notification supported:", "Notification" in window);
-      console.log("[PUSH UI] ServiceWorker supported:", "serviceWorker" in navigator);
-      console.log("[PUSH UI] PushManager supported:", "PushManager" in window);
       if ("Notification" in window) {
-        console.log("[PUSH UI] permission:", Notification.permission);
       }
     }
   }, []);
 
   const handleEnablePushNotifications = async () => {
     try {
-      if (import.meta.env.DEV) console.log("[PUSH BUTTON] clicked");
       setIsPushLoading(true);
       
       const success = await requestPermission();
-      if (import.meta.env.DEV) console.log("[PUSH BUTTON] requestPermission finished. Success:", success);
 
       if (success) {
       notify.success('Notificações ativadas.');
@@ -948,21 +937,20 @@ setUnconfirmedTomorrow(docs);
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-brand-linen/80 border border-brand-mist/50 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm backdrop-blur-sm"
+            className="bg-brand-linen/80 border border-brand-mist/50 p-5 rounded-3xl flex items-center justify-between gap-4 shadow-sm backdrop-blur-sm"
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-stone shrink-0">
-                <Loader2 size={20} className="animate-spin text-brand-terracotta" />
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-brand-stone shrink-0 shadow-sm border border-brand-mist/30">
+                <Loader2 size={24} strokeWidth={1} className="animate-spin text-brand-terracotta" />
               </div>
               <div>
-                <p className="text-[11px] font-bold text-brand-ink leading-tight">Ativação em processamento</p>
-                <p className="text-[10px] text-brand-stone font-light italic">Estamos sincronizando sua assinatura <span className="capitalize font-medium">{signupPlan}</span> com o Stripe.</p>
+                <p className="text-[12px] font-bold text-brand-ink mb-0.5">Finalizando sua ativação</p>
+                <p className="text-[11px] text-brand-stone font-light">A Nera está sincronizando seu acesso Premium.</p>
               </div>
             </div>
             <button 
               onClick={async () => {
                 const token = await user?.getIdToken();
-                notify.info('Verificando status no Stripe...');
                 const res = await fetch('/api/plans/reconcile-user', {
                   method: 'POST',
                   headers: {
@@ -973,15 +961,15 @@ setUnconfirmedTomorrow(docs);
                 });
                 const data = await res.json();
                 if (data.success) {
-                  notify.success('Assinatura ativada com sucesso!');
+                  notify.success('Assinatura ativada com sucesso.');
                   refreshProfile();
                 } else {
-                  notify.error('Ainda não identificamos o pagamento. Se você já concluiu no Stripe, aguarde alguns instantes.');
+                  notify.warning('Sua ativação ainda está sendo processada. Isso pode levar alguns instantes.');
                 }
               }}
-              className="px-4 py-2 bg-white border border-brand-mist/60 rounded-full text-[9px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-linen transition-all shrink-0 whitespace-nowrap"
+              className="px-5 py-2.5 bg-white border border-brand-mist/60 rounded-xl text-[9px] font-bold uppercase tracking-widest text-brand-ink hover:bg-[#FAF9F8] transition-all shadow-sm shrink-0 whitespace-nowrap focus:ring-4 ring-brand-ink/5"
             >
-              Atualizar Assinatura
+              Verificar Status
             </button>
           </motion.div>
         )}

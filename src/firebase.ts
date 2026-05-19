@@ -202,11 +202,9 @@ export function getClientKey(whatsapp: string, email: string, name: string) {
 
 export async function updateClientSummaryInternal(transaction: any, appointment: Appointment, professionalId: string, isCreate: boolean = false, oldStatus: string = '', existingSnap?: any) {
   // Stub implementation as the UI component still calls it during manual sync, but it doesn't need to do anything since the backend handles it now.
-  console.log('[updateClientSummaryInternal] Stub called. The backend manages client summaries now.');
 }
 
 export async function updateClientSummaryFromAppointment(appointment: Appointment) {
-  console.log('[updateClientSummaryFromAppointment] Stub called.');
 }
 
 export async function createBookingRequest(appointmentData: Partial<Appointment>) {
@@ -261,7 +259,6 @@ export async function deleteBlockedScheduleAtomic(professionalId: string, blockI
 export async function checkAndExpireAppointments(professionalId: string) {
   // Stub or actual implementation. Used for checking expired stuff.
   // The backend cron could be doing this, but if the client still calls it:
-  console.log('[checkAndExpireAppointments] called. Ignoring if backend handles it.');
 }
 
 export function handleBookingError(error: unknown) {
@@ -280,7 +277,6 @@ export function handleBookingError(error: unknown) {
  * Manages the logic for freeing slots and notifications.
  */
 export async function updateAppointmentStatus(appointmentId: string, newStatus: Appointment['status']) {
-  console.log(`[Status] Transitioning ${appointmentId} to ${newStatus}...`);
   
   const currentUid = auth.currentUser?.uid;
   if (!currentUid) {
@@ -375,7 +371,6 @@ export async function updateAppointmentStatus(appointmentId: string, newStatus: 
       return data;
     });
 
-    console.log(`[Status] Successfully updated to ${newStatus}`);
 
     // Trigger waitlist check if cancelled
     const freeingStatuses = ['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'rejected'];
@@ -403,7 +398,6 @@ export async function respondToBookingRequest(appointmentId: string, decision: t
  * Creates a manual appointment with atomic lock.
  */
 export async function createManualAppointment(data: Partial<Appointment>) {
-  console.log(`[Manual Booking] Creating for ${data.date} ${data.time}`);
   
   if (!data.professionalId || !data.date || !data.time) {
     throw new Error('Dados incompletos');
@@ -455,7 +449,6 @@ export async function createManualAppointment(data: Partial<Appointment>) {
       await updateClientSummaryInternal(transaction, apptForSummary, data.professionalId, true);
     });
 
-    console.log('[Manual Booking] Created successfully');
     return true;
   } catch (error: any) {
     console.error('[Manual Booking] Failed:', error);
@@ -468,7 +461,6 @@ export async function createManualAppointment(data: Partial<Appointment>) {
  */
 
 export async function confirmPresenceByClient(manageSlug: string) {
-  console.log(`[Client] Confirming presence via slug ${manageSlug}`);
   try {
     const response = await fetch(`/api/public/manage/${manageSlug}/confirm-presence`, {
       method: 'POST',
@@ -490,7 +482,6 @@ export async function confirmPresenceByClient(manageSlug: string) {
 }
 
 export async function cancelBookingByClient(manageSlug: string, reason?: string) {
-  console.log(`[Client] Cancelling booking via slug ${manageSlug}`);
   try {
     const response = await fetch(`/api/public/manage/${manageSlug}/cancel`, {
       method: 'POST',
@@ -508,13 +499,11 @@ export async function cancelBookingByClient(manageSlug: string, reason?: string)
 
     if (data) {
       // Notify pro about cancellation
-      console.log(`[Client Cancel] Triggering notification format ${data.id}`);
       notify('BOOKING_CANCELLED_BY_CLIENT', { 
         appointmentId: data.id, 
         id: data.id, 
         ...data 
       }).then(res => {
-        console.log(`[Client Cancel] Notification sent for ${data.id}:`, res);
       }).catch(err => {
         console.warn(`[Client Cancel] Notification FAILED for ${data.id}:`, err);
       });
@@ -530,7 +519,6 @@ export async function cancelBookingByClient(manageSlug: string, reason?: string)
 }
 
 export async function getAppointmentByToken(token: string): Promise<Appointment | null> {
-  console.log(`[BOOKING_MANAGEMENT] Multi-Strategy Search for: ${token}`);
   
   const strategies = [
     { field: 'manageSlug', value: token },
@@ -545,7 +533,6 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
     const snap = await getDocs(q);
     if (!snap.empty) {
       const appt = { id: snap.docs[0].id, ...snap.docs[0].data() } as Appointment;
-      console.log(`[BOOKING_MANAGEMENT] Found by ${strategy.field}: ${appt.id}`);
       return appt;
     }
   }
@@ -555,7 +542,6 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
     const docRef = doc(db, 'appointments', token);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      console.log(`[BOOKING_MANAGEMENT] Found by Document ID: ${docSnap.id}`);
       return { id: docSnap.id, ...docSnap.data() } as Appointment;
     }
   }
@@ -565,7 +551,6 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
 }
 
 export async function rescheduleBookingByClient(appointmentId: string, newDate: string, newTime: string) {
-  console.log(`[Client] Rescheduling ${appointmentId} to ${newDate} ${newTime}`);
   try {
     const data = await runTransaction(db, async (transaction) => {
       const apptRef = doc(db, 'appointments', appointmentId);
@@ -595,13 +580,11 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
       const oldLockRef = doc(db, 'booking_locks', oldLockId);
       const oldLockSnap = await transaction.get(oldLockRef);
       if (oldLockSnap.exists() && oldLockSnap.data().appointmentId === appointmentId) {
-        console.log(`[BOOKING LOCK] releasing old lock: ${oldLockId}`);
         transaction.delete(oldLockRef);
       }
 
       // 3. Block new lock if already confirmed
       if (blockingStatuses.includes(data.status)) {
-        console.log(`[BOOKING LOCK] creating new lock (rescheduled): ${lockId}`);
         transaction.set(lockRef, {
           professionalId: data.professionalId,
           date: newDate,
@@ -662,7 +645,6 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
  */
 
 export async function addToWaitlist(entry: Partial<WaitlistEntry>) {
-  console.log('[Waitlist] Adding entry...');
   const cleaned = removeUndefinedDeep(entry);
   const waitlistRef = collection(db, 'waitlist');
   try {
@@ -671,7 +653,6 @@ export async function addToWaitlist(entry: Partial<WaitlistEntry>) {
       status: 'waiting',
       createdAt: serverTimestamp()
     });
-    console.log('[Waitlist] Entry added');
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, 'waitlist');
   }
@@ -681,7 +662,6 @@ export async function addToWaitlist(entry: Partial<WaitlistEntry>) {
  * Triggered when a slot is freed. Finds the best candidate in the waitlist.
  */
 export async function triggerWaitlistCheck(professionalId: string, date: string, time: string) {
-  console.log(`[Waitlist] Checking availability for ${date} at ${time}...`);
   
   try {
     const proRef = doc(db, 'users', professionalId);
@@ -700,7 +680,6 @@ export async function triggerWaitlistCheck(professionalId: string, date: string,
     
     const snap = await getDocs(waitlistQ);
     if (snap.empty) {
-      console.log('[Waitlist] No one waiting for this date.');
       return;
     }
 
@@ -738,7 +717,6 @@ export async function triggerWaitlistCheck(professionalId: string, date: string,
         }).catch(e => console.error(e));
 
         // Set a cleanup task would be ideal, but for now we'll handle expiration during booking attempt
-        console.log(`[Waitlist] Invitation sent to ${entryData.clientName}`);
       } else {
         // Manual mode: Alert the professional
         notify('WAITLIST_SLOT_OPENED', {
@@ -748,7 +726,6 @@ export async function triggerWaitlistCheck(professionalId: string, date: string,
           candidateName: entryData.clientName,
           candidateId: entryId
         }).catch(e => console.error(e));
-        console.log('[Waitlist] Professional notified of opened slot (manual mode)');
       }
     }
   } catch (e) {

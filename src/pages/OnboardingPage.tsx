@@ -178,7 +178,6 @@ export default function OnboardingPage() {
           city: city || ''
         });
         
-        console.log(`[SlugCheck] Requesting check for slug: ${cleanSlug}`);
         const res = await fetch(`/api/slug/check?${queryParams}`);
         
         // If the slug changed while the fetch was in progress, ignore result
@@ -200,12 +199,6 @@ export default function OnboardingPage() {
           }
         }
 
-        console.log("[SlugCheck]", {
-          status: res.status,
-          body: data,
-          finalStatus
-        });
-
         if (finalStatus === 'available') {
           setSlugStatus('available');
           setSlugMessage(data.message || 'Seu link está disponível!');
@@ -223,11 +216,7 @@ export default function OnboardingPage() {
         // Only update if it's still the same slug
         if (slugCheckRef.current === cleanSlug) {
           const finalStatus = 'invalid';
-          console.log("[SlugCheck]", {
-            status: 'caught_error',
-            error: String(err),
-            finalStatus
-          });
+
           setSlugStatus(finalStatus);
           setSlugMessage('Erro de rede. Tente novamente.');
         }
@@ -357,7 +346,6 @@ export default function OnboardingPage() {
         if (draft.breakStart) setBreakStart(draft.breakStart);
         if (draft.breakEnd) setBreakEnd(draft.breakEnd);
         
-        console.log('[Onboarding] Hydrated from local draft');
       }
     } catch (e) {
       console.warn('[Onboarding] Failed to hydrate draft', e);
@@ -368,12 +356,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (profile) {
-      console.log('[Onboarding] Profile snapshot received:', {
-        step: profile.onboardingStep,
-        completed: profile.onboardingCompleted,
-        isFinalizing,
-        currentStep: step
-      });
+
 
       // 1. If onboarding is already completed on server, App.tsx guard will handle redirect.
       if (profile.onboardingCompleted && !isFinalizing && step !== 4) { // step 4 is considered out of bounds, meaning done. Or we check 3. It used to be 5.
@@ -441,7 +424,6 @@ export default function OnboardingPage() {
       });
 
       const data = await response.json();
-      console.log('[BioAI] Response payload:', data);
       
       if (!response.ok) {
         throw new Error(data.error || 'Erro na resposta do servidor.');
@@ -485,7 +467,6 @@ export default function OnboardingPage() {
         throw new Error('Não consegui preencher sua bio agora. Você pode escrever manualmente e tentar novamente.');
       }
 
-      console.log('[BioAI] Extracted:', { newBio, newHeadline });
 
       if (newBio) setBio(newBio);
       if (newHeadline) setHeadline(newHeadline);
@@ -965,12 +946,10 @@ export default function OnboardingPage() {
           useWebWorker: false
         };
         const compressedFile = await imageCompression(file, options);
-        console.log(`[Portfolio Onboarding] Compression done. Original: ${file.size}, Compressed: ${compressedFile.size}`);
         
         // 3. Upload
         uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
         const downloadUrl = await uploadImageToStorage(compressedFile, `portfolio/${user.uid}/${uniqueFilename}`);
-        console.log('[Portfolio Onboarding] upload finished:', downloadUrl);
         
         // 3b. AI Categorization
         let autoCategory = '';
@@ -983,7 +962,6 @@ export default function OnboardingPage() {
 
         // 4. Persistence
         const docId = await savePortfolioItem(user.uid, downloadUrl, autoCategory || specialty || 'Geral');
-        console.log('[Portfolio Onboarding] saved successfully with ID:', docId);
         
         // Update local state with real ID
         setPortfolio(prev => prev.map(item => 
@@ -1584,15 +1562,6 @@ export default function OnboardingPage() {
         </AnimatePresence>
       </main>
 
-      {/* Debug Overlay - Only visible during development/debugging if showDebugHUD is true */}
-      {process.env.NODE_ENV === 'development' && (window as any).showDebugHUD && (
-        <div className="fixed bottom-4 right-4 bg-brand-ink/90 text-brand-white p-4 rounded-2xl text-[8px] font-mono z-[100] border border-brand-mist/20 pointer-events-none opacity-50">
-          <p>STEP: {step}</p>
-          <p>FINALIZING: {isFinalizing ? 'YES' : 'NO'}</p>
-          <p>LOADING: {loading ? 'YES' : 'NO'}</p>
-          <p>PROFILE_COMPLETED: {profile?.onboardingCompleted ? 'YES' : 'NO'}</p>
-        </div>
-      )}
     </div>
   );
 }

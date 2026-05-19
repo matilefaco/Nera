@@ -37,7 +37,6 @@ export async function generateServiceDescription(params: {
       clearTimeout(timeoutId);
 
       const text = await response.text();
-      console.log(`[AI SERVICE] generateServiceDescription attempt ${attempt+1} status:`, response.status);
 
       let data;
       try {

@@ -77,7 +77,6 @@ export default function FinancialPage() {
         const cached = financialAppointmentsCache.get(financialCacheKey);
         
         if (cached && Date.now() - cached.fetchedAt < FINANCIAL_CACHE_TTL_MS) {
-          console.log('[Financial] loaded from cache');
           if (isMounted && !isCancelled) {
             setAppointments(cached.data);
             setLoading(false);
@@ -96,7 +95,6 @@ export default function FinancialPage() {
           setTimeout(() => reject(new Error('timeout')), 8000)
         );
 
-        console.log('[Financial] fetch start');
         const snapshot = await Promise.race([
           getDocs(q),
           timeoutPromise
@@ -104,9 +102,7 @@ export default function FinancialPage() {
 
         if (!isMounted || isCancelled) return;
         
-        console.log(`[Financial] fetch success count=${snapshot.docs.length}`);
         if (snapshot.empty) {
-          console.log('[Financial] empty records');
         }
 
         const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
@@ -120,7 +116,6 @@ export default function FinancialPage() {
         if (!isMounted || isCancelled) return;
         
         if (err.message === 'timeout') {
-          console.log('[Financial] timeout');
         } else if (err.message && err.message.includes('index')) {
           console.warn('[Financial] Firestore index required: appointments professionalId ASC, date ASC');
         } else {
@@ -129,7 +124,6 @@ export default function FinancialPage() {
         setError(true);
       } finally {
         if (isMounted && !isCancelled) {
-          console.log('[Financial] finally loading=false');
           setLoading(false);
         }
       }

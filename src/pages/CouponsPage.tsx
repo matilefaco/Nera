@@ -74,7 +74,6 @@ export default function CouponsPage() {
 
     loadingTimeout = setTimeout(() => {
       if (isMounted) {
-        console.log('[Coupons] timeout! forcing loading false');
         setError(true);
         setLoading(false);
       }
@@ -90,11 +89,9 @@ export default function CouponsPage() {
 
       try {
         if (snapshot.metadata.fromCache && snapshot.empty) {
-          console.log('[Coupons] from cache and empty, waiting for server');
           return;
         }
 
-        console.log(`[Coupons] success count=${snapshot.docs.length}`);
 
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Coupon));
         

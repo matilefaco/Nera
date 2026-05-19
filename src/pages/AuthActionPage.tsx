@@ -71,9 +71,11 @@ export default function AuthActionPage() {
       >
         {status === 'loading' && (
           <div className="py-10">
-            <Loader2 className="w-12 h-12 text-brand-terracotta animate-spin mx-auto mb-6" />
-            <h2 className="text-2xl font-serif mb-2">Confirmando seu e-mail</h2>
-            <p className="text-brand-stone font-light">Aguarde um instante enquanto validamos sua conta.</p>
+            <div className="w-20 h-20 bg-[#FAF9F8] border border-brand-mist/40 rounded-2xl flex items-center justify-center mx-auto mb-8 shadow-sm">
+              <Loader2 className="w-8 h-8 text-brand-ink animate-spin" strokeWidth={1.5} />
+            </div>
+            <h2 className="text-2xl font-serif mb-2 italic">Confirmando seu e-mail</h2>
+            <p className="text-[11px] text-brand-stone font-light uppercase tracking-widest max-w-[200px] mx-auto leading-relaxed">A Nera está validando sua conta...</p>
           </div>
         )}
 

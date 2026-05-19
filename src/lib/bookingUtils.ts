@@ -299,7 +299,6 @@ export function getNextAvailableSlot({
   let totalCounter = 0;
   const now = new Date();
   
-  console.log(`[BADGE NEXT SLOT] Starting search for next 14 days. duration=${serviceDuration}`);
 
   for (let i = 0; i < daysToLookAhead; i++) {
     const targetDate = new Date();
@@ -319,12 +318,9 @@ export function getNextAvailableSlot({
     
     // LOGS DE DEBUG RECURSIVOS (PEDIDO PELO USUÁRIO)
     if (i < 7) {
-      console.log(`[BADGE NEXT SLOT] date checked: ${dateStr}`);
-      console.log(`[BADGE NEXT SLOT] slots from getBookableSlotsForDate: ${slots.length}`);
     }
 
     if (slots.length > 0 && !firstSlot) {
-      console.log(`[BADGE NEXT SLOT] chosen: ${slots[0]} for date ${dateStr}`);
       firstSlot = { date: dateStr, time: slots[0] };
     }
   }

@@ -1,4 +1,3 @@
-// slug check deploy sync - forced redeploy at 2024-05-18T23:42
 process.env.NODE_ENV = "production";
 
 import { onRequest } from "firebase-functions/v2/https";
@@ -13,7 +12,6 @@ let cachedApp: any = null;
 
 async function createExpressApp() {
   if (!cachedApp) {
-    console.log("[BOOT] Loading server implementation from ./server.cjs");
     try {
       const module = await import("./server.cjs");
       // CJS/ESM Interop: try direct named export, then default.named, then default (if it were the function itself)
@@ -28,9 +26,7 @@ async function createExpressApp() {
         throw new Error("Invalid server bundle: createServerApp is not a function in ./server.cjs");
       }
 
-      console.log("[BOOT] Initializing server app...");
       cachedApp = await createServerApp();
-      console.log("[BOOT] Server app initialized successfully");
     } catch (err: any) {
       console.error("[BOOT ERROR] Failed to load or initialize server app", {
         message: err.message,

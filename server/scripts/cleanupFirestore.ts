@@ -14,8 +14,6 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`[CLEANUP] Starting audit/cleanup script...`);
-  console.log(`[CLEANUP] APPLY MODE: ${APPLY ? 'ON (DELETING)' : 'OFF (DRY RUN)'}`);
   
   const now = Date.now();
   
@@ -28,7 +26,6 @@ async function main() {
     queryDescriptor: string, 
     queryFn: (ref: admin.firestore.CollectionReference) => admin.firestore.Query
   ) {
-    console.log(`\n[CLEANUP] Auditing: ${collectionName} (${queryDescriptor})`);
     
     let deletedCount = 0;
     const ref = db.collection(collectionName);
@@ -36,14 +33,11 @@ async function main() {
     const snapshot = await query.get();
 
     if (snapshot.empty) {
-      console.log(`[CLEANUP] No matching documents found in ${collectionName}.`);
       return;
     }
 
-    console.log(`[CLEANUP][DRY_RUN] Found ${snapshot.size} documents to delete in ${collectionName}.`);
     
     if (APPLY) {
-      console.log(`[CLEANUP][APPLY] Deleting ${snapshot.size} documents...`);
       let batch = db.batch();
       let operations = 0;
 
@@ -63,7 +57,6 @@ async function main() {
         await batch.commit();
       }
       
-      console.log(`[CLEANUP][APPLY] Deleted ${deletedCount} documents from ${collectionName}.`);
     } else {
       deletedCount = snapshot.size;
     }
@@ -72,7 +65,6 @@ async function main() {
   }
 
   async function updatePendingAppointments() {
-    console.log(`\n[CLEANUP][PENDING] Auditing: appointments (pending and older than 24h)`);
     
     const oneDayAgo = new Date(now - 24 * 60 * 60 * 1000);
     const ref = db.collection('appointments');
@@ -94,14 +86,11 @@ async function main() {
     });
 
     if (toExpire.length === 0) {
-      console.log(`[CLEANUP] No pending appointments to expire.`);
       return;
     }
 
-    console.log(`[CLEANUP][DRY_RUN] Found ${toExpire.length} pending appointments older than 24h.`);
 
     if (APPLY) {
-      console.log(`[CLEANUP][APPLY] Expiring ${toExpire.length} appointments...`);
       let batch = db.batch();
       let operations = 0;
 
@@ -128,7 +117,6 @@ async function main() {
         await batch.commit();
       }
       
-      console.log(`[CLEANUP][APPLY] Expired ${toExpire.length} appointments and released ${totalUpdated} locks.`);
     } else {
       totalUpdated += toExpire.length;
     }
@@ -142,7 +130,6 @@ async function main() {
   const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
   // Only filtering locally or if indexes permit.
   async function cleanupAlerts() {
-    console.log(`\n[CLEANUP] Auditing: alerts (read and > 30 days)`);
     const ref = db.collection('alerts');
     const snap = await ref.where('read', '==', true).get();
     let toDelete = [];
@@ -155,7 +142,6 @@ async function main() {
     });
 
     if (toDelete.length > 0) {
-      console.log(`[CLEANUP][DRY_RUN] Found ${toDelete.length} old read alerts.`);
       if (APPLY) {
         let batch = db.batch();
         let ops = 0;
@@ -170,18 +156,15 @@ async function main() {
           }
         }
         if (ops > 0) await batch.commit();
-        console.log(`[CLEANUP][APPLY] Deleted ${toDelete.length} alerts.`);
       } else {
         totalDeleted += toDelete.length;
       }
     } else {
-      console.log(`[CLEANUP] No old read alerts.`);
     }
   }
   await cleanupAlerts();
 
   async function cleanupNotifications() {
-    console.log(`\n[CLEANUP] Auditing: notifications (read and > 30 days)`);
     const ref = db.collection('notifications');
     const snap = await ref.where('read', '==', true).get();
     let toDelete = [];
@@ -194,7 +177,6 @@ async function main() {
     });
 
     if (toDelete.length > 0) {
-      console.log(`[CLEANUP][DRY_RUN] Found ${toDelete.length} old read notifications.`);
       if (APPLY) {
         let batch = db.batch();
         let ops = 0;
@@ -209,19 +191,16 @@ async function main() {
           }
         }
         if (ops > 0) await batch.commit();
-        console.log(`[CLEANUP][APPLY] Deleted ${toDelete.length} notifications.`);
       } else {
         totalDeleted += toDelete.length;
       }
     } else {
-      console.log(`[CLEANUP] No old read notifications.`);
     }
   }
   await cleanupNotifications();
 
   // 3. review_requests: pending ONLY AND older than 30 days
   async function cleanupReviewRequests() {
-    console.log(`\n[CLEANUP] Auditing: review_requests (pending > 30 days)`);
     const ref = db.collection('review_requests');
     const snap = await ref.where('status', '==', 'pending').get();
     let toDelete = [];
@@ -234,11 +213,9 @@ async function main() {
     });
 
     if (toDelete.length === 0) {
-      console.log(`[CLEANUP] No old pending review requests found.`);
       return;
     }
 
-    console.log(`[CLEANUP][DRY_RUN] Found ${toDelete.length} old pending review requests.`);
     if (APPLY) {
       let batch = db.batch();
       let ops = 0;
@@ -253,7 +230,6 @@ async function main() {
         }
       }
       if (ops > 0) await batch.commit();
-      console.log(`[CLEANUP][APPLY] Deleted ${toDelete.length} review requests.`);
     } else {
         totalDeleted += toDelete.length;
     }
@@ -262,7 +238,6 @@ async function main() {
 
   // 4. booking_locks: pending > 24h
   async function cleanupBookingLocks() {
-    console.log(`\n[CLEANUP][LOCKS] Auditing: booking_locks (orphans or pending > 24h)`);
     const ref = db.collection('booking_locks');
     const snap = await ref.get();
     let toDelete = [];
@@ -290,11 +265,9 @@ async function main() {
     }
 
     if (toDelete.length === 0) {
-      console.log(`[CLEANUP] No orphaned booking locks found.`);
       return;
     }
 
-    console.log(`[CLEANUP][DRY_RUN] Found ${toDelete.length} orphaned booking locks.`);
     if (APPLY) {
       let batch = db.batch();
       let ops = 0;
@@ -309,7 +282,6 @@ async function main() {
         }
       }
       if (ops > 0) await batch.commit();
-      console.log(`[CLEANUP][APPLY] Deleted ${toDelete.length} booking locks.`);
     } else {
         totalDeleted += toDelete.length;
     }
@@ -319,15 +291,9 @@ async function main() {
   // 5. Update Pending Appointments
   await updatePendingAppointments();
 
-  console.log('\n=============================================');
-  console.log(`[CLEANUP] Audit Summary:`);
-  console.log(`- Documents ${APPLY ? 'Deleted' : 'Would Delete'}: ${totalDeleted}`);
-  console.log(`- Appointments ${APPLY ? 'Expired' : 'Would Expire'}: ${totalUpdated}`);
   
   if (!APPLY) {
-    console.log(`\nRun with CLEANUP_APPLY=true to apply these changes.`);
   }
-  console.log('=============================================\n');
 
   process.exit(0);
 }

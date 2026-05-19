@@ -96,7 +96,6 @@ export default function ManageBookingPage() {
       const lookupKey = token || id;
       if (!lookupKey) return;
 
-      console.log(`[BOOKING_MANAGEMENT] Fetching via API for: ${lookupKey}`);
       try {
         const response = await fetch(`/api/profile/reservation/${lookupKey}`);
         
@@ -128,7 +127,6 @@ export default function ManageBookingPage() {
         // Professional data is already included in the API response
         if (apptData.professional) {
           setProfessional(apptData.professional);
-          console.log(`[BOOKING_MANAGEMENT] Professional from API: ${apptData.professional.name}`);
         } else {
           // Fallback fetch if professional not in API for some reason
           const proSnap = await getDoc(doc(db, 'users', apptData.professionalId));
@@ -258,8 +256,12 @@ setBlockedSchedules(dayBlocked);
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] bg-[#FCFBF9] flex items-center justify-center p-8">
-        <div className="w-8 h-8 rounded-full border border-brand-mist/60 border-t-brand-stone/40 animate-spin" />
+      <div className="min-h-[100dvh] bg-[#FDFCFB] flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-16 h-16 bg-[#FAF9F8] border border-brand-mist/40 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
+          <div className="w-6 h-6 rounded-full border-2 border-brand-mist/60 border-t-brand-ink/40 animate-spin" />
+        </div>
+        <p className="text-xl font-serif text-brand-ink mb-2 italic">Acessando reserva</p>
+        <p className="text-[11px] text-brand-stone font-light uppercase tracking-widest max-w-[200px] leading-relaxed">Localizando detalhes do seu agendamento no sistema...</p>
       </div>
     );
   }

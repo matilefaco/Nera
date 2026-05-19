@@ -354,7 +354,6 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
       .where('status', 'in', ['pending_confirmation', 'confirmed', 'scheduled', 'pending'])
       .get();
 
-    console.log(`[WhatsApp-Inbound] Candidate appointments found: ${apptsSnap.docs.length}`);
 
     const now = new Date();
     const futureAppts = apptsSnap.docs

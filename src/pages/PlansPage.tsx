@@ -146,21 +146,21 @@ export default function PlansPage() {
                 <motion.div 
                   animate={{ rotate: 360 }}
                   transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-                  className="w-16 h-16 rounded-full border border-brand-linen flex items-center justify-center mb-6 relative"
+                  className="w-16 h-16 rounded-2xl bg-[#FAF9F8] border border-brand-mist/40 flex items-center justify-center mb-8 relative shadow-sm"
                 >
-                   <Sparkles className="text-brand-terracotta" size={24} />
-                   <div className="absolute inset-0 border-2 border-brand-terracotta rounded-full border-t-transparent animate-spin" />
+                   <Sparkles className="text-brand-terracotta" size={24} strokeWidth={1.5} />
+                   <div className="absolute inset-0 border-2 border-brand-mist/60 rounded-2xl border-t-brand-ink/40 animate-spin" />
                 </motion.div>
-                <h3 className="text-xl font-serif text-brand-ink mb-2">Ativando seus<br/>recursos Pro...</h3>
-                <div className="flex flex-col gap-3 mt-8 w-full text-left">
-                   <motion.div initial={{opacity: 0, x:-10}} animate={{opacity: 1, x:0}} transition={{delay: 0.5}} className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-brand-stone font-bold">
-                      <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center">✓</span> Preparando upgrade
+                <h3 className="text-xl md:text-2xl font-serif text-brand-ink mb-2 italic">Preparando seu acesso Pro</h3>
+                <div className="flex flex-col gap-4 mt-8 w-full text-left">
+                   <motion.div initial={{opacity: 0, x:-10}} animate={{opacity: 1, x:0}} transition={{delay: 0.5}} className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-brand-stone font-light">
+                      <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-normal">✓</span> Preparando upgrade
                    </motion.div>
-                   <motion.div initial={{opacity: 0, x:-10}} animate={{opacity: 1, x:0}} transition={{delay: 1.2}} className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-brand-stone font-bold">
-                      <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center">✓</span> Liberando recursos premium
+                   <motion.div initial={{opacity: 0, x:-10}} animate={{opacity: 1, x:0}} transition={{delay: 1.2}} className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-brand-stone font-light">
+                      <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-normal">✓</span> Liberando recursos premium
                    </motion.div>
-                   <motion.div initial={{opacity: 0, x:-10}} animate={{opacity: 1, x:0}} transition={{delay: 1.9}} className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-brand-stone font-bold">
-                      <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center">✓</span> Sincronizando assinatura
+                   <motion.div initial={{opacity: 0, x:-10}} animate={{opacity: 1, x:0}} transition={{delay: 1.9}} className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-brand-stone font-light">
+                      <span className="w-4 h-4 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center font-normal">✓</span> Sincronizando assinatura
                    </motion.div>
                 </div>
               </div>
@@ -171,18 +171,18 @@ export default function PlansPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 className="max-w-xs w-full flex flex-col items-center"
               >
-                <div className="w-20 h-20 bg-brand-linen rounded-full flex items-center justify-center text-brand-terracotta shadow-sm mb-6 border border-brand-mist/20">
+                <div className="w-20 h-20 bg-[#FAF9F8] rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm mb-6 border border-emerald-100">
                   <motion.div
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", bounce: 0.5, delay: 0.2 }}
                   >
-                    <ShieldCheck size={32} />
+                    <ShieldCheck size={32} strokeWidth={1.5} />
                   </motion.div>
                 </div>
-                <h3 className="text-2xl font-serif text-brand-ink leading-tight mb-3">Solicitação enviada com sucesso.</h3>
-                <p className="text-sm text-brand-stone font-light leading-relaxed">
-                  Seu plano está sendo atualizado. Os novos recursos estarão disponíveis em instantes, assim que a Stripe confirmar a transação.
+                <h3 className="text-2xl font-serif text-brand-ink leading-tight mb-2 italic">Tudo pronto.</h3>
+                <p className="text-[11px] uppercase tracking-widest text-brand-stone font-light leading-relaxed max-w-[250px] mx-auto">
+                  A Nera já ativou seu acesso. Estamos te redirecionando...
                 </p>
               </motion.div>
             )}
@@ -200,9 +200,9 @@ export default function PlansPage() {
             <button 
               onClick={() => handleManageSubscription()} 
               disabled={loadingPortal}
-              className="mt-6 px-6 py-3 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-stone transition-all"
+              className="mt-6 px-8 py-3.5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md focus:ring-4 ring-brand-ink/10"
             >
-              {loadingPortal ? 'Carregando...' : 'Gerenciar assinatura'}
+              {loadingPortal ? 'Acessando Portal...' : 'Gerenciar assinatura'}
             </button>
           )}
         </header>

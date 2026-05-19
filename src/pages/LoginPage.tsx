@@ -50,21 +50,15 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    console.log('[Login] submit start (Google)');
-    console.log('[Login] firebase auth start');
     
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      console.log('[Login] firebase auth success');
       notify.success('Seja bem-vinda.');
-      console.log('[Login] redirect start');
       navigate('/dashboard');
     } catch (error: any) {
-      console.log('[Login] error:', error);
       notify.error(getHumanError(error.code));
     } finally {
-      console.log('[Login] finally isSubmitting=false');
       setLoading(false);
     }
   };
@@ -74,8 +68,6 @@ export default function LoginPage() {
     if (loading) return;
     
     setLoading(true);
-    console.log('[Login] submit start');
-    console.log('[Login] firebase auth start');
     try {
       const authPromise = signInWithEmailAndPassword(auth, email, password);
       let timeoutId: any;
@@ -86,7 +78,6 @@ export default function LoginPage() {
       await Promise.race([authPromise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
       const user = auth.currentUser;
       
-      console.log('[Login] firebase auth success');
       
       // If user is not verified and logged in with password, redirect to verification
       if (user && !user.emailVerified && user.providerData.some(p => p.providerId === 'password')) {
@@ -97,10 +88,8 @@ export default function LoginPage() {
       }
 
       notify.success('Seja bem-vinda.');
-      console.log('[Login] redirect start');
       navigate('/dashboard');
     } catch (error: any) {
-      console.log('[Login] auth error:', error.code, error.message);
       if (error.message === 'TIMEOUT_FIREBASE') {
          notify.error('O login demorou muito para responder. Por favor, recarregue a página e tente novamente.');
       } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
@@ -111,7 +100,6 @@ export default function LoginPage() {
          notify.error(getHumanError(error.code));
       }
     } finally {
-      console.log('[Login] finally isSubmitting=false');
       setLoading(false);
     }
   };

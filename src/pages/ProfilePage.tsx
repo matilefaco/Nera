@@ -222,7 +222,6 @@ export default function ProfilePage() {
         // Fallback: Fetch portfolio from sub-collection if array is empty
         const fetchPortfolio = async () => {
           try {
-            console.log('[Profile] Fetching portfolio sub-collection...');
             const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
             const q = query(portfolioRef, orderBy('createdAt', 'desc'));
             const snapshot = await getDocs(q);
@@ -231,7 +230,6 @@ export default function ProfilePage() {
               url: doc.data().imageUrl || doc.data().url,
               category: doc.data().category
             }));
-            console.log('[Profile] Portfolio items fetched from sub-collection:', items.length);
             if (items.length > 0) setPortfolio(items);
           } catch (err) {
             console.error('[Profile] Error fetching portfolio:', err);
@@ -380,11 +378,9 @@ export default function ProfilePage() {
     }
 
     setLoading(true);
-    console.log('[ProfileSave] Start');
 
     try {
       // 1. Sanitize Data
-      console.log('[ProfileSave] Validating and sanitizing payload');
       const sanitizedName = name.trim();
       const sanitizedSpecialty = specialty.trim();
       const sanitizedBio = bio.trim();
@@ -445,7 +441,6 @@ export default function ProfilePage() {
       };
 
       try {
-        console.log('[ProfileSave] Calling transactional save API...');
         if (!auth.currentUser) {
           notify.error("Sua sessão expirou. Entre novamente para salvar.");
           setLoading(false);
@@ -470,7 +465,6 @@ export default function ProfilePage() {
           throw new Error(errorData.error || 'Erro ao salvar perfil');
         }
 
-        console.log('[ProfileSave] Success');
         notify.success('Perfil atualizado.');
         setSavedSnapshotString(currentSnapshotString);
         setShowSaveSuccess(true);
@@ -484,7 +478,6 @@ export default function ProfilePage() {
       notify.error('Não foi possível concluir agora. Tente novamente.');
     } finally {
       setLoading(false);
-      console.log('[ProfileSave] Done');
     }
   };
 
@@ -582,16 +575,13 @@ export default function ProfilePage() {
 
       let uniqueFilename = '';
       try {
-        console.log(`[Portfolio] Starting compression for ${file.name}`);
         // 2. Compression
         const options = { maxSizeMB: 0.2, maxWidthOrHeight: 1200, useWebWorker: false };
         const compressed = await imageCompression(file, options);
-        console.log(`[Portfolio] Compression done. Original: ${file.size}, Compressed: ${compressed.size}`);
 
         // 3. Upload
         uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '')}`;
         const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
-        console.log('[Portfolio] upload finished:', url);
 
         // 3b. AI Categorization
         let autoCategory = '';
@@ -603,9 +593,7 @@ export default function ProfilePage() {
         }
         
         // 4. Persistence
-        console.log('[Portfolio] saving to Firestore');
         const docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
-        console.log('[Portfolio] saved successfully with ID:', docId);
         
         // Replace temp item with final item
         setPortfolio(prev => prev.map(item => 
@@ -670,9 +658,7 @@ export default function ProfilePage() {
 
     setDeletingId(id);
     try {
-      console.log('[Portfolio] removing from Firestore');
       await deletePortfolioItem(user.uid, itemToRemove as any);
-      console.log('[Portfolio] removed successfully');
       
       setPortfolio(prev => prev.filter(item => item.id !== id));
       notify.success('Galeria atualizada.');

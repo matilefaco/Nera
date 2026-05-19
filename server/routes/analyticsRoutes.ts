@@ -22,7 +22,6 @@ const debugOnly = (req: any, res: any, next: any) => {
 
 router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
-  console.log('[BioAI] Entry /generate-content:', { name, specialty });
   
   // Simple rate limit check
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous') as string;
@@ -42,7 +41,6 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
     return res.status(429).json({ error: "Muitas solicitações. Tente novamente em um minuto." });
   }
   
-  console.log('[BioAI] NVIDIA_API_KEY present:', !!process.env.NVIDIA_API_KEY);
   if (!process.env.NVIDIA_API_KEY) {
     console.error("[BioAI] NVIDIA_API_KEY is missing in server environment");
     return res.status(500).json({ error: "Configuração de IA ausente." });
@@ -71,7 +69,6 @@ Exemplo de bio com tom elegante e natural: "Especialista em maquiagem com atendi
 Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato exato (as aspas devem ser duplas e a resposta deve ser puramente o JSON e nada mais):
 {"bio": "sua bio aqui", "headline": "Sua headline curta aqui"}`;
 
-    console.log('[BioAI] Calling NVIDIA Model meta/llama-3.1-8b-instruct');
     const content = await callNvidiaAI([
       { role: "user", content: prompt }
     ], { 
@@ -80,7 +77,6 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato ex
       max_tokens: 512
     });
     
-    console.log('[BioAI] Raw response from NVIDIA:', content);
     
     // Attempt to parse JSON from response string
     let parsed;
@@ -97,7 +93,6 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato ex
       throw new Error("Invalid format from AI model");
     }
 
-    console.log(`[BioAI] Successfully generated parsed:`, parsed);
     res.json(parsed);
 
   } catch (error: any) {

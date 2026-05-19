@@ -55,17 +55,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [successDraft, setSuccessDraft] = useState<any>(null);
   const [bookingMode, setBookingMode] = useState<'studio' | 'home' | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
-  const [, forceUpdate] = useState({});
 
-  useEffect(() => {
-    // Poll for debug logs periodically when modal is open and in dev/ais mode
-    if (!(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-')))) return;
-    
-    const interval = setInterval(() => {
-      forceUpdate({});
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [appointmentToken, setAppointmentToken] = useState<string | null>(null);
   const [reservationCode, setReservationCode] = useState<string | null>(null);
@@ -263,7 +253,6 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
   const availableSlots = useMemo(() => {
     if (!profile?.workingHours || !selectedDate) {
-      console.log(`[Slots] Missing requirements for slot generation: workingHours=${!!profile?.workingHours}, selectedDate=${!!selectedDate}`);
       return [];
     }
     const duration = Number(selectedService?.duration) || 60;
@@ -274,7 +263,6 @@ export default function BookingModal({ profile, services, onClose, open, initial
       appointments: dayAppointments,
       blockedSchedules
     });
-    console.log(`[Slots] generatedSlots count=${result.length} (after internal blocks/appts filtering)`);
     return result;
   }, [selectedDate, selectedService, profile, dayAppointments, blockedSchedules]);
 
@@ -430,10 +418,6 @@ export default function BookingModal({ profile, services, onClose, open, initial
     let isMounted = true;
     setIsLoadingSlots(true);
     setSlotsLoadError(null);
-    console.log(`[Slots] start - Date: ${selectedDate}, Pro: ${profile?.uid}`);
-    console.log(`[Slots] selectedService ID:`, selectedService?.id);
-    console.log(`[Slots] serviceDuration:`, Number(selectedService?.duration));
-    console.log(`[Slots] businessHours/professional availability:`, profile?.workingHours);
 
     const fetchAvailabilityData = async () => {
       try {
@@ -442,18 +426,15 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
         // 1. Fetch Blocked Schedules (we fetch this every time the date changes to ensure we have the latest, though it fetches all for the pro)
         try {
-          console.log(`[Slots] blockedTimes query start`);
           const blockedRef = collection(db, 'blocked_schedules');
           const blockedSnap = await getDocs(query(blockedRef, where('professionalId', '==', profile.uid)));
           currentBlocked = blockedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-          console.log(`[Slots] blockedTimes query success count=${currentBlocked.length}`);
         } catch (err) {
           console.error("[Slots] error actual= blockedTimes query:", err);
         }
 
         // 2. Fetch Appointments
         try {
-          console.log(`[Slots] appointments query start`);
           const apptsRef = collection(db, 'appointments');
           const apptsQ = query(
             apptsRef, 
@@ -476,11 +457,9 @@ export default function BookingModal({ profile, services, onClose, open, initial
           const allAppts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
           currentAppts = allAppts.filter(a => ['pending', 'confirmed', 'completed'].includes(a.status));
           
-          console.log(`[Slots] appointments query success count=${currentAppts.length}`);
         } catch (error) {
           console.error(`[Slots] error actual= appointments query:`, error);
           if (error instanceof Error && error.message === 'FIRESTORE_TIMEOUT') {
-             console.log(`[Slots] timeout`);
           }
           // Do not throw or block the UI, just fall back to base schedule without checking conflicts
           // so the user can at least see general availability
@@ -490,13 +469,11 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
         setBlockedSchedules(currentBlocked);
         setDayAppointments(currentAppts);
-        console.log(`[Slots] arrays set. currentAppts: ${currentAppts.length}, currentBlocked: ${currentBlocked.length}`);
       } catch (error) {
         console.error(`[Slots] error actual= general fetch error:`, error);
       } finally {
         if (isMounted) {
           setIsLoadingSlots(false);
-          console.log(`[Slots] finally setIsLoadingSlots(false)`);
         }
       }
     };
@@ -641,8 +618,6 @@ export default function BookingModal({ profile, services, onClose, open, initial
         setStep(4);
       }, 800);
     } catch (error: any) {
-      if (!(window as any).__BOOKING_DEBUG__) (window as any).__BOOKING_DEBUG__ = [];
-      (window as any).__BOOKING_DEBUG__.push(`[FATAL ERROR] ${error.message || error}`);
       handleBookingError(error);
     } finally {
       setBookingLoading(false);
@@ -1041,32 +1016,6 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     </p>
                   </div>
 
-                  {/* DEBUG PANEL FOR MOBILE DEV/PREVIEW ONLY */}
-                  {(import.meta.env.DEV === true && typeof window !== 'undefined' && window.location.hostname.includes('localhost')) && step === 3 && (
-                    <div className="mb-10 p-4 bg-brand-linen rounded-2xl border border-brand-mist text-left">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="text-[9px] font-bold text-brand-stone uppercase tracking-widest">Debug Info (DEV ONLY)</h4>
-                        <button 
-                          onClick={() => { (window as any).__BOOKING_DEBUG__ = []; forceUpdate({}); }}
-                          className="text-[9px] text-brand-terracotta underline"
-                        >
-                          Limpar
-                        </button>
-                      </div>
-                      <div className="max-h-60 overflow-y-auto text-[9px] font-mono text-brand-ink space-y-1">
-                        {(window as any).__BOOKING_DEBUG__?.length > 0 ? (
-                          (window as any).__BOOKING_DEBUG__.map((log: string, i: number) => (
-                            <div key={i} className="border-b border-brand-mist/30 pb-2">
-                              <pre className="whitespace-pre-wrap">{log}</pre>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-brand-stone italic">Nenhum log capturado ainda. Toque em "Confirmar Agora".</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   <div className="hidden md:block">
                     <PremiumButton variant="terracotta" className="w-full py-7" onClick={handleBooking} loading={bookingLoading} loadingText="Confirmando...">
                       Confirmar Agendamento <Check size={18} className="ml-1" />
@@ -1186,7 +1135,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     </div>
                   </div>
                   
-                  {/* Link de Gerenciamento - Temporário conforme pedido */}
+                  {/* Link de Gerenciamento da Reserva */}
                   {appointmentToken && (
                     <div className="mt-4 pt-4 border-t border-brand-mist/30">
                       <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-1">Link de Gerenciamento</span>

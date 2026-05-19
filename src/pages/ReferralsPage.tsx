@@ -31,25 +31,20 @@ export default function ReferralsPage() {
   const [copyAnim, setCopyAnim] = useState(false);
 
   useEffect(() => {
-    console.log('[Referrals] start');
     if (!isAuthReady) {
-      console.log('[Referrals] auth not ready, waiting');
       return;
     }
 
     if (!features.referrals) {
-      console.log('[Referrals] not available for this plan, loading=false');
       setLoading(false);
       return;
     }
 
     if (!profile?.referralCode) {
-      console.log('[Referrals] no referral code initially, loading=false');
       setLoading(false);
       return;
     }
 
-    console.log(`[Referrals] query start for code: ${profile.referralCode}`);
 
     let isMounted = true;
     let isCancelled = false;
