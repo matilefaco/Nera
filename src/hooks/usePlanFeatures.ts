@@ -6,6 +6,7 @@ export function usePlanFeatures() {
   const { profile } = useAuth();
   
   const rawPlan = (profile?.plan || 'free').toLowerCase() as PlanType;
+  const signupPlan = profile?.signupPlan as PlanType | undefined;
   const expiresAt = profile?.planExpiresAt;
   
   // Check if plan is expired
@@ -23,6 +24,7 @@ export function usePlanFeatures() {
   return {
     features,
     plan: activePlan,
+    signupPlan,
     isExpired,
     isPremium,
     isProPlan,

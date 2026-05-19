@@ -11,7 +11,7 @@ const router = express.Router();
  * Creates a new user via Admin SDK to avoid default Firebase emails and control branding.
  */
 router.post("/register", async (req, res) => {
-  const { name, email, password, referredBy } = req.body;
+  const { name, email, password, referredBy, plan } = req.body;
 
   if (!email || !password || !name) {
     return res.status(400).json({ error: "Dados incompletos" });
@@ -19,6 +19,7 @@ router.post("/register", async (req, res) => {
 
   const cleanEmail = email.trim().toLowerCase();
   const cleanName = name.trim();
+  const signupPlan = (plan === 'essencial' || plan === 'pro') ? plan : 'free';
 
   try {
     // 1. Create User in Firebase Auth via Admin SDK
@@ -102,7 +103,8 @@ router.post("/register", async (req, res) => {
       location: '',
       whatsapp: '',
       avatar: '',
-      plan: 'free'
+      plan: 'free',
+      signupPlan: signupPlan
     });
 
     logger.info("AUTH", "Firestore profile initialized", { uid: userRecord.uid });

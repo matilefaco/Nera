@@ -158,6 +158,7 @@ export interface UserProfile {
 
   createdAt: string;
   plan?: 'free' | 'essencial' | 'pro';
+  signupPlan?: 'free' | 'essencial' | 'pro';
   planExpiresAt?: string; // ISO date
   trialStartedAt?: string;
   referralCode?: string; // código único de indicação

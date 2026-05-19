@@ -80,7 +80,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
   // If user HAS finished onboarding and tries to go back to onboarding, send to dashboard
   if (isCompleted && location.pathname === '/onboarding') {
-    return <Navigate to="/dashboard" />;
+    return <Navigate to="/dashboard?tab=hoje" />;
   }
 
   return <>{children}</>;
@@ -96,7 +96,7 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (profile?.role !== 'admin') {
-    return <Navigate to="/dashboard" />;
+    return <Navigate to="/dashboard?tab=hoje" />;
   }
 
   return <>{children}</>;

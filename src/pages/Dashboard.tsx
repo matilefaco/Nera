@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { db, auth, handleBookingError, inviteFromWaitlist, updateAppointmentStatus } from '../firebase';
 import { 
@@ -13,7 +14,6 @@ import {
   ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
   AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info, Ticket, Gift
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { notify } from '../lib/notify';
 import { 
   formatCurrency, getTodayLocale, buildWhatsappLink, 
@@ -109,11 +109,24 @@ const appointmentsHistoryCache = new Map<string, AppointmentsCacheEntry>();
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const { features, plan } = usePlanFeatures();
+  const { features, plan, signupPlan } = usePlanFeatures();
+  const [searchParams] = useSearchParams();
   
   const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
+    // 1. Check URL param first (priority)
+    const tabParam = searchParams.get('tab');
+    if (tabParam === "hoje" || tabParam === "crescimento" || tabParam === "gestao") {
+      return tabParam as DashboardTab;
+    }
+
+    // 2. Check localStorage
     const saved = localStorage.getItem("nera_dashboard_tab");
-    return saved === "hoje" || saved === "crescimento" || saved === "gestao" ? saved : "hoje";
+    if (saved === "hoje" || saved === "crescimento" || saved === "gestao") {
+      return saved as DashboardTab;
+    }
+
+    // 3. Absolute Default
+    return "hoje";
   });
 
   useEffect(() => {
@@ -976,17 +989,25 @@ setUnconfirmedTomorrow(docs);
                   "text-[9px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded flex items-center hover:opacity-80 transition-opacity",
                   plan === 'pro' || plan === 'essencial' 
                     ? "text-brand-ink bg-brand-linen border border-brand-mist/50" 
-                    : "text-brand-stone bg-brand-mist/10 border border-brand-mist/30"
+                    : (signupPlan === 'essencial' || signupPlan === 'pro')
+                      ? "text-brand-terracotta bg-brand-linen border border-brand-terracotta/30"
+                      : "text-brand-stone bg-brand-mist/10 border border-brand-mist/30"
                 )}>
-                  Plano {
-                    plan === 'pro' ? 'Pro' : 
-                    plan === 'essencial' ? 'Essencial' : 
-                    'Gratuito'
-                  }
+                  {plan === 'pro' && 'Plano Pro'}
+                  {plan === 'essencial' && 'Plano Essencial'}
+                  {plan === 'free' && (signupPlan === 'essencial' || signupPlan === 'pro') && (
+                    <span className="flex items-center gap-1">
+                      {signupPlan} <span className="opacity-60 text-[8px]">· teste pendente</span>
+                    </span>
+                  )}
+                  {plan === 'free' && (!signupPlan || signupPlan === 'free') && 'Plano Gratuito'}
                 </Link>
-                {(plan === 'free') && (
-                  <Link to="/planos" className="text-[10px] text-brand-terracotta hover:text-brand-sienna transition-colors font-medium relative top-[-1px]">
-                    Upgrade
+                {plan === 'free' && (
+                  <Link to="/planos" className={cn(
+                    "text-[10px] hover:underline transition-colors font-medium relative top-[-1px]",
+                    (signupPlan === 'essencial' || signupPlan === 'pro') ? "text-brand-terracotta" : "text-brand-terracotta hover:text-brand-sienna"
+                  )}>
+                    {(signupPlan === 'essencial' || signupPlan === 'pro') ? 'Ativar Teste Grátis' : 'Upgrade'}
                   </Link>
                 )}
                 <span className="text-brand-mist text-[10px] hidden sm:inline">|</span>

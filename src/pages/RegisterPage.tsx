@@ -98,6 +98,8 @@ export default function RegisterPage() {
           referredBy: manualReferralCode || null,
           referralCode: userReferralCode,
           credits: 0,
+          plan: 'free',
+          signupPlan: (selectedPlan === 'essencial' || selectedPlan === 'pro') ? selectedPlan : 'free',
           createdAt: new Date().toISOString()
         }, { merge: true });
       } catch (firestoreError: any) {
@@ -144,7 +146,8 @@ export default function RegisterPage() {
           name,
           email,
           password,
-          referredBy: manualReferralCode
+          referredBy: manualReferralCode,
+          plan: selectedPlan
         }),
       });
 
@@ -175,6 +178,7 @@ export default function RegisterPage() {
 
       // 2. Sign in manually to establish client session for the newly created user
       await signInWithEmailAndPassword(auth, email, password);
+      const user = auth.currentUser;
 
       if (data.code === 'VERIFICATION_EMAIL_FAILED') {
         notify.warning(data.message || "Sua conta foi criada, mas não conseguimos enviar o e-mail agora. Tente reenviar em instantes.");
@@ -184,7 +188,13 @@ export default function RegisterPage() {
         });
       }
       
-      // 3. Redirect to verification landing
+      // 3. Handle Plan Checkout if applicable
+      if (user && (selectedPlan === 'essencial' || selectedPlan === 'pro')) {
+        await handlePostRegisterCheckout(user, email);
+        return;
+      }
+      
+      // 4. Redirect to verification landing
       navigate('/verificar-email');
 
     } catch (error: any) {

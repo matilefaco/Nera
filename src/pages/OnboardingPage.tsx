@@ -690,7 +690,7 @@ export default function OnboardingPage() {
     setFormErrors({});
 
     if (!user || isFinalizing || profile?.onboardingCompleted) {
-      if (profile?.onboardingCompleted) navigate('/dashboard');
+      if (profile?.onboardingCompleted) navigate('/dashboard?tab=hoje');
       return;
     }
 
@@ -864,10 +864,10 @@ export default function OnboardingPage() {
         onboardingCompleted: true,
         onboardingStep: 3
       });
-      navigate('/dashboard');
+      navigate('/dashboard?tab=hoje');
     } catch (error) {
       console.error('[ONBOARDING ERROR] final step failed:', error);
-      navigate('/dashboard');
+      navigate('/dashboard?tab=hoje');
     } finally {
       setIsFinalizing(false);
     }
