@@ -96,6 +96,7 @@ export default function ManageBookingPage() {
       const lookupKey = token || id;
       if (!lookupKey) return;
 
+      console.log(`[BOOKING_MANAGEMENT] Fetching via API for: ${lookupKey}`);
       try {
         const response = await fetch(`/api/profile/reservation/${lookupKey}`);
         
@@ -122,22 +123,26 @@ export default function ManageBookingPage() {
         }
 
         const apptData = result.appointment;
+        // Map appointmentId to id for compatibility with Appointment type if needed, 
+        // but it's better to update references
         setAppointment(apptData);
 
         // Professional data is already included in the API response
         if (apptData.professional) {
           setProfessional(apptData.professional);
+          console.log(`[BOOKING_MANAGEMENT] Professional from API: ${apptData.professional.name}`);
         } else {
           // Fallback fetch if professional not in API for some reason
           const proSnap = await getDoc(doc(db, 'users', apptData.professionalId));
           if (proSnap.exists()) {
-            setProfessional(proSnap.data() as UserProfile);
+            const data = proSnap.data() as any;
+            setProfessional({ professionalId: proSnap.id, ...data } as UserProfile);
           }
         }
 
         // Fetch review token if completed
         if (apptData.status === 'completed') {
-          const q = query(collection(db, 'review_requests'), where('bookingId', '==', apptData.id));
+          const q = query(collection(db, 'review_requests'), where('bookingId', '==', apptData.appointmentId || apptData.id));
           const snap = await getDocs(q);
           if (!snap.empty) {
             setReviewToken(snap.docs[0].data().token);
@@ -161,13 +166,13 @@ export default function ManageBookingPage() {
 
     const qAppts = query(
       collection(db, 'appointments'),
-      where('professionalId', '==', professional.uid),
+      where('professionalId', '==', professional.professionalId || (professional as any).uid),
       where('date', '==', selectedDate)
     );
 
     const unsubAppts = onSnapshot(qAppts, (snap) => {
       try {
-        const allAppts = snap.docs.map(d => d.data() as Appointment);
+        const allAppts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
         setDayAppointments(allAppts.filter(a => ['pending', 'confirmed'].includes(a.status)));
       } catch (err) {
         console.error("Error in onSnapshot callback:", err);
@@ -177,7 +182,7 @@ export default function ManageBookingPage() {
     const blockedRef = collection(db, 'blocked_schedules');
     const dayOfWeek = selectedDate ? new Date(selectedDate + 'T12:00:00').getDay() : null;
 
-    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', professional.uid)), (snap) => {
+    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', professional.professionalId || (professional as any).uid)), (snap) => {
       try {
         const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 const dayBlocked = allBlocked.filter(b => {
@@ -209,10 +214,11 @@ setBlockedSchedules(dayBlocked);
   }, [selectedDate, appointment, professional, dayAppointments, blockedSchedules]);
 
   const handleConfirmPresence = async () => {
-    if (!appointment?.id) return;
+    const aid = appointment?.appointmentId || appointment?.id;
+    if (!aid) return;
     setActionLoading(true);
     try {
-      const manageSlug = token || appointment.manageSlug || appointment.token || appointment.id;
+      const manageSlug = token || appointment.manageSlug || appointment.token || aid;
       await confirmPresenceByClient(manageSlug);
       notify.success('Presença confirmada! Nos vemos em breve. 💛');
     } catch (e) {
@@ -223,10 +229,11 @@ setBlockedSchedules(dayBlocked);
   };
 
   const handleCancel = async (reason: string) => {
-    if (!appointment?.id) return;
+    const aid = appointment?.appointmentId || appointment?.id;
+    if (!aid) return;
     setActionLoading(true);
     try {
-      await cancelBookingByClient(token || appointment.manageSlug || appointment.token || appointment.id, reason);
+      await cancelBookingByClient(token || appointment.manageSlug || appointment.token || aid, reason);
       notify.success('Reserva cancelada.');
       setView('main');
     } catch (e) {
@@ -237,10 +244,11 @@ setBlockedSchedules(dayBlocked);
   };
 
   const handleReschedule = async () => {
-    if (!appointment?.id || !selectedDate || !selectedTime) return;
+    const aid = appointment?.appointmentId || appointment?.id;
+    if (!aid || !selectedDate || !selectedTime) return;
     setActionLoading(true);
     try {
-      await rescheduleBookingByClient(appointment.id, selectedDate, selectedTime);
+      await rescheduleBookingByClient(aid, selectedDate, selectedTime);
       notify.success('Horário alterado com sucesso!');
       setView('main');
     } catch (e: any) {

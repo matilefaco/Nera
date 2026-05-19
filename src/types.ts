@@ -64,11 +64,16 @@ export interface PlanFeatures {
 }
 
 export interface UserProfile {
-  uid: string;
+  professionalId: string; // Sanitized public ID
+  /** @deprecated Use professionalId */
+  uid?: string;
   name: string;
   email: string;
   whatsapp: string;
   slug: string; // Unique public identifier (official)
+  
+  reviews?: Review[]; // Consolidated from API
+  stats?: any; // Consolidated from API
   
   avatar?: string;
   bio?: string; // Top-level official (removed from professionalIdentity)
@@ -203,7 +208,8 @@ export interface Review {
 }
 
 export interface Appointment {
-  id: string;
+  id: string; // Document ID (deprecated for public use)
+  appointmentId?: string; // Sanitized public ID
   
   clientName: string;
   clientEmail: string; // Mandatory

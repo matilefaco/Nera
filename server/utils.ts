@@ -45,6 +45,7 @@ export async function shouldSendEmail(appointmentId: string, eventKey: string): 
     
     const data = doc.data();
     if (data?.emailEvents?.[eventKey]) {
+      console.log(`[EMAIL_SKIP_DUPLICATE] Event ${eventKey} already sent for ${appointmentId}`);
       return false;
     }
     return true;
@@ -172,6 +173,23 @@ export const RATE_LIMIT_WINDOW = 60 * 1000;
 export const MAX_REQUESTS = 10;
 
 /**
+ * Detects if a string is a data URI/base64 image.
+ * Also checks for strings that are suspiciously large to be a normal URL.
+ */
+export function isDataUriImage(value: any): boolean {
+  if (typeof value !== "string") return false;
+  
+  // Detect data URI
+  if (value.startsWith("data:image/")) return true;
+  
+  // Detect suspicious base64 patterns (e.g., if it doesn't have the data: prefix but is still base64)
+  // Usually URLs are < 2048 chars. If it's > 4096 and doesn't look like a URL, it's likely a blob/base64.
+  if (value.length > 4096 && !value.startsWith("http")) return true;
+
+  return false;
+}
+
+/**
  * Generates a URL-safe slug from text.
  */
 export function generateSlug(text: string) {
@@ -241,13 +259,17 @@ export async function callNvidiaAI(messages: any[], options: { model?: string, t
       const data: any = await response.json();
       const content = data.choices?.[0]?.message?.content?.trim();
       
+      console.log(`[NVIDIA] model used: ${model}`);
+      console.log(`[NVIDIA] latency: ${latency}ms`);
+      console.log(`[NVIDIA] success: true`);
       
       return content;
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
       const isTimeout = err.name === 'AbortError';
-      // Muted debug log for normal retries
+      console.warn(`[NVIDIA] error (Attempt ${attempt + 1}):`, isTimeout ? "Timeout" : err.message);
+      if (attempt === 0) console.log(`[NVIDIA] Retrying...`);
     }
   }
 
@@ -302,10 +324,12 @@ REGRAS:
 
         // 2. Semantic Guard: Unhas should not talk about "olhar", etc.
         if (isUnhas && /(olhar|sobrancelha|cílio|pele|cabelo|maquiagem)/.test(contentLow)) {
+          console.log(`[AI SERVICE] description rejected by semantic guard: unhas talking about unrelated area. Content: "${content}"`);
           rejected = true;
         }
 
         if (!rejected) {
+          console.log(`[AI SERVICE] NVIDIA success for ${serviceName}`);
           return { success: true, source: "nvidia", description: content };
         }
       }
@@ -315,6 +339,7 @@ REGRAS:
   }
 
   // Fallback Logic
+  console.log(`[AI SERVICE] Using fallback for ${serviceName}`);
   
   let description = "Procedimento personalizado focado em realçar sua beleza natural com máxima qualidade.";
   let cat = "geral";
@@ -357,5 +382,6 @@ REGRAS:
     cat = "maquiagem";
   }
 
+  console.log(`[AI SERVICE] fallback used for category: ${cat}`);
   return { success: true, source: "fallback", description };
 }

@@ -68,6 +68,7 @@ import SEOHead from "../components/SEOHead";
 import { PublicProfileErrorBoundary } from "../components/public/PublicProfileErrorBoundary";
 
 const isDev = import.meta.env.DEV;
+const devLog = (...args: any[]) => isDev && console.log(...args);
 
 import { Skeleton } from "../components/ui/Skeleton";
 
@@ -174,20 +175,24 @@ function PublicProfileContent() {
 
   useEffect(() => {
     let isMounted = true;
+    console.log(`[PublicProfile] effect started for slug: ${slug}`);
     
     const fetchData = async () => {
       if (!slug) {
+        console.log(`[PublicProfile] No slug, setting loading to false`);
         if (isMounted) setLoading(false);
         return;
       }
 
       try {
+        console.log(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
         
         // 1. Fetch sanitized profile from backend API
         const response = await fetch(`/api/profile/public-profile/${slug}`);
         
         if (!response.ok) {
           if (response.status === 404) {
+            console.log(`[PublicProfile] No user found for slug: ${slug}`);
             if (isMounted) {
               setLoading(false);
               setProfile(null);
@@ -208,79 +213,32 @@ function PublicProfileContent() {
         }
 
         const userData = await response.json();
-        const professionalId = userData.uid;
+        const professionalId = userData.professionalId;
 
         if (!isMounted) return;
 
+        console.log(`[PublicProfile] Resolved user fetch completed via API. ProfessionalId: ${professionalId}`);
 
         if (isMounted) {
+          console.log(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
           setProfile(userData as UserProfile);
+          
+          if (userData.services) setServices(userData.services);
+          if (userData.reviews) setReviews(userData.reviews);
+          if (userData.stats) setStats(userData.stats);
+          
           setLoading(false); 
         }
 
         // Growth Analytics: Log Visit
         logAnalyticsEvent(professionalId, "visit").catch((err) => {
+          console.log("[PublicProfile] Analytics error:", err);
         });
 
-        // Secondary fetches should be silent, independent, and parallel
+        console.log(`[PublicProfile] Starting secondary background tasks`);
+        // Parallel fetches for portfolio (since it's not and shouldn't be in the main payload for size reasons)
         Promise.allSettled([
-            // 1. Services
-            (async () => {
-              const servicesQ = query(
-                collection(db, "services"),
-                where("professionalId", "==", professionalId),
-                where("active", "==", true),
-              );
-              const servicesSnapshot = await getDocs(servicesQ);
-              if (!isMounted) return;
-              const rawServices = servicesSnapshot.docs.map(
-                (doc) => ({ id: doc.id, ...doc.data() }) as Service,
-              );
-              const validServices = rawServices
-                .filter((s) => s.active !== false && s.name?.trim() && (s.price ?? 0) > 0 && s.professionalId)
-                .map((s) => ({ ...s, duration: Number(s.duration) >= 15 && Number(s.duration) <= 480 ? Number(s.duration) : 60 }));
-              
-              const normalizedGroups = new Map<string, Service[]>();
-              validServices.forEach((s) => {
-                const normName = s.name.toLowerCase().trim();
-                if (!normalizedGroups.has(normName)) normalizedGroups.set(normName, []);
-                normalizedGroups.get(normName)!.push(s);
-              });
-
-              const dedupedServices = Array.from(normalizedGroups.values()).map(group => {
-                if (group.length === 1) return group[0];
-                return group.sort((a, b) => {
-                  const aHasDesc = !!a.description?.trim();
-                  const bHasDesc = !!b.description?.trim();
-                  if (aHasDesc !== bHasDesc) return aHasDesc ? -1 : 1;
-                  return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
-                })[0];
-              });
-              if (isMounted) setServices(dedupedServices);
-            })(),
-
-            // 2. Stats
-            (async () => {
-              const statsDoc = await getDocs(query(collection(db, "review_stats"), where("professionalId", "==", professionalId)));
-              if (!isMounted) return;
-              if (!statsDoc.empty) setStats(statsDoc.docs[0].data());
-            })(),
-
-            // 3. Reviews
-            (async () => {
-              const reviewsQ = query(
-                collection(db, "reviews"),
-                where("professionalId", "==", professionalId),
-                where("publicApproved", "==", true),
-                where("publicDisplayMode", "in", ["named", "anonymous"]),
-                limit(15)
-              );
-              const reviewsSnapshot = await getDocs(reviewsQ);
-              if (!isMounted) return;
-              setReviews(reviewsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Review));
-            })(),
-
-            // 4. Portfolio (Legacy)
+            // Portfolio (Legacy & for completeness)
             (async () => {
               if (!userData.portfolio || userData.portfolio.length === 0) {
                 const portfolioQ = query(
@@ -310,6 +268,7 @@ function PublicProfileContent() {
           notify.error("Não foi possível carregar as informações do perfil.");
         }
       } finally {
+        console.log(`[PublicProfile] finally block executed. isMounted: ${isMounted}`);
         if (isMounted) setLoading(false);
       }
     };
@@ -317,6 +276,7 @@ function PublicProfileContent() {
     fetchData();
 
     return () => {
+      console.log(`[PublicProfile] unmount cleanup executed for slug: ${slug}`);
       isMounted = false;
     };
   }, [slug, retryCount]);
@@ -350,6 +310,7 @@ function PublicProfileContent() {
           }
         }
       } catch (e) {
+        devLog("Waitlist check failed", e);
       }
     }
     checkWaitlist();
@@ -360,6 +321,7 @@ function PublicProfileContent() {
       if (!profile?.uid || !profile?.workingHours || services.length === 0)
         return;
 
+      devLog(`[NEXT_SLOT] Starting calculation for pro: ${profile.uid}`);
 
       try {
         const now = new Date();
@@ -448,6 +410,7 @@ function PublicProfileContent() {
             blockedSchedules,
           });
 
+          devLog(
             `[BADGE DEBUG] Final Verification for ${result.date}: ${verificationSlots.length} slots found.`,
           );
 
@@ -459,6 +422,7 @@ function PublicProfileContent() {
             setTotalWeeklySlots(0);
             setIsAgendaFull(true);
           } else {
+            devLog(
               `[BADGE DEBUG] Success: Badge showing confirmed slot ${result.time} on ${result.date}`,
             );
             setNextSlot({ date: result.date, time: result.time });
@@ -466,11 +430,14 @@ function PublicProfileContent() {
             setIsAgendaFull(result.totalWeeklySlots === 0);
           }
         } else {
+          devLog(`[BADGE DEBUG] No slots found in the next 14 days`);
           setTotalWeeklySlots(0);
           setIsAgendaFull(true);
         }
 
+        devLog(`[NEXT_SLOT] Calculation finished.`);
       } catch (e) {
+        devLog("[NEXT_SLOT] Failed to find availability data:", e);
       }
     };
 

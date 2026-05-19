@@ -412,6 +412,23 @@ export function parseAddress(address: AddressData | string): AddressData {
 }
 
 /**
+ * Detects if a string is a data URI/base64 image.
+ * Also checks for strings that are suspiciously large to be a normal URL.
+ */
+export function isDataUriImage(value: any): boolean {
+  if (typeof value !== "string") return false;
+  
+  // Detect data URI
+  if (value.startsWith("data:image/")) return true;
+  
+  // Detect suspicious base64 patterns (e.g., if it doesn't have the data: prefix but is still base64)
+  // Usually URLs are < 2048 chars. If it's > 4096 and doesn't look like a URL, it's likely a blob/base64.
+  if (value.length > 4096 && !value.startsWith("http")) return true;
+
+  return false;
+}
+
+/**
  * Normalizes an Instagram handle by removing URLs, @ symbols, spacing, 
  * accents and invalid characters. Converts to lowercase and caps at 30 chars.
  */

@@ -1,7 +1,7 @@
 import express from "express";
 import { db, getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
-import { isValidWhatsapp } from "../utils.js";
+import { isValidWhatsapp, isDataUriImage } from "../utils.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { logger, maskUid } from "../utils/logger.js";
 import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimiter.js";
@@ -191,6 +191,21 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       const filteredProfile: any = {};
       ALLOWED_FIELDS.forEach(field => {
         if (sanitizedProfile[field] !== undefined) {
+          // BLOCK base64/data URI in profile fields
+          const val = sanitizedProfile[field];
+          if (['avatar', 'photoURL', 'coverImage'].includes(field) && isDataUriImage(val)) {
+            logger.warn("PROFILE", `Blocked base64 image in field: ${field}`, { professionalId: maskUid(uid) });
+            return; // Skip this field
+          }
+          
+          if (field === 'portfolio' && Array.isArray(val)) {
+            filteredProfile[field] = val.filter((item: any) => item && item.url && !isDataUriImage(item.url));
+            if (filteredProfile[field].length !== val.length) {
+               logger.warn("PROFILE", `Filtered out ${val.length - filteredProfile[field].length} base64 portfolio items`, { professionalId: maskUid(uid) });
+            }
+            return;
+          }
+
           filteredProfile[field] = sanitizedProfile[field];
         }
       });
@@ -350,9 +365,11 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
 
     // Return sanitized data for client
     const professionalData = proData ? {
+      professionalId: proData.uid || appointmentData.professionalId,
       name: proData.name,
       slug: proData.slug,
-      plan: proData.plan || 'free'
+      plan: proData.plan || 'free',
+      avatar: isDataUriImage(proData.avatar || proData.photoUrl) ? null : (proData.avatar || proData.photoUrl)
     } : null;
 
     // P0 CRITICAL: Only expose WhatsApp if the professional is Pro
@@ -361,7 +378,7 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
     }
 
     const safeAppointmentData = {
-      id: appointmentId,
+      appointmentId: appointmentId,
       manageSlug: appointmentData.manageSlug,
       token: appointmentData.token,
       date: appointmentData.date,
@@ -499,14 +516,57 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
 
     const userData = userDoc.data() || {};
 
-    // 4. Sanitize data - Return ONLY what's needed for the public profile
+    // 4. Fetch extra public data to consolidate payload (Improves security and performance)
+    const [servicesSnap, reviewsSnap, statsSnap] = await Promise.all([
+      db.collection("services")
+        .where("professionalId", "==", uid)
+        .where("active", "==", true)
+        .get(),
+      db.collection("reviews")
+        .where("professionalId", "==", uid)
+        .where("publicApproved", "==", true)
+        .limit(15)
+        .get(),
+      db.collection("review_stats")
+        .doc(uid)
+        .get()
+    ]);
+
+    const sanitizedServices = servicesSnap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        name: d.name,
+        description: d.description,
+        price: d.price,
+        duration: d.duration,
+        category: d.category,
+        order: d.order
+      };
+    });
+
+    const sanitizedReviews = reviewsSnap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        rating: d.rating,
+        comment: d.comment,
+        firstName: d.firstName,
+        neighborhood: d.neighborhood,
+        serviceName: d.serviceName,
+        locationLabel: d.locationLabel,
+        submittedAt: d.submittedAt ? (d.submittedAt.toDate ? d.submittedAt.toDate().toISOString() : d.submittedAt) : null
+      };
+    });
+
+    // 5. Sanitize data - Return ONLY what's needed for the public profile
     const sanitizedData: any = {
-      uid: uid,
+      professionalId: uid, // Renamed from uid for consistency
       name: userData.name,
       displayName: userData.displayName || userData.businessName || userData.name,
       slug: userData.slug,
-      avatar: userData.avatar || userData.photoUrl,
-      photoUrl: userData.photoUrl || userData.avatar,
+      avatar: isDataUriImage(userData.avatar || userData.photoUrl) ? null : (userData.avatar || userData.photoUrl),
+      photoUrl: isDataUriImage(userData.photoUrl || userData.avatar) ? null : (userData.photoUrl || userData.avatar),
       bio: userData.bio,
       headline: userData.headline,
       specialty: userData.specialty,
@@ -516,12 +576,15 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       serviceMode: userData.serviceMode,
       workingHours: userData.workingHours,
       professionalIdentity: userData.professionalIdentity,
-      portfolio: userData.portfolio || [],
+      portfolio: (userData.portfolio || []).filter((item: any) => item && item.url && !isDataUriImage(item.url)),
+      coverImage: isDataUriImage(userData.coverImage) ? null : userData.coverImage,
       profileTheme: userData.profileTheme,
       paymentMethods: userData.paymentMethods || [],
       instagram: userData.instagram,
       plan: userData.plan || 'free',
-      onboardingCompleted: userData.onboardingCompleted
+      services: sanitizedServices,
+      reviews: sanitizedReviews,
+      stats: statsSnap.exists ? statsSnap.data() : null
     };
 
     // P0 CRITICAL: Only expose WhatsApp if the plan is Pro
@@ -582,7 +645,7 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
         return {
           name: name,
           slug: data.slug,
-          avatar: data.avatar || data.photoUrl,
+          avatar: isDataUriImage(data.avatar || data.photoUrl) ? null : (data.avatar || data.photoUrl),
           specialty: data.specialty || '',
           city: data.city || '',
           neighborhood: data.neighborhood || '',
@@ -645,8 +708,8 @@ router.get("/referrals", requireFirebaseAuth, async (req: AuthenticatedRequest, 
     const referrals = snapshot.docs.map(doc => {
       const data = doc.data();
       return {
-        id: doc.id,
         name: data.name || 'Nova Profissional',
+        slug: data.slug || '',
         specialty: data.specialty || '',
         createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : new Date().toISOString(),
         plan: data.plan || 'free'
