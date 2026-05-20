@@ -115,7 +115,7 @@ export const getProfileHeroCopy = (specialty: string = "", id: string = "") => {
   }
   
   return { 
-    main: "Referência em", 
+    main: "Especialista em", 
     accent: formatted 
   };
 };

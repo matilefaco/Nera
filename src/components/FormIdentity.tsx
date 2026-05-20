@@ -37,6 +37,8 @@ export interface FormIdentityProps {
   differentials?: string[];
   setDifferentials?: (val: string[]) => void;
   availableDifferentials?: string[];
+  yearsExperience?: string;
+  setYearsExperience?: (val: string) => void;
   
   paymentMethods?: string[];
   setPaymentMethods?: (val: string[]) => void;
@@ -99,6 +101,8 @@ export const FormIdentity = ({
   differentials,
   setDifferentials,
   availableDifferentials = [],
+  yearsExperience,
+  setYearsExperience,
   paymentMethods,
   setPaymentMethods,
   acceptsInstallments,
@@ -268,6 +272,39 @@ export const FormIdentity = ({
               <FormError message={errors.specialty} />
             </div>
           </div>
+
+          {setYearsExperience && (
+            <div className="space-y-1.5 flex flex-col pt-2">
+              {showLabels && (
+                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
+                  Tempo de Experiência
+                </label>
+              )}
+              <div className="flex flex-wrap gap-2">
+                 {[
+                   { label: "Iniciante", value: "Iniciante" },
+                   { label: "1 a 2 anos", value: "1-2" },
+                   { label: "3 a 5 anos", value: "3-5" },
+                   { label: "5+ anos", value: "5+" },
+                   { label: "10+ anos", value: "10+" }
+                 ].map(exp => (
+                   <button
+                     key={exp.value}
+                     type="button"
+                     onClick={() => setYearsExperience(exp.value)}
+                     className={cn(
+                       "px-4 py-2 rounded-xl text-xs font-medium transition-all duration-300 ease-out border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
+                       yearsExperience === exp.value
+                         ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
+                         : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
+                     )}
+                   >
+                     {exp.label}
+                   </button>
+                 ))}
+              </div>
+            </div>
+          )}
 
           {(headline !== undefined && setHeadline) && (
             <div className="space-y-2">

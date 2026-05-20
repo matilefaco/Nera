@@ -328,11 +328,14 @@ export default function ProfilePage() {
         }
       });
       const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Erro desconhecido');
+      }
       if (data.url) {
         window.open(data.url, 'google_auth', 'width=600,height=700');
       }
-    } catch (err) {
-      notify.error('Erro ao iniciar conexão com Google Calendar.');
+    } catch (err: any) {
+      notify.error(err.message || 'Erro ao iniciar conexão com Google Calendar.');
     } finally {
       setCalendarLoading(false);
     }
@@ -476,7 +479,7 @@ export default function ProfilePage() {
         professionalIdentity: {
           mainSpecialty: sanitizedSpecialty,
           differentials: differentials,
-          yearsExperience: yearsExperience || '3-5',
+          yearsExperience: yearsExperience,
           serviceStyle: serviceStyle,
           attendsAt: serviceMode as any
         },
@@ -812,6 +815,8 @@ export default function ProfilePage() {
                 onFileUpload={handleAvatarUpload}
                 headline={headline}
                 setHeadline={setHeadline}
+                yearsExperience={yearsExperience}
+                setYearsExperience={setYearsExperience}
                 bio={bio}
                 setBio={setBio}
                 showLabels={true}
@@ -1104,8 +1109,7 @@ export default function ProfilePage() {
                   "flex items-center gap-2 p-3.5 rounded-[18px] border transition-all",
                   formErrors.slug ? "border-brand-terracotta ring-1 ring-brand-terracotta/20 bg-white" : "bg-brand-parchment border-brand-mist"
                 )}>
-                  <span className="text-brand-stone text-xs ml-1 hidden sm:inline">usenera.com/p/</span>
-                  <span className="text-brand-stone text-xs ml-1 sm:hidden">.../p/</span>
+                  <span className="text-brand-stone text-xs ml-1">usenera.com/p/</span>
                   <input 
                     type="text" 
                     value={slug} 

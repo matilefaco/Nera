@@ -344,7 +344,7 @@ export default function OnboardingPage() {
         
         if (draft.paymentMethods?.length > 0 && paymentMethods.length === 0) setPaymentMethods(draft.paymentMethods);
         if (draft.services?.length > 0 && (!services || services.length === 0 || (services.length === 1 && services[0].name === ''))) setServices(draft.services);
-        if (draft.yearsExperience && yearsExperience === '3-5') setYearsExperience(draft.yearsExperience);
+        if (draft.yearsExperience && yearsExperience === '') setYearsExperience(draft.yearsExperience);
         if (draft.selectedStyles?.length > 0 && selectedStyles.length === 0) setSelectedStyles(draft.selectedStyles);
         if (draft.selectedDifferentials?.length > 0 && selectedDifferentials.length === 0) setSelectedDifferentials(draft.selectedDifferentials);
         if (draft.serviceMode && serviceMode === 'studio') setServiceMode(draft.serviceMode);
@@ -1271,6 +1271,8 @@ export default function OnboardingPage() {
                 slugMessage={slugMessage}
                 slugSuggestions={slugSuggestions}
                 onSelectSuggestion={(val) => setSlug(val)}
+                yearsExperience={yearsExperience}
+                setYearsExperience={setYearsExperience}
                 headline={headline}
                 setHeadline={setHeadline}
                 bio={bio}

@@ -22,6 +22,7 @@ const debugOnly = (req: any, res: any, next: any) => {
 
 router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
+  console.log('[BioAI] Entry /generate-content:', { name, specialty });
   
   // Simple rate limit check
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous') as string;
@@ -41,34 +42,44 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
     return res.status(429).json({ error: "Muitas solicitações. Tente novamente em um minuto." });
   }
   
+  console.log('[BioAI] NVIDIA_API_KEY present:', !!process.env.NVIDIA_API_KEY);
   if (!process.env.NVIDIA_API_KEY) {
     console.error("[BioAI] NVIDIA_API_KEY is missing in server environment");
     return res.status(500).json({ error: "Configuração de IA ausente." });
   }
 
   try {
-    const prompt = `Você é um especialista em branding para profissionais de beleza brasileiras.
-Gere uma frase principal curta (headline) e uma bio profissional para:
-Nome: ${name || 'A profissional'}
-Especialidade: ${specialty || 'Beleza e Estética'}
-Anos de experiência: ${yearsExperience || 'alguns'}
-Estilo de atendimento: ${serviceStyle || 'personalizado'}
-Diferenciais: ${differentials || 'atendimento de qualidade'}
-Tom desejado: ${bioStyle || 'elegante'} (elegante | natural | direta)
+    const prompt = `Você é redator especialista em personal branding no mercado premium de beleza e estética no Brasil.
+Seu objetivo é gerar uma Frase Principal (headline) curta e uma Mini Bio (bio) profissional baseada EXCLUSIVAMENTE nos dados abaixo.
 
-Diretrizes obrigatórias:
-- Tom natural, brasileiro e elegante.
-- Escreva especificamente para a área de beleza/estética.
-- SEM exageros, SEM promessas falsas.
-- NÃO use frases clichês como "a melhor da cidade".
-- NÃO invente certificações não informadas.
-- Evite linguagem genérica e fria.
+A linguagem deve soar HUMANA, AUTÊNTICA, PROFISSIONAL, VENDEDORA (mas elegante), sem jargões corporativos e NUNCA robótica.
 
-Exemplo de bio com tom elegante e natural: "Especialista em maquiagem com atendimento cuidadoso, acabamento elegante e uma experiência pensada para realçar sua beleza com leveza."
+DADOS DA PROFISSIONAL:
+- Nome: ${name || 'A profissional'}
+- Profissão real/Especialidade: ${specialty || 'Beleza e Bem-estar'}
+- Tempo na área: ${yearsExperience ? yearsExperience + ' anos de experiência' : 'Profissional dedicada'}
+- Estilo: ${Array.isArray(serviceStyle) ? serviceStyle.join(', ') : (serviceStyle || 'Exclusivo e cuidadoso')}
+- Diferenciais focais: ${Array.isArray(differentials) ? differentials.join(', ') : (differentials || 'Resultados de alta qualidade')}
+- Tom de Voz Solicitado: ${bioStyle || 'Sofisticado e seguro'}
 
-Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato exato (as aspas devem ser duplas e a resposta deve ser puramente o JSON e nada mais):
-{"bio": "sua bio aqui", "headline": "Sua headline curta aqui"}`;
+DIRETRIZES CRÍTICAS DE SEMÂNTICA (LEIA COM ATENÇÃO MÁXIMA):
+1. ADAPTAÇÃO TOTAL: A semântica DEVE combinar com a profissão. 
+   - Depiladora: Fale de biossegurança, conforto, pele lisa, técnica rápida. NÃO FALE de "resgatar a autoestima com fios dourados" ou "elegância extrema".
+   - Lash Designer: Fale de retenção, saúde do fio natural, praticidade, mapeamento facial.
+   - Nail Designer: Fale de durabilidade, naturalidade, estrutura, cuticulagem perfeita.
+   - Massoterapeuta / Esteticista: Fale de alívio, tratamento, bem-estar profundo, resultados reais.
+2. PALAVRAS PROIBIDAS (Evite clichês artificiais): "Referência em [profissão]", "Cuidado com elegância" (se irrelevante), "A melhor", "Aperfeiçoando sua beleza", "Realçar a essência".
+3. ESTRUTURA NATURAL: Escreva em primeira pessoa ("Meu foco é...") ou terceira pessoa objetiva ("Atendimento focado em...").
 
+TAMANHO E SAÍDA:
+- headline: Uma frase curtíssima (máx 60 caracteres) de super impacto, resumindo a transformação/especialidade. 
+- bio: Um texto de 2 a 3 frases. Seja direto. Sem retórica vazia.
+
+Retorne APENAS um JSON válido, puro, sem marcações markdown, estruturado exatamente assim:
+{"bio": "Texto da bio humana, sem clichês...", "headline": "Headline focada na profissão real"}
+`;
+
+    console.log('[BioAI] Calling NVIDIA Model meta/llama-3.1-8b-instruct');
     const content = await callNvidiaAI([
       { role: "user", content: prompt }
     ], { 
@@ -77,6 +88,7 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato ex
       max_tokens: 512
     });
     
+    console.log('[BioAI] Raw response from NVIDIA:', content);
     
     // Attempt to parse JSON from response string
     let parsed;
@@ -93,6 +105,7 @@ Retorne APENAS um JSON válido, sem markdown, sem explicação, neste formato ex
       throw new Error("Invalid format from AI model");
     }
 
+    console.log(`[BioAI] Successfully generated parsed:`, parsed);
     res.json(parsed);
 
   } catch (error: any) {

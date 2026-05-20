@@ -12,6 +12,9 @@ const router = express.Router();
 const SCOPES = ["https://www.googleapis.com/auth/calendar.events"];
 
 function getOAuthClient(redirectUri: string) {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    throw new Error("Configuração do Google Calendar pendente no ambiente.");
+  }
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
@@ -21,6 +24,10 @@ function getOAuthClient(redirectUri: string) {
 
 // 1. Get Auth URL
 router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(400).json({ error: "Configuração do Google Calendar pendente no ambiente." });
+  }
+
   const uid = req.uid;
   const professionalIdQuery = req.query.professionalId as string;
   if (professionalIdQuery && professionalIdQuery !== uid) {

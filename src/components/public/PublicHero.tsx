@@ -95,8 +95,8 @@ export const PublicHero = ({
       {/* Decorative vertical line */}
       <div className="absolute top-0 left-[48%] w-px h-full bg-gradient-to-b from-transparent via-brand-mist to-transparent hidden lg:block z-10 pointer-events-none" />
 
-      {/* Back to Nera Link */}
-      <div className="absolute top-6 left-6 md:top-10 md:left-12 z-[100]">
+      {/* Back to Nera Link - Hidden on mobile for cleaner premium look */}
+      <div className="hidden md:block absolute top-6 left-6 md:top-10 md:left-12 z-[100]">
         <a href="/" className="inline-flex items-center gap-1.5 px-3 py-2 md:p-0 md:bg-transparent bg-brand-white/70 backdrop-blur-md md:backdrop-blur-none border border-brand-mist/50 md:border-transparent rounded-full md:rounded-none text-brand-stone hover:text-brand-ink transition-colors shadow-sm md:shadow-none">
           <ChevronRight size={14} className="rotate-180" />
           <span className="text-[9px] font-bold uppercase tracking-[0.15em] pt-[1px] leading-none pr-1 md:pr-0">Início</span>
@@ -304,7 +304,7 @@ export const PublicHero = ({
               )}
             </div>
             <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-40 ml-2">
-              Confirmação instantânea
+              Solicitação organizada
             </p>
           </div>
         </motion.div>
@@ -355,7 +355,7 @@ export const PublicHero = ({
                 <span className="font-signature text-3xl text-brand-ink/70 leading-none">{firstName}</span>
                 <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.25em] text-[var(--theme-accent,var(--color-brand-terracotta))]">
                   <div className="w-1 h-1 rounded-full bg-current" />
-                  {profile.neighborhood || profile.city}
+                  {profile.neighborhood ? `${profile.neighborhood}, ${profile.city || ''}` : profile.city}
                 </div>
               </div>
 
@@ -464,7 +464,7 @@ export const PublicHero = ({
                           </>
                         ) : (
                           <>
-                            <span className="block">{profile.neighborhood || profile.city}</span>
+                            <span className="block">{profile.neighborhood ? `${profile.neighborhood}, ${profile.city || ''}` : profile.city}</span>
                             <span className="block text-[11px] font-light italic text-brand-stone mt-2">Endereço detalhado disponível após a reserva</span>
                           </>
                         )}
