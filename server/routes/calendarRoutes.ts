@@ -128,6 +128,17 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
 });
 
 // 2. OAuth Callback
+router.get("/debug-query", (req, res) => {
+  res.json({
+    originalUrl: req.originalUrl,
+    url: req.url,
+    query: req.query,
+    code: req.query?.code,
+    state: req.query?.state,
+    error: req.query?.error,
+  });
+});
+
 router.get("/callback", async (req, res) => {
   const db = getDb();
   // Ensure we do not set Content-Type manually before redirect
@@ -140,6 +151,19 @@ router.get("/callback", async (req, res) => {
     const query = req.query || {};
     const redirectUri = getCalendarRedirectUri();
     
+    console.log("[RAW CALLBACK]", {
+      originalUrl: req.originalUrl,
+      url: req.url,
+      path: req.path,
+      query: req.query,
+      typeofQuery: typeof req.query,
+      keys: Object.keys(req.query || {}),
+      code: req.query?.code,
+      state: req.query?.state,
+      error: req.query?.error,
+      rawReqUrl: (req as any)._parsedUrl,
+    });
+
     const safeQuery = { ...req.query };
     if (safeQuery.code) {
       safeQuery.code = String(safeQuery.code).slice(0, 12) + '...';
