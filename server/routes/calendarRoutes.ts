@@ -106,77 +106,63 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
 // 2. OAuth Callback
 router.get("/callback", async (req, res) => {
   const db = getDb();
-  let appUrl = '';
-  // Force content-type
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  
-  try {
-    appUrl = PUBLIC_APP_URL ? PUBLIC_APP_URL.trim() : '';
-    const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${(appUrl || '').replace(/\/+$/, "")}/api/calendar/callback`).trim();
-    
-    logger.info("CALENDAR", "Callback start", { 
-      hasCode: !!req.query.code, 
-      hasState: !!req.query.state,
-      hasErrorUrl: !!req.query.error,
-      appUrl
-    });
+  // Ensure we do not set Content-Type manually before redirect
+  const appBaseUrl = "https://usenera.com";
 
+  try {
+    const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL ? PUBLIC_APP_URL.trim().replace(/\/+$/, "") : ""}/api/calendar/callback`).trim();
+    
     if (req.query.error) {
-      logger.error("CALENDAR", "OAuth Provider returned error in query", { error: req.query.error });
-      return res.redirect(`${appUrl}/profile?calendarAuth=error&error=${encodeURIComponent(String(req.query.error))}`);
+      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=provider_error`);
     }
 
     const { code, state: stateParam } = req.query;
     const stateStr = stateParam as string;
 
     if (!code || !stateStr) {
-      logger.error("CALENDAR", "Missing code or state in query params");
-      return res.redirect(`${appUrl}/profile?calendarAuth=error&error=${encodeURIComponent('Missing code or state')}`);
+      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=missing_code`);
     }
 
-    logger.info("CALENDAR", "Code and state present, validating state", { stateStr });
-    
     const stateDoc = await db.collection("oauth_states").doc(stateStr).get();
     if (!stateDoc.exists) {
-      logger.error("CALENDAR", "State not found in Firestore", { stateStr });
-      return res.redirect(`${appUrl}/profile?calendarAuth=error&error=${encodeURIComponent('Solicitação de autenticação não encontrada')}`);
+      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=invalid_state`);
     }
 
     const stateData = stateDoc.data();
     if (!stateData || stateData.provider !== "google_calendar" || stateData.used || stateData.expiresAt < Date.now()) {
-      logger.error("CALENDAR", "State invalid, used or expired", { stateData });
-      return res.redirect(`${appUrl}/profile?calendarAuth=error&error=${encodeURIComponent('Solicitação expirada ou já utilizada')}`);
+      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=invalid_state`);
     }
 
     const professionalId = stateData.uid;
-    logger.info("CALENDAR", "State is valid, UID found", { professionalId: maskUid(professionalId) });
 
     await db.collection("oauth_states").doc(stateStr).update({ used: true });
-    logger.info("CALENDAR", "State marked as used");
 
     const oauth2Client = getOAuthClient(redirectUri);
-    logger.info("CALENDAR", "Exchanging code for tokens", { redirectUri });
+    
+    let tokens;
+    try {
+      const tokenResponse = await oauth2Client.getToken(code as string);
+      tokens = tokenResponse.tokens;
+    } catch (err: any) {
+      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=token_exchange_failed`);
+    }
 
-    const { tokens } = await oauth2Client.getToken(code as string);
-    logger.info("CALENDAR", "Tokens received", { 
-      hasAccessToken: !!tokens.access_token, 
-      hasRefreshToken: !!tokens.refresh_token,
-      expiryDate: tokens.expiry_date
-    });
+    try {
+      await db.collection("users").doc(professionalId).update({
+        "integrations.google_calendar": {
+          tokens,
+          connectedAt: new Date().toISOString(),
+          enabled: true,
+        },
+      });
+    } catch (err: any) {
+      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=firestore_save_failed`);
+    }
 
-    await db.collection("users").doc(professionalId).update({
-      "integrations.google_calendar": {
-        tokens,
-        connectedAt: new Date().toISOString(),
-        enabled: true,
-      },
-    });
-    logger.info("CALENDAR", "Tokens saved to Firestore successfully", { professionalId: maskUid(professionalId) });
-
-    return res.redirect(`${appUrl}/profile?calendarAuth=success`);
+    return res.redirect(`${appBaseUrl}/profile?calendarAuth=success`);
   } catch (err: any) {
     logger.error("CALENDAR", "Failed to process OAuth callback - Exception caught", { error: String(err?.message || err) });
-    return res.redirect(`${appUrl || '/'}profile?calendarAuth=error&error=${encodeURIComponent(String(err?.message || "Erro interno no servidor"))}`);
+    return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=callback_exception`);
   }
 });
 
