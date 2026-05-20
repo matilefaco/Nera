@@ -68,11 +68,38 @@ const THEME_MOODS: Record<string, { label: string, subtitle: string }> = {
   }
 };
 
+class ProfileErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-12 text-center text-red-500 bg-red-50 rounded-lg m-12 relative z-50">
+          <h2 className="text-xl font-bold mb-4">Erro fatal na ProfilePage</h2>
+          <pre className="text-xs text-left overflow-auto p-4 bg-white rounded border">{this.state.error?.message || String(this.state.error)}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function ProfilePage() {
+  console.log('[ProfilePage] Render starts');
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
+
+  useEffect(() => {
+    console.log('[ProfilePage] User:', user?.uid, 'AuthLoading:', authLoading);
+  }, [user, authLoading]);
+
 
   const profileCompleteness = useMemo(() => {
     if (!profile) return 0;
@@ -341,7 +368,7 @@ export default function ProfilePage() {
     if (!user) return;
     setCalendarLoading(true);
     
-    notify.info('calendar debug: click received', { autoClose: 3000 });
+    notify.info('calendar debug: click received', { duration: 3000 });
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
@@ -366,10 +393,10 @@ export default function ProfilePage() {
       res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      notify.info(`debug: fetch ok. status=${res.status} type=${res.headers.get('content-type')}`, { autoClose: 3000 });
+      notify.info(`debug: fetch ok. status=${res.status} type=${res.headers.get('content-type')}`, { duration: 3000 });
     } catch (e: any) {
       if (popup) popup.close();
-      notify.error(`Erro antes do backend: falha no fetch (${e.message})`, { autoClose: 5000 });
+      notify.error(`Erro antes do backend: falha no fetch (${e.message})`, undefined, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
@@ -377,30 +404,30 @@ export default function ProfilePage() {
     let data: any;
     try {
       data = await res.json();
-      notify.info(`debug: JSON lido. tem debugInfo=${!!data.debugInfo}`, { autoClose: 3000 });
+      notify.info(`debug: JSON lido. tem debugInfo=${!!data.debugInfo}`, { duration: 3000 });
       console.log('Calendar Debug Info:', data.debugInfo);
     } catch (e: any) {
       if (popup) popup.close();
-      notify.error(`Backend não retornou JSON! status=${res.status}`, { autoClose: 5000 });
+      notify.error(`Backend não retornou JSON! status=${res.status}`, undefined, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
     if (!res.ok || data.error) {
       if (popup) popup.close();
-      notify.error(`Erro do backend: ${data.error || 'Desconhecido'}`, { autoClose: 5000 });
+      notify.error(`Erro do backend: ${data.error || 'Desconhecido'}`, undefined, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
     
     if (!data.url) {
       if (popup) popup.close();
-      notify.error('URL OAuth ausente no JSON da resposta', { autoClose: 5000 });
+      notify.error('URL OAuth ausente no JSON da resposta', undefined, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
-    notify.info(`debug: typeof data.url = ${typeof data.url}. Preview: ${data.url.substring(0,25)}...`, { autoClose: 3000 });
+    notify.info(`debug: typeof data.url = ${typeof data.url}. Preview: ${data.url.substring(0,25)}...`, { duration: 3000 });
 
     let cleanUrl: string;
     try {
@@ -415,25 +442,25 @@ export default function ProfilePage() {
     let parsed: URL;
     try {
       parsed = new URL(cleanUrl);
-      notify.info(`debug: new URL() passou. Origin: ${parsed.origin}`, { autoClose: 3000 });
+      notify.info(`debug: new URL() passou. Origin: ${parsed.origin}`, { duration: 3000 });
     } catch (e: any) {
       if (popup) popup.close();
       console.error('[Calendar] Invalid URL parse attempt:', cleanUrl);
-      notify.error(`URL OAuth inválida: ${e.message}`, { autoClose: 5000 });
+      notify.error(`URL OAuth inválida: ${e.message}`, undefined, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
     if (parsed.origin !== 'https://accounts.google.com') {
       if (popup) popup.close();
-      notify.error(`URL tem origem incorreta: ${parsed.origin}`, { autoClose: 5000 });
+      notify.error(`URL tem origem incorreta: ${parsed.origin}`, undefined, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
     try {
       if (shouldRedirect) {
-        notify.info('debug: assign...', { autoClose: 2000 });
+        notify.info('debug: assign...', { duration: 2000 });
         window.location.assign(cleanUrl);
       } else {
         if (popup && !popup.closed) {
@@ -444,7 +471,7 @@ export default function ProfilePage() {
       }
     } catch (e: any) {
       if (popup) popup.close();
-      notify.error(`Falha ao redirecionar no Safari: ${e.message}`, { autoClose: 5000 });
+      notify.error(`Falha ao redirecionar no Safari: ${e.message}`, undefined, { duration: 5000 });
     } finally {
       setCalendarLoading(false);
     }
@@ -856,8 +883,9 @@ export default function ProfilePage() {
   };
 
   return (
-    <AppLayout activeRoute="profile">
-      <div className="p-6 md:p-12 pb-32 md:pb-12 max-w-5xl mx-auto w-full">
+    <ProfileErrorBoundary>
+      <AppLayout activeRoute="profile">
+        <div className="p-6 md:p-12 pb-32 md:pb-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div className="space-y-3">
             <div className="flex items-center gap-2 mb-1">
@@ -1875,5 +1903,6 @@ export default function ProfilePage() {
         />
       </div>
     </AppLayout>
+  </ProfileErrorBoundary>
   );
 }
