@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { notify } from '../lib/notify';
+import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
 import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, getDifferentialPlaceholder } from '../lib/utils';
 import { THEMES, getTheme } from '../lib/themes';
@@ -318,7 +319,9 @@ export default function ProfilePage() {
           notify.success('Google Calendar conectado.');
         } else if (authStat === 'error') {
           const errMsg = searchParams.get('error') || searchParams.get('reason') || 'Erro desconhecido';
-          notify.error(`Erro ao conectar com Google Calendar: ${errMsg}`);
+          const details = searchParams.get('details');
+          const detailsStr = details ? ` (${details})` : '';
+          toast.error(`Erro ao conectar com Google Calendar: ${errMsg}${detailsStr}`, { duration: 8000 });
         }
         setSearchParams({}, { replace: true });
       }
@@ -396,7 +399,7 @@ export default function ProfilePage() {
       notify.info(`debug: fetch ok. status=${res.status} type=${res.headers.get('content-type')}`, { duration: 3000 });
     } catch (e: any) {
       if (popup) popup.close();
-      notify.error(`Erro antes do backend: falha no fetch (${e.message})`, undefined, { duration: 5000 });
+      toast.error(`Erro antes do backend: falha no fetch (${e.message})`, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
@@ -408,21 +411,23 @@ export default function ProfilePage() {
       console.log('Calendar Debug Info:', data.debugInfo);
     } catch (e: any) {
       if (popup) popup.close();
-      notify.error(`Backend não retornou JSON! status=${res.status}`, undefined, { duration: 5000 });
+      toast.error(`Backend não retornou JSON! status=${res.status}`, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
     if (!res.ok || data.error) {
       if (popup) popup.close();
-      notify.error(`Erro do backend: ${data.error || 'Desconhecido'}`, undefined, { duration: 5000 });
+      const stepStr = data.step ? `[${data.step}] ` : '[backend_error] ';
+      const msgStr = data.message || data.error || 'Falha no servidor';
+      toast.error(`${stepStr}${msgStr}`, { duration: 8000 });
       setCalendarLoading(false);
       return;
     }
     
     if (!data.url) {
       if (popup) popup.close();
-      notify.error('URL OAuth ausente no JSON da resposta', undefined, { duration: 5000 });
+      toast.error('URL OAuth ausente no JSON da resposta', { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
@@ -434,7 +439,7 @@ export default function ProfilePage() {
       cleanUrl = String(data.url).trim().replace(/\r?\n|\r/g, '');
     } catch (e: any) {
       if (popup) popup.close();
-      notify.error(`Erro ao limpar data.url (${e.message})`);
+      toast.error(`Erro ao limpar data.url (${e.message})`);
       setCalendarLoading(false);
       return;
     }
@@ -446,14 +451,14 @@ export default function ProfilePage() {
     } catch (e: any) {
       if (popup) popup.close();
       console.error('[Calendar] Invalid URL parse attempt:', cleanUrl);
-      notify.error(`URL OAuth inválida: ${e.message}`, undefined, { duration: 5000 });
+      toast.error(`URL OAuth inválida: ${e.message}`, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
     if (parsed.origin !== 'https://accounts.google.com') {
       if (popup) popup.close();
-      notify.error(`URL tem origem incorreta: ${parsed.origin}`, undefined, { duration: 5000 });
+      toast.error(`URL tem origem incorreta: ${parsed.origin}`, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
@@ -471,7 +476,7 @@ export default function ProfilePage() {
       }
     } catch (e: any) {
       if (popup) popup.close();
-      notify.error(`Falha ao redirecionar no Safari: ${e.message}`, undefined, { duration: 5000 });
+      toast.error(`Falha ao redirecionar no Safari: ${e.message}`, { duration: 5000 });
     } finally {
       setCalendarLoading(false);
     }
