@@ -123,35 +123,37 @@ router.get("/callback", async (req, res) => {
 
   try {
     step = "read_query";
+    const query = req.query || {};
     const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL ? PUBLIC_APP_URL.trim().replace(/\/+$/, "") : ""}/api/calendar/callback`).trim();
     
     step = "provider_error_check";
-    if (req.query.error) {
+    if (query?.error) {
       return res.redirect(`/profile?calendarAuth=error&reason=provider_error&step=${encodeURIComponent(step)}`);
     }
 
     step = "missing_code_check";
-    const { code, state: stateParam } = req.query;
-    const stateStr = stateParam as string;
+    const code = query?.code as string | undefined;
+    const stateStr = query?.state as string | undefined;
 
     if (!code || !stateStr) {
-      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}&details=${encodeURIComponent(String(req.query.error || ''))}`);
+      const qError = query?.error || "unknown_error";
+      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}&details=${encodeURIComponent(String(qError))}`);
     }
 
     step = "state_lookup";
     const stateDoc = await db.collection("oauth_states").doc(stateStr).get();
     
     step = "state_validate";
-    if (!stateDoc.exists) {
+    if (!stateDoc?.exists) {
       return res.redirect(`/profile?calendarAuth=error&reason=invalid_state&step=${encodeURIComponent(step)}`);
     }
 
-    const stateData = stateDoc.data();
-    if (!stateData || stateData.provider !== "google_calendar" || stateData.used || stateData.expiresAt < Date.now()) {
+    const stateData = stateDoc?.data();
+    if (!stateData || stateData?.provider !== "google_calendar" || stateData?.used || stateData?.expiresAt < Date.now()) {
       return res.redirect(`/profile?calendarAuth=error&reason=invalid_state&step=${encodeURIComponent(step)}`);
     }
 
-    const professionalId = stateData.uid;
+    const professionalId = stateData?.uid;
 
     await db.collection("oauth_states").doc(stateStr).update({ used: true });
 
@@ -162,9 +164,14 @@ router.get("/callback", async (req, res) => {
     let tokens;
     try {
       const tokenResponse = await oauth2Client.getToken(code as string);
-      tokens = tokenResponse.tokens;
+      tokens = tokenResponse?.tokens;
+      
+      if (tokens?.error) {
+        throw new Error(String(tokens?.error));
+      }
     } catch (err: any) {
-      const details = encodeURIComponent(String(err?.message || err).slice(0, 180));
+      const safeDetails = err?.response?.data?.error || err?.message || String(err) || "unknown_callback_error";
+      const details = encodeURIComponent(String(safeDetails).slice(0, 180));
       return res.redirect(`/profile?calendarAuth=error&reason=token_exchange_failed&step=${encodeURIComponent(step)}&details=${details}`);
     }
 
@@ -178,15 +185,17 @@ router.get("/callback", async (req, res) => {
         },
       });
     } catch (err: any) {
-      const details = encodeURIComponent(String(err?.message || err).slice(0, 180));
+      const safeDetails = err?.response?.data?.error || err?.message || String(err) || "unknown_callback_error";
+      const details = encodeURIComponent(String(safeDetails).slice(0, 180));
       return res.redirect(`/profile?calendarAuth=error&reason=firestore_save_failed&step=${encodeURIComponent(step)}&details=${details}`);
     }
 
     step = "redirect_success";
     return res.redirect(`/profile?calendarAuth=success`);
   } catch (err: any) {
-    logger.error("CALENDAR", "Failed to process OAuth callback - Exception caught", { error: String(err?.message || err) });
-    const details = encodeURIComponent(String(err?.message || err).slice(0, 180));
+    const safeDetails = err?.response?.data?.error || err?.message || String(err) || "unknown_callback_error";
+    logger.error("CALENDAR", "Failed to process OAuth callback - Exception caught", { error: safeDetails });
+    const details = encodeURIComponent(String(safeDetails).slice(0, 180));
     return res.redirect(`/profile?calendarAuth=error&reason=callback_exception&step=${encodeURIComponent(step)}&details=${details}`);
   }
 });
