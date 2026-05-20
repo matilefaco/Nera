@@ -24,86 +24,58 @@ function getOAuthClient(redirectUri: string) {
 
 // 1. Get Auth URL
 router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  let step = "init";
   try {
-    logger.info("CALENDAR", "[GCAL 1] route hit");
-
-    logger.info("CALENDAR", "[GCAL 2] env loaded", {
-      typeofClientId: typeof process.env.GOOGLE_CLIENT_ID,
-      typeofClientSecret: typeof process.env.GOOGLE_CLIENT_SECRET,
-      typeofRedirectUri: typeof process.env.GOOGLE_REDIRECT_URI,
-    });
-
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-      return res.status(400).json({ error: "Configuração do Google Calendar pendente no ambiente." });
+    step = "env_check";
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      throw new Error("GOOGLE_CLIENT_ID ausente no ambiente.");
+    }
+    if (!process.env.GOOGLE_CLIENT_SECRET) {
+      throw new Error("GOOGLE_CLIENT_SECRET ausente no ambiente.");
+    }
+    if (!process.env.GOOGLE_REDIRECT_URI) {
+      throw new Error("GOOGLE_REDIRECT_URI ausente no ambiente.");
     }
     
-    logger.info("CALENDAR", "[GCAL 3] client id exists=true");
-
     const uid = req.uid;
     const professionalIdQuery = req.query.professionalId as string;
     if (professionalIdQuery && professionalIdQuery !== uid) {
-      return res.status(403).json({ error: "Permissão negada" });
+      throw new Error("Permissão negada");
     }
     
     const professionalId = uid;
-
     if (!professionalId) {
-      return res.status(400).json({ error: "Missing professionalId" });
+      throw new Error("Missing professionalId");
     }
 
-    let redirectUri = "";
-    try {
-      redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${(PUBLIC_APP_URL || "").replace(/\/+$/, "")}/api/calendar/callback`).trim();
-      logger.info("CALENDAR", `[GCAL 4] redirect uri exists=true (value starts with: ${redirectUri.substring(0, 15)})`);
-    } catch(err: any) {
-      return res.status(500).json({ error: true, step: "redirect_uri_generate", message: String(err?.message || err) });
-    }
+    step = "redirect_uri_prepare";
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI.trim();
 
-    let oauth2Client;
-    try {
-      oauth2Client = getOAuthClient(redirectUri);
-      logger.info("CALENDAR", "[GCAL 5] oauth client created");
-    } catch(err: any) {
-      return res.status(500).json({ error: true, step: "oauth_client_create", message: String(err?.message || err) });
-    }
+    step = "oauth_client_create";
+    const oauth2Client = getOAuthClient(redirectUri);
 
-    // Generate secure state
-    let state = "";
-    try {
-      state = crypto.randomUUID();
-    } catch(err: any) {
-      return res.status(500).json({ error: true, step: "random_uuid", message: String(err?.message || err) });
-    }
-
+    step = "state_create";
+    const state = crypto.randomUUID();
     const db = getDb();
     
-    try {
-      await db.collection("oauth_states").doc(state).set({
-        uid: professionalId,
-        provider: "google_calendar",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        expiresAt: Date.now() + 10 * 60 * 1000,
-        used: false
-      });
-    } catch (err: any) {
-      logger.error("CALENDAR", "Failed to persist OAuth state", { professionalId: maskUid(professionalId), error: String(err?.message || err) });
-      return res.status(500).json({ error: true, step: "firestore_set", message: String(err?.message || err) });
-    }
+    step = "firestore_state_save";
+    await db.collection("oauth_states").doc(state).set({
+      uid: professionalId,
+      provider: "google_calendar",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: Date.now() + 10 * 60 * 1000,
+      used: false
+    });
 
-    let url = "";
-    try {
-      url = oauth2Client.generateAuthUrl({
-        access_type: "offline",
-        scope: SCOPES,
-        prompt: "consent",
-        state: state,
-      });
-      logger.info("CALENDAR", "[GCAL 6] auth url generated");
-    } catch(err: any) {
-      return res.status(500).json({ error: true, step: "generate_auth_url", message: String(err?.message || err) });
-    }
+    step = "generate_auth_url";
+    const url = oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: SCOPES,
+      prompt: "consent",
+      state: state,
+    });
 
-    logger.info("CALENDAR", "[GCAL 7] response json sent");
+    step = "response_json";
     return res.json({ 
       url: url.trim(),
       debugInfo: {
@@ -115,8 +87,19 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
     });
 
   } catch (err: any) {
-    logger.error("CALENDAR", "Unexpected error in auth-url", { error: String(err?.message || err) });
-    return res.status(500).json({ error: true, step: "unexpected", message: String(err?.message || err) });
+    const errorMsg = String(err instanceof Error ? err.message : err);
+    return res.status(500).json({
+      error: `[${step}] ${errorMsg}`, // Para o frontend exibir no toast corretamente
+      debugInfo: true,
+      step,
+      message: errorMsg,
+      hasClientId: !!process.env.GOOGLE_CLIENT_ID,
+      hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+      hasRedirectUri: !!process.env.GOOGLE_REDIRECT_URI,
+      redirectUriPreview: process.env.GOOGLE_REDIRECT_URI
+        ? process.env.GOOGLE_REDIRECT_URI.trim()
+        : null
+    });
   }
 });
 
