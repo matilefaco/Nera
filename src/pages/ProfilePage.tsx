@@ -318,10 +318,7 @@ export default function ProfilePage() {
         if (authStat === 'success') {
           notify.success('Google Calendar conectado.');
         } else if (authStat === 'error') {
-          const errMsg = searchParams.get('error') || searchParams.get('reason') || 'Erro desconhecido';
-          const details = searchParams.get('details');
-          const detailsStr = details ? ` (${details})` : '';
-          toast.error(`Erro ao conectar com Google Calendar: ${errMsg}${detailsStr}`, { duration: 8000 });
+          toast.error('Erro ao conectar com Google Calendar.', { duration: 5000 });
         }
         setSearchParams({}, { replace: true });
       }
@@ -371,8 +368,6 @@ export default function ProfilePage() {
     if (!user) return;
     setCalendarLoading(true);
     
-    notify.info('calendar debug: click received', { duration: 3000 });
-
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     const shouldRedirect = isIOS || isSafari;
@@ -396,7 +391,6 @@ export default function ProfilePage() {
       res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      notify.info(`debug: fetch ok. status=${res.status} type=${res.headers.get('content-type')}`, { duration: 3000 });
     } catch (e: any) {
       if (popup) popup.close();
       toast.error(`Erro antes do backend: falha no fetch (${e.message})`, { duration: 5000 });
@@ -407,39 +401,34 @@ export default function ProfilePage() {
     let data: any;
     try {
       data = await res.json();
-      notify.info(`debug: JSON lido. tem debugInfo=${!!data.debugInfo}`, { duration: 3000 });
-      console.log('Calendar Debug Info:', data.debugInfo);
     } catch (e: any) {
       if (popup) popup.close();
-      toast.error(`Backend não retornou JSON! status=${res.status}`, { duration: 5000 });
+      toast.error('Erro de comunicação com o servidor.', { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
     if (!res.ok || data.error) {
       if (popup) popup.close();
-      const stepStr = data.step ? `[${data.step}] ` : '[backend_error] ';
       const msgStr = data.message || data.error || 'Falha no servidor';
-      toast.error(`${stepStr}${msgStr}`, { duration: 8000 });
+      toast.error(`Erro: ${msgStr}`, { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
     
     if (!data.url) {
       if (popup) popup.close();
-      toast.error('URL OAuth ausente no JSON da resposta', { duration: 5000 });
+      toast.error('URL OAuth ausente na resposta.', { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
-
-    notify.info(`debug: typeof data.url = ${typeof data.url}. Preview: ${data.url.substring(0,25)}...`, { duration: 3000 });
 
     let cleanUrl: string;
     try {
       cleanUrl = String(data.url).trim().replace(/\r?\n|\r/g, '');
     } catch (e: any) {
       if (popup) popup.close();
-      toast.error(`Erro ao limpar data.url (${e.message})`);
+      toast.error('URL OAuth inválida.');
       setCalendarLoading(false);
       return;
     }
@@ -447,25 +436,22 @@ export default function ProfilePage() {
     let parsed: URL;
     try {
       parsed = new URL(cleanUrl);
-      notify.info(`debug: new URL() passou. Origin: ${parsed.origin}`, { duration: 3000 });
     } catch (e: any) {
       if (popup) popup.close();
-      console.error('[Calendar] Invalid URL parse attempt:', cleanUrl);
-      toast.error(`URL OAuth inválida: ${e.message}`, { duration: 5000 });
+      toast.error('URL OAuth inválida.');
       setCalendarLoading(false);
       return;
     }
 
     if (parsed.origin !== 'https://accounts.google.com') {
       if (popup) popup.close();
-      toast.error(`URL tem origem incorreta: ${parsed.origin}`, { duration: 5000 });
+      toast.error('Origem OAuth incorreta.', { duration: 5000 });
       setCalendarLoading(false);
       return;
     }
 
     try {
       if (shouldRedirect) {
-        notify.info('debug: assign...', { duration: 2000 });
         window.location.assign(cleanUrl);
       } else {
         if (popup && !popup.closed) {
@@ -476,7 +462,7 @@ export default function ProfilePage() {
       }
     } catch (e: any) {
       if (popup) popup.close();
-      toast.error(`Falha ao redirecionar no Safari: ${e.message}`, { duration: 5000 });
+      toast.error('Falha ao redirecionar para o Google.', { duration: 5000 });
     } finally {
       setCalendarLoading(false);
     }

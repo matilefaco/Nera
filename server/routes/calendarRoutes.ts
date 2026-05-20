@@ -99,52 +99,22 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
       state: state,
     });
 
-    console.log("[GCAL AUTH URL]", {
-      redirectUri,
-      generatedUrlPreview: url.slice(0, 200),
-      hasState: !!state
-    });
-
     step = "response_json";
     return res.json({ 
-      url: url.trim(),
-      debugInfo: {
-        hasClientId: !!process.env.GOOGLE_CLIENT_ID,
-        hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-        redirectUri,
-        urlPreview: url.substring(0, 80) + '...'
-      }
+      url: url.trim()
     });
 
   } catch (err: any) {
     const errorMsg = String(err instanceof Error ? err.message : err);
     return res.status(500).json({
       error: `[${step}] ${errorMsg}`, // Para o frontend exibir no toast corretamente
-      debugInfo: true,
       step,
-      message: errorMsg,
-      hasClientId: !!process.env.GOOGLE_CLIENT_ID,
-      hasClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-      hasRedirectUri: !!process.env.GOOGLE_REDIRECT_URI,
-      redirectUriPreview: process.env.GOOGLE_REDIRECT_URI
-        ? process.env.GOOGLE_REDIRECT_URI.trim()
-        : null
+      message: errorMsg
     });
   }
 });
 
 // 2. OAuth Callback
-router.get("/debug-query", (req, res) => {
-  res.json({
-    originalUrl: req.originalUrl,
-    url: req.url,
-    query: req.query,
-    code: req.query?.code,
-    state: req.query?.state,
-    error: req.query?.error,
-  });
-});
-
 router.get("/callback", async (req, res) => {
   const db = getDb();
   // Ensure we do not set Content-Type manually before redirect
@@ -168,10 +138,7 @@ router.get("/callback", async (req, res) => {
     const stateStr = getQueryParam(req, "state") as string | undefined;
 
     if (!code || !stateStr) {
-      const details = encodeURIComponent(
-        `hasCode=${!!code};hasState=${!!stateStr};hasError=${!!providerError};url=${String(req.originalUrl || "").slice(0, 120)}`
-      );
-      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}&details=${details}`);
+      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}`);
     }
 
     step = "state_lookup";
