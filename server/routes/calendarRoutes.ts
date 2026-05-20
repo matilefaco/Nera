@@ -119,44 +119,56 @@ router.get("/callback", async (req, res) => {
   // Ensure we do not set Content-Type manually before redirect
   const appBaseUrl = "https://usenera.com";
 
+  let step = "callback_start";
+
   try {
+    step = "read_query";
     const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL ? PUBLIC_APP_URL.trim().replace(/\/+$/, "") : ""}/api/calendar/callback`).trim();
     
+    step = "provider_error_check";
     if (req.query.error) {
-      return res.redirect(`/profile?calendarAuth=error&reason=provider_error`);
+      return res.redirect(`/profile?calendarAuth=error&reason=provider_error&step=${encodeURIComponent(step)}`);
     }
 
+    step = "missing_code_check";
     const { code, state: stateParam } = req.query;
     const stateStr = stateParam as string;
 
     if (!code || !stateStr) {
-      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&details=${encodeURIComponent(String(req.query.error || ''))}`);
+      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}&details=${encodeURIComponent(String(req.query.error || ''))}`);
     }
 
+    step = "state_lookup";
     const stateDoc = await db.collection("oauth_states").doc(stateStr).get();
+    
+    step = "state_validate";
     if (!stateDoc.exists) {
-      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state`);
+      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state&step=${encodeURIComponent(step)}`);
     }
 
     const stateData = stateDoc.data();
     if (!stateData || stateData.provider !== "google_calendar" || stateData.used || stateData.expiresAt < Date.now()) {
-      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state`);
+      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state&step=${encodeURIComponent(step)}`);
     }
 
     const professionalId = stateData.uid;
 
     await db.collection("oauth_states").doc(stateStr).update({ used: true });
 
+    step = "oauth_client_create";
     const oauth2Client = getOAuthClient(redirectUri);
     
+    step = "token_exchange";
     let tokens;
     try {
       const tokenResponse = await oauth2Client.getToken(code as string);
       tokens = tokenResponse.tokens;
     } catch (err: any) {
-      return res.redirect(`/profile?calendarAuth=error&reason=token_exchange_failed`);
+      const details = encodeURIComponent(String(err?.message || err).slice(0, 180));
+      return res.redirect(`/profile?calendarAuth=error&reason=token_exchange_failed&step=${encodeURIComponent(step)}&details=${details}`);
     }
 
+    step = "firestore_save_tokens";
     try {
       await db.collection("users").doc(professionalId).update({
         "integrations.google_calendar": {
@@ -166,13 +178,16 @@ router.get("/callback", async (req, res) => {
         },
       });
     } catch (err: any) {
-      return res.redirect(`/profile?calendarAuth=error&reason=firestore_save_failed`);
+      const details = encodeURIComponent(String(err?.message || err).slice(0, 180));
+      return res.redirect(`/profile?calendarAuth=error&reason=firestore_save_failed&step=${encodeURIComponent(step)}&details=${details}`);
     }
 
+    step = "redirect_success";
     return res.redirect(`/profile?calendarAuth=success`);
   } catch (err: any) {
     logger.error("CALENDAR", "Failed to process OAuth callback - Exception caught", { error: String(err?.message || err) });
-    return res.redirect(`/profile?calendarAuth=error&reason=callback_exception`);
+    const details = encodeURIComponent(String(err?.message || err).slice(0, 180));
+    return res.redirect(`/profile?calendarAuth=error&reason=callback_exception&step=${encodeURIComponent(step)}&details=${details}`);
   }
 });
 
