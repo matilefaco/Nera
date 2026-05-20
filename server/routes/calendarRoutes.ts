@@ -16,9 +16,9 @@ function getOAuthClient(redirectUri: string) {
     throw new Error("Configuração do Google Calendar pendente no ambiente.");
   }
   return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    redirectUri
+    process.env.GOOGLE_CLIENT_ID.trim(),
+    process.env.GOOGLE_CLIENT_SECRET.trim(),
+    redirectUri.trim()
   );
 }
 
@@ -40,7 +40,7 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
     return res.status(400).json({ error: "Missing professionalId" });
   }
 
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`;
+  const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`).trim();
   const oauth2Client = getOAuthClient(redirectUri);
 
   // Generate secure state
@@ -67,7 +67,7 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
     state: state, // Pass the secure random state
   });
 
-  res.json({ url });
+  res.json({ url: url.trim() });
 });
 
 // 2. OAuth Callback
@@ -75,8 +75,8 @@ router.get("/callback", async (req, res) => {
   const db = getDb();
   const { code, state: stateParam } = req.query;
   const stateStr = stateParam as string;
-  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`;
-  const appUrl = PUBLIC_APP_URL;
+  const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`).trim();
+  const appUrl = PUBLIC_APP_URL.trim();
 
   if (!code || !stateStr) {
     const safeError = JSON.stringify("Missing code or state");

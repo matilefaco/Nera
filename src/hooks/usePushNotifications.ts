@@ -57,10 +57,15 @@ export function usePushNotifications() {
     }
 
     try {
-      const result = await Notification.requestPermission();
+      const result = await withTimeout(
+        Notification.requestPermission(),
+        5000,
+        "O navegador não respondeu ao pedido de permissão. Se você estiver no iPhone, lembre-se de adicionar o app à Tela de Início primeiro."
+      );
       setPermission(result);
 
       if (result !== 'granted') {
+        notify.error("Você negou a permissão de notificações. Ative nos ajustes do seu celular ou navegador.");
         return false;
       }
 

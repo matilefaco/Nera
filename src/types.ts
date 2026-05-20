@@ -71,7 +71,8 @@ export interface UserProfile {
   email: string;
   whatsapp: string;
   slug: string; // Unique public identifier (official)
-  
+  hasSharedLink?: boolean;
+
   reviews?: Review[]; // Consolidated from API
   stats?: any; // Consolidated from API
   
@@ -84,6 +85,7 @@ export interface UserProfile {
   neighborhood?: string;
   
   instagram?: string; // Official social link
+  dismissedTips?: Record<string, boolean>; // Preferências de UI, dicas fechadas
   paymentMethods?: string[];
   acceptsInstallments?: boolean;
   

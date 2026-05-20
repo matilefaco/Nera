@@ -46,6 +46,9 @@ export function useProfileForm(profile: UserProfile | null) {
   const [workingDays, setWorkingDays] = useState<number[]>(profile?.workingHours?.workingDays || profile?.workingDays || [1, 2, 3, 4, 5]);
   const [startTime, setStartTime] = useState(profile?.workingHours?.startTime || profile?.startTime || '09:00');
   const [endTime, setEndTime] = useState(profile?.workingHours?.endTime || profile?.endTime || '18:00');
+  const [breakStart, setBreakStart] = useState(profile?.workingHours?.breakStart || '');
+  const [breakEnd, setBreakEnd] = useState(profile?.workingHours?.breakEnd || '');
+  const [showBreak, setShowBreak] = useState(!!profile?.workingHours?.breakStart || !!profile?.workingHours?.breakEnd);
   const [profileTheme, setProfileTheme] = useState<{ variant: "terracotta" | "rose" | "sage" | "navy" | "plum" }>(profile?.profileTheme || { variant: 'terracotta' });
   const [avatarSkipped, setAvatarSkipped] = useState(profile?.avatarSkipped || false);
 
@@ -85,6 +88,9 @@ export function useProfileForm(profile: UserProfile | null) {
         if (wh.workingDays?.length) setWorkingDays(wh.workingDays);
         if (wh.startTime) setStartTime(wh.startTime);
         if (wh.endTime) setEndTime(wh.endTime);
+        if (wh.breakStart) setBreakStart(wh.breakStart);
+        if (wh.breakEnd) setBreakEnd(wh.breakEnd);
+        if (wh.breakStart || wh.breakEnd) setShowBreak(true);
       } else {
         // Fallback legado (apenas leitura)
         if (profile.workingDays?.length) setWorkingDays(profile.workingDays);
@@ -123,6 +129,9 @@ export function useProfileForm(profile: UserProfile | null) {
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,
+    breakStart, setBreakStart,
+    breakEnd, setBreakEnd,
+    showBreak, setShowBreak,
     avatarSkipped, setAvatarSkipped,
     profileTheme, setProfileTheme
   };

@@ -32,15 +32,58 @@ export const ActivationChecklist = ({
   onShareClick
 }: ActivationChecklistProps) => {
   const [isMinimized, setIsMinimized] = useState(() => {
-    return localStorage.getItem('nera_checklist_minimized') === 'true';
+    return profile?.dismissedTips?.checklistMinimized || localStorage.getItem('nera_checklist_minimized') === 'true';
   });
   const [wowDismissed, setWowDismissed] = useState(() => {
-    return localStorage.getItem('nera_wow_celebrated') === 'true';
+    return profile?.dismissedTips?.wowCelebrated || localStorage.getItem('nera_wow_celebrated') === 'true';
   });
   const [copied, setCopied] = useState(false);
   const [hasShared, setHasShared] = useState(() => {
-    return localStorage.getItem('nera_link_shared') === 'true';
+    return profile?.hasSharedLink || localStorage.getItem('nera_link_shared') === 'true';
   });
+
+  useEffect(() => {
+    if (profile?.dismissedTips?.checklistMinimized && !isMinimized) setIsMinimized(true);
+    if (profile?.dismissedTips?.wowCelebrated && !wowDismissed) setWowDismissed(true);
+  }, [profile?.dismissedTips]);
+
+  const persistTip = async (key: string) => {
+    if (profile?.uid) {
+      try {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../firebase');
+        await updateDoc(doc(db, 'users', profile.uid), {
+          [`dismissedTips.${key}`]: true
+        });
+      } catch (err) {
+        console.error(`Failed to update ${key}:`, err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (profile?.hasSharedLink) {
+      setHasShared(true);
+      localStorage.setItem('nera_link_shared', 'true');
+    }
+  }, [profile?.hasSharedLink]);
+
+  const handleShareClick = async () => {
+    onShareClick();
+    setHasShared(true);
+    localStorage.setItem('nera_link_shared', 'true');
+    if (profile?.uid) {
+      try {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../firebase');
+        await updateDoc(doc(db, 'users', profile.uid), {
+          hasSharedLink: true
+        });
+      } catch (err) {
+        console.error("Failed to update share state:", err);
+      }
+    }
+  };
   const [hasHistoricalBooking, setHasHistoricalBooking] = useState(false);
 
   useEffect(() => {
@@ -62,15 +105,12 @@ export const ActivationChecklist = ({
         const q = query(
           collection(db, 'appointments'),
           where('professionalId', '==', profile.uid),
-          limit(10)
+          where('status', 'in', ['pending', 'pending_confirmation', 'confirmed', 'completed', 'accepted', 'concluido']),
+          limit(1)
         );
         const snap = await getDocs(q);
         if (!isMounted) return;
-        const valid = snap.docs.some(doc => {
-          const st = doc.data().status;
-          return st && !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(st);
-        });
-        if (valid) setHasHistoricalBooking(true);
+        if (!snap.empty) setHasHistoricalBooking(true);
       } catch (err) {
         // Ignore silently
       }
@@ -116,12 +156,8 @@ export const ActivationChecklist = ({
       label: 'Seu link profissional',
       description: 'Divulgue sua vitrine para suas clientes.',
       icon: Share2,
-      isComplete: hasShared,
-      action: () => {
-        onShareClick();
-        setHasShared(true);
-        localStorage.setItem('nera_link_shared', 'true');
-      }
+      isComplete: hasShared || !!profile?.hasSharedLink,
+      action: handleShareClick
     },
     {
       id: 'first_booking',
@@ -143,11 +179,13 @@ export const ActivationChecklist = ({
     const newState = !isMinimized;
     setIsMinimized(newState);
     localStorage.setItem('nera_checklist_minimized', String(newState));
+    if (newState) persistTip('checklistMinimized');
   };
 
   const handleDismissWow = () => {
     setWowDismissed(true);
     localStorage.setItem('nera_wow_celebrated', 'true');
+    persistTip('wowCelebrated');
   };
 
   const handleCopy = () => {

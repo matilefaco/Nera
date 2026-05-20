@@ -19,7 +19,7 @@ export interface DayAvailability {
 interface TimeRange {
   start: number; // minutos desde 00:00
   end: number;
-  type?: 'appointment' | 'block';
+  type?: 'appointment' | 'block' | 'break';
   status?: string;
   id?: string;
   reason?: string;
@@ -195,6 +195,13 @@ export function getBookableSlotsForDate({
   const endTotalMinutes = endHour * 60 + endMin;
 
   const occupiedSegments: TimeRange[] = [];
+
+  // Add breaks if provided
+  if (workingHours.breakStart && workingHours.breakEnd) {
+    const [bh, bm] = workingHours.breakStart.split(':').map(Number);
+    const [beh, bem] = workingHours.breakEnd.split(':').map(Number);
+    occupiedSegments.push({ start: bh * 60 + bm, end: beh * 60 + bem, type: 'break' });
+  }
 
   // 2. Appointments (Confirmados, pendentes, concluídos e aceitos bloqueiam publicamente)
   // Regra de Produto Nera: Se existe qualquer reserva no horário (inclusive pendente), o slot não aparece como livre.

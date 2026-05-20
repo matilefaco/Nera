@@ -17,7 +17,7 @@ import {
 import { notify } from '../lib/notify';
 import { 
   formatCurrency, getTodayLocale, buildWhatsappLink, 
-  generateWaitlistInviteMessage, cn, formatDateKey, parseLocalDate, cleanWhatsapp, isFakeContent
+  generateWaitlistInviteMessage, cn, formatDateKey, parseLocalDate, cleanWhatsapp, isFakeContent, formatLocalDate
 } from '../lib/utils';
 import { calculateFinancialMetrics } from '../lib/financialMetrics';
 import { getClientScore } from '../lib/clientUtils';
@@ -222,6 +222,26 @@ export default function Dashboard() {
     return confirmed.filter(req => optimisticUpdates[req.id] !== 'cancelled_by_professional').sort((a,b) => safeLocaleCompare(a.time, b.time));
   }, [confirmedToday, pendingRequests, optimisticUpdates]);
 
+  const nextUpcomingAppointment = useMemo(() => {
+    const today = getTodayLocale();
+    const confirmed = appointments.filter(a => 
+      a.status === 'confirmed' || a.status === 'accepted' || a.status === 'completed'
+    );
+    const nowHour = new Date().getHours().toString().padStart(2, '0');
+    const nowMin = new Date().getMinutes().toString().padStart(2, '0');
+    const nowTime = `${nowHour}:${nowMin}`;
+
+    const future = confirmed.filter(a => {
+      if (a.date > today) return true;
+      if (a.date === today && a.time >= nowTime && !isCompletedStatus(a.status)) return true;
+      return false;
+    }).sort((a,b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return safeLocaleCompare(a.time, b.time);
+    });
+    return future[0] || null;
+  }, [appointments]);
+
   const displayedDailyRevenue = useMemo(() => {
     return calculateFinancialMetrics(displayedConfirmedToday).monthlyRevenue;
   }, [displayedConfirmedToday]);
@@ -238,11 +258,30 @@ export default function Dashboard() {
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
-    return localStorage.getItem("nera_push_banner_dismissed") === "true";
+    return profile?.dismissedTips?.pushBanner || localStorage.getItem("nera_push_banner_dismissed") === "true";
   });
   const [blockTipDismissed, setBlockTipDismissed] = useState(() => {
-    return localStorage.getItem("nera_block_tip_dismissed") === "true";
+    return profile?.dismissedTips?.blockTip || localStorage.getItem("nera_block_tip_dismissed") === "true";
   });
+
+  // Sync state if profile loads later
+  useEffect(() => {
+    if (profile?.dismissedTips?.pushBanner && !pushBannerDismissed) setPushBannerDismissed(true);
+    if (profile?.dismissedTips?.blockTip && !blockTipDismissed) setBlockTipDismissed(true);
+  }, [profile?.dismissedTips]);
+
+  const handleDismissTip = async (tipKey: string) => {
+    if (!user) return;
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('../firebase');
+      await updateDoc(doc(db, 'users', user.uid), {
+        [`dismissedTips.${tipKey}`]: true
+      });
+    } catch (err) {
+      console.error(`Failed to dismiss ${tipKey}`, err);
+    }
+  };
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [unconfirmedTomorrow, setUnconfirmedTomorrow] = useState<Appointment[]>([]);
   const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
@@ -1359,7 +1398,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
             />
 
             {/* Notificações Banner */}
-            {!isSubscribed && !pushBannerDismissed && !isNewAccount && (
+            {isSupported && !isSubscribed && !pushBannerDismissed && !isNewAccount && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -1394,6 +1433,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
                       onClick={() => {
                         setPushBannerDismissed(true);
                         localStorage.setItem("nera_push_banner_dismissed", "true");
+                        handleDismissTip("pushBanner");
                       }}
                       className="text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors"
                     >
@@ -1506,7 +1546,11 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
                   {displayedConfirmedToday.length === 0 && (
                     <div className="mb-4 pb-4 border-b border-brand-mist/40">
                       <p className="text-[14px] font-serif text-brand-stone italic">Sua agenda está livre no momento.</p>
-                      {daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
+                      {nextUpcomingAppointment ? (
+                        <p className="text-[10px] font-medium tracking-widest text-brand-stone/80 mt-2">
+                          PRÓXIMO: <span className="font-bold text-brand-ink">{formatLocalDate(nextUpcomingAppointment.date, { day: '2-digit', month: '2-digit' })} às {nextUpcomingAppointment.time}</span> com <span className="text-brand-ink font-semibold">{nextUpcomingAppointment.clientName}</span>
+                        </p>
+                      ) : daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
                         <p className="text-[9px] font-medium uppercase tracking-widest text-brand-stone/60 mt-1">
                           Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
                         </p>
@@ -2001,7 +2045,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       />
 
       {/* 9. PRIMEIRA EXPERIÊNCIA / HINT (Se não houver bloqueios ativos) */}
-      {!blockTipDismissed && blockedSchedules.length === 0 && (
+      {!blockTipDismissed && blockedSchedules.length === 0 && (!isSupported || isSubscribed || pushBannerDismissed || isNewAccount) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
           <motion.div 
             initial={{ y: 50, opacity: 0 }}
@@ -2019,6 +2063,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
               onClick={() => {
                 localStorage.setItem("nera_block_tip_dismissed", "true");
                 setBlockTipDismissed(true);
+                handleDismissTip("blockTip");
               }} 
               className="absolute top-2 right-2 p-2 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
               title="Fechar dica"

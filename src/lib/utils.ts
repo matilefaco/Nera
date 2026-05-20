@@ -197,6 +197,16 @@ export function cleanWhatsapp(raw: string): string {
   return (raw || '').replace(/\D/g, '');
 }
 
+export function getDifferentialPlaceholder(specialty?: string): string {
+  if (!specialty) return "Ex: Atendimento com hora marcada";
+  const str = specialty.toLowerCase();
+  if (str.includes('depil')) return "Ex: Materiais descartáveis";
+  if (str.includes('sobrancelha')) return "Ex: Design personalizado";
+  if (str.includes('lash') || str.includes('cílios') || str.includes('cilios')) return "Ex: Fios leves e confortáveis";
+  if (str.includes('nail') || str.includes('manicure') || str.includes('unha')) return "Ex: Acabamento duradouro";
+  return "Ex: Ambiente reservado";
+}
+
 /**
  * Formats a numeric string into the "(XX) XXXXX-XXXX" pattern for display.
  * Handles partial inputs gracefully.

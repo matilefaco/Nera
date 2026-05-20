@@ -1747,6 +1747,17 @@ router.get("/debug-can-book-slot", debugOnly, async (req, res) => {
       return res.json({ canBook: false, reason: "Outside working hours", debug: { slotStart, slotEnd, workStart, workEnd } });
     }
 
+    if (workingHours.breakStart && workingHours.breakEnd) {
+      const [bhs, bms] = workingHours.breakStart.split(':').map(Number);
+      const [bhe, bme] = workingHours.breakEnd.split(':').map(Number);
+      const breakStartMinutes = bhs * 60 + bms;
+      const breakEndMinutes = bhe * 60 + bme;
+
+      if (Math.max(slotStart, breakStartMinutes) < Math.min(slotEnd, breakEndMinutes)) {
+        return res.json({ canBook: false, reason: "Slot overlaps with break time" });
+      }
+    }
+
     // Check against appointments
     const conflictingAppt = appointments.find((a: any) => {
       const [ah, am] = a.time.split(':').map(Number);
@@ -1898,7 +1909,16 @@ router.get("/debug-next-slot-full", debugOnly, async (req, res) => {
           return Math.max(curr, bS) < Math.min(pEnd, bE);
         });
 
-        if (!hasAppt && !hasBlock) {
+        const isBreak = (() => {
+          if (!workingHours.breakStart || !workingHours.breakEnd) return false;
+          const [bhs, bms] = workingHours.breakStart.split(':').map(Number);
+          const [bhe, bme] = workingHours.breakEnd.split(':').map(Number);
+          const bs = bhs * 60 + bms;
+          const be = bhe * 60 + bme;
+          return Math.max(curr, bs) < Math.min(pEnd, be);
+        })();
+
+        if (!hasAppt && !hasBlock && !isBreak) {
           const h = Math.floor(curr / 60);
           const m = curr % 60;
           slots.push(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);

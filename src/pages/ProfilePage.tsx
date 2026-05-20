@@ -7,12 +7,12 @@ import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } 
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
-  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, Key
+  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, Key, Check
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { notify } from '../lib/notify';
 import imageCompression from 'browser-image-compression';
-import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp } from '../lib/utils';
+import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, getDifferentialPlaceholder } from '../lib/utils';
 import { THEMES, getTheme } from '../lib/themes';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
@@ -117,6 +117,9 @@ export default function ProfilePage() {
     workingDays, setWorkingDays,
     startTime, setStartTime,
     endTime, setEndTime,
+    breakStart, setBreakStart,
+    breakEnd, setBreakEnd,
+    showBreak, setShowBreak,
     paymentMethods, setPaymentMethods,
     acceptsInstallments, setAcceptsInstallments,
     yearsExperience, setYearsExperience,
@@ -203,6 +206,9 @@ export default function ProfilePage() {
       workingDays: [...(Array.isArray(data.workingDays) ? data.workingDays : [1, 2, 3, 4, 5])].sort((a: any, b: any) => a - b),
       startTime: data.startTime || '09:00',
       endTime: data.endTime || '18:00',
+      showBreak: !!data.showBreak,
+      breakStart: data.breakStart || '',
+      breakEnd: data.breakEnd || '',
       paymentMethods: [...(Array.isArray(data.paymentMethods) ? data.paymentMethods : [])].sort(),
       acceptsInstallments: data.acceptsInstallments || false
     });
@@ -217,7 +223,10 @@ export default function ProfilePage() {
         serviceStyle: profile.professionalIdentity?.serviceStyle,
         workingDays: profile.workingHours?.workingDays || profile.workingDays,
         startTime: profile.workingHours?.startTime || profile.startTime,
-        endTime: profile.workingHours?.endTime || profile.endTime
+        endTime: profile.workingHours?.endTime || profile.endTime,
+        showBreak: !!profile.workingHours?.breakStart || !!profile.workingHours?.breakEnd,
+        breakStart: profile.workingHours?.breakStart || '',
+        breakEnd: profile.workingHours?.breakEnd || ''
       });
       setSavedSnapshotString(initialSnapshot);
     }
@@ -228,14 +237,14 @@ export default function ProfilePage() {
       name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
       studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
       advancePaymentRequired, delayTolerance, profileTheme,
-      differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, paymentMethods,
+      differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
       acceptsInstallments
     });
   }, [
     name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
     studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
     advancePaymentRequired, delayTolerance, profileTheme.variant,
-    differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, paymentMethods,
+    differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
     acceptsInstallments
   ]);
 
@@ -330,8 +339,21 @@ export default function ProfilePage() {
   const handleConnectCalendar = async () => {
     if (!user) return;
     setCalendarLoading(true);
-    // Safari iOS pode bloquear popups assíncronos. Abrimos de imediato.
-    const popup = window.open('', '_blank');
+
+    // No iPhone/Safari o comportamento de popup é problemático, e os cookies/sessões perdem contexto se for PWA.
+    // Vamos usar Same-Tab Redirect. Se quisermos popup apenas no desktop e redirect no mobile, 
+    // podemos checar userAgent, mas vamos tentar redirecionar sempre usando assign.
+    
+    // Check if it's Safari/iOS
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    const shouldRedirect = isIOS || isSafari;
+    let popup: Window | null = null;
+    
+    if (!shouldRedirect) {
+      popup = window.open('', '_blank');
+    }
     
     try {
       const token = await user.getIdToken();
@@ -343,22 +365,45 @@ export default function ProfilePage() {
       const data = await res.json();
       if (!res.ok || data.error) {
         if (popup) popup.close();
-        throw new Error(data.error || 'Erro desconhecido');
+        throw new Error(data.error || 'Erro desconhecido ao carregar auth-url');
       }
-      if (data.url) {
-        // Garantir que a URL não possui caracteres inválidos/espaços em branco/quebras de linha
-        const cleanUrl = data.url.replace(/\\s+/g, '').replace(/\\r?\\n|\\r/g, '');
-        console.log('[Calendar] Opening URL');
-        if (popup && !popup.closed && popup.location) {
+      
+      if (!data.url || typeof data.url !== 'string') {
+        throw new Error('URL de autenticação inválida gerada pelo servidor.');
+      }
+
+      // Safely trim and clean the URL (use standard js replace, avoiding double backslashes which caused bugs before)
+      const cleanUrl = data.url.trim().replace(/\r?\n|\r/g, '');
+
+      let parsed: URL;
+      try {
+        parsed = new URL(cleanUrl);
+      } catch (e) {
+        console.error('[Calendar] Invalid URL parse attempt:', cleanUrl);
+        throw new Error('URL retornada não é válida.');
+      }
+
+      if (parsed.origin !== 'https://accounts.google.com') {
+        console.error('[Calendar] Invalid origin in URL:', parsed.origin);
+        throw new Error('URL retornada tem origem bloqueada por segurança.');
+      }
+
+      console.log('[Calendar] Valid auth URL generated, type:', typeof data.url);
+
+      if (shouldRedirect) {
+        console.log('[Calendar] Redirecting in same tab (iOS/Safari fallback)');
+        window.location.assign(cleanUrl);
+      } else {
+        if (popup && !popup.closed) {
           popup.location.href = cleanUrl;
         } else {
-          window.location.href = cleanUrl;
+          // fallback if popup was blocked
+          window.location.assign(cleanUrl);
         }
-      } else {
-        if (popup) popup.close();
       }
     } catch (err: any) {
       if (popup) popup.close();
+      console.error('[Calendar] Error connecting:', err);
       notify.error(err.message || 'Erro ao iniciar conexão com Google Calendar.');
     } finally {
       setCalendarLoading(false);
@@ -498,7 +543,8 @@ export default function ProfilePage() {
         workingHours: {
           startTime,
           endTime,
-          workingDays
+          workingDays,
+          ...(showBreak ? { breakStart, breakEnd } : { breakStart: null, breakEnd: null })
         },
         professionalIdentity: {
           mainSpecialty: sanitizedSpecialty,
@@ -1076,7 +1122,7 @@ export default function ProfilePage() {
                 <div className="flex gap-2">
                   <input 
                     type="text" 
-                    placeholder="Ex: Estacionamento gratuito"
+                    placeholder={getDifferentialPlaceholder(specialty)}
                     className="flex-1 px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-[11px]"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -1109,17 +1155,32 @@ export default function ProfilePage() {
               <hr className="border-brand-mist" />
 
               <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>
-                <div className="flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border border-brand-mist shadow-sm transition-all">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1 block mb-1">Instagram (@usuario)</label>
+                <div className="flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border border-brand-mist shadow-sm transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50">
                   <span className="text-brand-stone text-xs ml-1">@</span>
                   <input 
                     type="text" 
                     value={instagram} 
-                    onChange={(e) => setInstagram(e.target.value.replace(/@/g, '').trim())} 
+                    onChange={(e) => setInstagram(normalizeInstagram(e.target.value))} 
                     placeholder="seu.usuario" 
                     className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs placeholder:font-light" 
                   />
                 </div>
+                {instagram && (
+                  <div className="mt-2 ml-1">
+                    <p className="text-[10px] text-brand-stone font-light italic mb-1">
+                      Confira se o @ está correto antes de salvar:
+                    </p>
+                    <a 
+                      href={`https://instagram.com/${instagram}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-brand-terracotta font-medium hover:underline flex items-center gap-1.5"
+                    >
+                      Ver perfil @{instagram} ↗
+                    </a>
+                  </div>
+                )}
               </div>
 
               <hr className="border-brand-mist/50 my-6" />
@@ -1315,6 +1376,48 @@ export default function ProfilePage() {
                     className="w-full px-4 py-2.5 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
                   />
                 </div>
+              </div>
+
+              <div className="mt-4 p-4 border border-brand-mist/60 rounded-2xl bg-brand-parchment/30">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative flex items-center justify-center">
+                    <input 
+                      type="checkbox" 
+                      className="peer appearance-none w-5 h-5 rounded-md border-2 border-brand-mist checked:bg-brand-ink checked:border-brand-ink transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2"
+                      checked={showBreak}
+                      onChange={(e) => setShowBreak(e.target.checked)}
+                    />
+                    <Check size={12} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
+                  </div>
+                  <span className="text-sm text-brand-ink font-medium select-none group-hover:text-brand-ink/80 transition-colors">
+                    Adicionar intervalo (almoço/pausa)
+                  </span>
+                </label>
+
+                {showBreak && (
+                  <div className="mt-4 flex flex-wrap gap-4 items-center">
+                    <div className="grid grid-cols-2 gap-3 flex-1 min-w-[200px]">
+                      <div className="space-y-1 min-w-0">
+                        <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início da pausa</label>
+                        <input 
+                          type="time" 
+                          value={breakStart} 
+                          onChange={(e) => setBreakStart(e.target.value)} 
+                          className="w-full px-4 py-2 bg-white border border-brand-mist/60 rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                        />
+                      </div>
+                      <div className="space-y-1 min-w-0">
+                        <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim da pausa</label>
+                        <input 
+                          type="time" 
+                          value={breakEnd} 
+                          onChange={(e) => setBreakEnd(e.target.value)} 
+                          className="w-full px-4 py-2 bg-white border border-brand-mist/60 rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
