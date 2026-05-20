@@ -9,7 +9,7 @@ import {
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
   RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, Key, Check
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { notify } from '../lib/notify';
 import imageCompression from 'browser-image-compression';
 import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, getDifferentialPlaceholder } from '../lib/utils';
@@ -71,6 +71,7 @@ const THEME_MOODS: Record<string, { label: string, subtitle: string }> = {
 export default function ProfilePage() {
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
 
   const profileCompleteness = useMemo(() => {
@@ -284,18 +285,18 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       fetchCalendarStatus();
-      const params = new URLSearchParams(window.location.search);
-      const calendarAuth = params.get('calendarAuth');
-      if (calendarAuth === 'success') {
-        notify.success('Agenda sincronizada.');
-        window.history.replaceState({}, '', window.location.pathname);
-      } else if (calendarAuth === 'error') {
-        const errMsg = params.get('error') || 'Erro desconhecido';
-        notify.error(`Erro ao conectar: ${errMsg}`);
-        window.history.replaceState({}, '', window.location.pathname);
+      if (searchParams.get('calendarAuth')) {
+        const authStat = searchParams.get('calendarAuth');
+        if (authStat === 'success') {
+          notify.success('Google Calendar conectado.');
+        } else if (authStat === 'error') {
+          const errMsg = searchParams.get('error') || searchParams.get('reason') || 'Erro desconhecido';
+          notify.error(`Erro ao conectar com Google Calendar: ${errMsg}`);
+        }
+        setSearchParams({}, { replace: true });
       }
     }
-  }, [user]);
+  }, [user, searchParams, setSearchParams]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {

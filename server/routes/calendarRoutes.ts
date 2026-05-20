@@ -113,24 +113,24 @@ router.get("/callback", async (req, res) => {
     const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL ? PUBLIC_APP_URL.trim().replace(/\/+$/, "") : ""}/api/calendar/callback`).trim();
     
     if (req.query.error) {
-      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=provider_error`);
+      return res.redirect(`/profile?calendarAuth=error&reason=provider_error`);
     }
 
     const { code, state: stateParam } = req.query;
     const stateStr = stateParam as string;
 
     if (!code || !stateStr) {
-      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=missing_code`);
+      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&details=${encodeURIComponent(String(req.query.error || ''))}`);
     }
 
     const stateDoc = await db.collection("oauth_states").doc(stateStr).get();
     if (!stateDoc.exists) {
-      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=invalid_state`);
+      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state`);
     }
 
     const stateData = stateDoc.data();
     if (!stateData || stateData.provider !== "google_calendar" || stateData.used || stateData.expiresAt < Date.now()) {
-      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=invalid_state`);
+      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state`);
     }
 
     const professionalId = stateData.uid;
@@ -144,7 +144,7 @@ router.get("/callback", async (req, res) => {
       const tokenResponse = await oauth2Client.getToken(code as string);
       tokens = tokenResponse.tokens;
     } catch (err: any) {
-      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=token_exchange_failed`);
+      return res.redirect(`/profile?calendarAuth=error&reason=token_exchange_failed`);
     }
 
     try {
@@ -156,13 +156,13 @@ router.get("/callback", async (req, res) => {
         },
       });
     } catch (err: any) {
-      return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=firestore_save_failed`);
+      return res.redirect(`/profile?calendarAuth=error&reason=firestore_save_failed`);
     }
 
-    return res.redirect(`${appBaseUrl}/profile?calendarAuth=success`);
+    return res.redirect(`/profile?calendarAuth=success`);
   } catch (err: any) {
     logger.error("CALENDAR", "Failed to process OAuth callback - Exception caught", { error: String(err?.message || err) });
-    return res.redirect(`${appBaseUrl}/profile?calendarAuth=error&reason=callback_exception`);
+    return res.redirect(`/profile?calendarAuth=error&reason=callback_exception`);
   }
 });
 

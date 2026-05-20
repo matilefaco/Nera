@@ -69,7 +69,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) return <AppLoadingScreen />;
   
   if (!user) {
-    return <Navigate to="/login" />;
+    const returnUrl = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
   // Verification Check
