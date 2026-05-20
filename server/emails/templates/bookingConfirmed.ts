@@ -9,8 +9,8 @@ interface BookingConfirmedData {
   location: string;
   calendarUrl: string;
   manageUrl: string;
-  prepInstructions?: string; // instruções de preparo enviadas pela profissional
-  whatsappUrl?: string;      // link wa.me/ para a profissional
+  prepInstructions?: string; 
+  whatsappUrl?: string;      
   locationType?: string;
   address?: {
     street?: string;
@@ -41,7 +41,6 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
   const isStudio = locationType === 'studio' || locationType === 'estudio' || !locationType;
   const hasValidAddress = address && address.street;
   
-  // Format full address
   let fullAddress = '';
   let mapsUrl = '';
 
@@ -56,7 +55,7 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
     if (address.city) secondLine.push(address.city);
 
     fullAddress = `
-      <div style="font-size: 13px; color: #18120E; margin-top: 4px; font-family: Arial, sans-serif; line-height: 1.4;">
+      <div style="font-size: 13px; color: ${COLORS.stone}; margin-top: 4px; font-family: ${FONTS.sans}; line-height: 1.4;">
         ${parts.join(', ')}<br/>
         ${secondLine.join(' — ')}
       </div>
@@ -67,12 +66,11 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
   }
 
   const bodyHtml = `
-    <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 25px; font-weight: 500;">
+    <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 25px; font-weight: 500;">
       Olá, ${clientName}.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 35px; line-height: 1.7;">
-      Seu horário com <strong>${professionalName}</strong> foi confirmado. 
-      Abaixo você encontra os detalhes para o seu atendimento.
+    <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 35px; line-height: 1.7;">
+      Seu horário com <strong>${professionalName}</strong> está confirmado. Esperamos você no momento combinado.
     </p>
     
     ${buildEmailCard([
@@ -82,8 +80,8 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
     ])}
 
     <div style="margin-top: 30px; padding: 0 10px;">
-      <h4 style="font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Localização</h4>
-      <div style="font-family: Arial, sans-serif; font-size: 14px; color: #18120E; line-height: 1.5;">
+      <h4 style="font-family: ${FONTS.sans}; font-size: 12px; font-weight: bold; color: ${COLORS.ink}; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Local</h4>
+      <div style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.ink}; line-height: 1.5;">
         <div style="font-weight: 600; font-size: 15px;">${location}</div>
         ${fullAddress}
         ${mapsUrl ? `
@@ -98,53 +96,19 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
 
     ${prepInstructions ? `
       <div style="margin-top: 40px; padding: 25px; border: 1px solid ${COLORS.mist};">
-        <h4 style="font-family: Arial, sans-serif; font-size: 12px; font-weight: bold; color: #18120E; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Instruções</h4>
-        <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin: 0; line-height: 1.6;">${prepInstructions}</p>
+        <h4 style="font-family: ${FONTS.sans}; font-size: 12px; font-weight: bold; color: ${COLORS.ink}; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px;">Instruções</h4>
+        <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin: 0; line-height: 1.6;">${prepInstructions}</p>
       </div>
     ` : ''}
 
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 50px;">
-      <!-- Primary Button -->
-      <tr>
-        <td align="center">
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-            <tr>
-              <td align="center" bgcolor="${COLORS.ink}" style="padding: 18px 45px;">
-                <a href="${calendarUrl}" target="_blank" style="color: #FDFAF7; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.25em; text-decoration: none; display: inline-block;">
-                  Adicionar ao Calendário
-                </a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-
+    <div style="margin-top: 40px; text-align: center;">
       ${whatsappUrl ? `
-        <!-- Spacer -->
-        <tr>
-          <td height="16" style="font-size: 16px; line-height: 16px;">&nbsp;</td>
-        </tr>
-
-        <!-- Secondary Button -->
-        <tr>
-          <td align="center">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" style="border: 1px solid ${COLORS.mist}; padding: 14px 40px;">
-                  <a href="${whatsappUrl}" target="_blank" style="color: ${COLORS.stone}; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; text-decoration: none; display: inline-block;">
-                    Mensagem para profissional
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+        <a href="${whatsappUrl}" target="_blank" style="color: ${COLORS.stone}; font-family: ${FONTS.sans}; font-size: 13px; text-decoration: underline;">
+          Dúvidas? Fale com a profissional no WhatsApp.
+        </a>
       ` : ''}
-    </table>
-
-    <div style="margin-top: 45px; text-align: center; padding-top: 30px; border-top: 1px solid ${COLORS.mist};">
-      <p style="font-family: Arial, sans-serif; font-size: 12px; color: ${COLORS.stone}; letter-spacing: 0.05em;">
-        Precisa reagendar? <a href="${manageUrl}" style="color: ${COLORS.stone}; font-weight: bold; text-decoration: underline;">Gerencie sua reserva</a>.
+      <p style="font-family: ${FONTS.sans}; font-size: 11px; color: ${COLORS.stone}; margin-top: 15px; line-height: 1.6;">
+        Você pode alterar seu agendamento a qualquer momento <a href="${manageUrl}" style="color: ${COLORS.stone}; text-decoration: underline;">pelo painel</a>.
       </p>
     </div>
   `;
@@ -152,11 +116,13 @@ export function buildBookingConfirmedEmail(data: BookingConfirmedData): string {
   return buildEmailBase({
     topbarText: 'Confirmação',
     heroVariant: 'parchment',
-    heroLabel: 'Reserva confirmada',
+    heroLabel: 'Horário Confirmado',
     heroTitle: 'Tudo pronto',
     heroTitleItalic: 'para a sua visita ✨',
-    badgeText: '✓ Confirmado',
+    badgeText: 'Confirmado',
     badgeVariant: 'success',
-    bodyHtml
+    bodyHtml,
+    ctaText: 'Adicionar ao Calendário',
+    ctaUrl: calendarUrl
   });
 }

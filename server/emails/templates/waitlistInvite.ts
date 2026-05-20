@@ -25,59 +25,39 @@ export function buildWaitlistInviteEmail(data: WaitlistInviteData): string {
     isExclusive 
   } = data;
 
-  const badgeText = isExclusive ? "Convite exclusivo para você" : `⏰ Expira em ${expiresInHours} horas`;
+  const badgeText = isExclusive ? "Convite exclusivo" : `Expira em ${expiresInHours} horas`;
   const badgeVariant = isExclusive ? 'success' : 'alert';
 
   const bodyHtml = `
-    <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin-bottom: 25px; line-height: 1.6;">
+    <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 20px;">
+      Olá, ${clientName}.
+    </p>
+    <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 25px; line-height: 1.6;">
       ${isExclusive 
-        ? "Este convite é exclusivo para você. Reserve agora e garanta seu horário."
-        : "Outras clientes na lista também foram notificadas. A vaga vai para quem confirmar primeiro."
+        ? "Uma vaga surgiu na agenda e este convite é especial para você. Garanta seu horário antes que seja liberado."
+        : "Avisamos as clientes na lista de espera. A vaga será de quem confirmar primeiro, não perca tempo!"
       }
     </p>
 
     ${buildEmailCard([
       { label: 'Profissional', value: professionalName },
       { label: 'Serviço', value: serviceName },
-      ...(servicePrice ? [{ label: 'Preço', value: servicePrice }] : []),
+      ...(servicePrice ? [{ label: 'Valor', value: servicePrice }] : []),
       { label: 'Data', value: formattedDate },
-      { label: 'Horário', value: time }
+      { label: 'Horário disponível', value: time }
     ])}
-    
-    <div style="margin-top: 40px; text-align: center;">
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-          <td align="center">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" bgcolor="${COLORS.terracotta}" style="padding: 18px 45px;">
-                  <a href="${bookingUrl}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; color: ${COLORS.white}; text-decoration: none; display: inline-block;">
-                    GARANTIR MEU HORÁRIO →
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td align="center" style="padding-top: 10px;">
-            <font style="font-family: ${FONTS.sans}; font-size: 11px; color: ${COLORS.stone};">
-              Este link expira em ${expiresInHours} horas.
-            </font>
-          </td>
-        </tr>
-      </table>
-    </div>
   `;
 
   return buildEmailBase({
     topbarText: 'Oportunidade',
     heroVariant: 'terracotta',
-    heroLabel: 'Sua vaga está esperando',
-    heroTitle: `${clientName},`,
-    heroTitleItalic: 'um horário abriu pra você! 🌟',
+    heroLabel: 'Vaga disponível',
+    heroTitle: 'Abriu um',
+    heroTitleItalic: 'horário para você ✨',
     badgeText,
     badgeVariant,
-    bodyHtml
+    bodyHtml,
+    ctaText: 'Garantir meu horário',
+    ctaUrl: bookingUrl
   });
 }

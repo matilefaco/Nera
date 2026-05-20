@@ -1,12 +1,12 @@
-import { buildEmailBase, buildEmailCard } from '../../services/emailBuilder.js';
+import { buildEmailBase, buildEmailCard, COLORS, FONTS } from '../../services/emailBuilder.js';
 
 interface RetentionEmailData {
   clientName: string;
   professionalName: string;
   serviceName: string;
   bookingUrl: string;
-  lastServiceDate: string;  // ex: "12 de março"
-  daysSince: number;        // ex: 32
+  lastServiceDate: string;  
+  daysSince: number;        
 }
 
 export function buildRetentionEmail(data: RetentionEmailData): string {
@@ -14,52 +14,27 @@ export function buildRetentionEmail(data: RetentionEmailData): string {
   const firstName = clientName.split(' ')[0];
 
   const bodyHtml = `
-    <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
-      Oi, ${firstName}!
+    <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 20px;">
+      Olá, ${firstName}.
     </p>
 
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.6;">
-      Você esteve com <strong>${professionalName}</strong> para <strong>${serviceName}</strong> em ${lastServiceDate}.
+    <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
+      Você esteve com <strong>${professionalName}</strong> para <strong>${serviceName}</strong> no dia ${lastServiceDate}.
       <br><br>
-      Que tal marcar o próximo horário?
+      Sua rotina de cuidados não pode parar. Garanta seu próximo horário agora mesmo com facilidade e rapidez.
     </p>
-
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 30px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-            <tr>
-              <td bgcolor="#18120E" style="padding: 18px 50px;">
-                <a href="${bookingUrl}" style="color: #FDFAF7; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; text-decoration: none; display: inline-block;">
-                  MARCAR MEU PRÓXIMO HORÁRIO
-                </a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td align="center" style="padding-top: 12px;">
-          <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-            <tr>
-              <td align="center" style="font-family: Arial, sans-serif; font-size: 11px; color: #5C4A3D;">
-                Reserve em menos de 1 minuto.
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
   `;
 
   return buildEmailBase({
-    topbarText: 'Hora de Retornar',
+    topbarText: 'Seu momento',
     heroVariant: 'terracotta',
-    heroLabel: `Saudades, ${firstName}!`,
-    heroTitle: 'Está na hora de',
-    heroTitleItalic: 'se cuidar de novo 🌸',
-    badgeText: `Faz ${daysSince} dias desde seu último horário`,
+    heroLabel: `Saudades de você`,
+    heroTitle: 'Hora de se',
+    heroTitleItalic: 'cuidar novamente ✨',
+    badgeText: `Faz ${daysSince} dias desde a sua última visita`,
     badgeVariant: 'info',
     bodyHtml,
+    ctaText: 'Reservar Novo Horário',
+    ctaUrl: bookingUrl
   });
 }

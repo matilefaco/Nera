@@ -15,16 +15,16 @@ export function buildReferralRewardEmail(data: ReferralRewardData): string {
       Olá, ${referrerName}.
     </p>
     <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.ink}; line-height: 1.6; margin-bottom: 25px;">
-      Boas notícias: sua indicação <strong>${refereeName}</strong> acaba de se tornar assinante do Nera Pro!
+      Boas notícias: sua indicação <strong>${refereeName}</strong> acaba de se tornar assinante da Nera!
     </p>
     
     ${buildEmailCard([
-      { label: 'Recompensa Recebida', value: `${formattedAmount} em créditos` },
+      { label: 'Recompensa', value: `${formattedAmount}` },
       { label: 'Indicação', value: refereeName }
     ])}
     
     <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; line-height: 1.6;">
-      O valor já foi adicionado à sua conta e será descontado automaticamente na sua próxima mensalidade. Obrigado por ajudar a crescer nossa comunidade de profissionais excelentes.
+      O valor já foi adicionado à sua conta como crédito e será descontado automaticamente na sua próxima fatura. Obrigado por ajudar a Nera a crescer.
     </p>
   `;
 
@@ -33,8 +33,8 @@ export function buildReferralRewardEmail(data: ReferralRewardData): string {
     heroVariant: 'terracotta',
     heroLabel: 'Comunidade Nera',
     heroTitle: 'Indicação convertida',
-    heroTitleItalic: 'créditos adicionados.',
-    badgeText: 'Crédito disponível',
+    heroTitleItalic: '',
+    badgeText: 'Crédito Adicionado',
     badgeVariant: 'success',
     bodyHtml,
   });

@@ -17,53 +17,39 @@ interface ProfessionalNewBookingData {
 export function buildProfessionalNewBookingEmail(data: ProfessionalNewBookingData): string {
   const { professionalName, clientName, serviceName, formattedDate, time, price, location, agendaUrl, paymentMethods, clientWhatsapp, whatsappUrl } = data;
 
-  const paymentMethodsHtml = paymentMethods && paymentMethods.length > 0 
-    ? paymentMethods.join(', ')
-    : 'Não configurado';
+  const cardItems = [
+    { label: 'Cliente', value: clientName },
+    { label: 'WhatsApp da cliente', value: clientWhatsapp, valueUrl: whatsappUrl },
+    { label: 'Serviço', value: serviceName },
+    { label: 'Data e Hora', value: `${formattedDate} às ${time}` },
+    { label: 'Local', value: location },
+    { label: 'Valor', value: price || 'Sob consulta' }
+  ];
+
+  if (paymentMethods && paymentMethods.length > 0) {
+    cardItems.push({ label: 'Forma de Pagamento', value: paymentMethods.join(', ') });
+  } else {
+    cardItems.push({ label: 'Pagamento', value: 'Combinado diretamente com você' });
+  }
 
   const bodyHtml = `
     <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 20px;">
-      Olá, ${professionalName}!
+      Olá, ${professionalName}.
     </p>
 
-    <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
-      ${clientName} acabou de pedir um horário. Confirme agora para ela receber a confirmação.
+    <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
+      <strong>${clientName}</strong> deseja reservar um horário com você. O agendamento só será definitivo após a sua confirmação.
     </p>
 
-    ${buildEmailCard([
-      { label: 'Cliente', value: clientName },
-      { label: 'WhatsApp da cliente', value: clientWhatsapp, valueUrl: whatsappUrl },
-      { label: 'Serviço', value: serviceName },
-      { label: 'Data e Hora', value: `${formattedDate} às ${time}` },
-      { label: 'Local', value: location },
-      { label: 'Valor', value: price || 'Sob consulta' },
-      { label: 'Seu Pagamento', value: paymentMethodsHtml }
-    ])}
+    ${buildEmailCard(cardItems)}
 
-    <!-- Urgency Box -->
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 10px; margin-bottom: 30px;">
-      <tr>
-        <td bgcolor="#FFF3E3" style="border: 1px solid #FFECCF; padding: 16px; text-align: center;">
-          <p style="font-family: ${FONTS.sans}; font-size: 14px; color: #6B3A00; margin: 0; line-height: 1.5;">
-            ⏱ <strong>Responda em até 2 horas.</strong> Clientes que não recebem resposta tendem a cancelar.
-          </p>
-        </td>
-      </tr>
-    </table>
-
-    <div style="margin-top: 10px; text-align: center;">
+    <div style="margin-top: 30px; text-align: center;">
       <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
         <tr>
-          <td align="center" style="padding-top: 16px;">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center">
-                  <a href="${agendaUrl || '#'}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 12px; font-weight: bold; color: ${COLORS.stone}; text-decoration: underline;">
-                    Ou recusar pelo painel caso não tenha disponibilidade
-                  </a>
-                </td>
-              </tr>
-            </table>
+          <td align="center">
+            <a href="${agendaUrl || '#'}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 13px; color: ${COLORS.stone}; text-decoration: underline;">
+              Se necessário, você pode recusar ou sugerir outro horário pelo painel.
+            </a>
           </td>
         </tr>
       </table>
@@ -71,15 +57,15 @@ export function buildProfessionalNewBookingEmail(data: ProfessionalNewBookingDat
   `;
 
   return buildEmailBase({
-    topbarText: 'Nova Reserva',
-    heroVariant: 'ink',
-    heroLabel: 'Nova reserva na sua agenda',
+    topbarText: 'Nova Solicitação',
+    heroVariant: 'terracotta',
+    heroLabel: 'Nova Reserva',
     heroTitle: 'Chegou!',
     heroTitleItalic: 'Uma nova cliente quer te ver ✨',
-    badgeText: 'Aguardando sua confirmação',
-    badgeVariant: 'alert',
+    badgeText: 'Ação necessária',
+    badgeVariant: 'info',
     bodyHtml,
-    ctaText: 'Confirmar Agendamento',
+    ctaText: 'Acessar Agenda',
     ctaUrl: agendaUrl || '#',
   });
 }

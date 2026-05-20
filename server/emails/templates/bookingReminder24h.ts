@@ -1,4 +1,4 @@
-import { buildEmailBase, buildEmailCard } from '../../services/emailBuilder.js';
+import { buildEmailBase, buildEmailCard, COLORS, FONTS } from '../../services/emailBuilder.js';
 
 interface BookingReminderData {
   clientName: string;
@@ -30,75 +30,43 @@ export function buildBookingReminder24hEmail(data: BookingReminderData): string 
   const firstName = clientName.split(' ')[0];
 
   const bodyHtml = `
-    <p style="font-family: Arial, sans-serif; font-size: 16px; color: #18120E; margin-bottom: 20px;">
-      Só um aviso carinhoso: seu horário com <strong>${professionalName}</strong> é amanhã.
+    <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 20px;">
+      Olá, ${firstName}. Um aviso carinhoso: seu horário com <strong>${professionalName}</strong> é amanhã.
     </p>
-    <p style="font-family: Arial, sans-serif; font-size: 14px; color: #5C4A3D; margin-bottom: 30px; line-height: 1.6;">
+    <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
       Guarde um tempinho na sua agenda e cuide-se com calma.
     </p>
     
     ${buildEmailCard([
       { label: 'Serviço', value: serviceName },
       { label: 'Data e Hora', value: `${formattedDate} às ${time}` },
-      { label: 'Duração', value: `${duration} minutos` },
+      { label: 'Duração estimada', value: `${duration} min` },
       { label: 'Local', value: location }
     ])}
 
     ${location.includes('Domicílio') ? `
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 10px; margin-bottom: 20px;">
-        <tr>
-          <td style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; padding: 12px; background-color: #FDFAF7; border: 1px solid #E5DDD6; border-radius: 8px;">
-            📍 <strong>Confirme seu endereço com a profissional se necessário.</strong>
-          </td>
-        </tr>
-      </table>
+      <p style="font-family: ${FONTS.sans}; font-size: 13px; color: ${COLORS.stone}; margin-top: 15px; background-color: ${COLORS.parchment}; padding: 15px; border-left: 2px solid ${COLORS.terracotta};">
+        📍 <strong>Dica Nera:</strong> Verifique se no painel o seu endereço está certinho para a profissional chegar até você.
+      </p>
     ` : ''}
     
-    <div style="margin-top: 30px; text-align: center;">
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-          <td align="center">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" bgcolor="${confirmUrl ? '#A85C3A' : '#18120E'}" style="padding: 18px 45px;">
-                  <a href="${confirmUrl || manageUrl}" target="_blank" style="color: #FDFAF7; font-family: Arial, sans-serif; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; text-decoration: none; display: inline-block;">
-                    ${confirmUrl ? 'Confirmar Presença' : 'Ver Detalhes'}
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td height="12" style="font-size: 12px; line-height: 12px;">&nbsp;</td>
-        </tr>
-        <tr>
-          <td align="center">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" style="border: 1px solid #E5DDD6; padding: 14px 40px;">
-                  <a href="${whatsappUrl}" target="_blank" style="color: #5C4A3D; font-family: Arial, sans-serif; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; text-decoration: none; display: inline-block;">
-                    Falar no WhatsApp
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
+    <div style="margin-top: 40px; text-align: center; padding-top: 20px; border-top: 1px solid ${COLORS.mist};">
+      ${whatsappUrl ? `
+        <a href="${whatsappUrl}" target="_blank" style="color: ${COLORS.stone}; font-family: ${FONTS.sans}; font-size: 13px; text-decoration: underline;">
+          Dúvidas? Fale com a profissional no WhatsApp.
+        </a><br><br>
+      ` : ''}
     </div>
-
-    <p style="font-family: Arial, sans-serif; font-size: 12px; color: #5C4A3D; font-style: italic; text-align: center; margin-top: 40px; border-top: 1px solid #E5DDD6; padding-top: 25px;">
-      ${professionalName} já está preparando tudo para o seu atendimento.
-    </p>
   `;
 
   return buildEmailBase({
     topbarText: 'Lembrete',
     heroVariant: 'terracotta',
-    heroLabel: 'Lembrete — amanhã é o dia',
-    heroTitle: 'Até amanhã,',
-    heroTitleItalic: `${firstName}! 🌸`,
-    bodyHtml
+    heroLabel: 'Amanhã é o dia',
+    heroTitle: 'Te esperamos,',
+    heroTitleItalic: `${firstName} ✨`,
+    bodyHtml,
+    ctaText: confirmUrl ? 'Confirmar Presença' : 'Visualizar Horário',
+    ctaUrl: confirmUrl || manageUrl
   });
 }

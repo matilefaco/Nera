@@ -22,58 +22,38 @@ export function buildBookingCancelledClientEmail(data: BookingCancelledClientDat
   } = data;
 
   const bodyHtml = `
-    <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 5px;">
+    <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 20px;">
       Olá, ${clientName}.
     </p>
-    <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin-bottom: 25px;">
-      Seu agendamento com <strong>${professionalName}</strong> foi cancelado.
+    <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 25px; line-height: 1.6;">
+      Seu agendamento com <strong>${professionalName}</strong> infelizmente precisou ser cancelado.
     </p>
     
     ${cancellationReason ? `
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 30px; border: 1px dashed ${COLORS.mist}; padding: 15px;">
-        <tr>
-          <td>
-            <font style="display: block; font-size: 9px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.stone}; margin-bottom: 8px; font-family: ${FONTS.sans};">MOTIVO DO CANCELAMENTO</font>
-            <p style="font-size: 13px; color: ${COLORS.ink}; margin: 0; font-family: ${FONTS.sans}; line-height: 1.5;">${cancellationReason}</p>
-          </td>
-        </tr>
-      </table>
+      <div style="background-color: ${COLORS.parchment}; padding: 20px; border-left: 2px solid ${COLORS.stone}; margin-bottom: 30px;">
+        <font style="display: block; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.stone}; margin-bottom: 8px; font-family: ${FONTS.sans};">Motivo do cancelamento</font>
+        <p style="font-size: 14px; color: ${COLORS.ink}; margin: 0; font-family: ${FONTS.sans}; line-height: 1.5;">${cancellationReason}</p>
+      </div>
     ` : ''}
 
     ${buildEmailCard([
-      { label: 'Serviço', value: serviceName },
+      { label: 'Serviço cancelado', value: serviceName },
       { label: 'O horário era', value: `${formattedDate} às ${time}` }
     ])}
     
-    <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin-top: 25px; margin-bottom: 35px; line-height: 1.6;">
-      Sentimos muito pelo inconveniente. Se desejar, você pode conferir a disponibilidade da profissional e realizar um novo agendamento a qualquer momento.
+    <p style="font-family: ${FONTS.sans}; font-size: 14px; color: ${COLORS.stone}; margin-top: 25px; margin-bottom: 10px; line-height: 1.6;">
+      Sentimos muito pelo inconveniente. Você pode verificar um novo horário pelo link abaixo.
     </p>
-
-    ${profileUrl ? `
-      <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-          <td align="center">
-            <table role="presentation" border="0" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" bgcolor="${COLORS.ink}" style="padding: 18px 45px;">
-                  <a href="${profileUrl}" target="_blank" style="font-family: ${FONTS.sans}; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.2em; color: ${COLORS.white}; text-decoration: none; display: inline-block;">
-                    Ver novos horários
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    ` : ''}
   `;
 
   return buildEmailBase({
     topbarText: 'Aviso importante',
     heroVariant: 'parchment',
     heroLabel: 'Agendamento cancelado',
-    heroTitle: 'Reserva cancelada',
-    heroTitleItalic: 'sentimos pelo inconveniente.',
+    heroTitle: 'Reserva',
+    heroTitleItalic: 'cancelada',
     bodyHtml,
+    ctaText: 'Ver Novos Horários',
+    ctaUrl: profileUrl
   });
 }
