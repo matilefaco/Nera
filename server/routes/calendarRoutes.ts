@@ -30,6 +30,12 @@ function getCalendarRedirectUri() {
   return redirectUri;
 }
 
+function getQueryParam(req: express.Request, key: string) {
+  const raw = String(req.originalUrl || req.url || "");
+  const queryString = raw.includes("?") ? raw.split("?").slice(1).join("?") : "";
+  return new URLSearchParams(queryString).get(key);
+}
+
 // 1. Get Auth URL
 router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   if (!req || !req.user || !req.uid) {
@@ -148,53 +154,22 @@ router.get("/callback", async (req, res) => {
 
   try {
     step = "read_query";
-    const query = req.query || {};
     const redirectUri = getCalendarRedirectUri();
     
-    console.log("[RAW CALLBACK]", {
-      originalUrl: req.originalUrl,
-      url: req.url,
-      path: req.path,
-      query: req.query,
-      typeofQuery: typeof req.query,
-      keys: Object.keys(req.query || {}),
-      code: req.query?.code,
-      state: req.query?.state,
-      error: req.query?.error,
-      rawReqUrl: (req as any)._parsedUrl,
-    });
-
-    const safeQuery = { ...req.query };
-    if (safeQuery.code) {
-      safeQuery.code = String(safeQuery.code).slice(0, 12) + '...';
-    }
-
-    console.log("[GCAL CALLBACK FULL]", {
-      originalUrl: req.originalUrl,
-      url: req.url,
-      query: safeQuery,
-      method: req.method,
-      redirectUri: getCalendarRedirectUri(),
-      headers: {
-        host: req.headers?.host,
-        referer: req.headers?.referer,
-        userAgent: req.headers?.["user-agent"]
-      }
-    });
-
+    const providerError = getQueryParam(req, "error");
+    
     step = "provider_error_check";
-    if (query?.error) {
-      return res.redirect(`/profile?calendarAuth=error&reason=provider_error&step=${encodeURIComponent(step)}`);
+    if (providerError) {
+      return res.redirect(`/profile?calendarAuth=error&reason=provider_error&step=${encodeURIComponent(step)}&details=${encodeURIComponent(providerError || '')}`);
     }
 
     step = "missing_code_check";
-    const code = query?.code as string | undefined;
-    const stateStr = query?.state as string | undefined;
+    const code = getQueryParam(req, "code") as string | undefined;
+    const stateStr = getQueryParam(req, "state") as string | undefined;
 
     if (!code || !stateStr) {
-      const queryKeys = Object.keys(query).join(",");
       const details = encodeURIComponent(
-        `hasCode=${!!query.code};hasState=${!!query.state};hasError=${!!query.error};keys=${queryKeys};url=${String(req.originalUrl || "").slice(0, 120)}`
+        `hasCode=${!!code};hasState=${!!stateStr};hasError=${!!providerError};url=${String(req.originalUrl || "").slice(0, 120)}`
       );
       return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}&details=${details}`);
     }
