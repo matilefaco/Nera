@@ -11,7 +11,6 @@ interface ConfidenceSectionProps {
 }
 
 export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) => {
-  const experiences = profile.professionalIdentity?.yearsExperience;
   const isAuto = profile.waitlistMode === 'auto';
   
   const badges = [

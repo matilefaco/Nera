@@ -533,11 +533,12 @@ export default function BookingModal({ profile, services, onClose, open, initial
     
     setBookingAttempted(true);
     
-    if (!profile?.uid || !selectedService?.id || (selectedService?.price ?? 0) < 0) {
+    const profId = profile?.professionalId || profile?.uid;
+    if (!profId || !selectedService?.id || (selectedService?.price ?? 0) < 0) {
       if (isDev) {
         console.error('[BOOKING_ERROR] Invalid service or profile data', { 
           service: selectedService, 
-          profileId: profile?.uid 
+          profileId: profId 
         });
       }
       notify.error('Dados de agendamento incompletos ou inválidos.');
@@ -619,7 +620,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
         resCode = 'HPRADO01';
       } else {
         const result = await createBookingRequest({
-          professionalId: profile.uid,
+          professionalId: profile.professionalId || profile.uid,
           professionalName: profile.name,
           professionalWhatsapp: profile.whatsapp,
           serviceId: selectedService.id,

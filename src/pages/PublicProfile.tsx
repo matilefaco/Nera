@@ -843,6 +843,7 @@ function PublicProfileContent() {
           </div>
           
           <div className="pt-8 border-t border-brand-mist/20 w-full max-w-xs mx-auto">
+            <a href="/" className="inline-block mb-3 font-serif text-xl tracking-tight text-brand-stone hover:text-brand-ink transition-colors">nera</a>
             <p className="text-[9px] uppercase tracking-[0.2em] text-brand-stone/60 leading-loose">
               © {new Date().getFullYear()} Nera<br />
               <span className="opacity-60">Plataforma para profissionais da beleza</span>

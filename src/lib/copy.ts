@@ -90,32 +90,38 @@ export const getProfileHeroCopy = (specialty: string = "", id: string = "") => {
   const s = specialty.toLowerCase().trim();
   
   if (s.includes('unha') || s.includes('manicure') || s.includes('pedicure') || s.includes('nail')) {
-    return { main: "Transformando mãos em", accent: "arte" };
+    return { main: "Nail", accent: "Designer" };
   }
   if (s.includes('sobrancelha') || s.includes('brow') || s.includes('olhar') || s.includes('micropigmentadora')) {
-    return { main: "Design que valoriza o seu", accent: "olhar" };
+    return { main: "Design de", accent: "Sobrancelhas" };
   }
   if (s.includes('cílios') || s.includes('lash') || s.includes('extensão')) {
-    return { main: "O segredo de um", accent: "olhar marcante" };
+    return { main: "Lash", accent: "Designer" };
   }
   if (s.includes('cabelo') || s.includes('hair') || s.includes('penteado') || s.includes('cabeleireira')) {
-    return { main: "Expressando sua essência através dos", accent: "fios" };
+    return { main: "Especialista em", accent: "Cabelos" };
   }
   if (s.includes('maquiagem') || s.includes('make') || s.includes('maquiadora')) {
-    return { main: "Sua beleza autêntica", accent: "realçada" };
+    return { main: "Maquiadora", accent: "Profissional" };
   }
-  if (s.includes('estética') || s.includes('esteticista')) {
-    return { main: "A ciência do cuidado", accent: "com você" };
+  if (s.includes('estética') || s.includes('esteticista') || s.includes('facial') || s.includes('corporal')) {
+    return { main: "Estética", accent: "Especializada" };
+  }
+  if (s.includes('depiladora') || s.includes('depilação')) {
+    return { main: "Especialista em", accent: "Depilação" };
+  }
+  if (s.includes('massagem') || s.includes('massoterapeuta')) {
+    return { main: "Bem-estar &", accent: "Massoterapia" };
   }
   
   const formatted = formatSpecialtyLabel(specialty);
   
   if (formatted === "Profissional de beleza") {
-    return { main: "Estética &", accent: "Bem-estar" };
+    return { main: "Sua beleza", accent: "especializada" };
   }
   
   return { 
-    main: "Especialista em", 
+    main: "Experiência em", 
     accent: formatted 
   };
 };

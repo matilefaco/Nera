@@ -332,7 +332,8 @@ export default function ProfilePage() {
         throw new Error(data.error || 'Erro desconhecido');
       }
       if (data.url) {
-        window.open(data.url, 'google_auth', 'width=600,height=700');
+        console.log('[Calendar] Opening URL:', data.url);
+        window.open(data.url, '_blank', 'width=600,height=700');
       }
     } catch (err: any) {
       notify.error(err.message || 'Erro ao iniciar conexão com Google Calendar.');

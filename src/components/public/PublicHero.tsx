@@ -95,14 +95,6 @@ export const PublicHero = ({
       {/* Decorative vertical line */}
       <div className="absolute top-0 left-[48%] w-px h-full bg-gradient-to-b from-transparent via-brand-mist to-transparent hidden lg:block z-10 pointer-events-none" />
 
-      {/* Back to Nera Link - Hidden on mobile for cleaner premium look */}
-      <div className="hidden md:block absolute top-6 left-6 md:top-10 md:left-12 z-[100]">
-        <a href="/" className="inline-flex items-center gap-1.5 px-3 py-2 md:p-0 md:bg-transparent bg-brand-white/70 backdrop-blur-md md:backdrop-blur-none border border-brand-mist/50 md:border-transparent rounded-full md:rounded-none text-brand-stone hover:text-brand-ink transition-colors shadow-sm md:shadow-none">
-          <ChevronRight size={14} className="rotate-180" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.15em] pt-[1px] leading-none pr-1 md:pr-0">Início</span>
-        </a>
-      </div>
-
       {/* Content Side */}
       <div className="flex flex-col justify-center px-4 sm:px-8 md:px-16 pt-24 pb-16 lg:py-20 relative z-20 order-2 lg:order-1">
         <motion.div
@@ -173,8 +165,14 @@ export const PublicHero = ({
                   elements.push(
                     <div key="experience" className="flex items-center gap-1.5">
                       <Award size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
-                      <span className="text-[10px] font-bold text-brand-ink">{profile.professionalIdentity?.yearsExperience} anos</span>
-                      <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Experiência</span>
+                      <span className="text-[10px] font-bold text-brand-ink">
+                        {profile.professionalIdentity?.yearsExperience === 'Iniciante' 
+                          ? 'Iniciante' 
+                          : `${profile.professionalIdentity?.yearsExperience} anos`}
+                      </span>
+                      {profile.professionalIdentity?.yearsExperience !== 'Iniciante' && (
+                        <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Experiência</span>
+                      )}
                     </div>
                   );
                 }
