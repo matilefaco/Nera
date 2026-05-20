@@ -8,6 +8,7 @@ interface DigitalReceiptData {
   time: string;
   price: string;
   bookingUrl: string;
+  reviewUrl?: string;
 }
 
 export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
@@ -18,7 +19,8 @@ export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
     formattedDate, 
     time, 
     price, 
-    bookingUrl 
+    bookingUrl,
+    reviewUrl
   } = data;
 
   const firstName = clientName ? clientName.split(' ')[0] : 'Cliente';
@@ -28,7 +30,7 @@ export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
       Olá, ${firstName}.
     </p>
     <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
-      Seu atendimento com ${professionalName} foi finalizado. Abaixo você encontra o registro do serviço. Esperamos ver você novamente em breve.
+      Seu atendimento com ${professionalName} foi finalizado. ${reviewUrl ? 'Se puder, conte como foi sua experiência — sua avaliação ajuda outras clientes a escolherem com mais confiança.' : 'Abaixo você encontra o registro do serviço. Esperamos ver você novamente em breve.'}
     </p>
     
     ${buildEmailCard([
@@ -48,7 +50,8 @@ export function buildDigitalReceiptEmail(data: DigitalReceiptData): string {
     badgeText: '✓ Finalizado',
     badgeVariant: 'success',
     bodyHtml,
-    ctaText: 'Agendar Novamente',
-    ctaUrl: bookingUrl
+    ctaText: reviewUrl ? 'Avaliar atendimento' : 'Agendar Novamente',
+    ctaUrl: reviewUrl || bookingUrl
   });
 }
+

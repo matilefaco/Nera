@@ -387,4 +387,101 @@ Mensagem: ${appointment.clientMessage || "Nenhuma"}
   }
 }
 
+export async function updateGoogleCalendarEvent(appointment: any, professionalId: string) {
+  const db = getDb();
+  try {
+    if (!appointment.googleCalendarEventId) return;
+
+    const userDoc = await db.collection("users").doc(professionalId).get();
+    const integration = userDoc.data()?.integrations?.google_calendar;
+
+    if (!integration || !integration.tokens || !integration.enabled) return;
+
+    const oauth2Client = getOAuthClient("");
+    oauth2Client.setCredentials(integration.tokens);
+
+    oauth2Client.on("tokens", (tokens) => {
+      const cleanNewTokens = Object.fromEntries(Object.entries(tokens).filter(([_, v]) => v !== undefined));
+      const existingTokens = integration?.tokens || {};
+      const updatedTokens = { ...existingTokens, ...cleanNewTokens };
+      db.collection("users").doc(professionalId).update({
+        "integrations.google_calendar.tokens": updatedTokens
+      }).catch(err => {
+        logger.error("CALENDAR", "Failed to persist refreshed tokens", { professionalId: maskUid(professionalId), error: err });
+      });
+    });
+
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+    const startDateTime = new Date(`${appointment.date}T${appointment.time}:00`);
+    const endDateTime = new Date(startDateTime.getTime() + (appointment.duration || 60) * 60000);
+
+    const description = `
+Cliente: ${appointment.clientName}
+WhatsApp: ${appointment.clientPhone}
+Serviço: ${appointment.serviceName}
+${appointment.isHomeService ? `Endereço: ${appointment.addressStreet}, ${appointment.addressNumber}` : "No Studio"}
+Mensagem: ${appointment.clientMessage || "Nenhuma"}
+    `.trim();
+
+    const event = {
+      summary: `Nera: ${appointment.serviceName} - ${appointment.clientName}`,
+      description: description,
+      start: {
+        dateTime: startDateTime.toISOString(),
+        timeZone: "America/Sao_Paulo",
+      },
+      end: {
+        dateTime: endDateTime.toISOString(),
+        timeZone: "America/Sao_Paulo",
+      },
+    };
+
+    await calendar.events.patch({
+      calendarId: "primary",
+      eventId: appointment.googleCalendarEventId,
+      requestBody: event,
+    });
+    logger.info("CALENDAR", "Event updated successfully", { professionalId: maskUid(professionalId) });
+  } catch (err: any) {
+    logger.error("CALENDAR", "Google Calendar event update failed", { professionalId: maskUid(professionalId), error: err });
+  }
+}
+
+export async function deleteGoogleCalendarEvent(appointment: any, professionalId: string) {
+  const db = getDb();
+  try {
+    if (!appointment.googleCalendarEventId) return;
+
+    const userDoc = await db.collection("users").doc(professionalId).get();
+    const integration = userDoc.data()?.integrations?.google_calendar;
+
+    if (!integration || !integration.tokens || !integration.enabled) return;
+
+    const oauth2Client = getOAuthClient("");
+    oauth2Client.setCredentials(integration.tokens);
+
+    oauth2Client.on("tokens", (tokens) => {
+      const cleanNewTokens = Object.fromEntries(Object.entries(tokens).filter(([_, v]) => v !== undefined));
+      const existingTokens = integration?.tokens || {};
+      const updatedTokens = { ...existingTokens, ...cleanNewTokens };
+      db.collection("users").doc(professionalId).update({
+        "integrations.google_calendar.tokens": updatedTokens
+      }).catch(err => {
+        logger.error("CALENDAR", "Failed to persist refreshed tokens", { professionalId: maskUid(professionalId), error: err });
+      });
+    });
+
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+    await calendar.events.delete({
+      calendarId: "primary",
+      eventId: appointment.googleCalendarEventId,
+    });
+    logger.info("CALENDAR", "Event deleted successfully", { professionalId: maskUid(professionalId) });
+  } catch (err: any) {
+    logger.error("CALENDAR", "Google Calendar event deletion failed", { professionalId: maskUid(professionalId), error: err });
+  }
+}
+
 export default router;

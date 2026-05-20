@@ -304,6 +304,7 @@ export default function Dashboard() {
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [isServicesLoading, setIsServicesLoading] = useState(true);
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
 
@@ -642,8 +643,13 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         setServices(uniqueServices);
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
+      } finally {
+        if (isMounted) setIsServicesLoading(false);
       }
-    }).catch((error) => { if (isDev) console.error("Firestore getDocs error:", error); });
+    }).catch((error) => { 
+      if (isDev) console.error("Firestore getDocs error:", error); 
+      if (isMounted) setIsServicesLoading(false);
+    });
 
     // Query: WhatsApp Logs
     const qWl = query(
@@ -1394,6 +1400,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
               profile={profile}
               appointments={appointments}
               services={services}
+              isLoading={isInitialLoading || isServicesLoading}
               onShareClick={() => setIsShareModalOpen(true)}
             />
 

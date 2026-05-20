@@ -22,6 +22,7 @@ interface ActivationChecklistProps {
   profile: UserProfile | null;
   appointments: Appointment[];
   services: Service[];
+  isLoading?: boolean;
   onShareClick: () => void;
 }
 
@@ -29,6 +30,7 @@ export const ActivationChecklist = ({
   profile, 
   appointments, 
   services,
+  isLoading,
   onShareClick
 }: ActivationChecklistProps) => {
   const [isMinimized, setIsMinimized] = useState(() => {
@@ -85,16 +87,24 @@ export const ActivationChecklist = ({
     }
   };
   const [hasHistoricalBooking, setHasHistoricalBooking] = useState(false);
+  const [isFetchingHistory, setIsFetchingHistory] = useState(true);
 
   useEffect(() => {
-    if (!profile?.uid) return;
+    if (!profile?.uid) {
+      setIsFetchingHistory(false);
+      return;
+    }
     
     // Fast path: if appointments from props already contains a valid booking
     const hasActiveProp = appointments.some(app => 
       app.status && 
       !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(app.status)
     );
-    if (hasActiveProp) return;
+    if (hasActiveProp) {
+      setHasHistoricalBooking(true);
+      setIsFetchingHistory(false);
+      return;
+    }
 
     let isMounted = true;
     (async () => {
@@ -113,6 +123,8 @@ export const ActivationChecklist = ({
         if (!snap.empty) setHasHistoricalBooking(true);
       } catch (err) {
         // Ignore silently
+      } finally {
+        if (isMounted) setIsFetchingHistory(false);
       }
     })();
     return () => { isMounted = false; };
@@ -194,6 +206,8 @@ export const ActivationChecklist = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (isLoading || isFetchingHistory) return null;
 
   if (checklistProgress === 100) {
     if (wowDismissed) return null;
