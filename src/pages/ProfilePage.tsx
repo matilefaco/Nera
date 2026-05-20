@@ -275,6 +275,16 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       fetchCalendarStatus();
+      const params = new URLSearchParams(window.location.search);
+      const calendarAuth = params.get('calendarAuth');
+      if (calendarAuth === 'success') {
+        notify.success('Agenda sincronizada.');
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (calendarAuth === 'error') {
+        const errMsg = params.get('error') || 'Erro desconhecido';
+        notify.error(`Erro ao conectar: ${errMsg}`);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
     }
   }, [user]);
 
@@ -320,6 +330,9 @@ export default function ProfilePage() {
   const handleConnectCalendar = async () => {
     if (!user) return;
     setCalendarLoading(true);
+    // Safari iOS pode bloquear popups assíncronos. Abrimos de imediato.
+    const popup = window.open('', '_blank');
+    
     try {
       const token = await user.getIdToken();
       const res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
@@ -329,13 +342,23 @@ export default function ProfilePage() {
       });
       const data = await res.json();
       if (!res.ok || data.error) {
+        if (popup) popup.close();
         throw new Error(data.error || 'Erro desconhecido');
       }
       if (data.url) {
-        console.log('[Calendar] Opening URL:', data.url);
-        window.open(data.url, '_blank', 'width=600,height=700');
+        // Garantir que a URL não possui caracteres inválidos/espaços em branco/quebras de linha
+        const cleanUrl = data.url.replace(/\\s+/g, '').replace(/\\r?\\n|\\r/g, '');
+        console.log('[Calendar] Opening URL');
+        if (popup && !popup.closed && popup.location) {
+          popup.location.href = cleanUrl;
+        } else {
+          window.location.href = cleanUrl;
+        }
+      } else {
+        if (popup) popup.close();
       }
     } catch (err: any) {
+      if (popup) popup.close();
       notify.error(err.message || 'Erro ao iniciar conexão com Google Calendar.');
     } finally {
       setCalendarLoading(false);

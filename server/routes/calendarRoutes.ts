@@ -84,8 +84,12 @@ router.get("/callback", async (req, res) => {
       <html>
         <body>
           <script>
-            window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
-            window.close();
+            if (window.opener) {
+              window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
+              window.close();
+            } else {
+              window.location.href = '${appUrl}/profile?calendarAuth=error';
+            }
           </script>
         </body>
       </html>
@@ -126,10 +130,14 @@ router.get("/callback", async (req, res) => {
       <html>
         <body>
           <script>
-            window.opener.postMessage({ type: 'CALENDAR_AUTH_SUCCESS' }, '${appUrl}');
-            window.close();
+            if (window.opener) {
+              window.opener.postMessage({ type: 'CALENDAR_AUTH_SUCCESS' }, '${appUrl}');
+              window.close();
+            } else {
+              window.location.href = '${appUrl}/profile?calendarAuth=success';
+            }
           </script>
-          <p>Conexão realizada com sucesso! Você já pode fechar esta janela.</p>
+          <p>Conexão realizada com sucesso! Redirecionando...</p>
         </body>
       </html>
     `);
@@ -140,8 +148,12 @@ router.get("/callback", async (req, res) => {
       <html>
         <body>
           <script>
-            window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
-            window.close();
+            if (window.opener) {
+              window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
+              window.close();
+            } else {
+              window.location.href = '${appUrl}/profile?calendarAuth=error&error=erro';
+            }
           </script>
         </body>
       </html>
