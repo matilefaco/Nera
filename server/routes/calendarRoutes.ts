@@ -22,6 +22,14 @@ function getOAuthClient(redirectUri: string) {
   );
 }
 
+function getCalendarRedirectUri() {
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (!redirectUri) {
+    throw new Error("GOOGLE_REDIRECT_URI ausente no ambiente.");
+  }
+  return redirectUri;
+}
+
 // 1. Get Auth URL
 router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   if (!req || !req.user || !req.uid) {
@@ -59,7 +67,7 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
     }
 
     step = "redirect_uri_prepare";
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI.trim();
+    const redirectUri = getCalendarRedirectUri();
 
     step = "oauth_client_create";
     const oauth2Client = getOAuthClient(redirectUri);
@@ -83,6 +91,12 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
       scope: SCOPES,
       prompt: "consent",
       state: state,
+    });
+
+    console.log("[GCAL AUTH URL]", {
+      redirectUri,
+      generatedUrlPreview: url.slice(0, 200),
+      hasState: !!state
     });
 
     step = "response_json";
@@ -124,8 +138,26 @@ router.get("/callback", async (req, res) => {
   try {
     step = "read_query";
     const query = req.query || {};
-    const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL ? PUBLIC_APP_URL.trim().replace(/\/+$/, "") : ""}/api/calendar/callback`).trim();
+    const redirectUri = getCalendarRedirectUri();
     
+    const safeQuery = { ...req.query };
+    if (safeQuery.code) {
+      safeQuery.code = String(safeQuery.code).slice(0, 12) + '...';
+    }
+
+    console.log("[GCAL CALLBACK FULL]", {
+      originalUrl: req.originalUrl,
+      url: req.url,
+      query: safeQuery,
+      method: req.method,
+      redirectUri: getCalendarRedirectUri(),
+      headers: {
+        host: req.headers?.host,
+        referer: req.headers?.referer,
+        userAgent: req.headers?.["user-agent"]
+      }
+    });
+
     step = "provider_error_check";
     if (query?.error) {
       return res.redirect(`/profile?calendarAuth=error&reason=provider_error&step=${encodeURIComponent(step)}`);
@@ -136,8 +168,11 @@ router.get("/callback", async (req, res) => {
     const stateStr = query?.state as string | undefined;
 
     if (!code || !stateStr) {
-      const qError = query?.error || "unknown_error";
-      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}&details=${encodeURIComponent(String(qError))}`);
+      const queryKeys = Object.keys(query).join(",");
+      const details = encodeURIComponent(
+        `hasCode=${!!query.code};hasState=${!!query.state};hasError=${!!query.error};keys=${queryKeys};url=${String(req.originalUrl || "").slice(0, 120)}`
+      );
+      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}&details=${details}`);
     }
 
     step = "state_lookup";
