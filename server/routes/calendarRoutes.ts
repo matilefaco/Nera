@@ -24,6 +24,16 @@ function getOAuthClient(redirectUri: string) {
 
 // 1. Get Auth URL
 router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({
+      error: true,
+      step: "auth_missing",
+      message: "Usuário não autenticado."
+    });
+  }
+
+  const query = req.query || {};
+
   let step = "init";
   try {
     step = "env_check";
@@ -38,12 +48,12 @@ router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, r
     }
     
     const uid = req.uid;
-    const professionalIdQuery = req.query.professionalId as string;
+    const professionalIdQuery = query.professionalId as string | undefined;
     if (professionalIdQuery && professionalIdQuery !== uid) {
       throw new Error("Permissão negada");
     }
     
-    const professionalId = uid;
+    const professionalId = uid || professionalIdQuery;
     if (!professionalId) {
       throw new Error("Missing professionalId");
     }
@@ -168,9 +178,14 @@ router.get("/callback", async (req, res) => {
 
 // 3. Status and Toggle
 router.get("/status", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({ error: true, step: "auth_missing", message: "Usuário não autenticado." });
+  }
+
   const db = getDb();
   const uid = req.uid;
-  const professionalIdQuery = req.query.professionalId as string;
+  const query = req.query || {};
+  const professionalIdQuery = query.professionalId as string | undefined;
 
   if (professionalIdQuery && professionalIdQuery !== uid) {
     return res.status(403).json({ error: "Permissão negada" });
@@ -201,9 +216,15 @@ router.get("/status", requireFirebaseAuth, async (req: AuthenticatedRequest, res
 });
 
 router.post("/toggle", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({ error: true, step: "auth_missing", message: "Usuário não autenticado." });
+  }
+
   const db = getDb();
   const uid = req.uid;
-  const { professionalId, enabled } = req.body;
+  const body = req.body || {};
+  const professionalId = body.professionalId;
+  const enabled = body.enabled;
 
   if (professionalId && professionalId !== uid) {
     return res.status(403).json({ error: "Permissão negada" });
@@ -226,9 +247,14 @@ router.post("/toggle", requireFirebaseAuth, async (req: AuthenticatedRequest, re
 });
 
 router.post("/disconnect", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({ error: true, step: "auth_missing", message: "Usuário não autenticado." });
+  }
+
   const db = getDb();
   const uid = req.uid;
-  const { professionalId } = req.body;
+  const body = req.body || {};
+  const professionalId = body.professionalId;
 
   if (professionalId && professionalId !== uid) {
     return res.status(403).json({ error: "Permissão negada" });
