@@ -339,72 +339,111 @@ export default function ProfilePage() {
   const handleConnectCalendar = async () => {
     if (!user) return;
     setCalendarLoading(true);
-
-    // No iPhone/Safari o comportamento de popup é problemático, e os cookies/sessões perdem contexto se for PWA.
-    // Vamos usar Same-Tab Redirect. Se quisermos popup apenas no desktop e redirect no mobile, 
-    // podemos checar userAgent, mas vamos tentar redirecionar sempre usando assign.
     
-    // Check if it's Safari/iOS
+    notify.info('calendar debug: click received', { autoClose: 3000 });
+
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    
     const shouldRedirect = isIOS || isSafari;
-    let popup: Window | null = null;
     
+    let popup: Window | null = null;
     if (!shouldRedirect) {
       popup = window.open('', '_blank');
     }
     
+    let token: string;
     try {
-      const token = await user.getIdToken();
-      const res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      token = await user.getIdToken();
+    } catch (e: any) {
+      notify.error(`Erro ao obter token do usuário: ${e.message}`);
+      setCalendarLoading(false);
+      return;
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        if (popup) popup.close();
-        throw new Error(data.error || 'Erro desconhecido ao carregar auth-url');
-      }
-      
-      if (!data.url || typeof data.url !== 'string') {
-        throw new Error('URL de autenticação inválida gerada pelo servidor.');
-      }
+      notify.info(`debug: fetch ok. status=${res.status} type=${res.headers.get('content-type')}`, { autoClose: 3000 });
+    } catch (e: any) {
+      if (popup) popup.close();
+      notify.error(`Erro antes do backend: falha no fetch (${e.message})`, { autoClose: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
 
-      // Safely trim and clean the URL (use standard js replace, avoiding double backslashes which caused bugs before)
-      const cleanUrl = data.url.trim().replace(/\r?\n|\r/g, '');
+    let data: any;
+    try {
+      data = await res.json();
+      notify.info(`debug: JSON lido. tem debugInfo=${!!data.debugInfo}`, { autoClose: 3000 });
+      console.log('Calendar Debug Info:', data.debugInfo);
+    } catch (e: any) {
+      if (popup) popup.close();
+      notify.error(`Backend não retornou JSON! status=${res.status}`, { autoClose: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
 
-      let parsed: URL;
-      try {
-        parsed = new URL(cleanUrl);
-      } catch (e) {
-        console.error('[Calendar] Invalid URL parse attempt:', cleanUrl);
-        throw new Error('URL retornada não é válida.');
-      }
+    if (!res.ok || data.error) {
+      if (popup) popup.close();
+      notify.error(`Erro do backend: ${data.error || 'Desconhecido'}`, { autoClose: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
+    
+    if (!data.url) {
+      if (popup) popup.close();
+      notify.error('URL OAuth ausente no JSON da resposta', { autoClose: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
 
-      if (parsed.origin !== 'https://accounts.google.com') {
-        console.error('[Calendar] Invalid origin in URL:', parsed.origin);
-        throw new Error('URL retornada tem origem bloqueada por segurança.');
-      }
+    notify.info(`debug: typeof data.url = ${typeof data.url}. Preview: ${data.url.substring(0,25)}...`, { autoClose: 3000 });
 
-      console.log('[Calendar] Valid auth URL generated, type:', typeof data.url);
+    let cleanUrl: string;
+    try {
+      cleanUrl = String(data.url).trim().replace(/\r?\n|\r/g, '');
+    } catch (e: any) {
+      if (popup) popup.close();
+      notify.error(`Erro ao limpar data.url (${e.message})`);
+      setCalendarLoading(false);
+      return;
+    }
 
+    let parsed: URL;
+    try {
+      parsed = new URL(cleanUrl);
+      notify.info(`debug: new URL() passou. Origin: ${parsed.origin}`, { autoClose: 3000 });
+    } catch (e: any) {
+      if (popup) popup.close();
+      console.error('[Calendar] Invalid URL parse attempt:', cleanUrl);
+      notify.error(`URL OAuth inválida: ${e.message}`, { autoClose: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
+
+    if (parsed.origin !== 'https://accounts.google.com') {
+      if (popup) popup.close();
+      notify.error(`URL tem origem incorreta: ${parsed.origin}`, { autoClose: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
+
+    try {
       if (shouldRedirect) {
-        console.log('[Calendar] Redirecting in same tab (iOS/Safari fallback)');
+        notify.info('debug: assign...', { autoClose: 2000 });
         window.location.assign(cleanUrl);
       } else {
         if (popup && !popup.closed) {
           popup.location.href = cleanUrl;
         } else {
-          // fallback if popup was blocked
           window.location.assign(cleanUrl);
         }
       }
-    } catch (err: any) {
+    } catch (e: any) {
       if (popup) popup.close();
-      console.error('[Calendar] Error connecting:', err);
-      notify.error(err.message || 'Erro ao iniciar conexão com Google Calendar.');
+      notify.error(`Falha ao redirecionar no Safari: ${e.message}`, { autoClose: 5000 });
     } finally {
       setCalendarLoading(false);
     }
