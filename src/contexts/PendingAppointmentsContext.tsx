@@ -21,7 +21,7 @@ const PendingAppointmentsContext = createContext<PendingAppointmentsContextData>
 export const usePendingAppointments = () => useContext(PendingAppointmentsContext);
 
 export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [pendingAppointments, setPendingAppointments] = useState<Appointment[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -29,8 +29,9 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
 
   useEffect(() => {
     let isMounted = true;
-    if (!user?.uid) {
+    if (!user?.uid || profile?.role !== 'professional' || !profile?.onboardingCompleted) {
       setPendingAppointments([]);
+      setPendingCount(0);
       setLoading(false);
       return;
     }
@@ -71,7 +72,7 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
       isMounted = false;
       unsubscribe();
     };
-  }, [user?.uid]);
+  }, [user?.uid, profile?.role, profile?.onboardingCompleted]);
 
   const value = {
     pendingAppointments,
