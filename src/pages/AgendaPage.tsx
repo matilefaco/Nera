@@ -1536,6 +1536,21 @@ export default function AgendaPage() {
                   </div>
                 )}
 
+                {selectedAppointment.timeline && selectedAppointment.timeline.length > 0 && (
+                  <div className="pt-4 pb-2">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-4">Histórico da Reserva</p>
+                    <div className="space-y-4 pl-2 border-l border-brand-mist/50">
+                      {[...selectedAppointment.timeline].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((event, idx) => (
+                        <div key={idx} className="relative pl-4">
+                          <div className="absolute -left-[5px] top-[6px] w-[9px] h-[9px] rounded-full bg-brand-mist border-2 border-brand-white" />
+                          <p className="text-[11px] text-brand-ink font-medium leading-tight">{event.label}</p>
+                          <p className="text-[9px] text-brand-stone mt-0.5">{formatLocalDate(formatDateKey(new Date(event.createdAt)), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-2 flex flex-col gap-2">
                   {selectedAppointment.status === 'pending' && (
                     <PremiumButton 
@@ -1621,10 +1636,17 @@ export default function AgendaPage() {
                         onClick={async () => {
                           setLoading(selectedAppointment.id);
                           try {
+                            const { arrayUnion } = await import('firebase/firestore');
                             const updatePayload = {
                               noShow: true,
-                              status: 'cancelled_by_professional' as const, // or maintain confirmed but with noShow flag
-                              updatedAt: serverTimestamp()
+                              status: 'no_show_client' as const,
+                              updatedAt: serverTimestamp(),
+                              timeline: arrayUnion({
+                                type: 'no_show_client',
+                                createdAt: new Date().toISOString(),
+                                actor: 'professional',
+                                label: 'Atendimento marcado como No-Show Cliente'
+                              })
                             };
                             const safeUpdate = sanitizeAppointment(updatePayload, true);
                             await updateDoc(doc(db, 'appointments', selectedAppointment.id), safeUpdate);

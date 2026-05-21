@@ -56,8 +56,8 @@ export function buildBookingPendingEmail(data: BookingPendingData): string {
     topbarText: 'Sua solicitação',
     heroVariant: 'parchment',
     heroLabel: 'Solicitação Enviada',
-    heroTitle: 'Falta pouco!',
-    heroTitleItalic: 'Seu horário está reservado',
+    heroTitle: 'Seu pedido',
+    heroTitleItalic: 'foi recebido',
     bodyHtml,
     ctaText: 'Acompanhar Reserva',
     ctaUrl: manageUrl

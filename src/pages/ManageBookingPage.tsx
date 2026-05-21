@@ -13,6 +13,7 @@ import {
   confirmPresenceByClient, 
   cancelBookingByClient, 
   rescheduleBookingByClient,
+  recordRescheduleRequest,
   getAppointmentByToken
 } from '../firebase';
 import { doc, getDoc, collection, query, where, onSnapshot, getDocs, limit } from 'firebase/firestore';
@@ -86,6 +87,16 @@ export default function ManageBookingPage() {
         const today = getTodayLocale();
         if (appointment.date >= today) {
           setSelectedDate(appointment.date);
+        }
+        
+        if (appointment.attendanceStatus !== 'reschedule_requested' && !isAutoProcessed) {
+          setIsAutoProcessed(true);
+          const lookupKey = appointment.manageSlug || appointment.id;
+          recordRescheduleRequest(lookupKey).then(() => {
+             setAppointment(prev => prev ? { ...prev, attendanceStatus: 'reschedule_requested' } : null);
+          }).catch(err => {
+             if (isDev) console.error('[AUTO_ACTION] Error recording reschedule request:', err);
+          });
         }
       }
     };
@@ -260,6 +271,23 @@ setBlockedSchedules(dayBlocked);
       notify.error('Erro ao cancelar');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleEnterReschedule = () => {
+    setView('reschedule');
+    const today = getTodayLocale();
+    if (appointment && appointment.date >= today) {
+      setSelectedDate(appointment.date);
+    }
+    
+    if (appointment && appointment.attendanceStatus !== 'reschedule_requested') {
+      const lookupKey = appointment.manageSlug || appointment.id;
+      recordRescheduleRequest(lookupKey).then(() => {
+         setAppointment(prev => prev ? { ...prev, attendanceStatus: 'reschedule_requested' } : null);
+      }).catch(err => {
+         if (isDev) console.error('Error recording reschedule request', err);
+      });
     }
   };
 
@@ -474,7 +502,7 @@ setBlockedSchedules(dayBlocked);
                     {!isPending && (
                       <div className="grid grid-cols-2 gap-4 pt-2">
                         <button 
-                          onClick={() => setView('reschedule')}
+                          onClick={handleEnterReschedule}
                           className="py-4 bg-brand-white text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm hover:border-brand-ink transition-all flex items-center justify-center gap-2"
                         >
                           <Clock size={14} /> Remarcar

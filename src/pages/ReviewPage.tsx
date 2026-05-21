@@ -65,16 +65,17 @@ export default function ReviewPage() {
       }
 
       try {
-        // 1. Find the review request by token (which is the document ID)
-        const docRef = doc(db, 'review_requests', token);
-        const docSnap = await getDoc(docRef);
+        // 1. Find the review request by token
+        const q = query(collection(db, 'review_requests'), where('token', '==', token));
+        const querySnapshot = await getDocs(q);
   
-        if (!docSnap.exists()) {
+        if (querySnapshot.empty) {
           setError('Solicitação de avaliação não encontrada.');
           setLoading(false);
           return;
         }
   
+        const docSnap = querySnapshot.docs[0];
         const requestData = { id: docSnap.id, ...docSnap.data() } as any;
         
         if (requestData.status === 'submitted') {
@@ -227,11 +228,18 @@ export default function ReviewPage() {
         className="w-full max-w-xl bg-brand-white rounded-[40px] border border-brand-mist p-8 md:p-12 shadow-sm"
       >
         <div className="text-center mb-12">
-          <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-brand-linen mx-auto mb-6 shadow-lg">
+          <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-brand-linen mx-auto mb-5 shadow-lg">
             <img src={professional?.avatar} alt={professional?.name} className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-3xl font-serif text-brand-ink mb-2">Como foi sua experiência com {professional?.name}?</h1>
-          <p className="body-text text-brand-stone text-sm italic">Seu feedback é precioso para nós.</p>
+          <h2 className="text-[10px] text-brand-terracotta uppercase tracking-[0.2em] font-medium mb-3">
+            O SEU FEEDBACK FAZ A DIFERENÇA
+          </h2>
+          <h1 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Como foi sua experiência com {professional?.name}?</h1>
+          {booking && (
+            <p className="body-text text-brand-stone text-sm mb-4">
+              Atendimento de <strong>{booking.serviceName}</strong> em {booking.date ? booking.date.split('-').reverse().join('/') : ''}
+            </p>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-12">

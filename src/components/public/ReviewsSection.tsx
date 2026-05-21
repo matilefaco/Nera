@@ -1,4 +1,4 @@
-import { Star, MapPin, Calendar } from 'lucide-react';
+import { Star, MapPin, Calendar, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Review } from '../../types';
 import { getRelativeDate } from '../../lib/utils';
@@ -30,16 +30,19 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
               ))}
             </div>
             <span className="text-[11px] font-bold uppercase tracking-widest text-brand-stone opacity-60">
-              {Math.max(stats?.totalReviews || 0, filteredReviews.length)} avaliações
+              {Math.max(stats?.totalReviews || 0, filteredReviews.length)} avaliações verdadeiras
             </span>
           </div>
         </div>
 
         <div className="flex-1">
-          <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-[var(--theme-accent,var(--color-brand-terracotta))] mb-4 block">Experiências Reais</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-[var(--theme-accent,var(--color-brand-terracotta))] mb-4 block flex items-center gap-2">
+            <ShieldCheck size={12} />
+            Experiências Reais e Verificadas
+          </span>
           <h2 className="text-[clamp(28px,8vw,36px)] md:text-5xl font-serif text-brand-ink">
-            O que elas dizem sobre<br />
-            o <em className="font-serif italic text-brand-stone">atendimento</em>
+            O que as clientes dizem <br />
+            sobre as <em className="font-serif italic text-brand-stone">sessões</em>
           </h2>
         </div>
       </div>
@@ -74,20 +77,30 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
               )}
             </div>
 
-            <div className="pt-8 border-t border-brand-mist/50 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-brand-linen flex items-center justify-center text-[14px] font-serif text-[var(--theme-accent,var(--color-brand-terracotta))] border border-brand-mist shrink-0">
-                {(review.publicDisplayMode === 'named' ? (review.firstName || 'C')[0] : 'C')}
-              </div>
-              <div>
-                <div className="text-[13px] font-semibold text-brand-ink">
-                  {review.publicDisplayMode === 'named' ? (review.firstName || 'Cliente') : 'Cliente'}
+            <div className="pt-8 border-t border-brand-mist/50 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-brand-linen flex items-center justify-center text-[14px] font-serif text-[var(--theme-accent,var(--color-brand-terracotta))] border border-brand-mist shrink-0">
+                  {(review.publicDisplayMode === 'named' ? (review.firstName || 'C')[0] : 'C')}
                 </div>
-                {(review.locationLabel || review.neighborhood) && (
-                  <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-50 mt-1">
-                    <MapPin size={8} />
-                    {review.locationLabel || review.neighborhood}
+                <div>
+                  <div className="text-[13px] font-semibold text-brand-ink">
+                    {review.publicDisplayMode === 'named' ? (review.firstName || 'Cliente') : 'Cliente Anônima'}
                   </div>
-                )}
+                  {(review.locationLabel || review.neighborhood) ? (
+                    <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-50 mt-1">
+                      <MapPin size={8} />
+                      {review.locationLabel || review.neighborhood}
+                    </div>
+                  ) : review.serviceName ? (
+                    <div className="flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest text-brand-stone opacity-50 mt-1">
+                      {review.serviceName}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-green-600 font-medium">
+                <ShieldCheck size={14} />
+                <span className="hidden sm:inline">Verificada</span>
               </div>
             </div>
           </motion.div>
