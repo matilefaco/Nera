@@ -50,6 +50,7 @@ export async function createServerApp() {
 
   const firebaseAdmin = await import("./server/firebaseAdmin.js");
   const { requestIdMiddleware } = await import("./server/middleware/requestId.js");
+  const { performanceLogger } = await import("./server/middleware/performanceLogger.js");
   const { 
     publicLookupLimiter, 
     bookingLimiter, 
@@ -62,6 +63,7 @@ export async function createServerApp() {
   app.set("trust proxy", 1);
   
   app.use(requestIdMiddleware);
+  app.use(performanceLogger);
 
   app.use(cors({
     origin: (origin, callback) => {
@@ -689,7 +691,11 @@ export async function createServerApp() {
   // 8. Error Handler
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.error("SERVER", "Critical Unhandled Error", { requestId: req.requestId, error: err });
-    res.status(500).json({ error: "Internal Server Error", message: err.message });
+    const isProd = process.env.NODE_ENV === "production";
+    res.status(500).json({ 
+      error: "Internal Server Error", 
+      message: isProd ? "Um erro inesperado ocorreu. Nossa equipe foi notificada." : err.message || "Unknown error"
+    });
   });
 
   return app;

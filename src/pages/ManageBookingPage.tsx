@@ -178,6 +178,7 @@ export default function ManageBookingPage() {
 
   // Subscription for slots validation during reschedule
   useEffect(() => {
+    let isMounted = true;
     if (view !== 'reschedule' || !professional || !selectedDate) return;
 
     const qAppts = query(
@@ -187,18 +188,23 @@ export default function ManageBookingPage() {
     );
 
     const unsubAppts = onSnapshot(qAppts, (snap) => {
+      if (!isMounted) return;
       try {
         const allAppts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
         setDayAppointments(allAppts.filter(a => ['pending', 'confirmed'].includes(a.status)));
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
       }
-    }, (error) => { if (isDev) console.error("Firestore onSnapshot error:", error); });
+    }, (error) => { 
+      if (!isMounted) return;
+      if (isDev) console.error("Firestore onSnapshot error:", error); 
+    });
 
     const blockedRef = collection(db, 'blocked_schedules');
     const dayOfWeek = selectedDate ? new Date(selectedDate + 'T12:00:00').getDay() : null;
 
     const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', professional.professionalId || (professional as any).uid)), (snap) => {
+      if (!isMounted) return;
       try {
         const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
 const dayBlocked = allBlocked.filter(b => {
@@ -210,9 +216,13 @@ setBlockedSchedules(dayBlocked);
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
       }
-    }, (error) => { if (isDev) console.error("Firestore onSnapshot error:", error); });
+    }, (error) => { 
+      if (!isMounted) return;
+      if (isDev) console.error("Firestore onSnapshot error:", error); 
+    });
 
     return () => {
+      isMounted = false;
       unsubAppts();
       unsubBlocked();
     };

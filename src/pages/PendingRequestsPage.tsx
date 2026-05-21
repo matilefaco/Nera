@@ -102,9 +102,12 @@ export default function PendingRequestsPage() {
   }, [user]);
 
   useEffect(() => {
+    let isMounted = true;
     if (!user?.uid) {
-      setTruePending([]);
-      setLoading(false);
+      if (isMounted) {
+        setTruePending([]);
+        setLoading(false);
+      }
       return;
     }
 
@@ -120,6 +123,7 @@ export default function PendingRequestsPage() {
     const unsubscribe = onSnapshot(
       qPending,
       (snapshot) => {
+        if (!isMounted) return;
         try {
           const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Appointment));
           setTruePending(docs);
@@ -129,12 +133,16 @@ export default function PendingRequestsPage() {
         }
       },
       (error) => {
+        if (!isMounted) return;
         if (isDev) console.error('[PendingRequestsPage] Firestore onSnapshot error:', error);
         setLoading(false);
       }
     );
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [user?.uid]);
 
   // Sync localRequests to include items being confirmed/handling WhatsApp

@@ -834,20 +834,24 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
 
 router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
   const db = getDb();
-  
+  const startTime = Date.now();
+  let processedCount = 0;
+  let sentCount = 0;
+  let failedCount = 0;
+
   try {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
     
-    logger.info("CRON", "Starting 24h reminders & confirmations");
+    logger.info("CRON", "Starting 24h reminders & confirmations", { meta: { event: "cron_start", type: "reminders24h" } });
 
     const snap = await db.collection('appointments')
       .where('date', '==', tomorrowStr)
       .where('status', '==', 'confirmed')
       .get();
     
-    let sentCount = 0;
+    processedCount = snap.size;
     const appUrl = PUBLIC_APP_URL;
 
     for (const docSnap of snap.docs) {
@@ -884,14 +888,19 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
               reminder24hSentAt: admin.firestore.FieldValue.serverTimestamp() // Keep for history compatibility
             });
             sentCount++;
+          } else {
+            failedCount++;
           }
         }
       }
     }
 
-    res.json({ success: true, processed: snap.size, sent: sentCount });
+    const durationMs = Date.now() - startTime;
+    logger.info("CRON", "Finished 24h reminders & confirmations", { meta: { event: "cron_finish", type: "reminders24h", durationMs, processedCount, sentCount, failedCount } });
+    res.json({ success: true, processed: processedCount, sent: sentCount, failed: failedCount, durationMs });
   } catch (err: any) {
-    logger.error("CRON", "Error on reminders24h", { error: err });
+    const durationMs = Date.now() - startTime;
+    logger.error("CRON", "Error on reminders24h", { error: err, meta: { durationMs, processedCount, sentCount } });
     res.status(500).json({ error: String(err) });
   }
 });

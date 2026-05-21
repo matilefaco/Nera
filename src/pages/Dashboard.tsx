@@ -502,7 +502,8 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         where('professionalId', '==', user.uid),
         where('date', '>=', startDateStr),
         where('date', '<=', endDateStr),
-        orderBy('date', 'desc')
+        orderBy('date', 'desc'),
+        limit(2000)
       );
 
       Promise.race([getDocs(qAll), timeoutPromise]).then((result) => {
