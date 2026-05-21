@@ -258,7 +258,6 @@ export default function AgendaPage() {
 
   // Fetch all appointments for week/month view with a safe window
   useEffect(() => {
-    let isMounted = true;
     if (!user) return;
     
     // We base the window on the 15th of the reference month
@@ -278,12 +277,10 @@ export default function AgendaPage() {
       collection(db, 'appointments'),
       where('professionalId', '==', user.uid),
       where('date', '>=', visibleStartStr),
-      where('date', '<=', visibleEndStr),
-      limit(2000)
+      where('date', '<=', visibleEndStr)
     );
 
     const unsubAll = onSnapshot(q, (snapshot) => {
-      if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any))
           .filter(a => !isFakeContent(a.clientName));
@@ -301,7 +298,6 @@ export default function AgendaPage() {
         setIsInitialLoading(false);
       }
     }, (error) => {
-      if (!isMounted) return;
       if (isDev) console.error('[AgendaPage] Subscription error (allAppointments):', error);
       setIsInitialLoading(false);
       // Fallback: If missing index, try to gracefully fallback to manual filtering
@@ -312,7 +308,6 @@ export default function AgendaPage() {
     });
 
     return () => {
-      isMounted = false;
       unsubAll();
     };
   }, [user, referenceMonth]);

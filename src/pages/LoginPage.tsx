@@ -148,9 +148,9 @@ export default function LoginPage() {
               >
                 Sair e trocar de conta
               </button>
-              <Link
+              <Link 
                 to="/dashboard"
-                className="w-full bg-brand-linen text-brand-ink py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all text-center block"
+                className="w-full bg-brand-linen text-brand-ink py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all text-center"
               >
                 Ir para meu Painel
               </Link>

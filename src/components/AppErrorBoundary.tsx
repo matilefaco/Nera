@@ -19,9 +19,7 @@ export class AppErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    if (error.name === 'ChunkLoadError' || error.message.includes('dynamically imported module') || error.message.includes('Failed to fetch dynamically imported module') || error.message.includes('Importing a module script failed')) {
-      window.location.reload();
-    }
+    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
@@ -96,14 +94,6 @@ export class AppErrorBoundary extends Component<Props, State> {
             <h1 className="text-2xl font-serif text-brand-ink mb-3">
               Algo saiu do ritmo por um instante.
             </h1>
-            
-            {import.meta.env.DEV && (
-              <div className="bg-red-50 p-3 rounded text-left text-xs mb-4 overflow-auto max-h-32 text-red-500">
-                {this.state.error?.message}
-                <br/>
-                {this.state.error?.stack}
-              </div>
-            )}
             
             <p className="text-brand-stone text-sm mb-8">
               Recarregue a página para continuar usando a Nera. Isso ajuda a sincronizar as informações mais recentes.

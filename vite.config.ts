@@ -60,8 +60,8 @@ export default defineConfig(({mode}) => {
       minify: 'esbuild',
       cssMinify: true,
       sourcemap: false,
-      chunkSizeWarningLimit: 1200,
-      reportCompressedSize: false
+      chunkSizeWarningLimit: 800,
+      reportCompressedSize: false, // Performance boost for build
     },
     resolve: {
       alias: {

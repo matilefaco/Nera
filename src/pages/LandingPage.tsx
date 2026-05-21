@@ -1,12 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import './LandingPage.css';
 import PricingGrid from '../components/PricingGrid';
 import { ShowcaseSequence } from '../components/ShowcaseSequence';
 
 export default function LandingPage() {
   const navRef = useRef<HTMLElement>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -86,11 +85,7 @@ export default function LandingPage() {
                 <span>Começar grátis</span>
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </Link>
-              <Link 
-                to="/p/helena-prado" 
-                className="btn-ghost" 
-                aria-label="Ver vitrine de exemplo"
-              >
+              <Link to="/p/helena-prado" className="btn-ghost" aria-label="Ver vitrine de exemplo">
                 Ver vitrine de exemplo →
               </Link>
             </div>

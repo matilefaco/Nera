@@ -486,15 +486,15 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
     const cachedAppointments = appointmentsHistoryCache.get(appointmentsCacheKey);
 
     let fetchValid = true;
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('timeout')), 8000);
-    });
-    // Prevent unhandled promise rejection if getDocs wins
-    timeoutPromise.catch(() => {});
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 8000)
+    );
 
     if (cachedAppointments && Date.now() - cachedAppointments.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
       setAppointments(cachedAppointments.data);
-      if (isMounted) setIsInitialLoading(false);
+      if (isMounted) {
+        setIsInitialLoading(false);
+      }
     } else {
       // Query: Historical and upcoming appointments to calculate metrics
       const qAll = query(
@@ -502,8 +502,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         where('professionalId', '==', user.uid),
         where('date', '>=', startDateStr),
         where('date', '<=', endDateStr),
-        orderBy('date', 'desc'),
-        limit(2000)
+        orderBy('date', 'desc')
       );
 
       Promise.race([getDocs(qAll), timeoutPromise]).then((result) => {
@@ -522,7 +521,9 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         if (isDev) console.error("Firestore getDocs error:", error); 
         fetchValid = false;
       }).finally(() => {
-        if (isMounted) setIsInitialLoading(false);
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
       });
     }
 

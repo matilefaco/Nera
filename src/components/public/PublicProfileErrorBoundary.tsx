@@ -20,9 +20,6 @@ export class PublicProfileErrorBoundary extends Component<Props, State> {
   }
 
   public static getDerivedStateFromError(error: Error): State {
-    if (error.name === 'ChunkLoadError' || error.message.includes('dynamically imported module') || error.message.includes('Failed to fetch dynamically imported module') || error.message.includes('Importing a module script failed')) {
-      window.location.reload();
-    }
     return { hasError: true, error };
   }
 
