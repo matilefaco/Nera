@@ -451,8 +451,8 @@ export default function AgendaPage() {
     const dayOfWeek = parseLocalDate(rescheduleDate).getDay();
     const dayBlocks = allBlockedSchedules.filter(b => b.date === rescheduleDate || (b.isRecurring && b.recurringDays?.includes(dayOfWeek)));
 
-    return getAvailableSlots({
-      date: rescheduleDate,
+    return getAvailableSlotsOld({
+      selectedDate: rescheduleDate,
       serviceDuration: duration,
       appointments: filteredAppts,
       blockedSchedules: dayBlocks,
@@ -1375,7 +1375,15 @@ export default function AgendaPage() {
                 <X size={20} strokeWidth={2.5} />
               </button>
 
-              <div className="mb-5 sm:mb-6 pr-12 relative">
+              {agendaView === 'details' && (
+                <motion.div 
+                   key="details"
+                   initial={{ opacity: 0, x: -20 }}
+                   animate={{ opacity: 1, x: 0 }}
+                   exit={{ opacity: 0, x: 20 }}
+                   className="w-full"
+                >
+                  <div className="mb-5 sm:mb-6 pr-12 relative">
                 <span className="block text-[9px] font-bold uppercase tracking-[0.2em] text-brand-terracotta mb-2">Detalhes da Reserva</span>
                 
                 <h3 className="text-2xl sm:text-3xl font-serif text-brand-ink leading-tight mb-1">{selectedAppointment.clientName}</h3>
@@ -1569,14 +1577,24 @@ export default function AgendaPage() {
                   </button>
 
                   {isConfirmedLikeStatus(selectedAppointment.status) && (
-                    <PremiumButton 
-                       variant="primary"
-                       className="w-full py-3 mt-1 text-[13px]"
-                       onClick={() => handleComplete(selectedAppointment)}
-                       disabled={loading === selectedAppointment.id}
-                     >
-                      {loading === selectedAppointment.id ? 'Finalizando...' : 'Finalizar Atendimento'}
-                    </PremiumButton>
+                    <>
+                      <button 
+                        onClick={() => {
+                          setAgendaView('reschedule');
+                        }}
+                        className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen hover:text-brand-ink rounded-xl transition-all border border-brand-mist/60 flex items-center justify-center gap-2 mt-2"
+                      >
+                         Remarcar Atendimento
+                      </button>
+                      <PremiumButton 
+                         variant="primary"
+                         className="w-full py-3 mt-4 text-[13px]"
+                         onClick={() => handleComplete(selectedAppointment)}
+                         disabled={loading === selectedAppointment.id}
+                       >
+                        {loading === selectedAppointment.id ? 'Finalizando...' : 'Finalizar Atendimento'}
+                      </PremiumButton>
+                    </>
                   )}
 
                   {!isCompletedStatus(selectedAppointment.status) && (
@@ -1627,6 +1645,85 @@ export default function AgendaPage() {
                   })()}
                 </div>
               </div>
+              </motion.div>
+              )}
+
+              {agendaView === 'reschedule' && (
+                <motion.div 
+                  key="reschedule"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="w-full pb-6"
+                >
+                  <button 
+                    onClick={() => setAgendaView('details')}
+                    className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink mb-6"
+                  >
+                    <ChevronLeft size={14} /> Voltar
+                  </button>
+
+                  <h3 className="text-2xl font-serif text-brand-ink leading-tight mb-2">Remarcar Horário</h3>
+                  <p className="text-sm text-brand-stone font-light mb-8">Escolha a nova data e horário para {selectedAppointment.clientName}. A cliente será notificada por e-mail.</p>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-2">Selecione a Data</label>
+                      <input 
+                        type="date"
+                        value={rescheduleDate}
+                        onChange={(e) => {
+                           setRescheduleDate(e.target.value);
+                           setRescheduleTime('');
+                        }}
+                        min={formatDateKey(new Date())}
+                        className="w-full bg-brand-linen/50 border border-brand-mist/50 rounded-2xl px-5 py-4 text-brand-ink font-serif text-lg focus:outline-none focus:ring-1 focus:ring-brand-terracotta"
+                      />
+                    </div>
+
+                    {rescheduleDate && (
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-2 text-center">Horários Disponíveis</label>
+                        {availableRescheduleSlots.length > 0 ? (
+                           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                             {availableRescheduleSlots.map((time) => (
+                               <button 
+                                 key={time}
+                                 onClick={() => setRescheduleTime(time)}
+                                 className={cn(
+                                   "py-3 rounded-xl border text-sm font-medium transition-all shadow-sm",
+                                    rescheduleTime === time
+                                      ? "bg-brand-terracotta border-brand-terracotta text-brand-white"
+                                      : "bg-brand-white border-brand-mist/50 text-brand-ink hover:border-brand-terracotta hover:bg-brand-linen"
+                                 )}
+                               >
+                                 {time}
+                               </button>
+                             ))}
+                           </div>
+                        ) : (
+                           <div className="p-6 bg-brand-linen/20 rounded-[28px] border border-dashed border-brand-mist/50 flex flex-col items-center text-center gap-2">
+                             <AlertCircle size={20} className="text-brand-stone/40" />
+                             <p className="text-[10px] text-brand-stone font-light px-4">
+                               Nenhum horário disponível para este serviço em {formatLocalDate(rescheduleDate, { day: '2-digit', month: '2-digit' })}.
+                             </p>
+                           </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="pt-8">
+                     <button
+                       onClick={handleRescheduleProfessional}
+                       disabled={!rescheduleDate || !rescheduleTime || isReschedulingLoading}
+                       className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                     >
+                       {isReschedulingLoading ? 'Remarcando...' : 'Confirmar Novo Horário'}
+                     </button>
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           </div>
         )}
