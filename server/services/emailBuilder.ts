@@ -94,13 +94,6 @@ export function buildEmailBase(options: EmailBaseOptions): string {
         img { -ms-interpolation-mode:bicubic; }
         a { text-decoration: none; }
         *[x-apple-data-detectors], .x-gmail-data-detectors, .x-gmail-data-detectors *, .aBn { border-bottom: 0 !important; cursor: default !important; color: inherit !important; text-decoration: none !important; font-size: inherit !important; font-family: inherit !important; font-weight: inherit !important; line-height: inherit !important; }
-        
-        @media screen and (max-width: 480px) {
-          .hero-title { font-size: 32px !important; line-height: 1.2 !important; }
-          .hero-padding { padding: 40px 25px !important; }
-          .body-padding { padding: 35px 25px !important; }
-          .footer-padding { padding: 35px 25px !important; }
-        }
       </style>
     </head>
     <body style="margin: 0; padding: 0 !important; background-color: ${COLORS.linen}; mso-line-height-rule: exactly;">
@@ -133,7 +126,7 @@ export function buildEmailBase(options: EmailBaseOptions): string {
 
                 <!-- Hero -->
                 <tr>
-                  <td bgcolor="${heroBg}" class="hero-padding" style="padding: 60px 40px; text-align: left;">
+                  <td bgcolor="${heroBg}" style="padding: 60px 40px; text-align: left;">
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td style="padding-bottom: 12px;">
@@ -144,7 +137,7 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                       </tr>
                       <tr>
                         <td>
-                          <h1 class="hero-title" style="color: ${heroText}; font-family: ${FONTS.serif}; font-size: 38px; line-height: 1.2; margin: 0; font-weight: normal;">
+                          <h1 style="color: ${heroText}; font-family: ${FONTS.serif}; font-size: 38px; line-height: 1.2; margin: 0; font-weight: normal;">
                             ${heroTitle}
                             ${heroTitleItalic ? `<br><span style="font-style: italic; color: ${heroText}; opacity: 0.95;">${heroTitleItalic}</span>` : ''}
                           </h1>
@@ -171,7 +164,7 @@ export function buildEmailBase(options: EmailBaseOptions): string {
 
                 <!-- Content Body -->
                 <tr>
-                  <td class="body-padding" style="padding: 50px 40px; background-color: ${COLORS.white};">
+                  <td style="padding: 50px 40px; background-color: ${COLORS.white};">
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td style="font-family: ${FONTS.sans}; font-size: 15px; line-height: 1.6; color: ${COLORS.ink};">
@@ -207,7 +200,7 @@ export function buildEmailBase(options: EmailBaseOptions): string {
 
                 <!-- Footer -->
                 <tr>
-                  <td class="footer-padding" style="padding: 50px 40px; text-align: center; border-top: 1px solid ${COLORS.mist}; background-color: ${COLORS.white};">
+                  <td style="padding: 50px 40px; text-align: center; border-top: 1px solid ${COLORS.mist}; background-color: ${COLORS.white};">
                     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                       <tr>
                         <td align="center" style="padding-bottom: 25px;">

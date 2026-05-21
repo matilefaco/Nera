@@ -30,10 +30,10 @@ export function buildConfirmationRequest24hEmail(data: ConfirmationRequest24hDat
 
     <div style="margin-top: 40px; text-align: center; padding-top: 20px; border-top: 1px solid ${COLORS.mist};">
       <p style="font-family: ${FONTS.sans}; font-size: 13px; color: ${COLORS.stone}; line-height: 1.6; margin-bottom: 12px;">
-        Se houver imprevistos, você pode reagendar seu horário:
+        Se houver imprevistos, você pode reagendar ou cancelar:
       </p>
-      <a href="${rescheduleUrl}" style="color: ${COLORS.stone}; font-family: ${FONTS.sans}; font-size: 13px; text-decoration: underline; font-weight: bold;">
-        Preciso remarcar
+      <a href="${confirmUrl}" style="color: ${COLORS.stone}; font-family: ${FONTS.sans}; font-size: 13px; text-decoration: underline; font-weight: bold;">
+        Gerenciar Agendamento
       </a>
     </div>
   `;
@@ -44,10 +44,10 @@ export function buildConfirmationRequest24hEmail(data: ConfirmationRequest24hDat
     heroLabel: 'Seu horário é amanhã',
     heroTitle: 'Te esperamos',
     heroTitleItalic: 'em breve ✨',
-    badgeText: 'Amanhã',
+    badgeText: 'Confirmar Presença',
     badgeVariant: 'info',
     bodyHtml,
-    ctaText: 'Confirmar Presença',
+    ctaText: 'Ver Detalhes do Horário',
     ctaUrl: confirmUrl,
   });
 }

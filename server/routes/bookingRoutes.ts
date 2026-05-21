@@ -9,7 +9,7 @@ import { createGoogleCalendarEvent, updateGoogleCalendarEvent, deleteGoogleCalen
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
 import { sendBookingPendingClientNotification, sendNewBookingRequestNotification, sendBookingConfirmedClientNotification } from "../services/notificationService.js";
-import { PUBLIC_APP_URL, shouldSendEmail, markEmailSent } from "../utils.js";
+import { PUBLIC_APP_URL } from "../utils.js";
 
 const router = express.Router();
 
@@ -914,42 +914,11 @@ router.post("/public/reviews/:token/submit", reviewSubmitLimiter, async (req, re
         submittedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // 4. Update appointment timeline
-      if (apptDoc.exists && apptRef) {
-        transaction.update(apptRef, {
-          timeline: admin.firestore.FieldValue.arrayUnion({
-            type: 'review_submitted',
-            createdAt: new Date().toISOString(),
-            actor: 'client',
-            label: 'Cliente enviou uma avaliação'
-          })
-        });
-      }
-
-      return { success: true, professionalId, firstName: firstName || 'Cliente', rating: Number(rating), comment: comment ? String(comment).trim() : '' };
+      return { success: true };
     });
 
     logger.info("REVIEW", "Review submitted successfully", { meta: { reviewToken: maskToken(token) } });
-    
-    // Async push notification
-    if (result.professionalId) {
-      db.collection('users').doc(result.professionalId).get().then((proDoc) => {
-        if (proDoc.exists && proDoc.data()?.email) {
-          const proData = proDoc.data();
-          import('../emails/sendEmail.js').then(({ sendReviewReceivedEmail }) => {
-            sendReviewReceivedEmail({
-              professionalEmail: proData!.email,
-              professionalName: proData!.name || 'Profissional',
-              clientName: result.firstName,
-              rating: result.rating,
-              comment: result.comment
-            });
-          }).catch(e => logger.error("REVIEW", "Error importing email sender", { error: e }));
-        }
-      });
-    }
-    
-    res.json({ success: true });
+    res.json(result);
   } catch (err: any) {
     logger.error("REVIEW", "Submit review error", { error: err, meta: { reviewToken: maskToken(token) } });
     res.status(400).json({ error: err.message || "Não foi possível enviar agora. Tente novamente." });
@@ -1419,13 +1388,7 @@ router.post("/appointments/:appointmentId/confirm", requireFirebaseAuth, async (
         confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         date: dateAttr,
-        time: timeAttr,
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'booking_confirmed',
-          createdAt: new Date().toISOString(),
-          actor: 'professional',
-          label: 'Profissional confirmou o atendimento'
-        })
+        time: timeAttr
       };
       
       const safeUpdate = sanitizeAppointment(updatePayload, true);
@@ -1498,11 +1461,6 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
       if (data.professionalId !== uid) {
         throw { status: 403, message: "Você não tem permissão." };
       }
-      
-      // Idempotency: if already completed, just return success
-      if (data.status === 'completed') {
-        return { success: true, appointmentId, status: "completed", alreadyCompleted: true, updatedData: data };
-      }
 
       if (data.status !== 'confirmed' && data.status !== 'accepted') {
         throw { status: 400, message: `Apenas atendimentos confirmados/aceitos podem ser concluídos. Status: ${data.status}` };
@@ -1516,13 +1474,7 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
       const updatePayload: any = {
         status: "completed",
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'booking_completed',
-          createdAt: new Date().toISOString(),
-          actor: 'professional',
-          label: 'Atendimento finalizado'
-        })
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
       const safeUpdate = sanitizeAppointment(updatePayload, true);
@@ -1569,33 +1521,21 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
            reviewUrl = `${PUBLIC_APP_URL}/review/${result.reviewToken}`;
         }
 
-        const eventKey = 'digital_receipt';
-        if (await shouldSendEmail(appointmentId, eventKey)) {
-          sendDigitalReceiptEmail({
-            clientEmail: updatedData.clientEmail,
-            clientName: updatedData.clientName,
-            professionalName: updatedData.professionalName || updatedData.serviceName, // fallback
-            appointmentId: updatedData.id || appointmentId,
-            serviceName: updatedData.serviceName,
-            date: updatedData.date,
-            time: updatedData.time,
-            totalPrice: updatedData.totalPrice,
-            price: updatedData.price,
-            slug,
-            reviewUrl
-          }).then(async (res) => {
-            if (res.success) {
-              await markEmailSent(appointmentId, eventKey);
-              if (reviewUrl) {
-                await db.collection('appointments').doc(appointmentId).update({
-                  reviewRequestedAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-              }
-            }
-          }).catch(e => {
-            logger.error("BOOKING", "Failed to send digital receipt email after completion", { error: e });
-          });
-        }
+        sendDigitalReceiptEmail({
+          clientEmail: updatedData.clientEmail,
+          clientName: updatedData.clientName,
+          professionalName: updatedData.professionalName || updatedData.serviceName, // fallback
+          appointmentId: updatedData.id || appointmentId,
+          serviceName: updatedData.serviceName,
+          date: updatedData.date,
+          time: updatedData.time,
+          totalPrice: updatedData.totalPrice,
+          price: updatedData.price,
+          slug,
+          reviewUrl
+        }).catch(e => {
+          logger.error("BOOKING", "Failed to send digital receipt email after completion", { error: e });
+        });
       }
     } catch (postError) {
       logger.error("BOOKING", "Post-completion email error", { error: postError });
@@ -1666,13 +1606,7 @@ router.post("/appointments/:appointmentId/decline", requireFirebaseAuth, async (
         declinedAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         lastChangeBy: 'professional',
-        changeMessage: 'Recusado pelo profissional',
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'booking_declined',
-          createdAt: new Date().toISOString(),
-          actor: 'professional',
-          label: 'Profissional recusou o pedido'
-        })
+        changeMessage: 'Recusado pelo profissional'
       };
       
       const safeUpdate = sanitizeAppointment(updatePayload, true);
@@ -1751,13 +1685,7 @@ router.post("/appointments/:appointmentId/cancel-by-professional", requireFireba
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         lastChangeBy: 'professional',
-        changeMessage: 'Cancelado pelo profissional',
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'booking_cancelled_professional',
-          createdAt: new Date().toISOString(),
-          actor: 'professional',
-          label: 'Profissional cancelou o atendimento'
-        })
+        changeMessage: 'Cancelado pelo profissional'
       };
       
       const safeUpdate = sanitizeAppointment(updatePayload, true);
@@ -1776,22 +1704,15 @@ router.post("/appointments/:appointmentId/cancel-by-professional", requireFireba
       const proDoc = await db.collection('users').doc(uid).get();
       const proData = proDoc.data();
       
-      const eventKey = 'bookingCancelledClient';
-      if (await shouldSendEmail(appointmentId, eventKey)) {
-        await sendBookingCancelledClientEmail({
-          clientEmail: result.updatedData.clientEmail,
-          clientName: result.updatedData.clientName,
-          professionalName: proData?.name || 'Profissional',
-          bookingId: result.appointmentId,
-          date: result.updatedData.date,
-          time: result.updatedData.time,
-          serviceName: result.updatedData.serviceName
-        }).then(async (res) => {
-          if (res.success) {
-            await markEmailSent(appointmentId, eventKey);
-          }
-        });
-      }
+      await sendBookingCancelledClientEmail({
+        clientEmail: result.updatedData.clientEmail,
+        clientName: result.updatedData.clientName,
+        professionalName: proData?.name || 'Profissional',
+        bookingId: result.appointmentId,
+        date: result.updatedData.date,
+        time: result.updatedData.time,
+        serviceName: result.updatedData.serviceName
+      });
       
       // Attempt to delete calendar event
       if (result.updatedData.googleCalendarEventId) {
@@ -2156,16 +2077,9 @@ router.post("/public/manage/:manageSlug/confirm-presence", async (req, res) => {
       // WRITES
       const updatePayload: any = {
         clientConfirmed24h: true,
-        clientAttendanceConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
-        attendanceStatus: 'confirmed',
+        clientConfirmedAt: admin.firestore.FieldValue.serverTimestamp(),
         lastChangeBy: 'client',
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'attendance_confirmed',
-          createdAt: new Date().toISOString(),
-          actor: 'client',
-          label: 'Cliente confirmou presença'
-        })
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
       };
 
       // Só alterar status para confirmed se o status atual for pending/pending_confirmation
@@ -2190,77 +2104,6 @@ router.post("/public/manage/:manageSlug/confirm-presence", async (req, res) => {
     } else {
        res.status(500).json({ error: err.message });
     }
-  }
-});
-
-router.post("/public/manage/:manageSlug/reschedule-request", async (req, res) => {
-  const db = getDb();
-  const { manageSlug } = req.params;
-
-  try {
-    const result = await db.runTransaction(async (transaction) => {
-      const linkRef = db.collection('reservation_links').doc(manageSlug);
-      const linkDoc = await transaction.get(linkRef);
-      if (!linkDoc.exists) throw { status: 404, message: "Link inválido." };
-      
-      const appointmentId = linkDoc.data()?.appointmentId;
-      if (!appointmentId) throw { status: 404, message: "Reserva não encontrada no link." };
-
-      const apptRef = db.collection('appointments').doc(appointmentId);
-      const apptDoc = await transaction.get(apptRef);
-      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
-      
-      const data: any = apptDoc.data();
-
-      if (['cancelled', 'completed', 'concluido'].includes(data.status)) {
-        throw { status: 409, message: "Não é mais possível alterar esta reserva." };
-      }
-      
-      // Return early if already marked to prevent email spam
-      if (data.attendanceStatus === 'reschedule_requested') {
-         return { success: true, appointmentId, alreadyRequested: true, updateData: data };
-      }
-
-      const updatePayload: any = {
-        attendanceStatus: 'reschedule_requested',
-        attendanceRescheduleRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'attendance_reschedule_requested',
-          createdAt: new Date().toISOString(),
-          actor: 'client',
-          label: 'Cliente solicitou remarcação'
-        })
-      };
-
-      transaction.update(apptRef, sanitizeAppointment(updatePayload, true));
-      return { success: true, appointmentId, updatedData: { ...data, ...updatePayload } };
-    });
-
-    if (result.success && !result.alreadyRequested && result.updatedData) {
-      // Send email to professional asynchronously
-      const appt = result.updatedData;
-      db.collection('users').doc(appt.professionalId).get().then(proSnap => {
-         const proData = proSnap.data();
-         if (proData && proData.email) {
-            import('../emails/sendEmail.js').then(({ sendRescheduleRequestedEmail }) => {
-              sendRescheduleRequestedEmail({
-                 professionalEmail: proData.email,
-                 professionalName: proData.name || 'Profissional',
-                 clientName: appt.clientName,
-                 serviceName: appt.serviceName,
-                 date: appt.date,
-                 time: appt.time,
-                 dashboardUrl: `${PUBLIC_APP_URL}/dashboard`
-              });
-            });
-         }
-      });
-    }
-
-    res.json({ success: true, appointmentId: result.appointmentId });
-  } catch (err: any) {
-    logger.error("BOOKING", "Manage Reschedule Request Error", { error: err });
-    res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -2327,13 +2170,7 @@ router.post("/public/manage/:manageSlug/cancel", async (req: express.Request, re
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         cancellationReason: reason || 'Cancelado pelo cliente',
         lastChangeBy: 'client',
-        changeMessage: 'Cliente cancelou a reserva',
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'booking_cancelled_client',
-          createdAt: new Date().toISOString(),
-          actor: 'client',
-          label: 'Cliente cancelou a reserva'
-        })
+        changeMessage: 'Cliente cancelou a reserva'
       };
       
       const safeUpdate = sanitizeAppointment(updatePayload, true);
@@ -2437,51 +2274,10 @@ router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: Authe
         topTags: newTopTags
       });
 
-      // 4. Milestone Check
-      let milestoneConfig: any = null;
-      let oldAvg = statsSnap.exists ? statsSnap.data()!.averageRating : 0;
-      if (newTotalReviews === 5 || newTotalReviews === 10 || newTotalReviews === 25 || (newTotalReviews >= 5 && newAverageRating === 5.0 && oldAvg < 5.0)) {
-        let title = '';
-        let message = '';
-        if (newTotalReviews === 5) {
-           title = '5 Avaliações Alcançadas';
-           message = 'Você conquistou suas primeiras 5 avaliações na vitrine Nera. Isso representa muita confiança do seu público!';
-        } else if (newTotalReviews === 10) {
-           title = '10 Avaliações! 🌟';
-           message = 'O selo de aprovação das suas clientes está cada vez mais forte.';
-        } else if (newTotalReviews === 25) {
-           title = '25 Avaliações! 🚀';
-           message = 'Um marco impressionante. Seu perfil agora é uma referência sólida de qualidade.';
-        } else if (newAverageRating === 5.0) {
-           title = 'Média 5 Estrelas Perfeita';
-           message = 'Com mais de 5 avaliações, você atingiu a excelência máxima de nota das clientes.';
-        }
-        milestoneConfig = { title, message };
-      }
-
-      return { success: true, milestoneConfig };
+      return { success: true };
     });
 
     res.json(result);
-    
-    // Async push notification for milestone
-    if (result.success && result.milestoneConfig && result.milestoneConfig.title) {
-       db.collection('users').doc(uid as string).get().then((proDoc) => {
-         const proData = proDoc.data();
-         if (proData && proData.email) {
-           const { PUBLIC_APP_URL } = require('../utils.js');
-           import('../emails/sendEmail.js').then(({ sendReviewMilestoneEmail }) => {
-             sendReviewMilestoneEmail({
-               professionalEmail: proData.email,
-               professionalName: proData.name || 'Profissional',
-               milestoneTitle: result.milestoneConfig.title,
-               milestoneMessage: result.milestoneConfig.message,
-               profileUrl: `${PUBLIC_APP_URL}/${proData.slug || ''}`
-             });
-           }).catch(e => logger.error("REVIEW", "Error sending milestone email", { error: e }));
-         }
-       }).catch(e => logger.error("REVIEW", "Error fetching pro for milestone", { error: e }));
-    }
   } catch (err: any) {
     logger.error("REVIEW", "Approve review error", { error: err });
     const status = err.status || 500;

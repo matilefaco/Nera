@@ -508,28 +508,6 @@ export async function confirmPresenceByClient(manageSlug: string) {
   }
 }
 
-export async function recordRescheduleRequest(manageSlug: string) {
-  devLog(`[Client] Recording reschedule request via slug ${manageSlug}`);
-  try {
-    const response = await fetch(`/api/public/manage/${manageSlug}/reschedule-request`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Erro ao registrar intenção de remarcação.');
-    }
-
-    const result = await response.json();
-    return result;
-  } catch (err: any) {
-    if (isDev) console.error('[recordRescheduleRequest]', err);
-    throw err;
-  }
-}
-
 export async function cancelBookingByClient(manageSlug: string, reason?: string) {
   devLog(`[Client] Cancelling booking via slug ${manageSlug}`);
   try {

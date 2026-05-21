@@ -14,8 +14,7 @@ import {
   sendBookingReminder24hEmail,
   sendReviewRequestEmail,
   sendConfirmationRequest24hEmail,
-  sendRetentionEmail,
-  sendDailyDigestEmail
+  sendRetentionEmail
 } from "../emails/sendEmail.js";
 import { sendWhatsApp, handleInboundMessage } from "../services/whatsappService.js";
 import webpush from "web-push";
@@ -126,7 +125,7 @@ import {
   buildReviewRequestMessage 
 } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta, PUBLIC_APP_URL } from "../utils.js";
-import { sendProfessionalBookingRescheduledEmail } from '../emails/sendEmail.js';
+import { sendProfessionalBookingRescheduledEmail, sendProfessionalBookingCancelledEmail } from '../emails/sendEmail.js';
 import { updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "./calendarRoutes.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
@@ -834,73 +833,137 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
 
 router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
   const db = getDb();
-  const startTime = Date.now();
-  let processedCount = 0;
-  let sentCount = 0;
-  let failedCount = 0;
-
+  
   try {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
     
-    logger.info("CRON", "Starting 24h reminders & confirmations", { meta: { event: "cron_start", type: "reminders24h" } });
+    logger.info("CRON", "Starting 24h reminders");
 
     const snap = await db.collection('appointments')
       .where('date', '==', tomorrowStr)
       .where('status', '==', 'confirmed')
+      .where('reminder24hSentAt', '==', null)
       .get();
     
-    processedCount = snap.size;
-    const appUrl = PUBLIC_APP_URL;
-
+    let emailSent = 0;
+    let whatsappSent = 0;
+    let noChannelCount = 0;
+    let errorsCount = 0;
+    
     for (const docSnap of snap.docs) {
       const appt = docSnap.data();
       const apptId = docSnap.id;
       
-      const proSnap = await db.collection('users').doc(appt.professionalId).get();
-      if (!proSnap.exists) continue;
-      const pro = proSnap.data();
+      if (!appt.professionalId) continue;
+      
+      try {
+        const proSnap = await db.collection('users').doc(appt.professionalId).get();
+        if (!proSnap.exists) continue;
+        
+        const pro = proSnap.data() as any;
+        const plan = pro?.plan || 'free';
+        const expiresAt = pro?.planExpiresAt;
+        const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+        const activePlan = isExpired ? 'free' : plan;
 
-      // Only send if not confirmed yet
-      if (appt.clientConfirmed24h) continue;
+        let sentSuccessfully = false;
+        let deliveryChannel = '';
 
-      if (appt.clientEmail) {
-        const eventKey = 'confirmationRequest24h';
-        if (await shouldSendEmail(apptId, eventKey)) {
-          const result = await sendConfirmationRequest24hEmail({
-            clientEmail: appt.clientEmail,
-            clientName: appt.clientName,
-            professionalName: pro?.name || 'Profissional',
-            serviceName: appt.serviceName,
-            date: appt.date,
-            time: appt.time,
-            confirmUrl: `${appUrl}/manage/${apptId}?action=confirm-presence`,
-            rescheduleUrl: `${appUrl}/manage/${apptId}?action=reschedule`,
-            cancelUrl: `${appUrl}/manage/${apptId}?action=cancel`,
-            appointmentId: apptId
+        const clientPhone = appt.clientWhatsapp;
+        const baseUrl = PUBLIC_APP_URL;
+        if (clientPhone && activePlan === 'pro') {
+          const formattedDate = tomorrowStr.split('-').reverse().join('/');
+          const msg = buildReminderMessage24h({
+            clienteNome: appt.clientName,
+            diaSemana: 'Amanhã', // Ideally derive this, but 'Amanhã' works for 24h cron
+            data: formattedDate,
+            horario: appt.time,
+            servicoNome: appt.serviceName,
+            profissionalNome: pro?.name || 'sua profissional',
+            local: appt.locationDetail || appt.neighborhood || 'Estúdio',
+            linkConfirmar: `${baseUrl}/manage/${apptId}?action=confirm-presence`,
+            linkManage: `${baseUrl}/manage/${apptId}`
           });
           
+          const result = await sendWhatsApp(db, clientPhone, msg, {
+            appointmentId: apptId,
+            userId: appt.professionalId,
+            type: 'reminder_24h_client',
+            clientName: appt.clientName,
+            clientWhatsapp: clientPhone
+          });
+
           if (result.success) {
-            await markEmailSent(apptId, eventKey);
-            await docSnap.ref.update({
-              status: 'pending_confirmation',
-              reminder24hSentAt: admin.firestore.FieldValue.serverTimestamp() // Keep for history compatibility
-            });
-            sentCount++;
-          } else {
-            failedCount++;
+            sentSuccessfully = true;
+            deliveryChannel = 'whatsapp_client';
+            whatsappSent++;
           }
         }
+
+        const proPhone = pro?.whatsapp;
+        if (proPhone && activePlan === 'pro') {
+          const formattedDate = tomorrowStr.split('-').reverse().join('/');
+          const msg = `Lembrete Nera! 🔔\n\nAmanhã, ${formattedDate}, você tem um atendimento com ${appt.clientName} às ${appt.time} (${appt.serviceName}).`;
+          
+          await sendWhatsApp(db, proPhone, msg, {
+            appointmentId: apptId,
+            userId: appt.professionalId,
+            type: 'reminder_24h_pro',
+            clientName: appt.clientName,
+            clientWhatsapp: clientPhone
+          });
+        }
+
+        if (!sentSuccessfully && process.env.RESEND_API_KEY && appt.clientEmail) {
+          try {
+            const result = await sendBookingReminder24hEmail({
+              clientName: appt.clientName,
+              serviceName: appt.serviceName,
+              date: appt.date,
+              time: appt.time,
+              duration: appt.duration || 60,
+              location: appt.locationDetail || appt.address || 'Local não informado',
+              professionalName: pro?.name || 'Profissional',
+              clientEmail: appt.clientEmail,
+              appointmentId: apptId,
+              bookingId: apptId
+            });
+            if (result.success) {
+              sentSuccessfully = true;
+              deliveryChannel = 'email_client';
+              emailSent++;
+            }
+          } catch (emailErr) {
+            logger.error("CRON", "Email delivery failed", { error: emailErr });
+          }
+        }
+
+        if (sentSuccessfully || proPhone) {
+          await docSnap.ref.update({ 
+            reminder24hSentAt: admin.firestore.FieldValue.serverTimestamp(),
+            deliveryChannel: deliveryChannel || 'whatsapp_pro'
+          });
+        } else {
+          noChannelCount++;
+        }
+
+      } catch (innerErr: any) {
+        errorsCount++;
       }
     }
-
-    const durationMs = Date.now() - startTime;
-    logger.info("CRON", "Finished 24h reminders & confirmations", { meta: { event: "cron_finish", type: "reminders24h", durationMs, processedCount, sentCount, failedCount } });
-    res.json({ success: true, processed: processedCount, sent: sentCount, failed: failedCount, durationMs });
+    
+    res.json({ 
+      success: true, 
+      date: tomorrowStr,
+      totalFound: snap.docs.length,
+      sentEmail: emailSent, 
+      sentWhatsApp: whatsappSent,
+      noChannel: noChannelCount,
+      errors: errorsCount
+    });
   } catch (err: any) {
-    const durationMs = Date.now() - startTime;
-    logger.error("CRON", "Error on reminders24h", { error: err, meta: { durationMs, processedCount, sentCount } });
     res.status(500).json({ error: String(err) });
   }
 });
@@ -1063,7 +1126,66 @@ router.get('/cron/review-requests', requireCronSecret, async (req, res) => {
   }
 });
 
+router.get('/cron/anti-no-show', requireCronSecret, async (req, res) => {
+  const db = getDb();
 
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    
+    const snap = await db.collection('appointments')
+      .where('date', '==', tomorrowStr)
+      .where('status', '==', 'confirmed')
+      .where('clientConfirmed24h', '!=', true)
+      .get();
+    
+    let sentCount = 0;
+    const appUrl = PUBLIC_APP_URL;
+
+    for (const docSnap of snap.docs) {
+      const appt = docSnap.data();
+      const apptId = docSnap.id;
+      
+      const proSnap = await db.collection('users').doc(appt.professionalId).get();
+      if (!proSnap.exists) continue;
+      const pro = proSnap.data();
+      
+      if (pro?.antiNoShowEnabled) {
+        if (appt.clientEmail) {
+          const eventKey = 'confirmationRequest24h';
+          if (await shouldSendEmail(apptId, eventKey)) {
+            const result = await sendConfirmationRequest24hEmail({
+              clientEmail: appt.clientEmail,
+              clientName: appt.clientName,
+              professionalName: pro.name || 'Profissional',
+              serviceName: appt.serviceName,
+              date: appt.date,
+              time: appt.time,
+              confirmUrl: `${appUrl}/manage/${apptId}?action=confirm-presence`,
+              rescheduleUrl: `${appUrl}/manage/${apptId}?action=reschedule`,
+              cancelUrl: `${appUrl}/manage/${apptId}?action=cancel`,
+              appointmentId: apptId
+            });
+            
+            if (result.success) {
+              await markEmailSent(apptId, eventKey);
+              await docSnap.ref.update({
+                status: 'pending_confirmation',
+                antiNoShowSentAt: admin.firestore.FieldValue.serverTimestamp()
+              });
+              sentCount++;
+            }
+          }
+        }
+      }
+    }
+
+    res.json({ success: true, processed: snap.size, sent: sentCount });
+  } catch (err: any) {
+    res.status(500).json({ error: String(err) });
+  }
+});
 
 router.get('/cron/retention', requireCronSecret, async (req, res) => {
   const db = getDb();
@@ -1123,88 +1245,6 @@ router.get('/cron/retention', requireCronSecret, async (req, res) => {
 
     res.json({ success: true, processed: snap.size, sent: sentCount });
   } catch (err: any) {
-    res.status(500).json({ error: String(err) });
-  }
-});
-
-router.get('/cron/daily-digest', requireCronSecret, async (req, res) => {
-  const db = getDb();
-
-  try {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    
-    // We get all appointments for today
-    const snap = await db.collection('appointments')
-      .where('date', '==', todayStr)
-      .get();
-      
-    // Group active appointments by professional
-    const proAppointments: Record<string, any[]> = {};
-    for (const doc of snap.docs) {
-      const appt = doc.data();
-      if (appt.status === 'cancelled' || appt.status === 'rejected') continue;
-      if (!appt.professionalId) continue;
-      
-      if (!proAppointments[appt.professionalId]) {
-        proAppointments[appt.professionalId] = [];
-      }
-      proAppointments[appt.professionalId].push(appt);
-    }
-    
-    let sentCount = 0;
-    const appUrl = PUBLIC_APP_URL;
-
-    // Send digest for each professional
-    for (const [proId, appts] of Object.entries(proAppointments)) {
-      const proSnap = await db.collection('users').doc(proId).get();
-      if (!proSnap.exists) continue;
-      const pro = proSnap.data();
-      
-      if (!pro?.email) continue;
-      
-      const eventKey = `dailyDigest_${todayStr}`;
-      // Just check if we already flagged in a daily log to avoid fetching all the daily metrics again
-      // We can use a general check but let's use a config doc per professional: users/{proId}/emailLogs/dailyDigest
-      const logRef = db.collection('users').doc(proId).collection('emailLogs').doc(eventKey);
-      const logSnap = await logRef.get();
-      if (logSnap.exists) continue;
-
-      let confirmedCount = 0;
-      let pendingCount = 0;
-      let earliestTime = '23:59';
-      
-      for (const appt of appts) {
-        if (appt.status === 'confirmed' || appt.status === 'completed') confirmedCount++;
-        else if (appt.status === 'pending' || appt.status === 'pending_confirmation') pendingCount++;
-        
-        if (appt.time && appt.time < earliestTime) {
-          earliestTime = appt.time;
-        }
-      }
-      
-      if (earliestTime === '23:59') earliestTime = '';
-
-      const result = await sendDailyDigestEmail({
-        professionalEmail: pro.email,
-        professionalName: pro.name || 'Profissional',
-        confirmedCount,
-        pendingCount,
-        firstAppointmentTime: earliestTime,
-        totalAppointments: appts.length,
-        agendaUrl: `${appUrl}/dashboard`
-      });
-
-      if (result.success) {
-        await logRef.set({ sentAt: admin.firestore.FieldValue.serverTimestamp() });
-        sentCount++;
-      }
-    }
-
-    res.json({ success: true, activeProsFound: Object.keys(proAppointments).length, sent: sentCount });
-
-  } catch (err: any) {
-    logger.error("CRON", "Error on daily digest", { error: err });
     res.status(500).json({ error: String(err) });
   }
 });

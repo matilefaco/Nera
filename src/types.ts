@@ -236,7 +236,6 @@ export interface Appointment {
   address?: AddressData | string;
   
   status: 'pending' | 'accepted' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'cancelled_by_professional' | 'completed' | 'expired' | 'no_show';
-  attendanceStatus?: 'confirmed' | 'reschedule_requested';
   notes?: string;
   
   clientConfirmedAt?: any; // When client hits "confirm presence"

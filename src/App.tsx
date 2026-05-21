@@ -62,12 +62,6 @@ function RouteLogger() {
   return null;
 }
 
-const RouteFallback = () => (
-  <div className="flex w-full items-center justify-center p-8 min-h-[50vh]">
-    <div className="w-8 h-8 border-2 border-brand-mist border-t-brand-rose rounded-full animate-spin"></div>
-  </div>
-);
-
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
@@ -127,7 +121,7 @@ export default function App() {
             <RouteLogger />
             <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
               <AppErrorBoundary>
-                <React.Suspense fallback={<RouteFallback />}>
+                <React.Suspense fallback={<AppLoadingScreen />}>
                   <Routes>
                   {/* ... routes ... */}
                   <Route path="/" element={<LandingPage />} />

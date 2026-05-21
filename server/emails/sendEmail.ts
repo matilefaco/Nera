@@ -18,10 +18,7 @@ import { buildReferralRewardEmail } from './templates/referralReward.js';
 import { buildTrialWillEndEmail } from './templates/trialWillEnd.js';
 import { buildVerificationEmail } from './templates/verificationEmail.js';
 import { buildProfessionalBookingRescheduledEmail } from './templates/professionalBookingRescheduled.js';
-import { buildReviewReceivedEmail } from './templates/reviewReceived.js';
-import { buildDailyDigestEmail } from './templates/dailyDigest.js';
-import { buildReviewMilestoneEmail } from './templates/reviewMilestone.js';
-import { buildRescheduleRequestedEmail } from './templates/rescheduleRequested.js';
+import { buildProfessionalBookingCancelledEmail } from './templates/professionalBookingCancelled.js';
 import { logger, maskEmail, maskToken } from '../utils/logger.js';
 import { PUBLIC_APP_URL } from '../utils.js';
 
@@ -188,7 +185,7 @@ export async function sendBookingPendingEmail(data: PendingEmailPayload) {
   }
 
   const formattedDate = formatDateSafely(date);
-  const whatsappMsg = encodeURIComponent(`Olá ${professionalName}, acabei de solicitar meu horário na Nera 💛`);
+  const whatsappMsg = encodeURIComponent(`Olá ${professionalName}, acabei de solicitar meu horário no Nera 💛`);
   const whatsappUrl = `https://wa.me/${(professionalWhatsapp || '').replace(/\D/g, '')}?text=${whatsappMsg}`;
 
   const html = buildBookingPendingEmail({
@@ -725,7 +722,7 @@ export async function sendWelcomeEmail(data: { name: string, email: string, slug
       from: FROM_EMAIL,
       to: [data.email],
       replyTo: REPLY_TO,
-      subject: `Boas-vindas à Nera, ${data.name} ✨`,
+      subject: `Boas-vindas ao Nera, ${data.name} ✨`,
       html,
     });
     if (error) {
@@ -793,7 +790,7 @@ export async function sendVerificationEmail(data: { email: string, verificationU
       from: FROM_EMAIL,
       to: [data.email],
       replyTo: REPLY_TO,
-      subject: 'Confirme sua conta na Nera ✨',
+      subject: 'Confirme sua conta no Nera ✨',
       html,
     });
     if (error) {
@@ -927,7 +924,7 @@ export async function sendDigitalReceiptEmail(data: any) {
       from: FROM_EMAIL,
       to: [clientEmail],
       replyTo: REPLY_TO,
-      subject: `Resumo do seu atendimento com ${professionalName || 'sua profissional'} ✨`,
+      subject: `Resumo do seu atendimento com ${professionalName || 'Sua profissional'} ✨`,
       html,
     });
 
@@ -978,30 +975,18 @@ export async function sendProfessionalBookingRescheduledEmail(data: any) {
   }
 }
 
-export async function sendReviewReceivedEmail(data: {
-  professionalEmail: string;
-  professionalName: string;
-  clientName: string;
-  rating: number;
-  comment: string;
-  dashboardUrl?: string;
-  reviewId?: string;
-}) {
-  const { professionalEmail, professionalName, clientName, rating, comment, dashboardUrl, reviewId } = data;
+export async function sendProfessionalBookingCancelledEmail(data: any) {
+  const { professionalEmail, professionalName, clientName, serviceName, formattedDate, time, reason, agendaUrl } = data;
 
-  logEmail('START', 'review_received_professional', { to: professionalEmail });
+  logEmail('START', 'booking_cancelled_pro_new', { to: professionalEmail });
 
   if (!isValidEmail(professionalEmail)) {
-    logEmail('ERROR', 'review_received_professional', { error: 'Invalid pro email', to: professionalEmail });
+    logEmail('ERROR', 'booking_cancelled_pro_new', { error: 'Invalid pro email', to: professionalEmail });
     return { success: false, error: 'Invalid email' };
   }
 
-  const html = buildReviewReceivedEmail({
-    professionalName: professionalName || 'Profissional',
-    clientName: clientName || 'Cliente anônimo',
-    rating: rating || 5,
-    comment: comment || '',
-    dashboardUrl: dashboardUrl || `${APP_URL}/dashboard`
+  const html = buildProfessionalBookingCancelledEmail({
+    professionalName, clientName, serviceName, formattedDate, time, reason, agendaUrl
   });
 
   try {
@@ -1010,165 +995,17 @@ export async function sendReviewReceivedEmail(data: {
       from: FROM_EMAIL,
       to: [professionalEmail],
       replyTo: REPLY_TO,
-      subject: `✨ Você recebeu uma nova avaliação de ${clientName}`,
+      subject: `Cancelamento de Reserva • ${clientName}`,
       html,
     });
-    
     if (error) {
-      logEmail('ERROR', 'review_received_professional', { error });
+      logEmail('ERROR', 'booking_cancelled_pro_new', { error });
       return { success: false, error };
     }
-    
-    logEmail('SUCCESS', 'review_received_professional', { resendId: resendData?.id });
+    logEmail('SUCCESS', 'booking_cancelled_pro_new', { resendId: resendData?.id });
     return { success: true, id: resendData?.id };
   } catch (err: any) {
-    logEmail('ERROR', 'review_received_professional', { error: err.message });
-    return { success: false, error: err.message };
-  }
-}
-
-export async function sendDailyDigestEmail(data: {
-  professionalEmail: string;
-  professionalName: string;
-  confirmedCount: number;
-  pendingCount: number;
-  firstAppointmentTime?: string;
-  totalAppointments: number;
-  agendaUrl?: string;
-}) {
-  const { professionalEmail, professionalName, confirmedCount, pendingCount, firstAppointmentTime, totalAppointments, agendaUrl } = data;
-
-  logEmail('START', 'daily_digest_professional', { to: professionalEmail });
-
-  if (!isValidEmail(professionalEmail)) {
-    logEmail('ERROR', 'daily_digest_professional', { error: 'Invalid pro email', to: professionalEmail });
-    return { success: false, error: 'Invalid email' };
-  }
-
-  const html = buildDailyDigestEmail({
-    professionalName: professionalName || 'Profissional',
-    confirmedCount: confirmedCount || 0,
-    pendingCount: pendingCount || 0,
-    firstAppointmentTime,
-    totalAppointments: totalAppointments || 0,
-    agendaUrl: agendaUrl || `${APP_URL}/dashboard`
-  });
-
-  try {
-    const resend = getResendClient();
-    const { data: resendData, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: [professionalEmail],
-      replyTo: REPLY_TO,
-      subject: `Resumo do dia • Nera ✨`,
-      html,
-    });
-    
-    if (error) {
-      logEmail('ERROR', 'daily_digest_professional', { error });
-      return { success: false, error };
-    }
-    
-    logEmail('SUCCESS', 'daily_digest_professional', { resendId: resendData?.id });
-    return { success: true, id: resendData?.id };
-  } catch (err: any) {
-    logEmail('ERROR', 'daily_digest_professional', { error: err.message });
-    return { success: false, error: err.message };
-  }
-}
-
-export async function sendReviewMilestoneEmail(data: {
-  professionalEmail: string;
-  professionalName: string;
-  milestoneTitle: string;
-  milestoneMessage: string;
-  profileUrl: string;
-}) {
-  const { professionalEmail, professionalName, milestoneTitle, milestoneMessage, profileUrl } = data;
-
-  logEmail('START', 'review_milestone', { to: professionalEmail });
-
-  if (!isValidEmail(professionalEmail)) {
-    logEmail('ERROR', 'review_milestone', { error: 'Invalid pro email', to: professionalEmail });
-    return { success: false, error: 'Invalid email' };
-  }
-
-  const html = buildReviewMilestoneEmail({
-    professionalName: professionalName || 'Profissional',
-    milestoneTitle,
-    milestoneMessage,
-    dashboardUrl: profileUrl
-  });
-
-  try {
-    const resend = getResendClient();
-    const { data: resendData, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: [professionalEmail],
-      replyTo: REPLY_TO,
-      subject: `✨ ${milestoneTitle} • Nera`,
-      html,
-    });
-    
-    if (error) {
-      logEmail('ERROR', 'review_milestone', { error });
-      return { success: false, error };
-    }
-    
-    logEmail('SUCCESS', 'review_milestone', { resendId: resendData?.id });
-    return { success: true, id: resendData?.id };
-  } catch (err: any) {
-    logEmail('ERROR', 'review_milestone', { error: err.message });
-    return { success: false, error: err.message };
-  }
-}
-
-export async function sendRescheduleRequestedEmail(data: {
-  professionalEmail: string;
-  professionalName: string;
-  clientName: string;
-  serviceName: string;
-  date: string;
-  time: string;
-  dashboardUrl?: string;
-}) {
-  const { professionalEmail, professionalName, clientName, serviceName, date, time, dashboardUrl } = data;
-
-  logEmail('START', 'reschedule_requested', { to: professionalEmail });
-
-  if (!isValidEmail(professionalEmail)) {
-    logEmail('ERROR', 'reschedule_requested', { error: 'Invalid pro email', to: professionalEmail });
-    return { success: false, error: 'Invalid email' };
-  }
-
-  const html = buildRescheduleRequestedEmail({
-    professionalName: professionalName || 'Profissional',
-    clientName: clientName || 'Cliente',
-    serviceName: serviceName || 'Serviço',
-    date: date || '',
-    time: time || '',
-    dashboardUrl: dashboardUrl || `${APP_URL}/dashboard`
-  });
-
-  try {
-    const resend = getResendClient();
-    const { data: resendData, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: [professionalEmail],
-      replyTo: REPLY_TO,
-      subject: `Mudança de planos • ${clientName}`,
-      html,
-    });
-    
-    if (error) {
-      logEmail('ERROR', 'reschedule_requested', { error });
-      return { success: false, error };
-    }
-    
-    logEmail('SUCCESS', 'reschedule_requested', { resendId: resendData?.id });
-    return { success: true, id: resendData?.id };
-  } catch (err: any) {
-    logEmail('ERROR', 'reschedule_requested', { error: err.message });
+    logEmail('ERROR', 'booking_cancelled_pro_new', { error: err.message });
     return { success: false, error: err.message };
   }
 }

@@ -15,34 +15,18 @@ function getSafeUptime(): string {
 
 router.get("/", (req: Request, res: Response) => {
   try {
-    const memory = process.memoryUsage();
-    const memoryUsage = {
-      rss: `${Math.round(memory.rss / 1024 / 1024)} MB`,
-      heapTotal: `${Math.round(memory.heapTotal / 1024 / 1024)} MB`,
-      heapUsed: `${Math.round(memory.heapUsed / 1024 / 1024)} MB`,
-      external: `${Math.round(memory.external / 1024 / 1024)} MB`,
-    };
-
-    let firestoreStatus = "degraded";
-    if (getDb()) {
-      firestoreStatus = "ok";
-    }
-
     const response = {
-      ok: true,
-      timestamp: new Date().toISOString(),
+      status: "ok",
       uptime: getSafeUptime(),
-      environment: process.env.NODE_ENV === "production" ? "production" : "dev",
-      version: process.env.npm_package_version || "unknown",
-      firestore: firestoreStatus,
-      memoryUsage
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV === "production" ? "production" : "dev"
     };
     
     logger.info("HEALTH", "Backend health check requested", { requestId: req.requestId });
     res.set("Cache-Control", "public, max-age=10").json(response);
   } catch (error) {
     logger.error("HEALTH", "Health check failed", { error, requestId: req.requestId });
-    res.status(500).json({ ok: false, error: "Health check failed" });
+    res.status(500).json({ status: "error" });
   }
 });
 

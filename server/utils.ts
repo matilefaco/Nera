@@ -1,7 +1,6 @@
 import { getDb } from "./firebaseAdmin.js";
 import admin from "firebase-admin";
 import { logWhatsAppMessage, normalizePhone } from "./services/whatsappService.js";
-import { logger } from "./utils/logger.js";
 
 export const PUBLIC_APP_URL = process.env.APP_URL || "https://usenera.com";
 
@@ -46,12 +45,12 @@ export async function shouldSendEmail(appointmentId: string, eventKey: string): 
     
     const data = doc.data();
     if (data?.emailEvents?.[eventKey]) {
-      logger.info("AI", `[EMAIL_SKIP_DUPLICATE] Event ${eventKey} already sent for ${appointmentId}`);
+      console.log(`[EMAIL_SKIP_DUPLICATE] Event ${eventKey} already sent for ${appointmentId}`);
       return false;
     }
     return true;
   } catch (err) {
-    logger.error("AI", "[EMAIL_GUARD_ERROR]", { error: err });
+    console.error('[EMAIL_GUARD_ERROR]', err);
     return true; 
   }
 }
@@ -64,7 +63,7 @@ export async function markEmailSent(appointmentId: string, eventKey: string) {
       [`emailEvents.${eventKey}`]: admin.firestore.FieldValue.serverTimestamp()
     });
   } catch (err) {
-    logger.error("AI", "[EMAIL_MARK_ERROR]", { error: err });
+    console.error('[EMAIL_MARK_ERROR]', err);
   }
 }
 
@@ -75,7 +74,7 @@ export async function sendWhatsAppMeta(to: string, message: string, metadata: { 
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 
   if (!accessToken || !phoneNumberId) {
-    logger.warn("AI", "[WhatsApp-Meta] Configuration missing (META_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID)");
+    console.warn('[WhatsApp-Meta] Configuration missing (META_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID)');
     return false;
   }
 
@@ -140,7 +139,7 @@ export async function sendWhatsAppMeta(to: string, message: string, metadata: { 
       return false;
     }
   } catch (err: any) {
-    logger.warn("AI", "[WhatsApp-Meta] Request failed", { meta: { error: err.message } });
+    console.warn('[WhatsApp-Meta] Request failed:', err);
     if (logId && metadata.userId) {
       await logWhatsAppMessage(db, {
         userId: metadata.userId,
@@ -162,8 +161,8 @@ export async function sendWhatsAppNotification(phone: string, message: string, a
     const url = `https://api.callmebot.com/whatsapp.php?phone=${cleanPhone}&text=${encodedMsg}&apikey=${apiKey}`;
     const resp = await fetch(url);
     return resp.ok;
-  } catch (err: any) {
-    logger.warn("AI", "[WhatsApp] CallMeBot notification failed", { meta: { error: err.message } });
+  } catch (err) {
+    console.warn('[WhatsApp] CallMeBot notification failed:', err);
     return false;
   }
 }
@@ -260,21 +259,21 @@ export async function callNvidiaAI(messages: any[], options: { model?: string, t
       const data: any = await response.json();
       const content = data.choices?.[0]?.message?.content?.trim();
       
-      logger.info("AI", `[NVIDIA] model used: ${model}`);
-      logger.info("AI", `[NVIDIA] latency: ${latency}ms`);
-      logger.info("AI", `[NVIDIA] success: true`);
+      console.log(`[NVIDIA] model used: ${model}`);
+      console.log(`[NVIDIA] latency: ${latency}ms`);
+      console.log(`[NVIDIA] success: true`);
       
       return content;
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
       const isTimeout = err.name === 'AbortError';
-      logger.warn("AI", `[NVIDIA] error (Attempt ${attempt + 1})`, { meta: { error: isTimeout ? "Timeout" : err.message } });
-      if (attempt === 0) logger.info("AI", `[NVIDIA] Retrying...`);
+      console.warn(`[NVIDIA] error (Attempt ${attempt + 1}):`, isTimeout ? "Timeout" : err.message);
+      if (attempt === 0) console.log(`[NVIDIA] Retrying...`);
     }
   }
 
-  logger.error("AI", `[NVIDIA] final failure`, { error: { message: lastError.message } });
+  console.error(`[NVIDIA] final failure:`, lastError.message);
   throw lastError;
 }
 
@@ -325,22 +324,22 @@ REGRAS:
 
         // 2. Semantic Guard: Unhas should not talk about "olhar", etc.
         if (isUnhas && /(olhar|sobrancelha|cílio|pele|cabelo|maquiagem)/.test(contentLow)) {
-          logger.info("AI", `[AI SERVICE] description rejected by semantic guard: unhas talking about unrelated area. Content: "${content}"`);
+          console.log(`[AI SERVICE] description rejected by semantic guard: unhas talking about unrelated area. Content: "${content}"`);
           rejected = true;
         }
 
         if (!rejected) {
-          logger.info("AI", `[AI SERVICE] NVIDIA success for ${serviceName}`);
+          console.log(`[AI SERVICE] NVIDIA success for ${serviceName}`);
           return { success: true, source: "nvidia", description: content };
         }
       }
     } catch (error: any) {
-      logger.error("AI", `[AI SERVICE] NVIDIA failed in description: ${error.message}`);
+      console.error(`[AI SERVICE] NVIDIA failed in description: ${error.message}`);
     }
   }
 
   // Fallback Logic
-  logger.info("AI", `[AI SERVICE] Using fallback for ${serviceName}`);
+  console.log(`[AI SERVICE] Using fallback for ${serviceName}`);
   
   let description = "Procedimento personalizado focado em realçar sua beleza natural com máxima qualidade.";
   let cat = "geral";
@@ -383,6 +382,6 @@ REGRAS:
     cat = "maquiagem";
   }
 
-  logger.info("AI", `[AI SERVICE] fallback used for category: ${cat}`);
+  console.log(`[AI SERVICE] fallback used for category: ${cat}`);
   return { success: true, source: "fallback", description };
 }

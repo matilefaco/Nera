@@ -71,8 +71,7 @@ export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
 
       next();
     } catch (err) {
-      const { logger } = require("../utils/logger.js");
-      logger.error("AUTH", "Error checking plan feature", { error: err });
+      console.error('Error checking plan feature:', err);
       return res.status(503).json({
         error: "Falha ao verificar os limites do plano.",
         code: "PLAN_CHECK_UNAVAILABLE"

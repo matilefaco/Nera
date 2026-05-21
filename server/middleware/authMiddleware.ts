@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import admin from "firebase-admin";
-import { logger } from "../utils/logger.js";
 
 export interface AuthenticatedRequest extends Request {
   uid?: string;
@@ -22,7 +21,7 @@ export const requireFirebaseAuth = async (req: AuthenticatedRequest, res: Respon
     req.user = decodedToken;
     next();
   } catch (error) {
-    logger.error("AUTH", "Auth Middleware Error", { error });
+    console.error("Auth Middleware Error:", error);
     return res.status(401).json({ error: "Token de autenticação inválido ou expirado." });
   }
 };
