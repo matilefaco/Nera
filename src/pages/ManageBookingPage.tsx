@@ -49,7 +49,6 @@ export default function ManageBookingPage() {
   const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [errorOccurred, setErrorOccurred] = useState(false);
   const [reviewToken, setReviewToken] = useState<string | null>(null);
-  const [reviewStatus, setReviewStatus] = useState<string | null>(null);
 
   const [diagnosticResults, setDiagnosticResults] = useState<any>(null);
   const [isAutoProcessed, setIsAutoProcessed] = useState(false);
@@ -150,7 +149,6 @@ export default function ManageBookingPage() {
           const snap = await getDocs(q);
           if (!snap.empty) {
             setReviewToken(snap.docs[0].data().token);
-            setReviewStatus(snap.docs[0].data().status);
           }
         }
 
@@ -208,27 +206,12 @@ setBlockedSchedules(dayBlocked);
   }, [view, professional, selectedDate]);
 
   const availableSlots = useMemo(() => {
-    if (!selectedDate || !appointment || !professional) return [];
-    
-    // Auto-fallback if the professional has legacy hours format instead of the nested workingHours object
-    const workingHours = professional.workingHours || {
-      startTime: (professional as any).startTime || '08:00',
-      endTime: (professional as any).endTime || '18:00',
-      workingDays: (professional as any).workingDays || [1, 2, 3, 4, 5],
-      breakStart: (professional as any).breakStart,
-      breakEnd: (professional as any).breakEnd
-    };
-    
-    // Ignore the current appointment we're trying to reschedule
-    const filteredAppts = dayAppointments.filter(a => 
-      a.id !== (appointment.appointmentId || appointment.id)
-    );
-
+    if (!professional?.workingHours || !selectedDate || !appointment) return [];
     return getAvailableSlots({
       selectedDate,
       serviceDuration: Number(appointment.duration) || 60,
-      workingHours,
-      appointments: filteredAppts,
+      workingHours: professional.workingHours,
+      appointments: dayAppointments,
       blockedSchedules
     });
   }, [selectedDate, appointment, professional, dayAppointments, blockedSchedules]);
@@ -493,18 +476,13 @@ setBlockedSchedules(dayBlocked);
                 {/* 2. COMPLETED ACTIONS */}
                 {isCompleted && (
                   <div className="space-y-4">
-                    {reviewToken && reviewStatus !== 'submitted' && (
+                    {reviewToken && (
                       <button 
                         onClick={() => navigate(`/review/${reviewToken}`)}
                         className="w-full py-7 bg-brand-ink text-brand-white rounded-full text-[11px] font-extrabold uppercase tracking-[0.25em] shadow-2xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 animate-bounce-slow"
                       >
                         <Sparkles size={24} className="fill-brand-terracotta text-brand-terracotta" /> Avaliar Atendimento 💛
                       </button>
-                    )}
-                    {reviewStatus === 'submitted' && (
-                      <div className="w-full py-5 bg-green-50 text-green-700 rounded-full text-[11px] font-bold uppercase tracking-[0.25em] flex items-center justify-center gap-3">
-                        <Check size={18} /> Avaliação enviada
-                      </div>
                     )}
                     
                     <PremiumButton 

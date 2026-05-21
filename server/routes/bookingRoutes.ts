@@ -4,8 +4,8 @@ import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskPhone, maskToken, maskUid } from "../utils/logger.js";
-import { sendBookingConfirmedEmail, sendDigitalReceiptEmail, sendBookingCancelledClientEmail } from "../emails/sendEmail.js";
-import { createGoogleCalendarEvent, updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "./calendarRoutes.js";
+import { sendBookingConfirmedEmail, sendDigitalReceiptEmail } from "../emails/sendEmail.js";
+import { createGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
 import { sendBookingPendingClientNotification, sendNewBookingRequestNotification, sendBookingConfirmedClientNotification } from "../services/notificationService.js";
@@ -1484,19 +1484,7 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
       const updatedData = { ...data, ...safeUpdate };
       await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
 
-      const reviewToken = randomBytes(24).toString('hex');
-      const reviewRef = db.collection('review_requests').doc();
-      transaction.set(reviewRef, {
-        bookingId: appointmentId,
-        professionalId: data.professionalId,
-        clientDisplayName: data.clientName,
-        clientNeighborhood: data.neighborhood || '',
-        token: reviewToken,
-        status: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      return { success: true, appointmentId, status: "completed", updatedData, reviewToken };
+      return { success: true, appointmentId, status: "completed", updatedData };
     });
 
     // -------------------------------------------------------------
@@ -1515,11 +1503,6 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
         } catch (e) {
           logger.warn("BOOKING", "Failed to fetch professional slug for digital receipt", { error: e });
         }
-        
-        let reviewUrl = '';
-        if (result.reviewToken) {
-           reviewUrl = `${PUBLIC_APP_URL}/review/${result.reviewToken}`;
-        }
 
         sendDigitalReceiptEmail({
           clientEmail: updatedData.clientEmail,
@@ -1531,8 +1514,7 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
           time: updatedData.time,
           totalPrice: updatedData.totalPrice,
           price: updatedData.price,
-          slug,
-          reviewUrl
+          slug
         }).catch(e => {
           logger.error("BOOKING", "Failed to send digital receipt email after completion", { error: e });
         });
@@ -1541,7 +1523,7 @@ router.post("/appointments/:appointmentId/complete", requireFirebaseAuth, async 
       logger.error("BOOKING", "Post-completion email error", { error: postError });
     }
 
-    return res.json({ success: result.success, appointmentId: result.appointmentId, status: result.status, reviewToken: result.reviewToken });
+    return res.json({ success: result.success, appointmentId: result.appointmentId, status: result.status });
 
   } catch (err: any) {
     logger.error("BOOKING", "Complete endpoint error", { error: err });
@@ -1692,33 +1674,11 @@ router.post("/appointments/:appointmentId/cancel-by-professional", requireFireba
 
       transaction.update(apptRef, safeUpdate);
       
-      const updatedData = { ...data, ...safeUpdate, id: appointmentId };
+      const updatedData = { ...data, ...safeUpdate };
       await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
 
-      return { success: true, appointmentId, updatedData };
+      return { success: true, appointmentId };
     });
-
-    // Notify client that professional cancelled
-    if (result.success && result.updatedData && result.updatedData.clientEmail) {
-      // Find pro doc for their name
-      const proDoc = await db.collection('users').doc(uid).get();
-      const proData = proDoc.data();
-      
-      await sendBookingCancelledClientEmail({
-        clientEmail: result.updatedData.clientEmail,
-        clientName: result.updatedData.clientName,
-        professionalName: proData?.name || 'Profissional',
-        bookingId: result.appointmentId,
-        date: result.updatedData.date,
-        time: result.updatedData.time,
-        serviceName: result.updatedData.serviceName
-      });
-      
-      // Attempt to delete calendar event
-      if (result.updatedData.googleCalendarEventId) {
-        deleteGoogleCalendarEvent(result.updatedData, uid);
-      }
-    }
 
     return res.json(result);
   } catch (err: any) {
@@ -2177,10 +2137,10 @@ router.post("/public/manage/:manageSlug/cancel", async (req: express.Request, re
 
       transaction.update(apptRef, safeUpdate);
       
-      const updatedData = { ...data, ...safeUpdate, id: appointmentId };
+      const updatedData = { ...data, ...safeUpdate };
       await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
 
-      return { success: true, appointmentId, appointmentData: updatedData };
+      return { success: true, appointmentId };
     });
 
     return res.json(result);

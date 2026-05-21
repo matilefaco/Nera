@@ -456,13 +456,6 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
       name: proData.name,
       slug: proData.slug,
       plan: proData.plan || 'free',
-      workingHours: proData.workingHours || {
-        startTime: proData.startTime || '08:00',
-        endTime: proData.endTime || '18:00',
-        workingDays: proData.workingDays || [1, 2, 3, 4, 5],
-        breakStart: proData.breakStart,
-        breakEnd: proData.breakEnd
-      },
       avatar: isDataUriImage(proData.avatar || proData.photoUrl) ? null : (proData.avatar || proData.photoUrl)
     } : null;
 

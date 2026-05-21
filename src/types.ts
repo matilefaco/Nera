@@ -85,7 +85,6 @@ export interface UserProfile {
   neighborhood?: string;
   
   instagram?: string; // Official social link
-  dismissedTips?: Record<string, boolean>; // Preferências de UI, dicas fechadas
   paymentMethods?: string[];
   acceptsInstallments?: boolean;
   

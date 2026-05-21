@@ -67,6 +67,7 @@ export const api = onRequest(
 
     if (isProdEnv || isHostProd) {
       const blockedDebugTerms = [
+        "debug",
         "test-email",
         "test-whatsapp",
         "test-ai-service-description",

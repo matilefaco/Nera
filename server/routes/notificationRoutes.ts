@@ -125,8 +125,6 @@ import {
   buildReviewRequestMessage 
 } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta, PUBLIC_APP_URL } from "../utils.js";
-import { sendProfessionalBookingRescheduledEmail, sendProfessionalBookingCancelledEmail } from '../emails/sendEmail.js';
-import { updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "./calendarRoutes.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
 import { authMutationLimiter } from "../middleware/rateLimiter.js";
@@ -640,15 +638,6 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
            });
            if (result.success) await markEmailSent(appointmentId, eventKeyClient);
         }
-        
-        // Delete Google Calendar Event
-        const apptDoc = await db.collection('appointments').doc(appointmentId).get();
-        if (apptDoc.exists) {
-          const apptData = apptDoc.data();
-          if (apptData?.googleCalendarEventId) {
-            deleteGoogleCalendarEvent({ id: appointmentId, ...apptData }, professionalId);
-          }
-        }
       }
       return res.json({ success: true });
     }
@@ -723,26 +712,6 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
           });
         }
 
-        if (pro?.email && rescheduledBy === 'client') {
-          const eventKeyPro = 'bookingRescheduledPro';
-          if (await shouldSendEmail(appointmentId, eventKeyPro)) {
-            const oldFormatted = previousDate.split('-').reverse().join('/');
-            const newFormatted = date.split('-').reverse().join('/');
-            const result = await sendProfessionalBookingRescheduledEmail({
-              professionalEmail: pro.email,
-              professionalName: pro.name || 'Sua Profissional',
-              clientName,
-              serviceName,
-              oldFormatDate: oldFormatted,
-              oldTime: previousTime,
-              newFormatDate: newFormatted,
-              newTime: time,
-              agendaUrl: `${baseUrl}/dashboard`
-            });
-            if (result.success) await markEmailSent(appointmentId, eventKeyPro);
-          }
-        }
-
         if (clientEmail) {
           const eventKey = 'bookingRescheduledClient';
           if (await shouldSendEmail(appointmentId, eventKey)) {
@@ -759,15 +728,6 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
               rescheduledBy
             });
             if (result.success) await markEmailSent(appointmentId, eventKey);
-          }
-        }
-        
-        // Update Google Calendar Event
-        const apptDoc = await db.collection('appointments').doc(appointmentId).get();
-        if (apptDoc.exists) {
-          const apptData = apptDoc.data();
-          if (apptData?.googleCalendarEventId) {
-            updateGoogleCalendarEvent({ id: appointmentId, ...apptData }, professionalId);
           }
         }
       }

@@ -55,8 +55,7 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       notify.success('Seja bem-vinda.');
-      const returnUrl = searchParams.get('returnUrl');
-      navigate(returnUrl || '/dashboard');
+      navigate('/dashboard');
     } catch (error: any) {
       notify.error(getHumanError(error.code));
     } finally {
@@ -88,8 +87,7 @@ export default function LoginPage() {
       }
 
       notify.success('Seja bem-vinda.');
-      const returnUrl = searchParams.get('returnUrl');
-      navigate(returnUrl || '/dashboard');
+      navigate('/dashboard');
     } catch (error: any) {
       if (error.message === 'TIMEOUT_FIREBASE') {
          notify.error('O login demorou muito para responder. Por favor, recarregue a página e tente novamente.');

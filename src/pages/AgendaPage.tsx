@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, handleBookingError, createManualAppointment, updateAppointmentStatus, sanitizeAppointment, rescheduleBookingByProfessional } from '../firebase';
+import { db, handleBookingError, createManualAppointment, updateAppointmentStatus, sanitizeAppointment } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs, getDoc, limit } from 'firebase/firestore';
 import { 
   Calendar, Clock, MessageCircle, 
@@ -130,12 +130,6 @@ export default function AgendaPage() {
   const [manualDate, setManualDate] = useState(selectedDate);
   const [manualTime, setManualTime] = useState('');
   const [services, setServices] = useState<any[]>([]);
-  
-  // Reschedule State
-  const [agendaView, setAgendaView] = useState<'details' | 'reschedule'>('details');
-  const [rescheduleDate, setRescheduleDate] = useState(selectedDate);
-  const [rescheduleTime, setRescheduleTime] = useState('');
-  const [isReschedulingLoading, setIsReschedulingLoading] = useState(false);
   // Intelligent Fit State
   const [isCreating, setIsCreating] = useState(false);
   const [blockToDelete, setBlockToDelete] = useState<any | null>(null);
@@ -204,14 +198,6 @@ export default function AgendaPage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  useEffect(() => {
-    if (!isDetailsOpen) {
-       setTimeout(() => setAgendaView('details'), 300);
-       setRescheduleDate(selectedDate);
-       setRescheduleTime('');
-    }
-  }, [isDetailsOpen, selectedDate]);
 
   useEffect(() => {
     if (!user) return;
@@ -441,47 +427,6 @@ export default function AgendaPage() {
     }
   };
 
-  const availableRescheduleSlots = React.useMemo(() => {
-    if (!rescheduleDate || !selectedAppointment || !profile?.workingHours) return [];
-    
-    const duration = Number(selectedAppointment.duration) || 60;
-    
-    // Ignore the current appointment we're trying to reschedule
-    const filteredAppts = allAppointments.filter(a => a.id !== selectedAppointment.id && a.date === rescheduleDate);
-    const dayOfWeek = parseLocalDate(rescheduleDate).getDay();
-    const dayBlocks = allBlockedSchedules.filter(b => b.date === rescheduleDate || (b.isRecurring && b.recurringDays?.includes(dayOfWeek)));
-
-    return getAvailableSlots({
-      date: rescheduleDate,
-      serviceDuration: duration,
-      appointments: filteredAppts,
-      blockedSchedules: dayBlocks,
-      workingHours: profile.workingHours
-    });
-  }, [rescheduleDate, selectedAppointment, allAppointments, allBlockedSchedules, profile]);
-
-  const handleRescheduleProfessional = async () => {
-    if (!user || !selectedAppointment || !rescheduleDate || !rescheduleTime) {
-      notify.error('Preencha data e horário.');
-      return;
-    }
-    setIsReschedulingLoading(true);
-    try {
-      await rescheduleBookingByProfessional(selectedAppointment.id, user.uid, rescheduleDate, rescheduleTime);
-      notify.success('Atendimento remarcado com sucesso!');
-      setAgendaView('details');
-      setIsDetailsOpen(false);
-    } catch (err: any) {
-      if (err.message === 'Horário indisponível') {
-        notify.error('Este horário acabou de ser preenchido. Escolha outro.');
-      } else {
-        notify.error('Não foi possível remarcar o atendimento.');
-      }
-    } finally {
-      setIsReschedulingLoading(false);
-    }
-  };
-
   const handleCreateManual = async () => {
     if (!user || !manualClient || !manualDate || !manualTime) {
       notify.error('Preencha nome da cliente, data e horário.');
@@ -536,12 +481,33 @@ export default function AgendaPage() {
         }
       });
       
-      const resData = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(resData.error || `Erro ao concluir (${res.status})`);
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro ao concluir (${res.status})`);
       }
 
-      notify.success('Atendimento finalizado. A cliente receberá o link de avaliação por e-mail.');
+      const token = Array.from(window.crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
+      await addDoc(collection(db, 'review_requests'), {
+        bookingId: app.id,
+        professionalId: user.uid,
+        clientDisplayName: app.clientName,
+        clientNeighborhood: app.neighborhood || '',
+        token,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+      
+      notify.success('Experiência finalizada! Redirecionando para envio de convite de avaliação.');
+      const reviewLink = `${window.location.origin}/review/${token}`;
+      try {
+        await navigator.clipboard.writeText(reviewLink);
+        notify.success('Link copiado.');
+      } catch {
+        // Ignorar erro do clipboard
+      }
+      
+      const text = `Oi, ${app.clientName} 🤎\nObrigada pela visita de hoje.\nSe puder, deixe sua avaliação por aqui:\n${reviewLink}`;
+      window.open(`https://wa.me/55${cleanWhatsapp(app.clientWhatsapp)}?text=${encodeURIComponent(text)}`, '_blank');
       setIsDetailsOpen(false);
 
     } catch (err) {

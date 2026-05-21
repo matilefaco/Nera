@@ -258,30 +258,11 @@ export default function Dashboard() {
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
-    return profile?.dismissedTips?.pushBanner || localStorage.getItem("nera_push_banner_dismissed") === "true";
+    return localStorage.getItem("nera_push_banner_dismissed") === "true";
   });
   const [blockTipDismissed, setBlockTipDismissed] = useState(() => {
-    return profile?.dismissedTips?.blockTip || localStorage.getItem("nera_block_tip_dismissed") === "true";
+    return localStorage.getItem("nera_block_tip_dismissed") === "true";
   });
-
-  // Sync state if profile loads later
-  useEffect(() => {
-    if (profile?.dismissedTips?.pushBanner && !pushBannerDismissed) setPushBannerDismissed(true);
-    if (profile?.dismissedTips?.blockTip && !blockTipDismissed) setBlockTipDismissed(true);
-  }, [profile?.dismissedTips]);
-
-  const handleDismissTip = async (tipKey: string) => {
-    if (!user) return;
-    try {
-      const { doc, updateDoc } = await import('firebase/firestore');
-      const { db } = await import('../firebase');
-      await updateDoc(doc(db, 'users', user.uid), {
-        [`dismissedTips.${tipKey}`]: true
-      });
-    } catch (err) {
-      console.error(`Failed to dismiss ${tipKey}`, err);
-    }
-  };
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [unconfirmedTomorrow, setUnconfirmedTomorrow] = useState<Appointment[]>([]);
   const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
@@ -304,80 +285,52 @@ export default function Dashboard() {
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [isServicesLoading, setIsServicesLoading] = useState(true);
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
-    let unsubAlerts: (() => void) | undefined;
-
-    const timer = setTimeout(() => {
-      if (!isMounted) return;
-      
-      const qCount = query(
-        collection(db, 'client_summaries'),
-        where('professionalId', '==', user.uid)
-      );
-      getCountFromServer(qCount).then(snap => {
-        if (isMounted) {
-          setTotalClientsCountFromSummaries(snap.data().count);
-        }
-      }).catch(err => {
-        if (isDev) console.error('Error fetching client summaries count:', err);
-      });
-
-      const qAlerts = query(
-        collection(db, 'alerts'),
-        where('professionalId', '==', user.uid),
-        where('read', '==', false),
-        orderBy('createdAt', 'desc'),
-        limit(50)
-      );
-
-      unsubAlerts = onSnapshot(qAlerts, (snap) => {
-        if (!isMounted) return;
-        try {
-          const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setAlerts(docs);
-        } catch (err) {
-          if (isDev) console.error("Error in onSnapshot callback:", err);
-        }
-      }, (error) => {
-        if (isDev) console.error('[Dashboard] Subscription error on qAlerts:', error);
-      });
-
-      const cached = analyticsEventsCache.get(user.uid);
-      if (cached && Date.now() - cached.fetchedAt < ANALYTICS_CACHE_TTL_MS) {
-        setAnalyticsEvents(cached.data);
-      } else {
-        const qAnalytics = query(
-          collection(db, 'analytics_events'),
-          where('professionalId', '==', user.uid),
-          orderBy('timestamp', 'desc'),
-          limit(100)
-        );
-
-        getDocs(qAnalytics).then((snapshot) => {
-          if (!isMounted) return;
-          try {
-            const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
-            analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
-            setAnalyticsEvents(docs);
-          } catch (err) {
-            if (isDev) console.error("Error processing getDocs callback:", err);
-          }
-        }).catch((error) => {
-          if (isDev) console.error('[Dashboard] Fetch error on qAnalytics:', error);
-        });
+    const qCount = query(
+      collection(db, 'client_summaries'),
+      where('professionalId', '==', user.uid)
+    );
+    getCountFromServer(qCount).then(snap => {
+      if (isMounted) {
+        setTotalClientsCountFromSummaries(snap.data().count);
       }
-    }, 150);
+    }).catch(err => {
+      if (isDev) console.error('Error fetching client summaries count:', err);
+    });
+    return () => { isMounted = false; };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+    const qAlerts = query(
+      collection(db, 'alerts'),
+      where('professionalId', '==', user.uid),
+      where('read', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+
+    const unsubAlerts = onSnapshot(qAlerts, (snap) => {
+      if (!isMounted) return;
+      try {
+        const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+setAlerts(docs);
+      } catch (err) {
+        if (isDev) console.error("Error in onSnapshot callback:", err);
+      }
+    }, (error) => {
+      if (isDev) console.error('[Dashboard] Subscription error on qAlerts:', error);
+    });
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
-      unsubAlerts?.();
+      unsubAlerts();
     };
   }, [user]);
 
@@ -388,6 +341,40 @@ export default function Dashboard() {
       if (isDev) console.error('Failed to mark alert as read:', err);
     }
   };
+
+  // Triggers handled by hook
+
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+
+    const cached = analyticsEventsCache.get(user.uid);
+    if (cached && Date.now() - cached.fetchedAt < ANALYTICS_CACHE_TTL_MS) {
+      setAnalyticsEvents(cached.data);
+      return;
+    }
+
+    const qAnalytics = query(
+      collection(db, 'analytics_events'),
+      where('professionalId', '==', user.uid),
+      orderBy('timestamp', 'desc'),
+      limit(100)
+    );
+
+    getDocs(qAnalytics).then((snapshot) => {
+      if (!isMounted) return;
+      try {
+        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
+        analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
+        setAnalyticsEvents(docs);
+      } catch (err) {
+        if (isDev) console.error("Error processing getDocs callback:", err);
+      }
+    }).catch((error) => {
+      if (isDev) console.error('[Dashboard] Fetch error on qAnalytics:', error);
+    });
+    return () => { isMounted = false; };
+  }, [user?.uid]);
 
 
 
@@ -433,36 +420,17 @@ export default function Dashboard() {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment))
           .filter(a => !isFakeContent(a.clientName));
         const relevantToday = docs.filter(a => isRevenueStatus(a.status));
-        setConfirmedToday(relevantToday);
-        setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
+setConfirmedToday(relevantToday);
+setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
-      } finally {
-        setIsInitialLoading(false);
       }
     }, (error) => {
       if (isDev) console.error('[Dashboard] Subscription error on qToday:', error);
-      if (isMounted) setIsInitialLoading(false);
     });
 
-    return () => {
-      isMounted = false;
-      unsubToday();
-    };
-  }, [user?.uid]);
-
-  useEffect(() => {
-    if (!user) return;
-    let isMounted = true;
-    let unsubUnconfirmed: (() => void) | undefined;
-    let unsubWaitlist: (() => void) | undefined;
-
-    const timer = setTimeout(() => {
-      if (!isMounted) return;
-
-      const today = getTodayLocale();
-      // Query: Unconfirmed for tomorrow
-      const tomorrow = new Date();
+    // Query: Unconfirmed for tomorrow
+    const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = formatDateKey(tomorrow);
 
@@ -473,7 +441,7 @@ export default function Dashboard() {
       where('status', '==', 'pending_confirmation')
     );
 
-    unsubUnconfirmed = onSnapshot(qUnconfirmed, (snapshot) => {
+    const unsubUnconfirmed = onSnapshot(qUnconfirmed, (snapshot) => {
       if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment))
@@ -497,8 +465,16 @@ export default function Dashboard() {
     const appointmentsCacheKey = `${user.uid}:${startDateStr}:${endDateStr}`;
     const cachedAppointments = appointmentsHistoryCache.get(appointmentsCacheKey);
 
+    let fetchValid = true;
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 8000)
+    );
+
     if (cachedAppointments && Date.now() - cachedAppointments.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
       setAppointments(cachedAppointments.data);
+      if (isMounted) {
+        setIsInitialLoading(false);
+      }
     } else {
       // Query: Historical and upcoming appointments to calculate metrics
       const qAll = query(
@@ -509,18 +485,25 @@ export default function Dashboard() {
         orderBy('date', 'desc')
       );
 
-      getDocs(qAll).then((snapshot) => {
+      Promise.race([getDocs(qAll), timeoutPromise]).then((result) => {
+        const snapshot = result as any;
         if (!isMounted) return;
         try {
           const appointmentsData = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
           appointmentsHistoryCache.set(appointmentsCacheKey, { data: appointmentsData, fetchedAt: Date.now() });
           setAppointments(appointmentsData);
+          // Metrics calculation moved to hook
         } catch (err) {
           if (isDev) console.error("Error processing getDocs callback:", err);
         }
       }).catch((error) => { 
         if (!isMounted) return;
         if (isDev) console.error("Firestore getDocs error:", error); 
+        fetchValid = false;
+      }).finally(() => {
+        if (isMounted) {
+          setIsInitialLoading(false);
+        }
       });
     }
 
@@ -532,7 +515,7 @@ export default function Dashboard() {
       where('professionalId', '==', user.uid)
     );
 
-    unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
+    const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
       if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
@@ -640,13 +623,8 @@ export default function Dashboard() {
         setServices(uniqueServices);
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
-      } finally {
-        if (isMounted) setIsServicesLoading(false);
       }
-    }).catch((error) => { 
-      if (isDev) console.error("Firestore getDocs error:", error); 
-      if (isMounted) setIsServicesLoading(false);
-    });
+    }).catch((error) => { if (isDev) console.error("Firestore getDocs error:", error); });
 
     // Query: WhatsApp Logs
     const qWl = query(
@@ -664,16 +642,15 @@ export default function Dashboard() {
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
       }
-      }).catch((error) => {
-        if (isDev) console.error('[Dashboard] Fetch error on qWl:', error);
-      });
-    }, 100);
+    }).catch((error) => {
+      if (isDev) console.error('[Dashboard] Fetch error on qWl:', error);
+    });
 
     return () => {
       isMounted = false;
-      clearTimeout(timer);
-      unsubUnconfirmed?.();
-      unsubWaitlist?.();
+      unsubToday();
+      unsubUnconfirmed();
+      unsubWaitlist();
     };
   }, [user?.uid]);
 
@@ -1398,7 +1375,6 @@ export default function Dashboard() {
               profile={profile}
               appointments={appointments}
               services={services}
-              isLoading={isInitialLoading || isServicesLoading}
               onShareClick={() => setIsShareModalOpen(true)}
             />
 
@@ -1438,7 +1414,6 @@ export default function Dashboard() {
                       onClick={() => {
                         setPushBannerDismissed(true);
                         localStorage.setItem("nera_push_banner_dismissed", "true");
-                        handleDismissTip("pushBanner");
                       }}
                       className="text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors"
                     >
@@ -2050,7 +2025,7 @@ export default function Dashboard() {
       />
 
       {/* 9. PRIMEIRA EXPERIÊNCIA / HINT (Se não houver bloqueios ativos) */}
-      {!blockTipDismissed && blockedSchedules.length === 0 && (!isSupported || isSubscribed || pushBannerDismissed || isNewAccount) && (
+      {!blockTipDismissed && blockedSchedules.length === 0 && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
           <motion.div 
             initial={{ y: 50, opacity: 0 }}
@@ -2068,7 +2043,6 @@ export default function Dashboard() {
               onClick={() => {
                 localStorage.setItem("nera_block_tip_dismissed", "true");
                 setBlockTipDismissed(true);
-                handleDismissTip("blockTip");
               }} 
               className="absolute top-2 right-2 p-2 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
               title="Fechar dica"

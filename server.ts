@@ -84,6 +84,7 @@ export async function createServerApp() {
     
     if (isProdEnv || isHostProd) {
       const blockedTerms = [
+        "debug",
         "test-email",
         "test-whatsapp",
         "fix-duplicate-slots",

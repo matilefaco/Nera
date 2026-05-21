@@ -17,8 +17,6 @@ import { buildDigitalReceiptEmail } from './templates/digitalReceipt.js';
 import { buildReferralRewardEmail } from './templates/referralReward.js';
 import { buildTrialWillEndEmail } from './templates/trialWillEnd.js';
 import { buildVerificationEmail } from './templates/verificationEmail.js';
-import { buildProfessionalBookingRescheduledEmail } from './templates/professionalBookingRescheduled.js';
-import { buildProfessionalBookingCancelledEmail } from './templates/professionalBookingCancelled.js';
 import { logger, maskEmail, maskToken } from '../utils/logger.js';
 import { PUBLIC_APP_URL } from '../utils.js';
 
@@ -889,7 +887,7 @@ export async function sendTrialWillEndEmail(data: { email: string, name: string,
  * EVENT: digital_receipt (Sent upon appointment completion)
  */
 export async function sendDigitalReceiptEmail(data: any) {
-  const { clientEmail, clientName, professionalName, appointmentId, serviceName, date, time, totalPrice, price, bookingUrl, reviewUrl } = data;
+  const { clientEmail, clientName, professionalName, appointmentId, serviceName, date, time, totalPrice, price, bookingUrl } = data;
 
   logEmail('START', 'digital_receipt', { to: clientEmail, appointmentId });
 
@@ -914,8 +912,7 @@ export async function sendDigitalReceiptEmail(data: any) {
     formattedDate,
     time: time || '',
     price: formattedPrice,
-    bookingUrl: finalBookingUrl,
-    reviewUrl
+    bookingUrl: finalBookingUrl
   });
 
   try {
@@ -940,72 +937,3 @@ export async function sendDigitalReceiptEmail(data: any) {
   }
 }
 
-export async function sendProfessionalBookingRescheduledEmail(data: any) {
-  const { professionalEmail, professionalName, clientName, serviceName, oldFormatDate, oldTime, newFormatDate, newTime, agendaUrl } = data;
-
-  logEmail('START', 'booking_rescheduled_professional', { to: professionalEmail });
-
-  if (!isValidEmail(professionalEmail)) {
-    logEmail('ERROR', 'booking_rescheduled_professional', { error: 'Invalid pro email', to: professionalEmail });
-    return { success: false, error: 'Invalid email' };
-  }
-
-  const html = buildProfessionalBookingRescheduledEmail({
-    professionalName, clientName, serviceName, oldFormatDate, oldTime, newFormatDate, newTime, agendaUrl
-  });
-
-  try {
-    const resend = getResendClient();
-    const { data: resendData, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: [professionalEmail],
-      replyTo: REPLY_TO,
-      subject: `Uma cliente solicitou remarcação • ${clientName}`,
-      html,
-    });
-    if (error) {
-      logEmail('ERROR', 'booking_rescheduled_professional', { error });
-      return { success: false, error };
-    }
-    logEmail('SUCCESS', 'booking_rescheduled_professional', { resendId: resendData?.id });
-    return { success: true, id: resendData?.id };
-  } catch (err: any) {
-    logEmail('ERROR', 'booking_rescheduled_professional', { error: err.message });
-    return { success: false, error: err.message };
-  }
-}
-
-export async function sendProfessionalBookingCancelledEmail(data: any) {
-  const { professionalEmail, professionalName, clientName, serviceName, formattedDate, time, reason, agendaUrl } = data;
-
-  logEmail('START', 'booking_cancelled_pro_new', { to: professionalEmail });
-
-  if (!isValidEmail(professionalEmail)) {
-    logEmail('ERROR', 'booking_cancelled_pro_new', { error: 'Invalid pro email', to: professionalEmail });
-    return { success: false, error: 'Invalid email' };
-  }
-
-  const html = buildProfessionalBookingCancelledEmail({
-    professionalName, clientName, serviceName, formattedDate, time, reason, agendaUrl
-  });
-
-  try {
-    const resend = getResendClient();
-    const { data: resendData, error } = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: [professionalEmail],
-      replyTo: REPLY_TO,
-      subject: `Cancelamento de Reserva • ${clientName}`,
-      html,
-    });
-    if (error) {
-      logEmail('ERROR', 'booking_cancelled_pro_new', { error });
-      return { success: false, error };
-    }
-    logEmail('SUCCESS', 'booking_cancelled_pro_new', { resendId: resendData?.id });
-    return { success: true, id: resendData?.id };
-  } catch (err: any) {
-    logEmail('ERROR', 'booking_cancelled_pro_new', { error: err.message });
-    return { success: false, error: err.message };
-  }
-}
