@@ -22,150 +22,195 @@ function getOAuthClient(redirectUri: string) {
   );
 }
 
+function getCalendarRedirectUri() {
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI?.trim();
+  if (!redirectUri) {
+    throw new Error("GOOGLE_REDIRECT_URI ausente no ambiente.");
+  }
+  return redirectUri;
+}
+
+function getQueryParam(req: express.Request, key: string) {
+  const raw = String(req.originalUrl || req.url || "");
+  const queryString = raw.includes("?") ? raw.split("?").slice(1).join("?") : "";
+  return new URLSearchParams(queryString).get(key);
+}
+
 // 1. Get Auth URL
 router.get("/auth-url", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
-  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    return res.status(400).json({ error: "Configuração do Google Calendar pendente no ambiente." });
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({
+      error: true,
+      step: "auth_missing",
+      message: "Usuário não autenticado."
+    });
   }
 
-  const uid = req.uid;
-  const professionalIdQuery = req.query.professionalId as string;
-  if (professionalIdQuery && professionalIdQuery !== uid) {
-    return res.status(403).json({ error: "Permissão negada" });
-  }
-  
-  const professionalId = uid;
+  const query = req.query || {};
 
-  if (!professionalId) {
-    return res.status(400).json({ error: "Missing professionalId" });
-  }
-
-  const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`).trim();
-  const oauth2Client = getOAuthClient(redirectUri);
-
-  // Generate secure state
-  const state = crypto.randomUUID();
-  const db = getDb();
-  
+  let step = "init";
   try {
+    step = "env_check";
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      throw new Error("GOOGLE_CLIENT_ID ausente no ambiente.");
+    }
+    if (!process.env.GOOGLE_CLIENT_SECRET) {
+      throw new Error("GOOGLE_CLIENT_SECRET ausente no ambiente.");
+    }
+    if (!process.env.GOOGLE_REDIRECT_URI) {
+      throw new Error("GOOGLE_REDIRECT_URI ausente no ambiente.");
+    }
+    
+    const uid = req.uid;
+    const professionalIdQuery = query.professionalId as string | undefined;
+    if (professionalIdQuery && professionalIdQuery !== uid) {
+      throw new Error("Permissão negada");
+    }
+    
+    const professionalId = uid || professionalIdQuery;
+    if (!professionalId) {
+      throw new Error("Missing professionalId");
+    }
+
+    step = "redirect_uri_prepare";
+    const redirectUri = getCalendarRedirectUri();
+
+    step = "oauth_client_create";
+    const oauth2Client = getOAuthClient(redirectUri);
+
+    step = "state_create";
+    const state = crypto.randomUUID();
+    const db = getDb();
+    
+    step = "firestore_state_save";
     await db.collection("oauth_states").doc(state).set({
       uid: professionalId,
       provider: "google_calendar",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+      expiresAt: Date.now() + 10 * 60 * 1000,
       used: false
     });
-  } catch (err) {
-    logger.error("CALENDAR", "Failed to persist OAuth state", { professionalId: maskUid(professionalId), error: err });
-    return res.status(500).json({ error: "Erro ao iniciar autenticação" });
+
+    step = "generate_auth_url";
+    const url = oauth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: SCOPES,
+      prompt: "consent",
+      state: state,
+    });
+
+    step = "response_json";
+    return res.json({ 
+      url: url.trim()
+    });
+
+  } catch (err: any) {
+    const errorMsg = String(err instanceof Error ? err.message : err);
+    return res.status(500).json({
+      error: `[${step}] ${errorMsg}`, // Para o frontend exibir no toast corretamente
+      step,
+      message: errorMsg
+    });
   }
-
-  const url = oauth2Client.generateAuthUrl({
-    access_type: "offline", // Required to get refresh_token
-    scope: SCOPES,
-    prompt: "consent", // Force consent to ensure refresh_token is provided every time for safety during dev
-    state: state, // Pass the secure random state
-  });
-
-  res.json({ url: url.trim() });
 });
 
 // 2. OAuth Callback
 router.get("/callback", async (req, res) => {
   const db = getDb();
-  const { code, state: stateParam } = req.query;
-  const stateStr = stateParam as string;
-  const redirectUri = (process.env.GOOGLE_REDIRECT_URI || `${PUBLIC_APP_URL.replace(/\/+$/, "")}/api/calendar/callback`).trim();
-  const appUrl = PUBLIC_APP_URL.trim();
+  // Ensure we do not set Content-Type manually before redirect
+  const appBaseUrl = "https://usenera.com";
 
-  if (!code || !stateStr) {
-    const safeError = JSON.stringify("Missing code or state");
-    return res.send(`
-      <html>
-        <body>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
-              window.close();
-            } else {
-              window.location.href = '${appUrl}/profile?calendarAuth=error';
-            }
-          </script>
-        </body>
-      </html>
-    `);
-  }
+  let step = "callback_start";
 
   try {
-    // Validate state
+    step = "read_query";
+    const redirectUri = getCalendarRedirectUri();
+    
+    const providerError = getQueryParam(req, "error");
+    
+    step = "provider_error_check";
+    if (providerError) {
+      return res.redirect(`/profile?calendarAuth=error&reason=provider_error&step=${encodeURIComponent(step)}&details=${encodeURIComponent(providerError || '')}`);
+    }
+
+    step = "missing_code_check";
+    const code = getQueryParam(req, "code") as string | undefined;
+    const stateStr = getQueryParam(req, "state") as string | undefined;
+
+    if (!code || !stateStr) {
+      return res.redirect(`/profile?calendarAuth=error&reason=missing_code&step=${encodeURIComponent(step)}`);
+    }
+
+    step = "state_lookup";
     const stateDoc = await db.collection("oauth_states").doc(stateStr).get();
     
-    if (!stateDoc.exists) {
-      throw new Error("Solicitação de autenticação inválida ou expirada (state not found)");
+    step = "state_validate";
+    if (!stateDoc?.exists) {
+      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state&step=${encodeURIComponent(step)}`);
     }
-    
-    const stateData = stateDoc.data();
-    if (!stateData || stateData.provider !== "google_calendar" || stateData.used || stateData.expiresAt < Date.now()) {
-      throw new Error("Solicitação de autenticação inválida, já utilizada ou expirada");
-    }
-    
-    const professionalId = stateData.uid;
 
-    // Mark state as used immediately
+    const stateData = stateDoc?.data();
+    if (!stateData || stateData?.provider !== "google_calendar" || stateData?.used || stateData?.expiresAt < Date.now()) {
+      return res.redirect(`/profile?calendarAuth=error&reason=invalid_state&step=${encodeURIComponent(step)}`);
+    }
+
+    const professionalId = stateData?.uid;
+
     await db.collection("oauth_states").doc(stateStr).update({ used: true });
 
+    step = "oauth_client_create";
     const oauth2Client = getOAuthClient(redirectUri);
-    const { tokens } = await oauth2Client.getToken(code as string);
+    
+    step = "token_exchange";
+    let tokens;
+    try {
+      const tokenResponse = await oauth2Client.getToken(code as string);
+      tokens = tokenResponse?.tokens;
+      
+      if (tokens?.error) {
+        throw new Error(String(tokens?.error));
+      }
+    } catch (err: any) {
+      const safeDetails = err?.response?.data?.error || err?.message || String(err) || "unknown_callback_error";
+      const details = encodeURIComponent(String(safeDetails).slice(0, 180));
+      return res.redirect(`/profile?calendarAuth=error&reason=token_exchange_failed&step=${encodeURIComponent(step)}&details=${details}`);
+    }
 
-    // Save tokens to Firestore
-    await db.collection("users").doc(professionalId).update({
-      "integrations.google_calendar": {
-        tokens,
-        connectedAt: new Date().toISOString(),
-        enabled: true,
-      },
-    });
+    step = "firestore_save_tokens";
+    try {
+      await db.collection("users").doc(professionalId).update({
+        "integrations.google_calendar": {
+          tokens,
+          connectedAt: new Date().toISOString(),
+          enabled: true,
+        },
+      });
+    } catch (err: any) {
+      const safeDetails = err?.response?.data?.error || err?.message || String(err) || "unknown_callback_error";
+      const details = encodeURIComponent(String(safeDetails).slice(0, 180));
+      return res.redirect(`/profile?calendarAuth=error&reason=firestore_save_failed&step=${encodeURIComponent(step)}&details=${details}`);
+    }
 
-    res.send(`
-      <html>
-        <body>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'CALENDAR_AUTH_SUCCESS' }, '${appUrl}');
-              window.close();
-            } else {
-              window.location.href = '${appUrl}/profile?calendarAuth=success';
-            }
-          </script>
-          <p>Conexão realizada com sucesso! Redirecionando...</p>
-        </body>
-      </html>
-    `);
+    step = "redirect_success";
+    return res.redirect(`/profile?calendarAuth=success`);
   } catch (err: any) {
-    logger.error("CALENDAR", "Failed to process OAuth callback", { requestId: req.requestId, state: stateStr, error: err });
-    const safeError = JSON.stringify(String(err?.message || "Erro desconhecido"));
-    res.send(`
-      <html>
-        <body>
-          <script>
-            if (window.opener) {
-              window.opener.postMessage({ type: 'CALENDAR_AUTH_ERROR', error: ${safeError} }, '${appUrl}');
-              window.close();
-            } else {
-              window.location.href = '${appUrl}/profile?calendarAuth=error&error=erro';
-            }
-          </script>
-        </body>
-      </html>
-    `);
+    const safeDetails = err?.response?.data?.error || err?.message || String(err) || "unknown_callback_error";
+    logger.error("CALENDAR", "Failed to process OAuth callback - Exception caught", { error: safeDetails });
+    const details = encodeURIComponent(String(safeDetails).slice(0, 180));
+    return res.redirect(`/profile?calendarAuth=error&reason=callback_exception&step=${encodeURIComponent(step)}&details=${details}`);
   }
 });
 
 // 3. Status and Toggle
 router.get("/status", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({ error: true, step: "auth_missing", message: "Usuário não autenticado." });
+  }
+
   const db = getDb();
   const uid = req.uid;
-  const professionalIdQuery = req.query.professionalId as string;
+  const query = req.query || {};
+  const professionalIdQuery = query.professionalId as string | undefined;
 
   if (professionalIdQuery && professionalIdQuery !== uid) {
     return res.status(403).json({ error: "Permissão negada" });
@@ -196,9 +241,15 @@ router.get("/status", requireFirebaseAuth, async (req: AuthenticatedRequest, res
 });
 
 router.post("/toggle", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({ error: true, step: "auth_missing", message: "Usuário não autenticado." });
+  }
+
   const db = getDb();
   const uid = req.uid;
-  const { professionalId, enabled } = req.body;
+  const body = req.body || {};
+  const professionalId = body.professionalId;
+  const enabled = body.enabled;
 
   if (professionalId && professionalId !== uid) {
     return res.status(403).json({ error: "Permissão negada" });
@@ -221,9 +272,14 @@ router.post("/toggle", requireFirebaseAuth, async (req: AuthenticatedRequest, re
 });
 
 router.post("/disconnect", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  if (!req || !req.user || !req.uid) {
+    return res.status(401).json({ error: true, step: "auth_missing", message: "Usuário não autenticado." });
+  }
+
   const db = getDb();
   const uid = req.uid;
-  const { professionalId } = req.body;
+  const body = req.body || {};
+  const professionalId = body.professionalId;
 
   if (professionalId && professionalId !== uid) {
     return res.status(403).json({ error: "Permissão negada" });
@@ -328,6 +384,103 @@ Mensagem: ${appointment.clientMessage || "Nenhuma"}
     return response.data;
   } catch (err: any) {
     logger.error("CALENDAR", "Google Calendar event creation failed", { professionalId: maskUid(professionalId), error: err });
+  }
+}
+
+export async function updateGoogleCalendarEvent(appointment: any, professionalId: string) {
+  const db = getDb();
+  try {
+    if (!appointment.googleCalendarEventId) return;
+
+    const userDoc = await db.collection("users").doc(professionalId).get();
+    const integration = userDoc.data()?.integrations?.google_calendar;
+
+    if (!integration || !integration.tokens || !integration.enabled) return;
+
+    const oauth2Client = getOAuthClient("");
+    oauth2Client.setCredentials(integration.tokens);
+
+    oauth2Client.on("tokens", (tokens) => {
+      const cleanNewTokens = Object.fromEntries(Object.entries(tokens).filter(([_, v]) => v !== undefined));
+      const existingTokens = integration?.tokens || {};
+      const updatedTokens = { ...existingTokens, ...cleanNewTokens };
+      db.collection("users").doc(professionalId).update({
+        "integrations.google_calendar.tokens": updatedTokens
+      }).catch(err => {
+        logger.error("CALENDAR", "Failed to persist refreshed tokens", { professionalId: maskUid(professionalId), error: err });
+      });
+    });
+
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+    const startDateTime = new Date(`${appointment.date}T${appointment.time}:00`);
+    const endDateTime = new Date(startDateTime.getTime() + (appointment.duration || 60) * 60000);
+
+    const description = `
+Cliente: ${appointment.clientName}
+WhatsApp: ${appointment.clientPhone}
+Serviço: ${appointment.serviceName}
+${appointment.isHomeService ? `Endereço: ${appointment.addressStreet}, ${appointment.addressNumber}` : "No Studio"}
+Mensagem: ${appointment.clientMessage || "Nenhuma"}
+    `.trim();
+
+    const event = {
+      summary: `Nera: ${appointment.serviceName} - ${appointment.clientName}`,
+      description: description,
+      start: {
+        dateTime: startDateTime.toISOString(),
+        timeZone: "America/Sao_Paulo",
+      },
+      end: {
+        dateTime: endDateTime.toISOString(),
+        timeZone: "America/Sao_Paulo",
+      },
+    };
+
+    await calendar.events.patch({
+      calendarId: "primary",
+      eventId: appointment.googleCalendarEventId,
+      requestBody: event,
+    });
+    logger.info("CALENDAR", "Event updated successfully", { professionalId: maskUid(professionalId) });
+  } catch (err: any) {
+    logger.error("CALENDAR", "Google Calendar event update failed", { professionalId: maskUid(professionalId), error: err });
+  }
+}
+
+export async function deleteGoogleCalendarEvent(appointment: any, professionalId: string) {
+  const db = getDb();
+  try {
+    if (!appointment.googleCalendarEventId) return;
+
+    const userDoc = await db.collection("users").doc(professionalId).get();
+    const integration = userDoc.data()?.integrations?.google_calendar;
+
+    if (!integration || !integration.tokens || !integration.enabled) return;
+
+    const oauth2Client = getOAuthClient("");
+    oauth2Client.setCredentials(integration.tokens);
+
+    oauth2Client.on("tokens", (tokens) => {
+      const cleanNewTokens = Object.fromEntries(Object.entries(tokens).filter(([_, v]) => v !== undefined));
+      const existingTokens = integration?.tokens || {};
+      const updatedTokens = { ...existingTokens, ...cleanNewTokens };
+      db.collection("users").doc(professionalId).update({
+        "integrations.google_calendar.tokens": updatedTokens
+      }).catch(err => {
+        logger.error("CALENDAR", "Failed to persist refreshed tokens", { professionalId: maskUid(professionalId), error: err });
+      });
+    });
+
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+
+    await calendar.events.delete({
+      calendarId: "primary",
+      eventId: appointment.googleCalendarEventId,
+    });
+    logger.info("CALENDAR", "Event deleted successfully", { professionalId: maskUid(professionalId) });
+  } catch (err: any) {
+    logger.error("CALENDAR", "Google Calendar event deletion failed", { professionalId: maskUid(professionalId), error: err });
   }
 }
 

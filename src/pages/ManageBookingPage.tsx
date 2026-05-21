@@ -13,6 +13,7 @@ import {
   confirmPresenceByClient, 
   cancelBookingByClient, 
   rescheduleBookingByClient,
+  recordRescheduleRequest,
   getAppointmentByToken
 } from '../firebase';
 import { doc, getDoc, collection, query, where, onSnapshot, getDocs, limit } from 'firebase/firestore';
@@ -49,6 +50,7 @@ export default function ManageBookingPage() {
   const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [errorOccurred, setErrorOccurred] = useState(false);
   const [reviewToken, setReviewToken] = useState<string | null>(null);
+  const [reviewStatus, setReviewStatus] = useState<string | null>(null);
 
   const [diagnosticResults, setDiagnosticResults] = useState<any>(null);
   const [isAutoProcessed, setIsAutoProcessed] = useState(false);
@@ -85,6 +87,16 @@ export default function ManageBookingPage() {
         const today = getTodayLocale();
         if (appointment.date >= today) {
           setSelectedDate(appointment.date);
+        }
+        
+        if (appointment.attendanceStatus !== 'reschedule_requested' && !isAutoProcessed) {
+          setIsAutoProcessed(true);
+          const lookupKey = appointment.manageSlug || appointment.id;
+          recordRescheduleRequest(lookupKey).then(() => {
+             setAppointment(prev => prev ? { ...prev, attendanceStatus: 'reschedule_requested' } : null);
+          }).catch(err => {
+             if (isDev) console.error('[AUTO_ACTION] Error recording reschedule request:', err);
+          });
         }
       }
     };
@@ -149,6 +161,7 @@ export default function ManageBookingPage() {
           const snap = await getDocs(q);
           if (!snap.empty) {
             setReviewToken(snap.docs[0].data().token);
+            setReviewStatus(snap.docs[0].data().status);
           }
         }
 
@@ -206,12 +219,27 @@ setBlockedSchedules(dayBlocked);
   }, [view, professional, selectedDate]);
 
   const availableSlots = useMemo(() => {
-    if (!professional?.workingHours || !selectedDate || !appointment) return [];
+    if (!selectedDate || !appointment || !professional) return [];
+    
+    // Auto-fallback if the professional has legacy hours format instead of the nested workingHours object
+    const workingHours = professional.workingHours || {
+      startTime: (professional as any).startTime || '08:00',
+      endTime: (professional as any).endTime || '18:00',
+      workingDays: (professional as any).workingDays || [1, 2, 3, 4, 5],
+      breakStart: (professional as any).breakStart,
+      breakEnd: (professional as any).breakEnd
+    };
+    
+    // Ignore the current appointment we're trying to reschedule
+    const filteredAppts = dayAppointments.filter(a => 
+      a.id !== (appointment.appointmentId || appointment.id)
+    );
+
     return getAvailableSlots({
       selectedDate,
       serviceDuration: Number(appointment.duration) || 60,
-      workingHours: professional.workingHours,
-      appointments: dayAppointments,
+      workingHours,
+      appointments: filteredAppts,
       blockedSchedules
     });
   }, [selectedDate, appointment, professional, dayAppointments, blockedSchedules]);
@@ -243,6 +271,23 @@ setBlockedSchedules(dayBlocked);
       notify.error('Erro ao cancelar');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleEnterReschedule = () => {
+    setView('reschedule');
+    const today = getTodayLocale();
+    if (appointment && appointment.date >= today) {
+      setSelectedDate(appointment.date);
+    }
+    
+    if (appointment && appointment.attendanceStatus !== 'reschedule_requested') {
+      const lookupKey = appointment.manageSlug || appointment.id;
+      recordRescheduleRequest(lookupKey).then(() => {
+         setAppointment(prev => prev ? { ...prev, attendanceStatus: 'reschedule_requested' } : null);
+      }).catch(err => {
+         if (isDev) console.error('Error recording reschedule request', err);
+      });
     }
   };
 
@@ -457,7 +502,7 @@ setBlockedSchedules(dayBlocked);
                     {!isPending && (
                       <div className="grid grid-cols-2 gap-4 pt-2">
                         <button 
-                          onClick={() => setView('reschedule')}
+                          onClick={handleEnterReschedule}
                           className="py-4 bg-brand-white text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest shadow-sm hover:border-brand-ink transition-all flex items-center justify-center gap-2"
                         >
                           <Clock size={14} /> Remarcar
@@ -476,13 +521,18 @@ setBlockedSchedules(dayBlocked);
                 {/* 2. COMPLETED ACTIONS */}
                 {isCompleted && (
                   <div className="space-y-4">
-                    {reviewToken && (
+                    {reviewToken && reviewStatus !== 'submitted' && (
                       <button 
                         onClick={() => navigate(`/review/${reviewToken}`)}
                         className="w-full py-7 bg-brand-ink text-brand-white rounded-full text-[11px] font-extrabold uppercase tracking-[0.25em] shadow-2xl hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 animate-bounce-slow"
                       >
                         <Sparkles size={24} className="fill-brand-terracotta text-brand-terracotta" /> Avaliar Atendimento 💛
                       </button>
+                    )}
+                    {reviewStatus === 'submitted' && (
+                      <div className="w-full py-5 bg-green-50 text-green-700 rounded-full text-[11px] font-bold uppercase tracking-[0.25em] flex items-center justify-center gap-3">
+                        <Check size={18} /> Avaliação enviada
+                      </div>
                     )}
                     
                     <PremiumButton 

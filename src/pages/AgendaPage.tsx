@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
-import { db, handleBookingError, createManualAppointment, updateAppointmentStatus, sanitizeAppointment } from '../firebase';
+import { db, handleBookingError, createManualAppointment, updateAppointmentStatus, sanitizeAppointment, rescheduleBookingByProfessional } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, serverTimestamp, setDoc, deleteDoc, getDocs, getDoc, limit } from 'firebase/firestore';
 import { 
   Calendar, Clock, MessageCircle, 
@@ -130,6 +130,12 @@ export default function AgendaPage() {
   const [manualDate, setManualDate] = useState(selectedDate);
   const [manualTime, setManualTime] = useState('');
   const [services, setServices] = useState<any[]>([]);
+  
+  // Reschedule State
+  const [agendaView, setAgendaView] = useState<'details' | 'reschedule'>('details');
+  const [rescheduleDate, setRescheduleDate] = useState(selectedDate);
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [isReschedulingLoading, setIsReschedulingLoading] = useState(false);
   // Intelligent Fit State
   const [isCreating, setIsCreating] = useState(false);
   const [blockToDelete, setBlockToDelete] = useState<any | null>(null);
@@ -198,6 +204,14 @@ export default function AgendaPage() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (!isDetailsOpen) {
+       setTimeout(() => setAgendaView('details'), 300);
+       setRescheduleDate(selectedDate);
+       setRescheduleTime('');
+    }
+  }, [isDetailsOpen, selectedDate]);
 
   useEffect(() => {
     if (!user) return;
@@ -427,6 +441,47 @@ export default function AgendaPage() {
     }
   };
 
+  const availableRescheduleSlots = React.useMemo(() => {
+    if (!rescheduleDate || !selectedAppointment || !profile?.workingHours) return [];
+    
+    const duration = Number(selectedAppointment.duration) || 60;
+    
+    // Ignore the current appointment we're trying to reschedule
+    const filteredAppts = allAppointments.filter(a => a.id !== selectedAppointment.id && a.date === rescheduleDate);
+    const dayOfWeek = parseLocalDate(rescheduleDate).getDay();
+    const dayBlocks = allBlockedSchedules.filter(b => b.date === rescheduleDate || (b.isRecurring && b.recurringDays?.includes(dayOfWeek)));
+
+    return getAvailableSlotsOld({
+      selectedDate: rescheduleDate,
+      serviceDuration: duration,
+      appointments: filteredAppts,
+      blockedSchedules: dayBlocks,
+      workingHours: profile.workingHours
+    });
+  }, [rescheduleDate, selectedAppointment, allAppointments, allBlockedSchedules, profile]);
+
+  const handleRescheduleProfessional = async () => {
+    if (!user || !selectedAppointment || !rescheduleDate || !rescheduleTime) {
+      notify.error('Preencha data e horário.');
+      return;
+    }
+    setIsReschedulingLoading(true);
+    try {
+      await rescheduleBookingByProfessional(selectedAppointment.id, user.uid, rescheduleDate, rescheduleTime);
+      notify.success('Atendimento remarcado com sucesso!');
+      setAgendaView('details');
+      setIsDetailsOpen(false);
+    } catch (err: any) {
+      if (err.message === 'Horário indisponível') {
+        notify.error('Este horário acabou de ser preenchido. Escolha outro.');
+      } else {
+        notify.error('Não foi possível remarcar o atendimento.');
+      }
+    } finally {
+      setIsReschedulingLoading(false);
+    }
+  };
+
   const handleCreateManual = async () => {
     if (!user || !manualClient || !manualDate || !manualTime) {
       notify.error('Preencha nome da cliente, data e horário.');
@@ -481,33 +536,12 @@ export default function AgendaPage() {
         }
       });
       
+      const resData = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Erro ao concluir (${res.status})`);
+        throw new Error(resData.error || `Erro ao concluir (${res.status})`);
       }
 
-      const token = Array.from(window.crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2, '0')).join('');
-      await addDoc(collection(db, 'review_requests'), {
-        bookingId: app.id,
-        professionalId: user.uid,
-        clientDisplayName: app.clientName,
-        clientNeighborhood: app.neighborhood || '',
-        token,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      });
-      
-      notify.success('Experiência finalizada! Redirecionando para envio de convite de avaliação.');
-      const reviewLink = `${window.location.origin}/review/${token}`;
-      try {
-        await navigator.clipboard.writeText(reviewLink);
-        notify.success('Link copiado.');
-      } catch {
-        // Ignorar erro do clipboard
-      }
-      
-      const text = `Oi, ${app.clientName} 🤎\nObrigada pela visita de hoje.\nSe puder, deixe sua avaliação por aqui:\n${reviewLink}`;
-      window.open(`https://wa.me/55${cleanWhatsapp(app.clientWhatsapp)}?text=${encodeURIComponent(text)}`, '_blank');
+      notify.success('Atendimento finalizado. A cliente receberá o link de avaliação por e-mail.');
       setIsDetailsOpen(false);
 
     } catch (err) {
@@ -1341,7 +1375,15 @@ export default function AgendaPage() {
                 <X size={20} strokeWidth={2.5} />
               </button>
 
-              <div className="mb-5 sm:mb-6 pr-12 relative">
+              {agendaView === 'details' && (
+                <motion.div 
+                   key="details"
+                   initial={{ opacity: 0, x: -20 }}
+                   animate={{ opacity: 1, x: 0 }}
+                   exit={{ opacity: 0, x: 20 }}
+                   className="w-full"
+                >
+                  <div className="mb-5 sm:mb-6 pr-12 relative">
                 <span className="block text-[9px] font-bold uppercase tracking-[0.2em] text-brand-terracotta mb-2">Detalhes da Reserva</span>
                 
                 <h3 className="text-2xl sm:text-3xl font-serif text-brand-ink leading-tight mb-1">{selectedAppointment.clientName}</h3>
@@ -1494,6 +1536,21 @@ export default function AgendaPage() {
                   </div>
                 )}
 
+                {selectedAppointment.timeline && selectedAppointment.timeline.length > 0 && (
+                  <div className="pt-4 pb-2">
+                    <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-4">Histórico da Reserva</p>
+                    <div className="space-y-4 pl-2 border-l border-brand-mist/50">
+                      {[...selectedAppointment.timeline].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((event, idx) => (
+                        <div key={idx} className="relative pl-4">
+                          <div className="absolute -left-[5px] top-[6px] w-[9px] h-[9px] rounded-full bg-brand-mist border-2 border-brand-white" />
+                          <p className="text-[11px] text-brand-ink font-medium leading-tight">{event.label}</p>
+                          <p className="text-[9px] text-brand-stone mt-0.5">{formatLocalDate(formatDateKey(new Date(event.createdAt)), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="pt-2 flex flex-col gap-2">
                   {selectedAppointment.status === 'pending' && (
                     <PremiumButton 
@@ -1535,14 +1592,24 @@ export default function AgendaPage() {
                   </button>
 
                   {isConfirmedLikeStatus(selectedAppointment.status) && (
-                    <PremiumButton 
-                       variant="primary"
-                       className="w-full py-3 mt-1 text-[13px]"
-                       onClick={() => handleComplete(selectedAppointment)}
-                       disabled={loading === selectedAppointment.id}
-                     >
-                      {loading === selectedAppointment.id ? 'Finalizando...' : 'Finalizar Atendimento'}
-                    </PremiumButton>
+                    <>
+                      <button 
+                        onClick={() => {
+                          setAgendaView('reschedule');
+                        }}
+                        className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen hover:text-brand-ink rounded-xl transition-all border border-brand-mist/60 flex items-center justify-center gap-2 mt-2"
+                      >
+                         Remarcar Atendimento
+                      </button>
+                      <PremiumButton 
+                         variant="primary"
+                         className="w-full py-3 mt-4 text-[13px]"
+                         onClick={() => handleComplete(selectedAppointment)}
+                         disabled={loading === selectedAppointment.id}
+                       >
+                        {loading === selectedAppointment.id ? 'Finalizando...' : 'Finalizar Atendimento'}
+                      </PremiumButton>
+                    </>
                   )}
 
                   {!isCompletedStatus(selectedAppointment.status) && (
@@ -1569,10 +1636,17 @@ export default function AgendaPage() {
                         onClick={async () => {
                           setLoading(selectedAppointment.id);
                           try {
+                            const { arrayUnion } = await import('firebase/firestore');
                             const updatePayload = {
                               noShow: true,
-                              status: 'cancelled_by_professional' as const, // or maintain confirmed but with noShow flag
-                              updatedAt: serverTimestamp()
+                              status: 'no_show_client' as const,
+                              updatedAt: serverTimestamp(),
+                              timeline: arrayUnion({
+                                type: 'no_show_client',
+                                createdAt: new Date().toISOString(),
+                                actor: 'professional',
+                                label: 'Atendimento marcado como No-Show Cliente'
+                              })
                             };
                             const safeUpdate = sanitizeAppointment(updatePayload, true);
                             await updateDoc(doc(db, 'appointments', selectedAppointment.id), safeUpdate);
@@ -1593,6 +1667,85 @@ export default function AgendaPage() {
                   })()}
                 </div>
               </div>
+              </motion.div>
+              )}
+
+              {agendaView === 'reschedule' && (
+                <motion.div 
+                  key="reschedule"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="w-full pb-6"
+                >
+                  <button 
+                    onClick={() => setAgendaView('details')}
+                    className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink mb-6"
+                  >
+                    <ChevronLeft size={14} /> Voltar
+                  </button>
+
+                  <h3 className="text-2xl font-serif text-brand-ink leading-tight mb-2">Remarcar Horário</h3>
+                  <p className="text-sm text-brand-stone font-light mb-8">Escolha a nova data e horário para {selectedAppointment.clientName}. A cliente será notificada por e-mail.</p>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-2">Selecione a Data</label>
+                      <input 
+                        type="date"
+                        value={rescheduleDate}
+                        onChange={(e) => {
+                           setRescheduleDate(e.target.value);
+                           setRescheduleTime('');
+                        }}
+                        min={formatDateKey(new Date())}
+                        className="w-full bg-brand-linen/50 border border-brand-mist/50 rounded-2xl px-5 py-4 text-brand-ink font-serif text-lg focus:outline-none focus:ring-1 focus:ring-brand-terracotta"
+                      />
+                    </div>
+
+                    {rescheduleDate && (
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-2 text-center">Horários Disponíveis</label>
+                        {availableRescheduleSlots.length > 0 ? (
+                           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                             {availableRescheduleSlots.map((time) => (
+                               <button 
+                                 key={time}
+                                 onClick={() => setRescheduleTime(time)}
+                                 className={cn(
+                                   "py-3 rounded-xl border text-sm font-medium transition-all shadow-sm",
+                                    rescheduleTime === time
+                                      ? "bg-brand-terracotta border-brand-terracotta text-brand-white"
+                                      : "bg-brand-white border-brand-mist/50 text-brand-ink hover:border-brand-terracotta hover:bg-brand-linen"
+                                 )}
+                               >
+                                 {time}
+                               </button>
+                             ))}
+                           </div>
+                        ) : (
+                           <div className="p-6 bg-brand-linen/20 rounded-[28px] border border-dashed border-brand-mist/50 flex flex-col items-center text-center gap-2">
+                             <AlertCircle size={20} className="text-brand-stone/40" />
+                             <p className="text-[10px] text-brand-stone font-light px-4">
+                               Nenhum horário disponível para este serviço em {formatLocalDate(rescheduleDate, { day: '2-digit', month: '2-digit' })}.
+                             </p>
+                           </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="pt-8">
+                     <button
+                       onClick={handleRescheduleProfessional}
+                       disabled={!rescheduleDate || !rescheduleTime || isReschedulingLoading}
+                       className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                     >
+                       {isReschedulingLoading ? 'Remarcando...' : 'Confirmar Novo Horário'}
+                     </button>
+                  </div>
+                </motion.div>
+              )}
             </motion.div>
           </div>
         )}

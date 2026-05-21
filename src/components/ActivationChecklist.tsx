@@ -22,6 +22,7 @@ interface ActivationChecklistProps {
   profile: UserProfile | null;
   appointments: Appointment[];
   services: Service[];
+  isLoading?: boolean;
   onShareClick: () => void;
 }
 
@@ -29,18 +30,38 @@ export const ActivationChecklist = ({
   profile, 
   appointments, 
   services,
+  isLoading,
   onShareClick
 }: ActivationChecklistProps) => {
   const [isMinimized, setIsMinimized] = useState(() => {
-    return localStorage.getItem('nera_checklist_minimized') === 'true';
+    return profile?.dismissedTips?.checklistMinimized || localStorage.getItem('nera_checklist_minimized') === 'true';
   });
   const [wowDismissed, setWowDismissed] = useState(() => {
-    return localStorage.getItem('nera_wow_celebrated') === 'true';
+    return profile?.dismissedTips?.wowCelebrated || localStorage.getItem('nera_wow_celebrated') === 'true';
   });
   const [copied, setCopied] = useState(false);
   const [hasShared, setHasShared] = useState(() => {
     return profile?.hasSharedLink || localStorage.getItem('nera_link_shared') === 'true';
   });
+
+  useEffect(() => {
+    if (profile?.dismissedTips?.checklistMinimized && !isMinimized) setIsMinimized(true);
+    if (profile?.dismissedTips?.wowCelebrated && !wowDismissed) setWowDismissed(true);
+  }, [profile?.dismissedTips]);
+
+  const persistTip = async (key: string) => {
+    if (profile?.uid) {
+      try {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('../firebase');
+        await updateDoc(doc(db, 'users', profile.uid), {
+          [`dismissedTips.${key}`]: true
+        });
+      } catch (err) {
+        console.error(`Failed to update ${key}:`, err);
+      }
+    }
+  };
 
   useEffect(() => {
     if (profile?.hasSharedLink) {
@@ -66,16 +87,24 @@ export const ActivationChecklist = ({
     }
   };
   const [hasHistoricalBooking, setHasHistoricalBooking] = useState(false);
+  const [isFetchingHistory, setIsFetchingHistory] = useState(true);
 
   useEffect(() => {
-    if (!profile?.uid) return;
+    if (!profile?.uid) {
+      setIsFetchingHistory(false);
+      return;
+    }
     
     // Fast path: if appointments from props already contains a valid booking
     const hasActiveProp = appointments.some(app => 
       app.status && 
       !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(app.status)
     );
-    if (hasActiveProp) return;
+    if (hasActiveProp) {
+      setHasHistoricalBooking(true);
+      setIsFetchingHistory(false);
+      return;
+    }
 
     let isMounted = true;
     (async () => {
@@ -94,6 +123,8 @@ export const ActivationChecklist = ({
         if (!snap.empty) setHasHistoricalBooking(true);
       } catch (err) {
         // Ignore silently
+      } finally {
+        if (isMounted) setIsFetchingHistory(false);
       }
     })();
     return () => { isMounted = false; };
@@ -160,11 +191,13 @@ export const ActivationChecklist = ({
     const newState = !isMinimized;
     setIsMinimized(newState);
     localStorage.setItem('nera_checklist_minimized', String(newState));
+    if (newState) persistTip('checklistMinimized');
   };
 
   const handleDismissWow = () => {
     setWowDismissed(true);
     localStorage.setItem('nera_wow_celebrated', 'true');
+    persistTip('wowCelebrated');
   };
 
   const handleCopy = () => {
@@ -173,6 +206,8 @@ export const ActivationChecklist = ({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (isLoading || isFetchingHistory) return null;
 
   if (checklistProgress === 100) {
     if (wowDismissed) return null;

@@ -10,6 +10,7 @@ import {
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
 import { generateMonthlyReportPDF } from "../reports/monthlyReport.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
+import { logger } from "../utils/logger.js";
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ const debugOnly = (req: any, res: any, next: any) => {
 
 router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
-  console.log('[BioAI] Entry /generate-content:', { name, specialty });
+  logger.info("AI", "[BioAI] Entry /generate-content", { meta: { name, specialty } });
   
   // Simple rate limit check
   const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous') as string;
@@ -38,13 +39,13 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   aiRateLimit.set(ip, rateData);
 
   if (rateData.count > MAX_REQUESTS) {
-    console.warn('[BioAI] Rate limit hit:', ip);
+    logger.warn("AI", "[BioAI] Rate limit hit", { meta: { ip } });
     return res.status(429).json({ error: "Muitas solicitações. Tente novamente em um minuto." });
   }
   
-  console.log('[BioAI] NVIDIA_API_KEY present:', !!process.env.NVIDIA_API_KEY);
+  logger.info("AI", "[BioAI] NVIDIA_API_KEY present", { meta: { key: !!process.env.NVIDIA_API_KEY } });
   if (!process.env.NVIDIA_API_KEY) {
-    console.error("[BioAI] NVIDIA_API_KEY is missing in server environment");
+    logger.error("AI", "[BioAI] NVIDIA_API_KEY is missing in server environment");
     return res.status(500).json({ error: "Configuração de IA ausente." });
   }
 
@@ -79,7 +80,7 @@ Retorne APENAS um JSON válido, puro, sem marcações markdown, estruturado exat
 {"bio": "Texto da bio humana, sem clichês...", "headline": "Headline focada na profissão real"}
 `;
 
-    console.log('[BioAI] Calling NVIDIA Model meta/llama-3.1-8b-instruct');
+    logger.info("AI", "[BioAI] Calling NVIDIA Model meta/llama-3.1-8b-instruct");
     const content = await callNvidiaAI([
       { role: "user", content: prompt }
     ], { 
@@ -88,7 +89,7 @@ Retorne APENAS um JSON válido, puro, sem marcações markdown, estruturado exat
       max_tokens: 512
     });
     
-    console.log('[BioAI] Raw response from NVIDIA:', content);
+    logger.info("AI", "[BioAI] Raw response from NVIDIA", { meta: { content } });
     
     // Attempt to parse JSON from response string
     let parsed;
@@ -101,15 +102,15 @@ Retorne APENAS um JSON válido, puro, sem marcações markdown, estruturado exat
       }
       parsed = JSON.parse(jsonString);
     } catch (e) {
-      console.error("[BioAI] JSON parse error from model output:", content);
+      logger.error("AI", "[BioAI] JSON parse error from model output", { error: { content } });
       throw new Error("Invalid format from AI model");
     }
 
-    console.log(`[BioAI] Successfully generated parsed:`, parsed);
+    logger.info("AI", `[BioAI] Successfully generated parsed`, { meta: { parsed } });
     res.json(parsed);
 
   } catch (error: any) {
-    console.error("[BioAI] Generation error:", error.message);
+    logger.error("AI", "[BioAI] Generation error", { error: { message: error.message } });
     res.status(500).json({ error: "Não foi possível gerar o conteúdo." });
   }
 });
@@ -118,7 +119,7 @@ router.post("/analyze-portfolio-image", requireFirebaseAuth, checkPlanFeature('a
   const { imageUrl, specialty } = req.body;
   
   if (!process.env.NVIDIA_API_KEY) {
-    console.error("[PortfolioAI] NVIDIA_API_KEY is missing");
+    logger.error("AI", "[PortfolioAI] NVIDIA_API_KEY is missing");
     return res.json({ category: "Portfólio" });
   }
 
@@ -140,7 +141,7 @@ router.post("/analyze-portfolio-image", requireFirebaseAuth, checkPlanFeature('a
     res.json({ category: content || "Portfólio" });
 
   } catch (error: any) {
-    console.error("[PortfolioAI] error:", error.message);
+    logger.error("AI", "[PortfolioAI] error", { error: { message: error.message } });
     res.json({ category: "Portfólio" });
   }
 });
@@ -196,7 +197,7 @@ router.post("/ai/service-description", requireFirebaseAuth, checkPlanFeature('ad
 router.post("/ai/categorize-service", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { serviceName } = req.body;
   if (!process.env.NVIDIA_API_KEY) {
-    console.warn("[AI SERVICE] NVIDIA failed (missing key), using local fallback");
+    logger.warn("AI", "[AI SERVICE] NVIDIA failed (missing key), using local fallback");
     return res.json({ category: "Outros" });
   }
 
@@ -209,7 +210,7 @@ router.post("/ai/categorize-service", requireFirebaseAuth, async (req: Authentic
     });
     res.json({ category: content || "Outros" });
   } catch (error) {
-    console.warn("[AI SERVICE] NVIDIA categorization failed, using local fallback");
+    logger.warn("AI", "[AI SERVICE] NVIDIA categorization failed, using local fallback");
     res.json({ category: "Outros" });
   }
 });
@@ -217,7 +218,7 @@ router.post("/ai/categorize-service", requireFirebaseAuth, async (req: Authentic
 router.post("/ai/categorize-portfolio-item", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { title, description } = req.body;
   if (!process.env.NVIDIA_API_KEY) {
-    console.warn("[AI SERVICE] NVIDIA failed (missing key), using local fallback");
+    logger.warn("AI", "[AI SERVICE] NVIDIA failed (missing key), using local fallback");
     return res.json({ category: "Geral" });
   }
 
@@ -230,7 +231,7 @@ router.post("/ai/categorize-portfolio-item", requireFirebaseAuth, async (req: Au
     });
     res.json({ category: content || "Geral" });
   } catch (error) {
-    console.warn("[AI SERVICE] NVIDIA portfolio categorization failed, using local fallback");
+    logger.warn("AI", "[AI SERVICE] NVIDIA portfolio categorization failed, using local fallback");
     res.json({ category: "Geral" });
   }
 });
@@ -241,7 +242,7 @@ router.get("/reports/monthly", requireFirebaseAuth, checkPlanFeature('reports'),
   const professionalId = String(req.query.professionalId || req.uid);
 
   if (professionalId !== req.uid) {
-    console.warn(`[REPORT AUTH] User ${req.uid} attempted to access report of ${professionalId}. Access denied.`);
+    logger.warn("AI", `[REPORT AUTH] User ${req.uid} attempted to access report of ${professionalId}. Access denied.`);
     return res.status(403).json({ error: "Acesso negado. Você só pode gerar relatórios da sua própria conta." });
   }
 
@@ -328,7 +329,7 @@ router.get("/reports/monthly", requireFirebaseAuth, checkPlanFeature('reports'),
     res.send(buffer);
 
   } catch (error: any) {
-    console.error("[REPORT] Generation error:", error);
+    logger.error("AI", "[REPORT] Generation error", { error });
     res.status(500).json({ error: "Erro ao gerar relatório." });
   }
 });

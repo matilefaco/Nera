@@ -9,10 +9,11 @@ import {
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
   RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, Key, Check
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { notify } from '../lib/notify';
+import { toast } from 'sonner';
 import imageCompression from 'browser-image-compression';
-import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp } from '../lib/utils';
+import { formatCurrency, cn, getHumanError, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, getDifferentialPlaceholder } from '../lib/utils';
 import { THEMES, getTheme } from '../lib/themes';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
@@ -68,10 +69,38 @@ const THEME_MOODS: Record<string, { label: string, subtitle: string }> = {
   }
 };
 
+class ProfileErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean, error: any}> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-12 text-center text-red-500 bg-red-50 rounded-lg m-12 relative z-50">
+          <h2 className="text-xl font-bold mb-4">Erro fatal na ProfilePage</h2>
+          <pre className="text-xs text-left overflow-auto p-4 bg-white rounded border">{this.state.error?.message || String(this.state.error)}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function ProfilePage() {
+  console.log('[ProfilePage] Render starts');
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
+
+  useEffect(() => {
+    console.log('[ProfilePage] User:', user?.uid, 'AuthLoading:', authLoading);
+  }, [user, authLoading]);
+
 
   const profileCompleteness = useMemo(() => {
     if (!profile) return 0;
@@ -284,18 +313,17 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user) {
       fetchCalendarStatus();
-      const params = new URLSearchParams(window.location.search);
-      const calendarAuth = params.get('calendarAuth');
-      if (calendarAuth === 'success') {
-        notify.success('Agenda sincronizada.');
-        window.history.replaceState({}, '', window.location.pathname);
-      } else if (calendarAuth === 'error') {
-        const errMsg = params.get('error') || 'Erro desconhecido';
-        notify.error(`Erro ao conectar: ${errMsg}`);
-        window.history.replaceState({}, '', window.location.pathname);
+      if (searchParams.get('calendarAuth')) {
+        const authStat = searchParams.get('calendarAuth');
+        if (authStat === 'success') {
+          notify.success('Google Calendar conectado.');
+        } else if (authStat === 'error') {
+          toast.error('Erro ao conectar com Google Calendar.', { duration: 5000 });
+        }
+        setSearchParams({}, { replace: true });
       }
     }
-  }, [user]);
+  }, [user, searchParams, setSearchParams]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -339,72 +367,102 @@ export default function ProfilePage() {
   const handleConnectCalendar = async () => {
     if (!user) return;
     setCalendarLoading(true);
-
-    // No iPhone/Safari o comportamento de popup é problemático, e os cookies/sessões perdem contexto se for PWA.
-    // Vamos usar Same-Tab Redirect. Se quisermos popup apenas no desktop e redirect no mobile, 
-    // podemos checar userAgent, mas vamos tentar redirecionar sempre usando assign.
     
-    // Check if it's Safari/iOS
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    
     const shouldRedirect = isIOS || isSafari;
-    let popup: Window | null = null;
     
+    let popup: Window | null = null;
     if (!shouldRedirect) {
       popup = window.open('', '_blank');
     }
     
+    let token: string;
     try {
-      const token = await user.getIdToken();
-      const res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      token = await user.getIdToken();
+    } catch (e: any) {
+      notify.error(`Erro ao obter token do usuário: ${e.message}`);
+      setCalendarLoading(false);
+      return;
+    }
+
+    let res: Response;
+    try {
+      res = await fetch(`/api/calendar/auth-url?professionalId=${user.uid}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        if (popup) popup.close();
-        throw new Error(data.error || 'Erro desconhecido ao carregar auth-url');
-      }
-      
-      if (!data.url || typeof data.url !== 'string') {
-        throw new Error('URL de autenticação inválida gerada pelo servidor.');
-      }
+    } catch (e: any) {
+      if (popup) popup.close();
+      toast.error(`Erro antes do backend: falha no fetch (${e.message})`, { duration: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
 
-      // Safely trim and clean the URL (use standard js replace, avoiding double backslashes which caused bugs before)
-      const cleanUrl = data.url.trim().replace(/\r?\n|\r/g, '');
+    let data: any;
+    try {
+      data = await res.json();
+    } catch (e: any) {
+      if (popup) popup.close();
+      toast.error('Erro de comunicação com o servidor.', { duration: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
 
-      let parsed: URL;
-      try {
-        parsed = new URL(cleanUrl);
-      } catch (e) {
-        console.error('[Calendar] Invalid URL parse attempt:', cleanUrl);
-        throw new Error('URL retornada não é válida.');
-      }
+    if (!res.ok || data.error) {
+      if (popup) popup.close();
+      const msgStr = data.message || data.error || 'Falha no servidor';
+      toast.error(`Erro: ${msgStr}`, { duration: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
+    
+    if (!data.url) {
+      if (popup) popup.close();
+      toast.error('URL OAuth ausente na resposta.', { duration: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
 
-      if (parsed.origin !== 'https://accounts.google.com') {
-        console.error('[Calendar] Invalid origin in URL:', parsed.origin);
-        throw new Error('URL retornada tem origem bloqueada por segurança.');
-      }
+    let cleanUrl: string;
+    try {
+      cleanUrl = String(data.url).trim().replace(/\r?\n|\r/g, '');
+    } catch (e: any) {
+      if (popup) popup.close();
+      toast.error('URL OAuth inválida.');
+      setCalendarLoading(false);
+      return;
+    }
 
-      console.log('[Calendar] Valid auth URL generated, type:', typeof data.url);
+    let parsed: URL;
+    try {
+      parsed = new URL(cleanUrl);
+    } catch (e: any) {
+      if (popup) popup.close();
+      toast.error('URL OAuth inválida.');
+      setCalendarLoading(false);
+      return;
+    }
 
+    if (parsed.origin !== 'https://accounts.google.com') {
+      if (popup) popup.close();
+      toast.error('Origem OAuth incorreta.', { duration: 5000 });
+      setCalendarLoading(false);
+      return;
+    }
+
+    try {
       if (shouldRedirect) {
-        console.log('[Calendar] Redirecting in same tab (iOS/Safari fallback)');
         window.location.assign(cleanUrl);
       } else {
         if (popup && !popup.closed) {
           popup.location.href = cleanUrl;
         } else {
-          // fallback if popup was blocked
           window.location.assign(cleanUrl);
         }
       }
-    } catch (err: any) {
+    } catch (e: any) {
       if (popup) popup.close();
-      console.error('[Calendar] Error connecting:', err);
-      notify.error(err.message || 'Erro ao iniciar conexão com Google Calendar.');
+      toast.error('Falha ao redirecionar para o Google.', { duration: 5000 });
     } finally {
       setCalendarLoading(false);
     }
@@ -816,8 +874,9 @@ export default function ProfilePage() {
   };
 
   return (
-    <AppLayout activeRoute="profile">
-      <div className="p-6 md:p-12 pb-32 md:pb-12 max-w-5xl mx-auto w-full">
+    <ProfileErrorBoundary>
+      <AppLayout activeRoute="profile">
+        <div className="p-6 md:p-12 pb-32 md:pb-12 max-w-5xl mx-auto w-full">
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
           <div className="space-y-3">
             <div className="flex items-center gap-2 mb-1">
@@ -1122,7 +1181,7 @@ export default function ProfilePage() {
                 <div className="flex gap-2">
                   <input 
                     type="text" 
-                    placeholder="Ex: Estacionamento gratuito"
+                    placeholder={getDifferentialPlaceholder(specialty)}
                     className="flex-1 px-5 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-[11px]"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -1155,17 +1214,32 @@ export default function ProfilePage() {
               <hr className="border-brand-mist" />
 
               <div className="space-y-2">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Instagram (@usuario)</label>
-                <div className="flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border border-brand-mist shadow-sm transition-all">
+                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1 block mb-1">Instagram (@usuario)</label>
+                <div className="flex items-center gap-2 bg-brand-parchment p-3.5 rounded-[18px] border border-brand-mist shadow-sm transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50">
                   <span className="text-brand-stone text-xs ml-1">@</span>
                   <input 
                     type="text" 
                     value={instagram} 
-                    onChange={(e) => setInstagram(e.target.value.replace(/@/g, '').trim())} 
+                    onChange={(e) => setInstagram(normalizeInstagram(e.target.value))} 
                     placeholder="seu.usuario" 
                     className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs placeholder:font-light" 
                   />
                 </div>
+                {instagram && (
+                  <div className="mt-2 ml-1">
+                    <p className="text-[10px] text-brand-stone font-light italic mb-1">
+                      Confira se o @ está correto antes de salvar:
+                    </p>
+                    <a 
+                      href={`https://instagram.com/${instagram}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-brand-terracotta font-medium hover:underline flex items-center gap-1.5"
+                    >
+                      Ver perfil @{instagram} ↗
+                    </a>
+                  </div>
+                )}
               </div>
 
               <hr className="border-brand-mist/50 my-6" />
@@ -1820,5 +1894,6 @@ export default function ProfilePage() {
         />
       </div>
     </AppLayout>
+  </ProfileErrorBoundary>
   );
 }

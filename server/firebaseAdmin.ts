@@ -1,5 +1,6 @@
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
+import { logger } from "./utils/logger.js";
 
 export let db: admin.firestore.Firestore;
 export let defaultDb: admin.firestore.Firestore;
@@ -11,7 +12,7 @@ export let storageBucket: ReturnType<admin.storage.Storage['bucket']>;
  */
 export const getDb = () => {
   if (!db) {
-    console.warn("[FIREBASE ADMIN] db requested but not initialized. Returning default if available.");
+    logger.warn("FIRESTORE", "db requested but not initialized. Returning default if available.");
     return defaultDb || getFirestore();
   }
   return db;
@@ -39,6 +40,6 @@ export const initFirebase = async () => {
     defaultDb = db;
     storageBucket = admin.storage().bucket();
   } catch (err: any) {
-    console.error("[FIREBASE ADMIN] Critical Initialization Error:", err.message);
+    logger.error("FIRESTORE", "Critical Initialization Error", { error: err.message });
   }
 };

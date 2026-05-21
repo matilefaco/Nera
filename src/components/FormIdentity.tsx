@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Camera, Sparkles, X, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, INSTAGRAM_REGEX } from '../lib/utils';
+import { cn, cleanWhatsapp, formatWhatsappDisplay, isValidWhatsapp, normalizeInstagram, getDifferentialPlaceholder, INSTAGRAM_REGEX } from '../lib/utils';
 
 export interface FormIdentityProps {
   name: string;
@@ -441,7 +441,7 @@ export const FormIdentity = ({
               <div className="flex gap-2">
                 <input 
                   type="text" 
-                  placeholder="Ex: Estacionamento gratuito"
+                  placeholder={getDifferentialPlaceholder(specialty)}
                   className="flex-1 px-4 py-2.5 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-xs placeholder:text-brand-stone/50"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {

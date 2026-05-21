@@ -508,6 +508,28 @@ export async function confirmPresenceByClient(manageSlug: string) {
   }
 }
 
+export async function recordRescheduleRequest(manageSlug: string) {
+  devLog(`[Client] Recording reschedule request via slug ${manageSlug}`);
+  try {
+    const response = await fetch(`/api/public/manage/${manageSlug}/reschedule-request`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Erro ao registrar intenção de remarcação.');
+    }
+
+    const result = await response.json();
+    return result;
+  } catch (err: any) {
+    if (isDev) console.error('[recordRescheduleRequest]', err);
+    throw err;
+  }
+}
+
 export async function cancelBookingByClient(manageSlug: string, reason?: string) {
   devLog(`[Client] Cancelling booking via slug ${manageSlug}`);
   try {
@@ -672,6 +694,103 @@ export async function rescheduleBookingByClient(appointmentId: string, newDate: 
     triggerWaitlistCheck(data.professionalId, data.date, data.time).catch(e => { if (isDev) console.error("[Waitlist Check Error]", e); });
   } catch (error) {
     if (isDev) console.error('[Client Reschedule] Failed:', error);
+    throw error;
+  }
+}
+
+export async function rescheduleBookingByProfessional(appointmentId: string, professionalId: string, newDate: string, newTime: string) {
+  devLog(`[Professional] Rescheduling ${appointmentId} to ${newDate} ${newTime}`);
+  try {
+    const data = await runTransaction(db, async (transaction) => {
+      const apptRef = doc(db, 'appointments', appointmentId);
+      const apptDoc = await transaction.get(apptRef);
+      if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
+      
+      const data = apptDoc.data() as Appointment;
+
+      if (data.professionalId !== professionalId) throw new Error('Operação não permitida');
+      
+      // 1. Verify new slot lock
+      const cleanNewTime = newTime.replace(':', '');
+      const lockId = `${professionalId}_${newDate}_${cleanNewTime}`;
+      const lockRef = doc(db, 'booking_locks', lockId);
+      const lockSnap = await transaction.get(lockRef);
+      
+      const blockingStatuses = ['confirmed', 'accepted', 'completed'];
+
+      if (lockSnap.exists() && blockingStatuses.includes(lockSnap.data().status)) {
+        if (lockSnap.data().appointmentId !== appointmentId) {
+          if (isDev) console.error(`[BOOKING LOCK] reschedule conflict at ${lockId}`);
+          throw new Error('Horário indisponível');
+        }
+      }
+
+      // 2. Free old lock
+      const cleanOldTime = data.time.replace(':', '');
+      const oldLockId = `${professionalId}_${data.date}_${cleanOldTime}`;
+      const oldLockRef = doc(db, 'booking_locks', oldLockId);
+      const oldLockSnap = await transaction.get(oldLockRef);
+      if (oldLockSnap.exists() && oldLockSnap.data().appointmentId === appointmentId) {
+        devLog(`[BOOKING LOCK] releasing old lock: ${oldLockId}`);
+        transaction.delete(oldLockRef);
+      }
+
+      // 3. Block new lock if already confirmed
+      if (blockingStatuses.includes(data.status)) {
+        devLog(`[BOOKING LOCK] creating new lock (rescheduled): ${lockId}`);
+        transaction.set(lockRef, {
+          professionalId: professionalId,
+          date: newDate,
+          time: newTime,
+          appointmentId: appointmentId,
+          serviceId: data.serviceId || 'unknown',
+          status: data.status,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+      }
+
+      // 4. Update appointment
+      const updatePayload = {
+        date: newDate,
+        time: newTime,
+        previousDate: data.date,
+        previousTime: data.time,
+        rescheduledAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        lastChangeBy: 'professional' as const,
+        changeMessage: `Profissional reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`
+      };
+      
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
+
+      transaction.update(apptRef, safeUpdate);
+
+      // Update Client Summary
+      const updatedAppt = { ...data, ...safeUpdate } as Appointment;
+      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status);
+
+      return data;
+    });
+
+    // Notify client about reschedule
+    notify('BOOKING_RESCHEDULED', { 
+      id: appointmentId, 
+      appointmentId,
+      ...data, 
+      previousDate: data.date, 
+      previousTime: data.time, 
+      date: newDate, 
+      time: newTime,
+      rescheduledBy: 'professional'
+    }).catch(e => { if (isDev) console.error("[Reschedule Notify Error]", e); });
+    
+    // Trigger waitlist check for the OLD slot
+    triggerWaitlistCheck(professionalId, data.date, data.time).catch(e => { if (isDev) console.error("[Waitlist Check Error]", e); });
+
+    return data;
+  } catch (error) {
+    if (isDev) console.error('[Professional Reschedule] Failed:', error);
     throw error;
   }
 }

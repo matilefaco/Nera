@@ -258,11 +258,30 @@ export default function Dashboard() {
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
-    return localStorage.getItem("nera_push_banner_dismissed") === "true";
+    return profile?.dismissedTips?.pushBanner || localStorage.getItem("nera_push_banner_dismissed") === "true";
   });
   const [blockTipDismissed, setBlockTipDismissed] = useState(() => {
-    return localStorage.getItem("nera_block_tip_dismissed") === "true";
+    return profile?.dismissedTips?.blockTip || localStorage.getItem("nera_block_tip_dismissed") === "true";
   });
+
+  // Sync state if profile loads later
+  useEffect(() => {
+    if (profile?.dismissedTips?.pushBanner && !pushBannerDismissed) setPushBannerDismissed(true);
+    if (profile?.dismissedTips?.blockTip && !blockTipDismissed) setBlockTipDismissed(true);
+  }, [profile?.dismissedTips]);
+
+  const handleDismissTip = async (tipKey: string) => {
+    if (!user) return;
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('../firebase');
+      await updateDoc(doc(db, 'users', user.uid), {
+        [`dismissedTips.${tipKey}`]: true
+      });
+    } catch (err) {
+      console.error(`Failed to dismiss ${tipKey}`, err);
+    }
+  };
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [unconfirmedTomorrow, setUnconfirmedTomorrow] = useState<Appointment[]>([]);
   const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
@@ -285,6 +304,7 @@ export default function Dashboard() {
   const [inactiveClientsCount, setInactiveClientsCount] = useState(0);
   const [inactiveClients, setInactiveClients] = useState<any[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [isServicesLoading, setIsServicesLoading] = useState(true);
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
 
@@ -623,8 +643,13 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         setServices(uniqueServices);
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
+      } finally {
+        if (isMounted) setIsServicesLoading(false);
       }
-    }).catch((error) => { if (isDev) console.error("Firestore getDocs error:", error); });
+    }).catch((error) => { 
+      if (isDev) console.error("Firestore getDocs error:", error); 
+      if (isMounted) setIsServicesLoading(false);
+    });
 
     // Query: WhatsApp Logs
     const qWl = query(
@@ -1375,6 +1400,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
               profile={profile}
               appointments={appointments}
               services={services}
+              isLoading={isInitialLoading || isServicesLoading}
               onShareClick={() => setIsShareModalOpen(true)}
             />
 
@@ -1414,6 +1440,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
                       onClick={() => {
                         setPushBannerDismissed(true);
                         localStorage.setItem("nera_push_banner_dismissed", "true");
+                        handleDismissTip("pushBanner");
                       }}
                       className="text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors"
                     >
@@ -2025,7 +2052,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       />
 
       {/* 9. PRIMEIRA EXPERIÊNCIA / HINT (Se não houver bloqueios ativos) */}
-      {!blockTipDismissed && blockedSchedules.length === 0 && (
+      {!blockTipDismissed && blockedSchedules.length === 0 && (!isSupported || isSubscribed || pushBannerDismissed || isNewAccount) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
           <motion.div 
             initial={{ y: 50, opacity: 0 }}
@@ -2043,6 +2070,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
               onClick={() => {
                 localStorage.setItem("nera_block_tip_dismissed", "true");
                 setBlockTipDismissed(true);
+                handleDismissTip("blockTip");
               }} 
               className="absolute top-2 right-2 p-2 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors"
               title="Fechar dica"

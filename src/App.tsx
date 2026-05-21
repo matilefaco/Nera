@@ -69,7 +69,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) return <AppLoadingScreen />;
   
   if (!user) {
-    return <Navigate to="/login" />;
+    const returnUrl = encodeURIComponent(location.pathname + location.search);
+    return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
   // Verification Check
@@ -120,11 +121,7 @@ export default function App() {
             <RouteLogger />
             <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
               <AppErrorBoundary>
-                <React.Suspense fallback={
-                  <div className="min-h-[40vh] flex items-center justify-center pointer-events-none">
-                    <div className="opacity-60">...</div>
-                  </div>
-                }>
+                <React.Suspense fallback={<AppLoadingScreen />}>
                   <Routes>
                   {/* ... routes ... */}
                   <Route path="/" element={<LandingPage />} />
