@@ -253,18 +253,7 @@ export default function Dashboard() {
   const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(() => {
-    if (!user) return true;
-    const todayNum = new Date();
-    const firstDayLastMonth = new Date(todayNum.getFullYear(), todayNum.getMonth() - 1, 1);
-    const startDateStr = formatDateKey(firstDayLastMonth);
-    const thirtyDaysFromNow = new Date(todayNum);
-    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-    const endDateStr = formatDateKey(thirtyDaysFromNow);
-    const cacheKey = `${user.uid}:${startDateStr}:${endDateStr}`;
-    const cached = appointmentsHistoryCache.get(cacheKey);
-    return !(cached && Date.now() - cached.fetchedAt < APPOINTMENTS_CACHE_TTL_MS);
-  });
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
@@ -497,15 +486,15 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
     const cachedAppointments = appointmentsHistoryCache.get(appointmentsCacheKey);
 
     let fetchValid = true;
-    let timeoutId: any;
     const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error('timeout')), 8000);
+      setTimeout(() => reject(new Error('timeout')), 8000);
     });
+    // Prevent unhandled promise rejection if getDocs wins
+    timeoutPromise.catch(() => {});
 
     if (cachedAppointments && Date.now() - cachedAppointments.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
       setAppointments(cachedAppointments.data);
       if (isMounted) setIsInitialLoading(false);
-      clearTimeout(timeoutId);
     } else {
       // Query: Historical and upcoming appointments to calculate metrics
       const qAll = query(
@@ -533,7 +522,6 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         if (isDev) console.error("Firestore getDocs error:", error); 
         fetchValid = false;
       }).finally(() => {
-        clearTimeout(timeoutId);
         if (isMounted) setIsInitialLoading(false);
       });
     }
