@@ -121,7 +121,11 @@ export default function App() {
             <RouteLogger />
             <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
               <AppErrorBoundary>
-                <React.Suspense fallback={<AppLoadingScreen />}>
+                <React.Suspense fallback={
+                  <div className="min-h-[40vh] flex items-center justify-center pointer-events-none">
+                    <div className="opacity-60">...</div>
+                  </div>
+                }>
                   <Routes>
                   {/* ... routes ... */}
                   <Route path="/" element={<LandingPage />} />
