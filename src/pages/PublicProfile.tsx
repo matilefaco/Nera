@@ -640,6 +640,17 @@ function PublicProfileContent() {
         } as React.CSSProperties
       }
     >
+      {slug === 'helena-prado' && (
+        <div className="bg-brand-ink/90 backdrop-blur-md sticky top-0 z-[200] text-center py-2.5 px-4 flex justify-between items-center border-b border-white/10 shrink-0 shadow-sm">
+          <Link to="/" className="text-white/80 hover:text-white flex items-center gap-1.5 text-[9px] uppercase tracking-widest font-medium transition-colors">
+            <ArrowLeft size={12} />
+            Voltar para o início
+          </Link>
+          <div className="text-[9px] uppercase tracking-widest text-brand-terracotta/90 font-bold">
+            Vitrine de exemplo
+          </div>
+        </div>
+      )}
       <SEOHead
         title={profile.specialty ? `${profile.name} | ${formatSpecialtyLabel(profile.specialty)} | Nera` : `${profile.name} | Nera`}
         description={

@@ -95,30 +95,35 @@ export default function FinancialPage() {
           where('date', '<=', endDateStr)
         );
 
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 8000)
-        );
+        let timeoutId: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('timeout')), 8000);
+        });
 
         if (isDev) console.log('[Financial] fetch start');
-        const snapshot = await Promise.race([
-          getDocs(q),
-          timeoutPromise
-        ]) as any;
+        try {
+          const snapshot = await Promise.race([
+            getDocs(q),
+            timeoutPromise
+          ]) as any;
 
-        if (!isMounted || isCancelled) return;
-        
-        if (isDev) console.log(`[Financial] fetch success count=${snapshot.docs.length}`);
-        if (snapshot.empty) {
-          if (isDev) console.log('[Financial] empty records');
+          if (!isMounted || isCancelled) return;
+          
+          if (isDev) console.log(`[Financial] fetch success count=${snapshot.docs.length}`);
+          if (snapshot.empty) {
+            if (isDev) console.log('[Financial] empty records');
+          }
+
+          const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
+          
+          // Order in memory
+          docs.sort((a, b) => b.date.localeCompare(a.date));
+          
+          financialAppointmentsCache.set(financialCacheKey, { data: docs, fetchedAt: Date.now() });
+          setAppointments(docs);
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
-        
-        // Order in memory
-        docs.sort((a, b) => b.date.localeCompare(a.date));
-        
-        financialAppointmentsCache.set(financialCacheKey, { data: docs, fetchedAt: Date.now() });
-        setAppointments(docs);
       } catch (err: any) {
         if (!isMounted || isCancelled) return;
         

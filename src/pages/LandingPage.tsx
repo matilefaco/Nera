@@ -86,14 +86,13 @@ export default function LandingPage() {
                 <span>Começar grátis</span>
                 <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </Link>
-              <button 
-                type="button" 
-                onClick={() => navigate('/p/helena-prado')} 
+              <Link 
+                to="/p/helena-prado" 
                 className="btn-ghost" 
                 aria-label="Ver vitrine de exemplo"
               >
                 Ver vitrine de exemplo →
-              </button>
+              </Link>
             </div>
 
           </div>

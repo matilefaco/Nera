@@ -95,6 +95,14 @@ export class AppErrorBoundary extends Component<Props, State> {
               Algo saiu do ritmo por um instante.
             </h1>
             
+            {import.meta.env.DEV && (
+              <div className="bg-red-50 p-3 rounded text-left text-xs mb-4 overflow-auto max-h-32 text-red-500">
+                {this.state.error?.message}
+                <br/>
+                {this.state.error?.stack}
+              </div>
+            )}
+            
             <p className="text-brand-stone text-sm mb-8">
               Recarregue a página para continuar usando a Nera. Isso ajuda a sincronizar as informações mais recentes.
             </p>
