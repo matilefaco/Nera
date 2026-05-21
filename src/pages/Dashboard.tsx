@@ -311,46 +311,73 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
-    const qCount = query(
-      collection(db, 'client_summaries'),
-      where('professionalId', '==', user.uid)
-    );
-    getCountFromServer(qCount).then(snap => {
-      if (isMounted) {
-        setTotalClientsCountFromSummaries(snap.data().count);
-      }
-    }).catch(err => {
-      if (isDev) console.error('Error fetching client summaries count:', err);
-    });
-    return () => { isMounted = false; };
-  }, [user]);
+    let unsubAlerts: (() => void) | undefined;
 
-  useEffect(() => {
-    if (!user) return;
-    let isMounted = true;
-    const qAlerts = query(
-      collection(db, 'alerts'),
-      where('professionalId', '==', user.uid),
-      where('read', '==', false),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    );
-
-    const unsubAlerts = onSnapshot(qAlerts, (snap) => {
+    const timer = setTimeout(() => {
       if (!isMounted) return;
-      try {
-        const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-setAlerts(docs);
-      } catch (err) {
-        if (isDev) console.error("Error in onSnapshot callback:", err);
+      
+      const qCount = query(
+        collection(db, 'client_summaries'),
+        where('professionalId', '==', user.uid)
+      );
+      getCountFromServer(qCount).then(snap => {
+        if (isMounted) {
+          setTotalClientsCountFromSummaries(snap.data().count);
+        }
+      }).catch(err => {
+        if (isDev) console.error('Error fetching client summaries count:', err);
+      });
+
+      const qAlerts = query(
+        collection(db, 'alerts'),
+        where('professionalId', '==', user.uid),
+        where('read', '==', false),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      );
+
+      unsubAlerts = onSnapshot(qAlerts, (snap) => {
+        if (!isMounted) return;
+        try {
+          const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAlerts(docs);
+        } catch (err) {
+          if (isDev) console.error("Error in onSnapshot callback:", err);
+        }
+      }, (error) => {
+        if (isDev) console.error('[Dashboard] Subscription error on qAlerts:', error);
+      });
+
+      const cached = analyticsEventsCache.get(user.uid);
+      if (cached && Date.now() - cached.fetchedAt < ANALYTICS_CACHE_TTL_MS) {
+        setAnalyticsEvents(cached.data);
+      } else {
+        const qAnalytics = query(
+          collection(db, 'analytics_events'),
+          where('professionalId', '==', user.uid),
+          orderBy('timestamp', 'desc'),
+          limit(100)
+        );
+
+        getDocs(qAnalytics).then((snapshot) => {
+          if (!isMounted) return;
+          try {
+            const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
+            analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
+            setAnalyticsEvents(docs);
+          } catch (err) {
+            if (isDev) console.error("Error processing getDocs callback:", err);
+          }
+        }).catch((error) => {
+          if (isDev) console.error('[Dashboard] Fetch error on qAnalytics:', error);
+        });
       }
-    }, (error) => {
-      if (isDev) console.error('[Dashboard] Subscription error on qAlerts:', error);
-    });
+    }, 150);
 
     return () => {
       isMounted = false;
-      unsubAlerts();
+      clearTimeout(timer);
+      unsubAlerts?.();
     };
   }, [user]);
 
@@ -361,40 +388,6 @@ setAlerts(docs);
       if (isDev) console.error('Failed to mark alert as read:', err);
     }
   };
-
-  // Triggers handled by hook
-
-  useEffect(() => {
-    if (!user) return;
-    let isMounted = true;
-
-    const cached = analyticsEventsCache.get(user.uid);
-    if (cached && Date.now() - cached.fetchedAt < ANALYTICS_CACHE_TTL_MS) {
-      setAnalyticsEvents(cached.data);
-      return;
-    }
-
-    const qAnalytics = query(
-      collection(db, 'analytics_events'),
-      where('professionalId', '==', user.uid),
-      orderBy('timestamp', 'desc'),
-      limit(100)
-    );
-
-    getDocs(qAnalytics).then((snapshot) => {
-      if (!isMounted) return;
-      try {
-        const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
-        analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
-        setAnalyticsEvents(docs);
-      } catch (err) {
-        if (isDev) console.error("Error processing getDocs callback:", err);
-      }
-    }).catch((error) => {
-      if (isDev) console.error('[Dashboard] Fetch error on qAnalytics:', error);
-    });
-    return () => { isMounted = false; };
-  }, [user?.uid]);
 
 
 
@@ -440,17 +433,36 @@ setAlerts(docs);
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment))
           .filter(a => !isFakeContent(a.clientName));
         const relevantToday = docs.filter(a => isRevenueStatus(a.status));
-setConfirmedToday(relevantToday);
-setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
+        setConfirmedToday(relevantToday);
+        setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
+      } finally {
+        setIsInitialLoading(false);
       }
     }, (error) => {
       if (isDev) console.error('[Dashboard] Subscription error on qToday:', error);
+      if (isMounted) setIsInitialLoading(false);
     });
 
-    // Query: Unconfirmed for tomorrow
-    const tomorrow = new Date();
+    return () => {
+      isMounted = false;
+      unsubToday();
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+    let unsubUnconfirmed: (() => void) | undefined;
+    let unsubWaitlist: (() => void) | undefined;
+
+    const timer = setTimeout(() => {
+      if (!isMounted) return;
+
+      const today = getTodayLocale();
+      // Query: Unconfirmed for tomorrow
+      const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStr = formatDateKey(tomorrow);
 
@@ -461,7 +473,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       where('status', '==', 'pending_confirmation')
     );
 
-    const unsubUnconfirmed = onSnapshot(qUnconfirmed, (snapshot) => {
+    unsubUnconfirmed = onSnapshot(qUnconfirmed, (snapshot) => {
       if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment))
@@ -485,16 +497,8 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
     const appointmentsCacheKey = `${user.uid}:${startDateStr}:${endDateStr}`;
     const cachedAppointments = appointmentsHistoryCache.get(appointmentsCacheKey);
 
-    let fetchValid = true;
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), 8000)
-    );
-
     if (cachedAppointments && Date.now() - cachedAppointments.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
       setAppointments(cachedAppointments.data);
-      if (isMounted) {
-        setIsInitialLoading(false);
-      }
     } else {
       // Query: Historical and upcoming appointments to calculate metrics
       const qAll = query(
@@ -505,25 +509,18 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         orderBy('date', 'desc')
       );
 
-      Promise.race([getDocs(qAll), timeoutPromise]).then((result) => {
-        const snapshot = result as any;
+      getDocs(qAll).then((snapshot) => {
         if (!isMounted) return;
         try {
           const appointmentsData = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
           appointmentsHistoryCache.set(appointmentsCacheKey, { data: appointmentsData, fetchedAt: Date.now() });
           setAppointments(appointmentsData);
-          // Metrics calculation moved to hook
         } catch (err) {
           if (isDev) console.error("Error processing getDocs callback:", err);
         }
       }).catch((error) => { 
         if (!isMounted) return;
         if (isDev) console.error("Firestore getDocs error:", error); 
-        fetchValid = false;
-      }).finally(() => {
-        if (isMounted) {
-          setIsInitialLoading(false);
-        }
       });
     }
 
@@ -535,7 +532,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       where('professionalId', '==', user.uid)
     );
 
-    const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
+    unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
       if (!isMounted) return;
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
@@ -667,15 +664,16 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
       }
-    }).catch((error) => {
-      if (isDev) console.error('[Dashboard] Fetch error on qWl:', error);
-    });
+      }).catch((error) => {
+        if (isDev) console.error('[Dashboard] Fetch error on qWl:', error);
+      });
+    }, 100);
 
     return () => {
       isMounted = false;
-      unsubToday();
-      unsubUnconfirmed();
-      unsubWaitlist();
+      clearTimeout(timer);
+      unsubUnconfirmed?.();
+      unsubWaitlist?.();
     };
   }, [user?.uid]);
 
