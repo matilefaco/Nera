@@ -2656,7 +2656,7 @@ async function triggerWaitlistCheckBackend(db: admin.firestore.Firestore, profes
   if (!proSnap.exists) return;
   const proSettings = proSnap.data() as any;
 
-  const hasWaitlistFeature = proSettings.plan === 'pro' || proSettings.features?.waitlist === true;
+  const hasWaitlistFeature = proSettings.plan === 'pro' && proSettings.features?.waitlist !== false;
   if (!hasWaitlistFeature) {
     logger.info("WAITLIST", `Profissional ${professionalId} sem recurso PRO ativo. Processamento da lista de espera ignorado.`);
     return;
@@ -2719,6 +2719,22 @@ async function triggerWaitlistCheckBackend(db: admin.firestore.Firestore, profes
          })
       }).catch(e => logger.error("WAITLIST", "Waitlist Invitation Error", { error: e }));
     } else {
+      const notifySuccess = await db.runTransaction(async (t) => {
+        const ref = db.collection('waitlist').doc(entryId);
+        const snap = await t.get(ref);
+        const data = snap.data();
+        if (data?.status !== 'waiting') return false;
+
+        const notifiedMap = data?.slotNotifiedAt || {};
+        if (notifiedMap[time]) return false;
+
+        notifiedMap[time] = new Date().toISOString();
+        t.update(ref, { slotNotifiedAt: notifiedMap });
+        return true;
+      });
+
+      if (!notifySuccess) return;
+
       await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
