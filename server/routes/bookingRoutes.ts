@@ -2194,58 +2194,13 @@ router.post("/public/manage/:manageSlug/confirm-presence", async (req, res) => {
 });
 
 router.post("/public/manage/:manageSlug/reschedule-request", async (req, res) => {
-  const db = getDb();
-  const { manageSlug } = req.params;
-
-  try {
-    const result = await db.runTransaction(async (transaction) => {
-      const linkRef = db.collection('reservation_links').doc(manageSlug);
-      const linkDoc = await transaction.get(linkRef);
-      if (!linkDoc.exists) throw { status: 404, message: "Link inválido." };
-      
-      const appointmentId = linkDoc.data()?.appointmentId;
-      if (!appointmentId) throw { status: 404, message: "Reserva não encontrada no link." };
-
-      const apptRef = db.collection('appointments').doc(appointmentId);
-      const apptDoc = await transaction.get(apptRef);
-      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
-      
-      const data: any = apptDoc.data();
-
-      if (['cancelled', 'completed', 'concluido'].includes(data.status)) {
-        throw { status: 409, message: "Não é mais possível alterar esta reserva." };
-      }
-      
-      // Return early if already marked to prevent email spam
-      if (data.attendanceStatus === 'reschedule_requested') {
-         return { success: true, appointmentId, alreadyRequested: true, updateData: data };
-      }
-
-      const updatePayload: any = {
-        attendanceStatus: 'reschedule_requested',
-        attendanceRescheduleRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
-        timeline: admin.firestore.FieldValue.arrayUnion({
-          type: 'attendance_reschedule_requested',
-          createdAt: new Date().toISOString(),
-          actor: 'client',
-          label: 'Cliente solicitou remarcação'
-        })
-      };
-
-      transaction.update(apptRef, sanitizeAppointment(updatePayload, true));
-      return { success: true, appointmentId, updatedData: { ...data, ...updatePayload } };
-    });
-
-    if (result.success && !result.alreadyRequested && result.updatedData) {
-      // NOTE: Removed sendRescheduleRequestedEmail to prevent premature "reschedule requested" 
-      // emails being sent before the client actually chooses a new date/time.
-    }
-
-    res.json({ success: true, appointmentId: result.appointmentId });
-  } catch (err: any) {
-    logger.error("BOOKING", "Manage Reschedule Request Error", { error: err });
-    res.status(err.status || 500).json({ error: err.message });
-  }
+  // Rota neutralizada intencionalmente (P0). 
+  // O fluxo foi alterado para apenas notificar a profissional
+  // quando a cliente escolher e confirmar o novo horário no endpoint /reschedule.
+  res.status(410).json({ 
+    error: "Este fluxo foi substituído. Escolha uma nova data e horário para concluir a remarcação.",
+    code: "GONE_RESCHEDULE_REQUEST"
+  });
 });
 
 
