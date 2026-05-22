@@ -2726,9 +2726,10 @@ async function triggerWaitlistCheckBackend(db: admin.firestore.Firestore, profes
         if (data?.status !== 'waiting') return false;
 
         const notifiedMap = data?.slotNotifiedAt || {};
-        if (notifiedMap[time]) return false;
+        const slotKey = `${date}_${time}`;
+        if (notifiedMap[slotKey]) return false;
 
-        notifiedMap[time] = new Date().toISOString();
+        notifiedMap[slotKey] = new Date().toISOString();
         t.update(ref, { slotNotifiedAt: notifiedMap });
         return true;
       });
