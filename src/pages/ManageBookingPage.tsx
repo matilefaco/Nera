@@ -292,10 +292,18 @@ setBlockedSchedules(dayBlocked);
       notify.success('Horário alterado com sucesso!');
       setView('main');
     } catch (e: any) {
+      const maskedLookupKey = lookupKey ? `${lookupKey.substring(0, 4)}***${lookupKey.substring(lookupKey.length - 4)}` : 'NULL';
+      if (isDev) {
+        console.error(`[DIAGNOSTIC] handleReschedule error. lookupKey: ${maskedLookupKey}, date: ${selectedDate}, time: ${selectedTime}, message: ${e.message}`);
+      }
       if (e.message === 'Horário indisponível') {
         notify.error('Este horário acabou de ser preenchido. Escolha outro.');
       } else {
-        notify.error('Erro ao remarcar');
+        if (isDev) {
+          notify.error(`Erro ao remarcar: ${e.message}`);
+        } else {
+          notify.error('Erro ao remarcar');
+        }
       }
     } finally {
       setActionLoading(false);

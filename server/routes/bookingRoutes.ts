@@ -2299,6 +2299,9 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
   const { manageSlug } = req.params;
   const { newDate, newTime } = req.body;
 
+  const maskedSlug = manageSlug ? `${manageSlug.substring(0, 4)}***${manageSlug.substring(manageSlug.length - 4)}` : 'NULL';
+  logger.info("DIAGNOSTIC", `Start reschedule flow: token ${maskedSlug}, to ${newDate} ${newTime}`);
+
   if (!newDate || !newTime || typeof newDate !== 'string' || typeof newTime !== 'string') {
     return res.status(400).json({ error: "Nova data e horário são obrigatórios." });
   }
@@ -2328,8 +2331,11 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
     return res.status(400).json({ error: "Horário inexistente ou inválido." });
   }
 
+  let debugStep = "INIT";
+
   try {
     const result = await db.runTransaction(async (transaction) => {
+      debugStep = "LINK_LOOKUP";
       // 1. Validate slug using only explicit token fields
       const linkRef = db.collection('reservation_links').doc(manageSlug);
       const linkDoc = await transaction.get(linkRef);
@@ -2339,6 +2345,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       let apptDoc = null;
 
       if (!appointmentId) {
+         debugStep = "APPT_LOOKUP_BY_TOKEN";
          // Fallback: check query for token fields only. NEVER use apptDoc.id === manageSlug here.
          const strategies = ['manageSlug', 'token', 'publicToken', 'manageToken'];
          for (const field of strategies) {
@@ -2352,6 +2359,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
          }
          if (!appointmentId) throw { status: 404, message: "Link de gerenciamento ou reserva não encontrada." };
       } else {
+        debugStep = "APPT_LOOKUP_BY_ID";
         apptRef = db.collection('appointments').doc(appointmentId);
         apptDoc = await transaction.get(apptRef);
       }
@@ -2359,12 +2367,14 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       if (!apptDoc || !apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
       const data: any = apptDoc.data();
 
+      debugStep = "STATUS_VALIDATION";
       // Ensure valid status for rescheduling
       const blockRescheduleStatuses = ['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'concluido', 'no_show'];
       if (blockRescheduleStatuses.includes(data.status)) {
         throw { status: 400, message: "Esta reserva possui um status que não permite remarcação." };
       }
 
+      debugStep = "PRO_LOOKUP";
       // Need professional and service to validate availability
       const proRef = db.collection('users').doc(data.professionalId);
       const proSnap = await transaction.get(proRef);
@@ -2381,6 +2391,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       const apptStartMin = timeToMinutes(safeNewTime);
       const apptEndMin = apptStartMin + duration;
 
+      debugStep = "WORKING_HOURS";
       // Validate working hours / days
       if (proData.workingHours) {
         if (Array.isArray(proData.workingHours.workingDays) && proData.workingHours.workingDays.length > 0) {
@@ -2398,6 +2409,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
         }
       }
 
+      debugStep = "BLOCKED_SCHEDULES";
       // Check blocked schedules
       const blockedQ = db.collection('blocked_schedules').where('professionalId', '==', data.professionalId);
       const blockedSnap = await transaction.get(blockedQ);
@@ -2421,6 +2433,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
         }
       }
 
+      debugStep = "OVERLAPPING_APPTS";
       // Check overlapping appointments
       const existingApptsSnap = await transaction.get(
         db.collection('appointments')
@@ -2459,10 +2472,12 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
         }
       }
 
+      debugStep = "SUMMARY_LOOKUP";
       // Client summary read
       const summaryRef = db.collection('client_summaries').doc(`${data.professionalId}_${getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName)}`);
       const summarySnap = await transaction.get(summaryRef);
 
+      debugStep = "OLD_LOCK";
       // Old lock
       let oldLockRef: admin.firestore.DocumentReference | null = null;
       let oldLockSnap: admin.firestore.DocumentSnapshot | null = null;
@@ -2472,6 +2487,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
         oldLockSnap = await transaction.get(oldLockRef);
       }
 
+      debugStep = "NEW_LOCK";
       // New lock
       const simulatedNewData = { ...data, date: safeNewDate, time: safeNewTime };
       const newLockId = getBookingLockId(simulatedNewData);
@@ -2487,6 +2503,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
         }
       }
 
+      debugStep = "APPLY_WRITES";
       // Apply Writes (after all reads are done)
       if (oldLockRef && oldLockId !== newLockId) { // Only delete if the lock changed
         if (oldLockSnap && oldLockSnap.exists && oldLockSnap.data()?.appointmentId === appointmentId) {
@@ -2527,9 +2544,11 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       const safeUpdate = sanitizeAppointment(updatePayload, true);
       transaction.update(apptRef, safeUpdate);
 
+      debugStep = "CLIENT_SUMMARY_UPDATE";
       const updatedData = { ...data, ...safeUpdate, id: appointmentId };
       await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
 
+      debugStep = "TRANSACTION_SUCCESS";
       return { success: true, updatedData };
     });
 
@@ -2541,8 +2560,8 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
   } catch (err: any) {
     const status = err.status || 500;
     const message = err.message || "Erro interno do servidor";
-    logger.error("BOOKING", "Reschedule by client error", { error: err });
-    return res.status(status).json({ error: message });
+    logger.error("BOOKING", `Reschedule by client error. Step: ${debugStep}`, { error: err.message, stack: err.stack, code: err.code });
+    return res.status(status).json({ error: message, code: err.code, step: debugStep });
   }
 });
 

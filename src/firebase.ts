@@ -585,6 +585,8 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
 }
 
 export async function rescheduleBookingByClient(token: string, newDate: string, newTime: string) {
+  const maskedToken = token ? `${token.substring(0, 4)}***${token.substring(token.length - 4)}` : 'NULL';
+  if (isDev) console.log(`[DIAGNOSTIC] rescheduleBookingByClient - Token: ${maskedToken}, ${newDate} ${newTime}, Endpoint: /api/public/manage/${maskedToken}/reschedule`);
   devLog(`[Client] Rescheduling via token ${token} to ${newDate} ${newTime}`);
   try {
     const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://nera-hub-server.up.railway.app'}/api/public/manage/${token}/reschedule`, {
@@ -597,6 +599,13 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
+      if (isDev) {
+        console.error(`[DIAGNOSTIC] fetch failed. Status: ${response.status}`, {
+          error: errorData.error,
+          message: errorData.message,
+          code: errorData.code
+        });
+      }
       if (errorData.message === "Este horário acabou de ser preenchido. Escolha outro.") {
         throw new Error('Horário indisponível');
       }
