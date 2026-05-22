@@ -448,7 +448,7 @@ export default function Dashboard() {
     // Fallback to clear loading state if network stalls
     const timeoutId = setTimeout(() => {
       if (isMounted) setIsTodayLoading(false);
-    }, 5000);
+    }, 2000);
 
     const unsubToday = onSnapshot(qToday, (snapshot) => {
       if (!isMounted) return;
@@ -1592,16 +1592,22 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
               </motion.div>
             ) : (
               <div className="bg-[#FCFBF9] p-6 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-                <div className="flex flex-col">
+                <div className="flex flex-col w-full md:w-auto">
                   {isTodayLoading ? (
                     <div className="mb-4 pb-4 border-b border-brand-mist/40">
-                      <p className="text-[14px] font-serif text-brand-stone italic flex items-center gap-2">
-                        <Loader2 size={14} className="animate-spin text-brand-terracotta" /> Atualizando sua agenda...
-                      </p>
+                      <div className="animate-pulse space-y-2">
+                        <div className="h-4 bg-brand-mist/60 rounded w-1/2"></div>
+                        <div className="h-3 bg-brand-mist/40 rounded w-1/3"></div>
+                      </div>
                     </div>
-                  ) : displayedConfirmedToday.length === 0 && (
+                  ) : (
                     <div className="mb-4 pb-4 border-b border-brand-mist/40">
-                      <p className="text-[14px] font-serif text-brand-stone italic">Sua agenda está livre no momento.</p>
+                      {displayedConfirmedToday.length === 0 ? (
+                        <p className="text-[14px] font-serif text-brand-stone italic">Sua agenda está livre no momento.</p>
+                      ) : (
+                        <p className="text-[14px] font-serif text-brand-stone italic">Você tem {displayedConfirmedToday.length} agendamento{displayedConfirmedToday.length > 1 ? 's' : ''} hoje.</p>
+                      )}
+                      
                       {nextUpcomingAppointment ? (
                         <p className="text-[10px] font-medium tracking-widest text-brand-stone/80 mt-2">
                           PRÓXIMO: <span className="font-bold text-brand-ink">{formatLocalDate(nextUpcomingAppointment.date, { day: '2-digit', month: '2-digit' })} às {nextUpcomingAppointment.time}</span> com <span className="text-brand-ink font-semibold">{nextUpcomingAppointment.clientName}</span>
@@ -1614,7 +1620,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
                     </div>
                   )}
                   
-                  <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar">
+                  <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar mt-1">
                     <div className="flex-none">
                       <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Faturamento Hoje</p>
                       <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{formatCurrency(displayedDailyRevenue)}</p>

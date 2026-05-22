@@ -280,7 +280,12 @@ export default function AgendaPage() {
       where('date', '<=', visibleEndStr)
     );
 
+    const timeoutId = setTimeout(() => {
+      setIsInitialLoading(false);
+    }, 2000);
+
     const unsubAll = onSnapshot(q, (snapshot) => {
+      clearTimeout(timeoutId);
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any))
           .filter(a => !isFakeContent(a.clientName));
@@ -298,6 +303,7 @@ export default function AgendaPage() {
         setIsInitialLoading(false);
       }
     }, (error) => {
+      clearTimeout(timeoutId);
       if (isDev) console.error('[AgendaPage] Subscription error (allAppointments):', error);
       setIsInitialLoading(false);
       // Fallback: If missing index, try to gracefully fallback to manual filtering

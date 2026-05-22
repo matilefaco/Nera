@@ -650,13 +650,13 @@ function PublicProfileContent() {
         url={`https://usenera.com/p/${profile.slug}`}
       />
       {slug === 'helena-prado' && (
-        <div className="w-full bg-brand-white/80 backdrop-blur-sm border-b border-brand-mist/50 py-3 px-6 sticky top-0 z-[200] flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors">
-            <ArrowLeft size={14} /> Voltar para o início
+        <div className="w-full bg-brand-white/80 backdrop-blur-sm border-b border-brand-mist/50 py-2 sm:py-3 px-4 sm:px-6 sticky top-0 z-[200] flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 sm:gap-0">
+          <Link to="/" className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors">
+            <ArrowLeft size={12} className="sm:w-3.5 sm:h-3.5" /> Voltar para o início
           </Link>
-          <div className="hidden sm:flex items-center gap-1.5 bg-brand-parchment border border-brand-mist/50 px-3 py-1 rounded-full">
-            <Sparkles size={12} className="text-brand-terracotta" />
-            <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Exemplo de vitrine profissional</span>
+          <div className="flex items-center gap-1 sm:gap-1.5 bg-brand-parchment border border-brand-mist/50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full">
+            <Sparkles size={10} className="text-brand-terracotta sm:w-3 sm:h-3" />
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-brand-stone">Exemplo de vitrine</span>
           </div>
         </div>
       )}
