@@ -8,7 +8,7 @@ import {
   CheckCircle2, ChevronLeft, ChevronRight, Plus, MapPin,
   Users, List, Settings, Check, Sparkles, X, Lock, RefreshCw, Star,
   TrendingUp, Trash2, ArrowUpRight, Filter, MoreHorizontal, ArrowRight,
-  CalendarCheck2, AlertCircle, Info, Share2, Search
+  CalendarCheck2, AlertCircle, Info, Share2, Search, Loader2
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatCurrency, parseLocalDate, formatLocalDate, getTodayLocale, formatDateKey, buildWhatsappLink, cn, cleanWhatsapp, isFakeContent } from '../lib/utils';
@@ -764,15 +764,7 @@ export default function AgendaPage() {
     }
   };
 
-  useEffect(() => {
-    if (isDev) console.log(`[P0] AgendaPage: mount at ${Date.now()}`);
-  }, []);
 
-  useEffect(() => {
-    if (isDev && allAppointmentsStatus === 'loaded') {
-      console.log(`[P0] AgendaPage: first useful render (loading ended) at ${Date.now()}`);
-    }
-  }, [allAppointmentsStatus]);
 
   if ((allAppointmentsStatus === 'loading' || allAppointmentsStatus === 'stalled') && allAppointments.length === 0) {
     return (
@@ -1016,14 +1008,16 @@ export default function AgendaPage() {
                 >
                   <Share2 size={13} strokeWidth={1.5} className="text-white/80 transition-colors" /> Divulgar agenda
                 </button>
-                {features.waitlist && (
-                  <button 
-                     onClick={() => setIsWaitlistOpen(true)}
-                     className="flex-1 py-3.5 bg-white/60 hover:bg-white backdrop-blur-sm border border-brand-mist/80 text-brand-ink rounded-[18px] text-[10px] font-medium uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)] active:scale-[0.98]"
-                  >
-                    <Users size={13} strokeWidth={1.5} className="text-brand-stone/80 transition-colors" /> Ver espera
-                  </button>
-                )}
+                <button 
+                   onClick={() => {
+                     if (checkFeatureAccess('waitlist')) {
+                       setIsWaitlistOpen(true);
+                     }
+                   }}
+                   className="flex-1 py-3.5 bg-white/60 hover:bg-white backdrop-blur-sm border border-brand-mist/80 text-brand-ink rounded-[18px] text-[10px] font-medium uppercase tracking-[0.1em] flex items-center justify-center gap-2 transition-all duration-300 hover:shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)] active:scale-[0.98]"
+                >
+                  <Users size={13} strokeWidth={1.5} className="text-brand-stone/80 transition-colors" /> Ver espera
+                </button>
               </div>
             </div>
           )}
@@ -1079,7 +1073,12 @@ export default function AgendaPage() {
                 <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">Encaixe</span>
               </button>
               <button 
-                onClick={() => { setIsWaitlistOpen(true); setIsFabOpen(false); }} 
+                onClick={() => {
+                  if (checkFeatureAccess('waitlist')) {
+                    setIsWaitlistOpen(true);
+                  }
+                  setIsFabOpen(false);
+                }} 
                 className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[20px] flex items-center gap-3 transition-colors group"
               >
                 <Users size={16} strokeWidth={1.5} className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors" />

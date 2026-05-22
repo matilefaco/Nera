@@ -93,25 +93,12 @@ class ProfileErrorBoundary extends React.Component<{children: React.ReactNode}, 
 const profilePortfolioCache = new Map<string, any[]>();
 
 export default function ProfilePage() {
-  console.log('[ProfilePage] Render starts');
   const { user, profile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [diagnosticInfo, setDiagnosticInfo] = useState<any>(null);
 
-  useEffect(() => {
-    console.log('[ProfilePage] User:', user?.uid, 'AuthLoading:', authLoading);
-  }, [user, authLoading]);
 
-  useEffect(() => {
-    if (isDev) console.log(`[P0] ProfilePage: mount at ${Date.now()}`);
-  }, []);
-
-  useEffect(() => {
-    if (isDev && !authLoading) {
-      console.log(`[P0] ProfilePage: first useful render (loading ended) at ${Date.now()}`);
-    }
-  }, [authLoading]);
 
 
   const profileCompleteness = useMemo(() => {
@@ -195,7 +182,7 @@ export default function ProfilePage() {
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   
-  const [portfolioStatus, setPortfolioStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>(() => {
+  const [portfolioStatus, setPortfolioStatus] = useState<'idle' | 'loading' | 'loaded' | 'stalled' | 'error'>(() => {
     return user && profilePortfolioCache.has(user.uid) ? 'loaded' : 'loading';
   });
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>(() => {

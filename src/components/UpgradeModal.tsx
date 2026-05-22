@@ -51,9 +51,9 @@ export default function UpgradeModal({
     switch (feature) {
       case 'waitlist':
         return {
-          title: "Lista de Espera Inteligente",
-          desc: "Nunca mais perca uma cliente por falta de horário. Ative a fila automática.",
-          limit: "Otimize seus horários"
+          title: "Preencha horários vagos automaticamente",
+          desc: "Clientes entram em uma fila inteligente e recebem aviso quando surgir uma vaga. Transforme cancelamentos em faturamento.",
+          limit: "Disponível exclusivamente no Plano PRO."
         };
       case 'coupons':
         return {

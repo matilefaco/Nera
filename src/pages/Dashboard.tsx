@@ -264,7 +264,7 @@ export default function Dashboard() {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return safeLocaleCompare(a.time, b.time);
     });
-    if (isDev) console.log(`[P0] Dashboard: nextUpcomingAppointment calculated at ${Date.now()}`);
+
     return future[0] || null;
   }, [appointments, confirmedToday]);
 
@@ -379,7 +379,7 @@ export default function Dashboard() {
       try {
         const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setAlerts(docs);
-        if (isDev) console.log(`[P0] Dashboard: alerts query finished at ${Date.now()}`);
+
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
       }
@@ -426,7 +426,7 @@ export default function Dashboard() {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
         analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
         setAnalyticsEvents(docs);
-        if (isDev) console.log(`[P0] Dashboard: analytics query finished at ${Date.now()}`);
+
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
       }
@@ -508,7 +508,7 @@ export default function Dashboard() {
         if (isDev) console.error("Error in onSnapshot callback:", err);
         setAgendaHojeStatus('error');
       } finally {
-        if (isDev) console.log(`[P0] Dashboard: today query finished at ${Date.now()}`);
+
         setAgendaHojeStatus('loaded');
       }
     }, (error) => {
@@ -589,7 +589,7 @@ export default function Dashboard() {
         fetchValid = false;
       }).finally(() => {
         if (isMounted) {
-          if (isDev) console.log(`[P0] Dashboard: general appointments query finished at ${Date.now()}`);
+
           setIsInitialLoading(false);
         }
       });
@@ -713,7 +713,7 @@ export default function Dashboard() {
         if (isDev) console.error("Error processing getDocs callback:", err);
       } finally {
         if (isMounted) {
-          if (isDev) console.log(`[P0] Dashboard: services query finished at ${Date.now()}`);
+
           setIsServicesLoading(false);
         }
       }
@@ -1043,19 +1043,7 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    if (isDev) console.log(`[P0] Dashboard: profile/user ready at ${Date.now()}`);
-  }, [profile]);
 
-  useEffect(() => {
-    if (isDev) console.log(`[P0] Dashboard: mount at ${Date.now()}`);
-  }, []);
-
-  useEffect(() => {
-    if (isDev && !isInitialLoading) {
-      console.log(`[P0] Dashboard: first useful render (loading ended) at ${Date.now()}`);
-    }
-  }, [isInitialLoading]);
 
   if (isInitialLoading) {
     return <DashboardSkeleton />;
@@ -1928,18 +1916,20 @@ export default function Dashboard() {
                        </div>
                     </div>
                     
-                    {features.waitlist && (
-                      <button 
-                        onClick={() => setIsWaitlistModalOpen(true)}
-                        className="p-5 bg-brand-linen rounded-[24px] border border-brand-mist flex flex-col items-start gap-2 hover:bg-brand-white transition-all group"
-                      >
-                        <p className="text-[10px] text-brand-terracotta uppercase tracking-widest font-bold">Vaga Presa?</p>
-                        <div className="flex items-center gap-2">
-                           <Users size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
-                           <span className="text-[10px] text-brand-ink uppercase tracking-widest">Avisar Lista de Espera</span>
-                        </div>
-                      </button>
-                    )}
+                    <button 
+                      onClick={() => {
+                        if (checkFeatureAccess('waitlist')) {
+                          setIsWaitlistModalOpen(true);
+                        }
+                      }}
+                      className="p-5 bg-brand-linen rounded-[24px] border border-brand-mist flex flex-col items-start gap-2 hover:bg-brand-white transition-all group"
+                    >
+                      <p className="text-[10px] text-brand-terracotta uppercase tracking-widest font-bold">Vaga Presa?</p>
+                      <div className="flex items-center gap-2">
+                         <Users size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" />
+                         <span className="text-[10px] text-brand-ink uppercase tracking-widest">Avisar Lista de Espera</span>
+                      </div>
+                    </button>
                   </div>
 
                   <div className="pt-6 border-t border-brand-mist space-y-3">
