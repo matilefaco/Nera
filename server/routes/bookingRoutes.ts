@@ -2360,13 +2360,23 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
   const { manageSlug } = req.params;
   const { newDate, newTime } = req.body;
 
-  if (!newDate || !newTime) {
+  if (!newDate || !newTime || typeof newDate !== 'string' || typeof newTime !== 'string') {
     return res.status(400).json({ error: "Nova data e horário são obrigatórios." });
+  }
+
+  const safeNewDate = newDate.trim();
+  const safeNewTime = newTime.trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(safeNewDate)) {
+    return res.status(400).json({ error: "Data em formato inválido. Use YYYY-MM-DD." });
+  }
+  if (!/^\d{2}:\d{2}$/.test(safeNewTime)) {
+    return res.status(400).json({ error: "Horário em formato inválido. Use HH:mm." });
   }
 
   try {
     const result = await db.runTransaction(async (transaction) => {
-      // 1. Validate slug
+      // 1. Validate slug using only explicit token fields
       const linkRef = db.collection('reservation_links').doc(manageSlug);
       const linkDoc = await transaction.get(linkRef);
       
@@ -2375,25 +2385,18 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       let apptDoc = null;
 
       if (!appointmentId) {
-        // Fallback: check if manageSlug is actually an appointment ID
-        apptRef = db.collection('appointments').doc(manageSlug);
-        apptDoc = await transaction.get(apptRef);
-        if (apptDoc.exists && (apptDoc.data()?.manageSlug === manageSlug || apptDoc.id === manageSlug)) {
-          appointmentId = apptDoc.id;
-        } else {
-           // Fallback: check query
-           const strategies = ['manageSlug', 'token', 'publicToken', 'manageToken'];
-           for (const field of strategies) {
-             const q = await transaction.get(db.collection('appointments').where(field, '==', manageSlug).limit(1));
-             if (!q.empty) {
-               appointmentId = q.docs[0].id;
-               apptRef = db.collection('appointments').doc(appointmentId);
-               apptDoc = await transaction.get(apptRef);
-               break;
-             }
+         // Fallback: check query for token fields only. NEVER use apptDoc.id === manageSlug here.
+         const strategies = ['manageSlug', 'token', 'publicToken', 'manageToken'];
+         for (const field of strategies) {
+           const q = await transaction.get(db.collection('appointments').where(field, '==', manageSlug).limit(1));
+           if (!q.empty) {
+             appointmentId = q.docs[0].id;
+             apptRef = db.collection('appointments').doc(appointmentId);
+             apptDoc = await transaction.get(apptRef);
+             break;
            }
-           if (!appointmentId) throw { status: 404, message: "Link de gerenciamento ou reserva não encontrada." };
-        }
+         }
+         if (!appointmentId) throw { status: 404, message: "Link de gerenciamento ou reserva não encontrada." };
       } else {
         apptRef = db.collection('appointments').doc(appointmentId);
         apptDoc = await transaction.get(apptRef);
@@ -2414,11 +2417,14 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       if (!proSnap.exists) throw { status: 404, message: "Profissional não encontrado." };
       const proData = proSnap.data() as any;
 
-      // Use official duration from the current appointment, not client payload
-      const duration = Number(data.duration || 60);
+      // Use frozen duration from current appointment
+      const duration = Number(data.duration);
+      if (isNaN(duration) || duration <= 0) {
+        throw { status: 400, message: "Duração inválida na reserva." }; // Remarcação preserva a duração original congelada da reserva
+      }
 
-      const apptDayOfWeek = new Date(newDate + 'T12:00:00').getDay();
-      const apptStartMin = timeToMinutes(newTime);
+      const apptDayOfWeek = new Date(safeNewDate + 'T12:00:00').getDay();
+      const apptStartMin = timeToMinutes(safeNewTime);
       const apptEndMin = apptStartMin + duration;
 
       // Validate working hours / days
@@ -2444,7 +2450,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       
       for (const bDoc of blockedSnap.docs) {
         const b = bDoc.data();
-        const isFixed = b.date === newDate;
+        const isFixed = b.date === safeNewDate;
         const isRecurring = b.isRecurring && Array.isArray(b.recurringDays) && b.recurringDays.includes(apptDayOfWeek);
         
         if (isFixed || isRecurring) {
@@ -2465,7 +2471,7 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       const existingApptsSnap = await transaction.get(
         db.collection('appointments')
           .where('professionalId', '==', data.professionalId)
-          .where('date', '==', newDate)
+          .where('date', '==', safeNewDate)
       );
 
       const overlapBlockingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
@@ -2499,15 +2505,21 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
         }
       }
 
+      // Client summary read
+      const summaryRef = db.collection('client_summaries').doc(`${data.professionalId}_${getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName)}`);
+      const summarySnap = await transaction.get(summaryRef);
+
       // Old lock
       let oldLockRef: admin.firestore.DocumentReference | null = null;
+      let oldLockSnap: admin.firestore.DocumentSnapshot | null = null;
       const oldLockId = getBookingLockId(data);
       if (oldLockId) {
         oldLockRef = db.collection('booking_locks').doc(oldLockId);
+        oldLockSnap = await transaction.get(oldLockRef);
       }
 
       // New lock
-      const simulatedNewData = { ...data, date: newDate, time: newTime };
+      const simulatedNewData = { ...data, date: safeNewDate, time: safeNewTime };
       const newLockId = getBookingLockId(simulatedNewData);
       
       let newLockRef: admin.firestore.DocumentReference | null = null;
@@ -2521,10 +2533,9 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
         }
       }
 
-      // Apply Writes
+      // Apply Writes (after all reads are done)
       if (oldLockRef && oldLockId !== newLockId) { // Only delete if the lock changed
-        const oldLockSnap = await transaction.get(oldLockRef);
-        if (oldLockSnap.exists && oldLockSnap.data()?.appointmentId === appointmentId) {
+        if (oldLockSnap && oldLockSnap.exists && oldLockSnap.data()?.appointmentId === appointmentId) {
           transaction.delete(oldLockRef);
         }
       }
@@ -2532,8 +2543,8 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       if (newLockRef && overlapBlockingStatuses.includes(data.status)) {
         transaction.set(newLockRef, {
           professionalId: data.professionalId,
-          date: newDate,
-          time: newTime,
+          date: safeNewDate,
+          time: safeNewTime,
           appointmentId: appointmentId,
           serviceId: data.serviceId || 'unknown',
           status: data.status, // preserve existing status
@@ -2543,19 +2554,19 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       }
 
       const updatePayload: any = {
-        date: newDate,
-        time: newTime,
+        date: safeNewDate,
+        time: safeNewTime,
         previousDate: data.date,
         previousTime: data.time,
         rescheduledAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         lastChangeBy: 'client',
-        changeMessage: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`,
+        changeMessage: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${safeNewDate.split('-').reverse().join('/')}`,
         timeline: admin.firestore.FieldValue.arrayUnion({
           type: 'booking_rescheduled_client',
           createdAt: new Date().toISOString(),
           actor: 'client',
-          label: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`
+          label: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${safeNewDate.split('-').reverse().join('/')}`
         })
       };
 
@@ -2563,7 +2574,6 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       transaction.update(apptRef, safeUpdate);
 
       const updatedData = { ...data, ...safeUpdate, id: appointmentId };
-      const summarySnap = await transaction.get(db.collection('client_summaries').doc(`${data.professionalId}_${getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName)}`));
       await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
 
       return { success: true, updatedData };
@@ -2606,9 +2616,9 @@ async function postRescheduleActions(appointmentId: string, previousDate: string
 
     if (updatedData.status === 'confirmed' || updatedData.status === 'completed') {
       try {
-        const { handleGoogleCalendarReschedule } = require('./calendarRoutes');
-        if (handleGoogleCalendarReschedule) {
-           await handleGoogleCalendarReschedule(db, appointmentId, updatedData.professionalId);
+        const { updateGoogleCalendarEvent } = require('./calendarRoutes');
+        if (updateGoogleCalendarEvent) {
+           await updateGoogleCalendarEvent(updatedData, updatedData.professionalId);
         }
       } catch (e: any) {
         logger.error("CALENDAR", `Error evaluating calendar sync for rescheduled appt: ${e.message}`);

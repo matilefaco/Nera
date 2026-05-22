@@ -628,12 +628,6 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
     }
 
     const responseData = await response.json();
-    const updatedData = responseData.updatedData;
-    
-    if (updatedData) {
-      triggerWaitlistCheck(updatedData.professionalId, updatedData.previousDate, updatedData.previousTime).catch(e => { if (isDev) console.error("[Waitlist Check Error]", e); });
-    }
-
     return responseData;
   } catch (error) {
     if (isDev) console.error('[Client Reschedule] Failed:', error);
