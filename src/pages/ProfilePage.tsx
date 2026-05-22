@@ -90,6 +90,8 @@ class ProfileErrorBoundary extends React.Component<{children: React.ReactNode}, 
   }
 }
 
+const profilePortfolioCache = new Map<string, any[]>();
+
 export default function ProfilePage() {
   console.log('[ProfilePage] Render starts');
   const { user, profile, loading: authLoading } = useAuth();
@@ -192,7 +194,11 @@ export default function ProfilePage() {
 
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
-  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>([]);
+  
+  const [portfolioStatus, setPortfolioStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('loading');
+  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>(() => {
+    return user ? (profilePortfolioCache.get(user.uid) || []) : [];
+  });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -295,10 +301,19 @@ export default function ProfilePage() {
 
       // Load portfolio from profile array (Single Source of Truth)
       if (profile.portfolio) {
+        profilePortfolioCache.set(user.uid, profile.portfolio as any);
         setPortfolio(profile.portfolio as any);
+        setPortfolioStatus('loaded');
       } else {
         // Fallback: Fetch portfolio from sub-collection if array is empty
         const fetchPortfolio = async () => {
+          setPortfolioStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
+          
+          // Timeout to release stalled state
+          const stallTimeout = setTimeout(() => {
+            setPortfolioStatus('loaded');
+          }, 2000);
+          
           try {
             if (isDev) console.log('[Profile] Fetching portfolio sub-collection...');
             const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
@@ -309,10 +324,19 @@ export default function ProfilePage() {
               url: doc.data().imageUrl || doc.data().url,
               category: doc.data().category
             }));
+            
+            clearTimeout(stallTimeout);
+            
             if (isDev) console.log('[Profile] Portfolio items fetched from sub-collection:', items.length);
-            if (items.length > 0) setPortfolio(items);
+            if (items.length > 0) {
+              profilePortfolioCache.set(user.uid, items);
+              setPortfolio(items);
+            }
+            setPortfolioStatus('loaded');
           } catch (err) {
+            clearTimeout(stallTimeout);
             if (isDev) console.error('[Profile] Error fetching portfolio:', err);
+            setPortfolioStatus('error');
           }
         };
         fetchPortfolio();
@@ -795,9 +819,13 @@ export default function ProfilePage() {
         if (isDev) console.log('[Portfolio] saved successfully with ID:', docId);
         
         // Replace temp item with final item
-        setPortfolio(prev => prev.map(item => 
-          item.id === tempId ? { id: docId, url: url, category: autoCategory || specialty || 'Geral' } : item
-        ));
+        setPortfolio(prev => {
+          const newPortfolio = prev.map(item => 
+            item.id === tempId ? { id: docId, url: url, category: autoCategory || specialty || 'Geral' } : item
+          );
+          if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
+          return newPortfolio;
+        });
 
         notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
         setDiagnosticInfo(null);
@@ -838,7 +866,11 @@ export default function ProfilePage() {
         
         notify.error(errorMessage);
         // Remove temp item on error
-        setPortfolio(prev => prev.filter(item => item.id !== tempId));
+        setPortfolio(prev => {
+          const revert = prev.filter(item => item.id !== tempId);
+          if (user?.uid) profilePortfolioCache.set(user.uid, revert);
+          return revert;
+        });
       } finally {
         setUploadingImage(false);
         if (portfolioInputRef.current) portfolioInputRef.current.value = '';
@@ -861,7 +893,11 @@ export default function ProfilePage() {
       await deletePortfolioItem(user.uid, itemToRemove as any);
       if (isDev) console.log('[Portfolio] removed successfully');
       
-      setPortfolio(prev => prev.filter(item => item.id !== id));
+      setPortfolio(prev => {
+        const filtered = prev.filter(item => item.id !== id);
+        if (user?.uid) profilePortfolioCache.set(user.uid, filtered);
+        return filtered;
+      });
       notify.success('Galeria atualizada.');
     } catch (err) {
       if (isDev) console.error('[Portfolio] Error removing:', err);
@@ -981,7 +1017,18 @@ export default function ProfilePage() {
                 <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Exiba fotos do seu trabalho</p>
               </div>
               
-              {portfolio.length === 0 ? (
+              {(portfolioStatus === 'loading' || portfolioStatus === 'idle') && portfolio.length === 0 ? (
+                <div className="bg-brand-white/50 border border-brand-mist/60 rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden backdrop-blur-sm animate-pulse min-h-[300px]">
+                   <div className="w-14 h-14 bg-brand-mist/20 rounded-full mb-4"></div>
+                   <div className="h-5 bg-brand-mist/30 w-3/4 max-w-[250px] rounded mb-3"></div>
+                   <div className="h-4 bg-brand-mist/20 w-1/2 max-w-[200px] rounded mb-6"></div>
+                   <div className="h-10 bg-brand-mist/30 w-full max-w-[200px] rounded-xl"></div>
+                </div>
+              ) : portfolioStatus === 'error' && portfolio.length === 0 ? (
+                <div className="bg-brand-white/50 border border-brand-mist/60 rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center text-center shadow-sm mb-4">
+                  <p className="text-[14px] font-serif text-brand-stone italic">Não foi possível carregar seu portfólio agora.</p>
+                </div>
+              ) : portfolio.length === 0 ? (
                 <div className="bg-brand-white/50 border border-brand-mist/60 rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden backdrop-blur-sm">
                   <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-brand-parchment via-brand-terracotta/20 to-brand-parchment" />
                   <div className="w-14 h-14 bg-brand-white rounded-full flex items-center justify-center shadow-sm border border-brand-mist mb-5 relative group cursor-pointer" onClick={() => portfolioInputRef.current?.click()}>
@@ -1062,6 +1109,7 @@ export default function ProfilePage() {
                             const newPortfolio = [...portfolio];
                             newPortfolio[idx].category = newCategory;
                             setPortfolio(newPortfolio);
+                            if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
                             
                             if (user) {
                               try {
