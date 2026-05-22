@@ -13,7 +13,6 @@ import {
   confirmPresenceByClient, 
   cancelBookingByClient, 
   rescheduleBookingByClient,
-  recordRescheduleRequest,
   getAppointmentByToken
 } from '../firebase';
 import { doc, getDoc, collection, query, where, onSnapshot, getDocs, limit } from 'firebase/firestore';
@@ -87,16 +86,6 @@ export default function ManageBookingPage() {
         const today = getTodayLocale();
         if (appointment.date >= today) {
           setSelectedDate(appointment.date);
-        }
-        
-        if (appointment.attendanceStatus !== 'reschedule_requested' && !isAutoProcessed) {
-          setIsAutoProcessed(true);
-          const lookupKey = appointment.manageSlug || appointment.id;
-          recordRescheduleRequest(lookupKey).then(() => {
-             setAppointment(prev => prev ? { ...prev, attendanceStatus: 'reschedule_requested' } : null);
-          }).catch(err => {
-             if (isDev) console.error('[AUTO_ACTION] Error recording reschedule request:', err);
-          });
         }
       }
     };
@@ -280,20 +269,23 @@ setBlockedSchedules(dayBlocked);
     if (appointment && appointment.date >= today) {
       setSelectedDate(appointment.date);
     }
-    
-    if (appointment && appointment.attendanceStatus !== 'reschedule_requested') {
-      const lookupKey = appointment.manageSlug || appointment.id;
-      recordRescheduleRequest(lookupKey).then(() => {
-         setAppointment(prev => prev ? { ...prev, attendanceStatus: 'reschedule_requested' } : null);
-      }).catch(err => {
-         if (isDev) console.error('Error recording reschedule request', err);
-      });
-    }
   };
 
   const handleReschedule = async () => {
-    const lookupKey = token || id || appointment?.manageSlug || appointment?.id || '';
-    if (!lookupKey || !selectedDate || !selectedTime) return;
+    const lookupKey = 
+      token || 
+      id || 
+      appointment?.manageSlug || 
+      appointment?.token || 
+      appointment?.publicToken || 
+      appointment?.manageToken;
+      
+    if (!lookupKey) {
+      notify.error('Link de remarcação incorreto ou expirado.');
+      return;
+    }
+    if (!selectedDate || !selectedTime) return;
+    
     setActionLoading(true);
     try {
       await rescheduleBookingByClient(lookupKey, selectedDate, selectedTime);

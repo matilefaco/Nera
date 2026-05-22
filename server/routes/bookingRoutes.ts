@@ -2237,24 +2237,8 @@ router.post("/public/manage/:manageSlug/reschedule-request", async (req, res) =>
     });
 
     if (result.success && !result.alreadyRequested && result.updatedData) {
-      // Send email to professional asynchronously
-      const appt = result.updatedData;
-      db.collection('users').doc(appt.professionalId).get().then(proSnap => {
-         const proData = proSnap.data();
-         if (proData && proData.email) {
-            import('../emails/sendEmail.js').then(({ sendRescheduleRequestedEmail }) => {
-              sendRescheduleRequestedEmail({
-                 professionalEmail: proData.email,
-                 professionalName: proData.name || 'Profissional',
-                 clientName: appt.clientName,
-                 serviceName: appt.serviceName,
-                 date: appt.date,
-                 time: appt.time,
-                 dashboardUrl: `${PUBLIC_APP_URL}/dashboard`
-              });
-            });
-         }
-      });
+      // NOTE: Removed sendRescheduleRequestedEmail to prevent premature "reschedule requested" 
+      // emails being sent before the client actually chooses a new date/time.
     }
 
     res.json({ success: true, appointmentId: result.appointmentId });
