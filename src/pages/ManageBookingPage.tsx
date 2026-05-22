@@ -272,27 +272,34 @@ setBlockedSchedules(dayBlocked);
   };
 
   const handleReschedule = async () => {
-    const lookupKey = 
-      token || 
-      id || 
+    const safeManageToken = 
       appointment?.manageSlug || 
-      appointment?.token || 
+      appointment?.manageToken || 
       appointment?.publicToken || 
-      appointment?.manageToken;
+      appointment?.token;
       
-    if (!lookupKey) {
-      notify.error('Link de remarcação incorreto ou expirado.');
+    if (isDev) {
+      console.log('[DIAGNOSTIC] Token check:', {
+        hasManageSlug: !!appointment?.manageSlug,
+        hasManageToken: !!appointment?.manageToken,
+        hasPublicToken: !!appointment?.publicToken,
+        hasToken: !!appointment?.token
+      });
+    }
+
+    if (!safeManageToken) {
+      notify.error('Não foi possível validar o link de remarcação. Abra novamente pelo link recebido por e-mail.');
       return;
     }
     if (!selectedDate || !selectedTime) return;
     
     setActionLoading(true);
     try {
-      await rescheduleBookingByClient(lookupKey, selectedDate, selectedTime);
+      await rescheduleBookingByClient(safeManageToken, selectedDate, selectedTime);
       notify.success('Horário alterado com sucesso!');
       setView('main');
     } catch (e: any) {
-      const maskedLookupKey = lookupKey ? `${lookupKey.substring(0, 4)}***${lookupKey.substring(lookupKey.length - 4)}` : 'NULL';
+      const maskedLookupKey = safeManageToken ? `${safeManageToken.substring(0, 4)}***${safeManageToken.substring(safeManageToken.length - 4)}` : 'NULL';
       if (isDev) {
         console.error(`[DIAGNOSTIC] handleReschedule error. lookupKey: ${maskedLookupKey}, date: ${selectedDate}, time: ${selectedTime}, message: ${e.message}`);
       }
