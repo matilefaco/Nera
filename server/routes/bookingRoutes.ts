@@ -2355,6 +2355,270 @@ router.post("/public/manage/:manageSlug/cancel", async (req: express.Request, re
   }
 });
 
+router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request, res: express.Response) => {
+  const db = getDb();
+  const { manageSlug } = req.params;
+  const { newDate, newTime } = req.body;
+
+  if (!newDate || !newTime) {
+    return res.status(400).json({ error: "Nova data e horário são obrigatórios." });
+  }
+
+  try {
+    const result = await db.runTransaction(async (transaction) => {
+      // 1. Validate slug
+      const linkRef = db.collection('reservation_links').doc(manageSlug);
+      const linkDoc = await transaction.get(linkRef);
+      
+      let appointmentId = linkDoc.exists ? linkDoc.data()?.appointmentId : null;
+      let apptRef = null;
+      let apptDoc = null;
+
+      if (!appointmentId) {
+        // Fallback: check if manageSlug is actually an appointment ID
+        apptRef = db.collection('appointments').doc(manageSlug);
+        apptDoc = await transaction.get(apptRef);
+        if (apptDoc.exists && (apptDoc.data()?.manageSlug === manageSlug || apptDoc.id === manageSlug)) {
+          appointmentId = apptDoc.id;
+        } else {
+           // Fallback: check query
+           const strategies = ['manageSlug', 'token', 'publicToken', 'manageToken'];
+           for (const field of strategies) {
+             const q = await transaction.get(db.collection('appointments').where(field, '==', manageSlug).limit(1));
+             if (!q.empty) {
+               appointmentId = q.docs[0].id;
+               apptRef = db.collection('appointments').doc(appointmentId);
+               apptDoc = await transaction.get(apptRef);
+               break;
+             }
+           }
+           if (!appointmentId) throw { status: 404, message: "Link de gerenciamento ou reserva não encontrada." };
+        }
+      } else {
+        apptRef = db.collection('appointments').doc(appointmentId);
+        apptDoc = await transaction.get(apptRef);
+      }
+
+      if (!apptDoc || !apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
+      const data: any = apptDoc.data();
+
+      // Ensure valid status for rescheduling
+      const blockRescheduleStatuses = ['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'concluido', 'no_show'];
+      if (blockRescheduleStatuses.includes(data.status)) {
+        throw { status: 400, message: "Esta reserva possui um status que não permite remarcação." };
+      }
+
+      // Need professional and service to validate availability
+      const proRef = db.collection('users').doc(data.professionalId);
+      const proSnap = await transaction.get(proRef);
+      if (!proSnap.exists) throw { status: 404, message: "Profissional não encontrado." };
+      const proData = proSnap.data() as any;
+
+      // Use official duration from the current appointment, not client payload
+      const duration = Number(data.duration || 60);
+
+      const apptDayOfWeek = new Date(newDate + 'T12:00:00').getDay();
+      const apptStartMin = timeToMinutes(newTime);
+      const apptEndMin = apptStartMin + duration;
+
+      // Validate working hours / days
+      if (proData.workingHours) {
+        if (Array.isArray(proData.workingHours.workingDays) && proData.workingHours.workingDays.length > 0) {
+          if (!proData.workingHours.workingDays.includes(apptDayOfWeek)) {
+            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+        }
+        
+        if (proData.workingHours.startTime && proData.workingHours.endTime) {
+          const whStart = timeToMinutes(proData.workingHours.startTime);
+          const whEnd = timeToMinutes(proData.workingHours.endTime);
+          if (apptStartMin < whStart || apptEndMin > whEnd) {
+             throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+        }
+      }
+
+      // Check blocked schedules
+      const blockedQ = db.collection('blocked_schedules').where('professionalId', '==', data.professionalId);
+      const blockedSnap = await transaction.get(blockedQ);
+      
+      for (const bDoc of blockedSnap.docs) {
+        const b = bDoc.data();
+        const isFixed = b.date === newDate;
+        const isRecurring = b.isRecurring && Array.isArray(b.recurringDays) && b.recurringDays.includes(apptDayOfWeek);
+        
+        if (isFixed || isRecurring) {
+          if (b.type === 'full_day' || b.allDay) {
+            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+          if (b.startTime && b.endTime) {
+            const bStart = timeToMinutes(b.startTime);
+            const bEnd = timeToMinutes(b.endTime);
+            if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) {
+              throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+            }
+          }
+        }
+      }
+
+      // Check overlapping appointments
+      const existingApptsSnap = await transaction.get(
+        db.collection('appointments')
+          .where('professionalId', '==', data.professionalId)
+          .where('date', '==', newDate)
+      );
+
+      const overlapBlockingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
+      
+      for (const doc of existingApptsSnap.docs) {
+        if (doc.id === appointmentId) continue; // ignore self
+        const existing = doc.data();
+        if (overlapBlockingStatuses.includes(existing.status)) {
+          const existingStart = timeToMinutes(existing.time);
+          const existingDuration = Number(existing.duration || existing.serviceDuration || 60);
+          const existingEnd = existingStart + existingDuration;
+
+          if (intervalsOverlap(apptStartMin, apptEndMin, existingStart, existingEnd)) {
+            // Also check lock expiry logic for pending items to be fully safe, similar to creation
+            if (['pending', 'pending_confirmation'].includes(existing.status)) {
+              const existingLockId = getBookingLockId(existing);
+              if (existingLockId) {
+                const existingLockSnap = await transaction.get(db.collection('booking_locks').doc(existingLockId));
+                if (existingLockSnap.exists) {
+                   const eld = existingLockSnap.data();
+                   if (eld?.expiresAt && ((typeof eld.expiresAt.toMillis === 'function' && eld.expiresAt.toMillis() <= Date.now()) || (new Date(eld.expiresAt).getTime() <= Date.now()))) {
+                     continue; // expired lock, ignores overlap
+                   }
+                } else {
+                  continue; // pending without lock
+                }
+              }
+            }
+            throw { status: 400, message: "Este horário acabou de ser preenchido. Escolha outro." };
+          }
+        }
+      }
+
+      // Old lock
+      let oldLockRef: admin.firestore.DocumentReference | null = null;
+      const oldLockId = getBookingLockId(data);
+      if (oldLockId) {
+        oldLockRef = db.collection('booking_locks').doc(oldLockId);
+      }
+
+      // New lock
+      const simulatedNewData = { ...data, date: newDate, time: newTime };
+      const newLockId = getBookingLockId(simulatedNewData);
+      
+      let newLockRef: admin.firestore.DocumentReference | null = null;
+      if (newLockId) {
+        newLockRef = db.collection('booking_locks').doc(newLockId);
+        const newLockSnap = await transaction.get(newLockRef);
+        if (newLockSnap.exists && overlapBlockingStatuses.includes(newLockSnap.data()?.status)) {
+          if (newLockSnap.data()?.appointmentId !== appointmentId) {
+            throw { status: 400, message: "Este horário acabou de ser preenchido. Escolha outro." };
+          }
+        }
+      }
+
+      // Apply Writes
+      if (oldLockRef && oldLockId !== newLockId) { // Only delete if the lock changed
+        const oldLockSnap = await transaction.get(oldLockRef);
+        if (oldLockSnap.exists && oldLockSnap.data()?.appointmentId === appointmentId) {
+          transaction.delete(oldLockRef);
+        }
+      }
+
+      if (newLockRef && overlapBlockingStatuses.includes(data.status)) {
+        transaction.set(newLockRef, {
+          professionalId: data.professionalId,
+          date: newDate,
+          time: newTime,
+          appointmentId: appointmentId,
+          serviceId: data.serviceId || 'unknown',
+          status: data.status, // preserve existing status
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
+
+      const updatePayload: any = {
+        date: newDate,
+        time: newTime,
+        previousDate: data.date,
+        previousTime: data.time,
+        rescheduledAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastChangeBy: 'client',
+        changeMessage: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`,
+        timeline: admin.firestore.FieldValue.arrayUnion({
+          type: 'booking_rescheduled_client',
+          createdAt: new Date().toISOString(),
+          actor: 'client',
+          label: `Cliente reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`
+        })
+      };
+
+      const safeUpdate = sanitizeAppointment(updatePayload, true);
+      transaction.update(apptRef, safeUpdate);
+
+      const updatedData = { ...data, ...safeUpdate, id: appointmentId };
+      const summarySnap = await transaction.get(db.collection('client_summaries').doc(`${data.professionalId}_${getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName)}`));
+      await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
+
+      return { success: true, updatedData };
+    });
+
+    // Notify asynchronously
+    const { updatedData } = result;
+    postRescheduleActions(updatedData.id, updatedData.previousDate, updatedData.previousTime, updatedData, 'client');
+
+    return res.json(result);
+  } catch (err: any) {
+    const status = err.status || 500;
+    const message = err.message || "Erro interno do servidor";
+    logger.error("BOOKING", "Reschedule by client error", { error: err });
+    return res.status(status).json({ error: message });
+  }
+});
+
+// Helper for background notifications/waitlist after reschedule
+async function postRescheduleActions(appointmentId: string, previousDate: string, previousTime: string, updatedData: any, actor: 'client' | 'professional') {
+  const db = getDb();
+  try {
+    const notifyPayload = {
+      id: appointmentId,
+      appointmentId,
+      ...updatedData,
+      previousDate,
+      previousTime,
+      rescheduledBy: actor
+    };
+    
+    await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({
+         type: actor === 'client' ? 'BOOKING_RESCHEDULED_BY_CLIENT' : 'BOOKING_RESCHEDULED_BY_PROFESSIONAL',
+         payload: notifyPayload
+       })
+    }).catch(e => logger.error("BOOKING", "Failed to send notification", e));
+
+    if (updatedData.status === 'confirmed' || updatedData.status === 'completed') {
+      try {
+        const { handleGoogleCalendarReschedule } = require('./calendarRoutes');
+        if (handleGoogleCalendarReschedule) {
+           await handleGoogleCalendarReschedule(db, appointmentId, updatedData.professionalId);
+        }
+      } catch (e: any) {
+        logger.error("CALENDAR", `Error evaluating calendar sync for rescheduled appt: ${e.message}`);
+      }
+    }
+  } catch (err) {
+    logger.error("BOOKING", "Error in postRescheduleActions", { error: err });
+  }
+}
+
 // --- NEW: REVIEW MODERATION ROUTES ---
 router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const db = getDb();

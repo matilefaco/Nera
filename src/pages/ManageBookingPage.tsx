@@ -292,11 +292,11 @@ setBlockedSchedules(dayBlocked);
   };
 
   const handleReschedule = async () => {
-    const aid = appointment?.appointmentId || appointment?.id;
-    if (!aid || !selectedDate || !selectedTime) return;
+    const lookupKey = token || id || appointment?.manageSlug || appointment?.id || '';
+    if (!lookupKey || !selectedDate || !selectedTime) return;
     setActionLoading(true);
     try {
-      await rescheduleBookingByClient(aid, selectedDate, selectedTime);
+      await rescheduleBookingByClient(lookupKey, selectedDate, selectedTime);
       notify.success('Horário alterado com sucesso!');
       setView('main');
     } catch (e: any) {
