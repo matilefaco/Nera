@@ -2578,14 +2578,60 @@ async function postRescheduleActions(appointmentId: string, previousDate: string
       rescheduledBy: actor
     };
     
-    await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
-       method: 'POST',
-       headers: { 'Content-Type': 'application/json' },
-       body: JSON.stringify({
-         type: actor === 'client' ? 'BOOKING_RESCHEDULED_BY_CLIENT' : 'BOOKING_RESCHEDULED_BY_PROFESSIONAL',
-         payload: notifyPayload
-       })
-    }).catch(e => logger.error("BOOKING", "Failed to send notification", e));
+    if (actor === 'client') {
+      import('../emails/sendEmail.js').then(async ({ sendProfessionalBookingRescheduledEmail }) => {
+        try {
+          const proDoc = await db.collection('users').doc(updatedData.professionalId).get();
+          if (proDoc.exists && proDoc.data()?.email) {
+            const proData = proDoc.data();
+            const eventKey = `bookingRescheduledPro_${updatedData.date}_${updatedData.time}`;
+            
+            if (await shouldSendEmail(appointmentId, eventKey)) {
+              logger.info('EMAIL', `Enviando e-mail de remarcação concluída para a profissional (actor: client): ${proData!.email}`);
+              
+              const formatToBRDate = (d: string) => {
+                 if (!d) return d;
+                 const [y, m, day] = d.split('-');
+                 if (y && m && day) return `${day}/${m}/${y}`;
+                 return d;
+              };
+
+              const emailResult = await sendProfessionalBookingRescheduledEmail({
+                professionalEmail: proData!.email,
+                professionalName: proData!.name || 'Profissional',
+                clientName: updatedData.clientName,
+                serviceName: updatedData.serviceName,
+                oldFormatDate: formatToBRDate(previousDate),
+                oldTime: previousTime,
+                newFormatDate: formatToBRDate(updatedData.date),
+                newTime: updatedData.time,
+                agendaUrl: `${PUBLIC_APP_URL}/dashboard`
+              });
+              
+              if (emailResult && emailResult.success) {
+                await markEmailSent(appointmentId, eventKey);
+                logger.info('EMAIL', `E-mail de remarcação enviado com sucesso.`);
+              } else {
+                logger.error('EMAIL', `Falha no envio de e-mail de remarcação: ${emailResult?.error}`);
+              }
+            } else {
+               logger.info('EMAIL', `E-mail de remarcação ignorado por idempotência: ${eventKey}`);
+            }
+          }
+        } catch (err: any) {
+           logger.error('EMAIL', `Erro ao preparar e-mail de remarcação para profissional: ${err.message}`);
+        }
+      });
+    } else {
+      await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           type: 'BOOKING_RESCHEDULED_BY_PROFESSIONAL',
+           payload: notifyPayload
+         })
+      }).catch(e => logger.error("BOOKING", "Failed to send notification via /notify", e));
+    }
 
     if (updatedData.status === 'confirmed' || updatedData.status === 'completed') {
       try {
