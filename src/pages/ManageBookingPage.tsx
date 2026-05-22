@@ -273,12 +273,12 @@ setBlockedSchedules(dayBlocked);
 
   const handleReschedule = async () => {
     const lookupKey = 
+      token || 
+      id || 
       appointment?.manageSlug || 
       appointment?.token || 
       appointment?.publicToken || 
-      appointment?.manageToken ||
-      token || 
-      id;
+      appointment?.manageToken;
       
     if (!lookupKey) {
       notify.error('Link de remarcação incorreto ou expirado.');
