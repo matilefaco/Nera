@@ -2656,11 +2656,18 @@ async function triggerWaitlistCheckBackend(db: admin.firestore.Firestore, profes
   if (!proSnap.exists) return;
   const proSettings = proSnap.data() as any;
 
+  const hasWaitlistFeature = proSettings.plan === 'pro' || proSettings.features?.waitlist === true;
+  if (!hasWaitlistFeature) {
+    logger.info("WAITLIST", `Profissional ${professionalId} sem recurso PRO ativo. Processamento da lista de espera ignorado.`);
+    return;
+  }
+
   const waitlistSnap = await db.collection('waitlist')
     .where('professionalId', '==', professionalId)
     .where('requestedDate', '==', date)
     .where('status', '==', 'waiting')
     .orderBy('createdAt', 'asc')
+    .limit(20)
     .get();
 
   if (waitlistSnap.empty) return;
@@ -2680,12 +2687,21 @@ async function triggerWaitlistCheckBackend(db: admin.firestore.Firestore, profes
     if (proSettings.waitlistMode === 'auto') {
       const expiresAt = new Date(Date.now() + 15 * 60000);
 
-      await db.collection('waitlist').doc(entryId).update({
-        status: 'invited',
-        invitationSentAt: admin.firestore.FieldValue.serverTimestamp(),
-        invitationExpiresAt: expiresAt.toISOString(),
-        assignedTime: time
+      const inviteSuccess = await db.runTransaction(async (t) => {
+        const ref = db.collection('waitlist').doc(entryId);
+        const snap = await t.get(ref);
+        if (snap.data()?.status !== 'waiting') return false;
+
+        t.update(ref, {
+          status: 'invited',
+          invitationSentAt: admin.firestore.FieldValue.serverTimestamp(),
+          invitationExpiresAt: expiresAt.toISOString(),
+          assignedTime: time
+        });
+        return true;
       });
+
+      if (!inviteSuccess) return;
 
       await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
          method: 'POST',
