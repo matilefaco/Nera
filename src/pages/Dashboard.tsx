@@ -107,6 +107,7 @@ interface AppointmentsCacheEntry {
 
 const APPOINTMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 const appointmentsHistoryCache = new Map<string, AppointmentsCacheEntry>();
+const dashboardTodayCache = new Map<string, { confirmedToday: Appointment[], revenue: number }>();
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
@@ -195,8 +196,12 @@ export default function Dashboard() {
     openUpgradeModal
   } = useUpgradeTriggers(appointments);
 
-  const [confirmedToday, setConfirmedToday] = useState<Appointment[]>([]);
-  const [dailyRevenue, setDailyRevenue] = useState(0);
+  const [confirmedToday, setConfirmedToday] = useState<Appointment[]>(() => {
+    return user ? (dashboardTodayCache.get(user.uid)?.confirmedToday || []) : [];
+  });
+  const [dailyRevenue, setDailyRevenue] = useState(() => {
+    return user ? (dashboardTodayCache.get(user.uid)?.revenue || 0) : 0;
+  });
   const [optimisticUpdates, setOptimisticUpdates] = useState<Record<string, string>>({});
 
   const { pendingAppointments: pendingRequests, pendingCount: contextPendingCount } = usePendingAppointments();
@@ -263,7 +268,7 @@ export default function Dashboard() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [isTodayLoading, setIsTodayLoading] = useState(true);
+  const [agendaHojeStatus, setAgendaHojeStatus] = useState<'loading' | 'loaded' | 'error' | 'stalled'>('loading');
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
@@ -447,7 +452,7 @@ export default function Dashboard() {
 
     // Fallback to clear loading state if network stalls
     const timeoutId = setTimeout(() => {
-      if (isMounted) setIsTodayLoading(false);
+      if (isMounted) setAgendaHojeStatus(prev => prev === 'loading' ? 'stalled' : prev);
     }, 2000);
 
     const unsubToday = onSnapshot(qToday, (snapshot) => {
@@ -458,17 +463,22 @@ export default function Dashboard() {
           .filter(a => !isFakeContent(a.clientName))
           .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         const relevantToday = docs.filter(a => isRevenueStatus(a.status));
-setConfirmedToday(relevantToday);
-setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
+        const rev = calculateFinancialMetrics(relevantToday).monthlyRevenue;
+        if (user?.uid) {
+          dashboardTodayCache.set(user.uid, { confirmedToday: relevantToday, revenue: rev });
+        }
+        setConfirmedToday(relevantToday);
+        setDailyRevenue(rev);
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
+        setAgendaHojeStatus('error');
       } finally {
         if (isDev) console.log(`[P0] Dashboard: today query finished at ${Date.now()}`);
-        setIsTodayLoading(false);
+        setAgendaHojeStatus('loaded');
       }
     }, (error) => {
       if (isDev) console.error('[Dashboard] Subscription error on qToday:', error);
-      setIsTodayLoading(false);
+      setAgendaHojeStatus('error');
     });
 
     // Query: Unconfirmed for tomorrow
@@ -1593,44 +1603,69 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
             ) : (
               <div className="bg-[#FCFBF9] p-6 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
                 <div className="flex flex-col w-full md:w-auto">
-                  {isTodayLoading ? (
-                    <div className="mb-4 pb-4 border-b border-brand-mist/40">
-                      <div className="animate-pulse space-y-2">
-                        <div className="h-4 bg-brand-mist/60 rounded w-1/2"></div>
-                        <div className="h-3 bg-brand-mist/40 rounded w-1/3"></div>
+                  {(agendaHojeStatus === 'loading' || agendaHojeStatus === 'stalled') && displayedConfirmedToday.length === 0 ? (
+                    <>
+                      <div className="mb-4 pb-4 border-b border-brand-mist/40 mt-1">
+                        <div className="animate-pulse flex items-center gap-2 mb-2">
+                           <Loader2 size={12} className="animate-spin text-brand-stone" />
+                           <span className="text-[12px] font-serif text-brand-stone italic text-opacity-80">
+                             {agendaHojeStatus === 'stalled' ? 'Sincronizando agenda (sua conexão pode estar lenta)...' : 'Atualizando sua agenda...'}
+                           </span>
+                        </div>
+                        <div className="h-3 bg-brand-mist/40 rounded w-1/3 mt-3"></div>
                       </div>
+                      <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar mt-1">
+                        <div className="flex-none animate-pulse">
+                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/40 mb-1.5">Faturamento Hoje</p>
+                          <div className="h-6 bg-brand-mist/60 rounded w-20"></div>
+                        </div>
+                        <div className="flex-none animate-pulse">
+                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/40 mb-1.5">Agendamentos</p>
+                          <div className="h-6 bg-brand-mist/60 rounded w-10"></div>
+                        </div>
+                      </div>
+                    </>
+                  ) : agendaHojeStatus === 'error' && displayedConfirmedToday.length === 0 ? (
+                    <div className="mb-4 pb-4 border-b border-brand-mist/40">
+                      <p className="text-[14px] font-serif text-red-800/60 italic">Erro ao carregar sua agenda. Tente novamente.</p>
                     </div>
                   ) : (
-                    <div className="mb-4 pb-4 border-b border-brand-mist/40">
-                      {displayedConfirmedToday.length === 0 ? (
-                        <p className="text-[14px] font-serif text-brand-stone italic">Sua agenda está livre no momento.</p>
-                      ) : (
-                        <p className="text-[14px] font-serif text-brand-stone italic">Você tem {displayedConfirmedToday.length} agendamento{displayedConfirmedToday.length > 1 ? 's' : ''} hoje.</p>
-                      )}
-                      
-                      {nextUpcomingAppointment ? (
-                        <p className="text-[10px] font-medium tracking-widest text-brand-stone/80 mt-2">
-                          PRÓXIMO: <span className="font-bold text-brand-ink">{formatLocalDate(nextUpcomingAppointment.date, { day: '2-digit', month: '2-digit' })} às {nextUpcomingAppointment.time}</span> com <span className="text-brand-ink font-semibold">{nextUpcomingAppointment.clientName}</span>
-                        </p>
-                      ) : daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
-                        <p className="text-[9px] font-medium uppercase tracking-widest text-brand-stone/60 mt-1">
-                          Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
-                        </p>
-                      )}
-                    </div>
+                    <>
+                      <div className="mb-4 pb-4 border-b border-brand-mist/40">
+                        {displayedConfirmedToday.length === 0 ? (
+                          <p className="text-[14px] font-serif text-brand-stone italic">Sua agenda está livre no momento.</p>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                             <p className="text-[14px] font-serif text-brand-stone italic">Você tem {displayedConfirmedToday.length} agendamento{displayedConfirmedToday.length > 1 ? 's' : ''} hoje.</p>
+                             {(agendaHojeStatus === 'loading' || agendaHojeStatus === 'stalled') && (
+                               <Loader2 size={10} className="animate-spin text-brand-stone opacity-50" />
+                             )}
+                          </div>
+                        )}
+                        
+                        {nextUpcomingAppointment ? (
+                          <p className="text-[10px] font-medium tracking-widest text-brand-stone/80 mt-2">
+                            PRÓXIMO: <span className="font-bold text-brand-ink">{formatLocalDate(nextUpcomingAppointment.date, { day: '2-digit', month: '2-digit' })} às {nextUpcomingAppointment.time}</span> com <span className="text-brand-ink font-semibold">{nextUpcomingAppointment.clientName}</span>
+                          </p>
+                        ) : daysSinceLastAppointment !== null && daysSinceLastAppointment > 0 && (
+                          <p className="text-[9px] font-medium uppercase tracking-widest text-brand-stone/60 mt-1">
+                            Último agendamento há {daysSinceLastAppointment} {daysSinceLastAppointment === 1 ? 'dia' : 'dias'}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar mt-1">
+                        <div className="flex-none">
+                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Faturamento Hoje</p>
+                          <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{formatCurrency(displayedDailyRevenue)}</p>
+                        </div>
+                        <div className="w-px h-8 bg-brand-mist/40 shrink-0" />
+                        <div className="flex-none">
+                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Agendamentos</p>
+                          <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{displayedConfirmedToday.length}</p>
+                        </div>
+                      </div>
+                    </>
                   )}
-                  
-                  <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar mt-1">
-                    <div className="flex-none">
-                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Faturamento Hoje</p>
-                      <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{formatCurrency(displayedDailyRevenue)}</p>
-                    </div>
-                    <div className="w-px h-8 bg-brand-mist/40 shrink-0" />
-                    <div className="flex-none">
-                      <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Agendamentos</p>
-                      <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{displayedConfirmedToday.length}</p>
-                    </div>
-                  </div>
                 </div>
                 
                 <Link to="/financeiro" className="mt-2 md:mt-0 pt-4 md:pt-0 border-t border-brand-mist/40 md:border-0 w-full md:w-auto shrink-0 flex justify-end">

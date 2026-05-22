@@ -43,6 +43,7 @@ const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.lo
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
 const blockedSchedulesCache = new Map<string, { data: any[], fetchedAt: number }>();
+const agendaDocsCache = new Map<string, any[]>();
 
 export default function AgendaPage() {
   const { user, profile } = useAuth();
@@ -66,12 +67,21 @@ export default function AgendaPage() {
   const dateFromUrl = searchParams.get('date');
   const appointmentIdFromUrl = searchParams.get('appointment');
 
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [allAppointmentsStatus, setAllAppointmentsStatus] = useState<'loading' | 'loaded' | 'error' | 'stalled'>('loading');
 
   const [appointments, setAppointments] = useState<any[]>([]);
   const [conflicts, setConflicts] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(dateFromUrl || getTodayLocale());
-  const [allAppointments, setAllAppointments] = useState<any[]>([]);
+  
+  // Extract reference month (YYYY-MM) to avoid re-subscribing daily
+  const referenceMonth = selectedDate.substring(0, 7);
+  // Global cache for Agenda to prevent flicker on remount
+  const globalAgendaCacheKey = `agenda_${user?.uid}_${referenceMonth}`;
+  
+  const [allAppointments, setAllAppointments] = useState<any[]>(() => {
+     return agendaDocsCache.get(globalAgendaCacheKey) || [];
+  });
+  
   const [allBlockedSchedules, setAllBlockedSchedules] = useState<any[]>([]);
   const [loading, setLoading] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(appointmentIdFromUrl);
@@ -253,13 +263,10 @@ export default function AgendaPage() {
     setBlockedSchedules(dailyBlocks as any);
   }, [allAppointments, allBlockedSchedules, selectedDate]);
 
-  // Extract reference month (YYYY-MM) to avoid re-subscribing daily
-  const referenceMonth = selectedDate.substring(0, 7);
-
   // Fetch all appointments for week/month view with a safe window
   useEffect(() => {
     if (!user) return;
-    
+
     // We base the window on the 15th of the reference month
     const baseDate = new Date(`${referenceMonth}-15T12:00:00`);
     
@@ -281,7 +288,7 @@ export default function AgendaPage() {
     );
 
     const timeoutId = setTimeout(() => {
-      setIsInitialLoading(false);
+      setAllAppointmentsStatus(prev => prev === 'loading' ? 'stalled' : prev);
     }, 2000);
 
     const unsubAll = onSnapshot(q, (snapshot) => {
@@ -296,16 +303,18 @@ export default function AgendaPage() {
           }
           return (a.date || '').localeCompare(b.date || '');
         });
+        
+        agendaDocsCache.set(globalAgendaCacheKey, docs);
         setAllAppointments(docs);
-        setIsInitialLoading(false);
+        setAllAppointmentsStatus('loaded');
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
-        setIsInitialLoading(false);
+        setAllAppointmentsStatus('error');
       }
     }, (error) => {
       clearTimeout(timeoutId);
       if (isDev) console.error('[AgendaPage] Subscription error (allAppointments):', error);
-      setIsInitialLoading(false);
+      setAllAppointmentsStatus('error');
       // Fallback: If missing index, try to gracefully fallback to manual filtering
       if (error.message.includes('index')) {
         if (isDev) console.log('[AgendaPage] Firestore index required: appointments professionalId ASC, date ASC');
@@ -739,13 +748,23 @@ export default function AgendaPage() {
   }, []);
 
   useEffect(() => {
-    if (isDev && !isInitialLoading) {
+    if (isDev && allAppointmentsStatus === 'loaded') {
       console.log(`[P0] AgendaPage: first useful render (loading ended) at ${Date.now()}`);
     }
-  }, [isInitialLoading]);
+  }, [allAppointmentsStatus]);
 
-  if (isInitialLoading) {
-    return <AgendaSkeleton />;
+  if ((allAppointmentsStatus === 'loading' || allAppointmentsStatus === 'stalled') && allAppointments.length === 0) {
+    return (
+      <div className="relative">
+        {allAppointmentsStatus === 'stalled' && (
+           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white shadow-xl rounded-2xl p-4 flex gap-3 items-center text-brand-ink text-sm border border-brand-mist animate-in fade-in duration-300">
+               <Loader2 size={16} className="animate-spin text-brand-terracotta" />
+               <span className="font-serif">Sincronizando agenda...</span>
+           </div>
+        )}
+        <AgendaSkeleton />
+      </div>
+    );
   }
 
   return (
