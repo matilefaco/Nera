@@ -2367,11 +2367,26 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
   const safeNewDate = newDate.trim();
   const safeNewTime = newTime.trim();
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(safeNewDate)) {
+  const dateMatch = safeNewDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) {
     return res.status(400).json({ error: "Data em formato inválido. Use YYYY-MM-DD." });
   }
-  if (!/^\d{2}:\d{2}$/.test(safeNewTime)) {
+  const year = parseInt(dateMatch[1], 10);
+  const month = parseInt(dateMatch[2], 10);
+  const day = parseInt(dateMatch[3], 10);
+  const dateObj = new Date(year, month - 1, day);
+  if (dateObj.getFullYear() !== year || dateObj.getMonth() !== month - 1 || dateObj.getDate() !== day) {
+    return res.status(400).json({ error: "Data inexistente ou inválida." });
+  }
+
+  const timeMatch = safeNewTime.match(/^(\d{2}):(\d{2})$/);
+  if (!timeMatch) {
     return res.status(400).json({ error: "Horário em formato inválido. Use HH:mm." });
+  }
+  const hour = parseInt(timeMatch[1], 10);
+  const minute = parseInt(timeMatch[2], 10);
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return res.status(400).json({ error: "Horário inexistente ou inválido." });
   }
 
   try {
@@ -2616,7 +2631,6 @@ async function postRescheduleActions(appointmentId: string, previousDate: string
 
     if (updatedData.status === 'confirmed' || updatedData.status === 'completed') {
       try {
-        const { updateGoogleCalendarEvent } = require('./calendarRoutes');
         if (updateGoogleCalendarEvent) {
            await updateGoogleCalendarEvent(updatedData, updatedData.professionalId);
         }
@@ -2624,8 +2638,84 @@ async function postRescheduleActions(appointmentId: string, previousDate: string
         logger.error("CALENDAR", `Error evaluating calendar sync for rescheduled appt: ${e.message}`);
       }
     }
+
+    try {
+      await triggerWaitlistCheckBackend(db, updatedData.professionalId, previousDate, previousTime);
+    } catch (e: any) {
+      logger.error("WAITLIST", `Error triggering waitlist check: ${e.message}`);
+    }
+
   } catch (err) {
     logger.error("BOOKING", "Error in postRescheduleActions", { error: err });
+  }
+}
+
+async function triggerWaitlistCheckBackend(db: admin.firestore.Firestore, professionalId: string, date: string, time: string) {
+  const proRef = db.collection('users').doc(professionalId);
+  const proSnap = await proRef.get();
+  if (!proSnap.exists) return;
+  const proSettings = proSnap.data() as any;
+
+  const waitlistSnap = await db.collection('waitlist')
+    .where('professionalId', '==', professionalId)
+    .where('requestedDate', '==', date)
+    .where('status', '==', 'waiting')
+    .orderBy('createdAt', 'asc')
+    .get();
+
+  if (waitlistSnap.empty) return;
+
+  const hour = parseInt(time.split(':')[0]);
+  const slotPeriod = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'night';
+
+  const eligibleDoc = waitlistSnap.docs.find(doc => {
+    const d = doc.data();
+    return d.period === 'any' || d.period === slotPeriod || d.preferredTime === time;
+  });
+
+  if (eligibleDoc) {
+    const entryId = eligibleDoc.id;
+    const entryData = eligibleDoc.data();
+
+    if (proSettings.waitlistMode === 'auto') {
+      const expiresAt = new Date(Date.now() + 15 * 60000);
+
+      await db.collection('waitlist').doc(entryId).update({
+        status: 'invited',
+        invitationSentAt: admin.firestore.FieldValue.serverTimestamp(),
+        invitationExpiresAt: expiresAt.toISOString(),
+        assignedTime: time
+      });
+
+      await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           type: 'WAITLIST_INVITATION',
+           payload: {
+             id: entryId,
+             ...entryData,
+             assignedTime: time,
+             expiresAt: expiresAt.toISOString(),
+             professionalName: proSettings.name,
+             professionalSlug: proSettings.slug || ''
+           }
+         })
+      }).catch(e => logger.error("WAITLIST", "Waitlist Invitation Error", { error: e }));
+    } else {
+      await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           type: 'WAITLIST_SLOT_OPENED',
+           payload: {
+             professionalId, date, time,
+             candidateName: entryData.clientName,
+             candidateId: entryId
+           }
+         })
+      }).catch(e => logger.error("WAITLIST", "Waitlist Notify Error", { error: e }));
+    }
   }
 }
 
