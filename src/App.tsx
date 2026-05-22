@@ -13,6 +13,7 @@ import { PendingAppointmentsProvider } from './contexts/PendingAppointmentsConte
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import AppLoadingScreen from './components/AppLoadingScreen';
 import { runtimeLogger } from './lib/runtimeDiagnostics';
+import PublicProfile from './pages/PublicProfile';
 
 // Pages (Lazy Loaded for performance)
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
@@ -28,7 +29,6 @@ const ProfilePage = React.lazy(() => import('./pages/ProfilePage'));
 const ClientsPage = React.lazy(() => import('./pages/ClientsPage'));
 const PlansPage = React.lazy(() => import('./pages/PlansPage'));
 const AgendaPage = React.lazy(() => import('./pages/AgendaPage'));
-const PublicProfile = React.lazy(() => import('./pages/PublicProfile'));
 const OnboardingPage = React.lazy(() => import('./pages/OnboardingPage'));
 const ReviewPage = React.lazy(() => import('./pages/ReviewPage'));
 const BookingResponsePage = React.lazy(() => import('./pages/BookingResponsePage'));

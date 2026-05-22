@@ -34,24 +34,26 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
   useEffect(() => {
     if (!user) return;
 
-    let timeoutId: NodeJS.Timeout;
+    let lastActivityTime = Date.now();
 
-    const resetTimer = () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        handleLogout('Sua sessão expirou por inatividade.');
-      }, SESSION_TIMEOUT);
+    const updateActivity = () => {
+      lastActivityTime = Date.now();
     };
 
-    // Events to track activity
+    // Events to track activity (passive to prevent scroll blocking)
     const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    events.forEach(event => window.addEventListener(event, resetTimer));
+    events.forEach(event => window.addEventListener(event, updateActivity, { passive: true }));
 
-    resetTimer();
+    // Check activity every minute instead of re-registering timers on every pixel moved
+    const checkInterval = setInterval(() => {
+      if (Date.now() - lastActivityTime > SESSION_TIMEOUT) {
+        handleLogout('Sua sessão expirou por inatividade.');
+      }
+    }, 60000);
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
+      clearInterval(checkInterval);
+      events.forEach(event => window.removeEventListener(event, updateActivity, { capture: false } as EventListenerOptions));
     };
   }, [user]);
 

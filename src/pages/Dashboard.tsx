@@ -442,15 +442,21 @@ export default function Dashboard() {
     const qToday = query(
       collection(db, 'appointments'),
       where('professionalId', '==', user.uid),
-      where('date', '==', today),
-      orderBy('time', 'asc')
+      where('date', '==', today)
     );
+
+    // Fallback to clear loading state if network stalls
+    const timeoutId = setTimeout(() => {
+      if (isMounted) setIsTodayLoading(false);
+    }, 5000);
 
     const unsubToday = onSnapshot(qToday, (snapshot) => {
       if (!isMounted) return;
+      clearTimeout(timeoutId);
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment))
-          .filter(a => !isFakeContent(a.clientName));
+          .filter(a => !isFakeContent(a.clientName))
+          .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         const relevantToday = docs.filter(a => isRevenueStatus(a.status));
 setConfirmedToday(relevantToday);
 setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
@@ -462,6 +468,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       }
     }, (error) => {
       if (isDev) console.error('[Dashboard] Subscription error on qToday:', error);
+      setIsTodayLoading(false);
     });
 
     // Query: Unconfirmed for tomorrow
