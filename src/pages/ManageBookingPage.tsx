@@ -307,7 +307,9 @@ setBlockedSchedules(dayBlocked);
         notify.error('Este horário acabou de ser preenchido. Escolha outro.');
       } else {
         if (isDev) {
-          notify.error(`Erro ao remarcar: ${e.message}`);
+          // A friendly message mapping will intercept "Failed to fetch", so we manipulate the string slightly for the DEV toast.
+          const msg = e.message.replace('fetch', 'f_e_t_c_h');
+          notify.error(`Falha na remarcação: ${msg}`);
         } else {
           notify.error('Erro ao remarcar');
         }

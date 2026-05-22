@@ -586,10 +586,14 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
 
 export async function rescheduleBookingByClient(token: string, newDate: string, newTime: string) {
   const maskedToken = token ? `${token.substring(0, 4)}***${token.substring(token.length - 4)}` : 'NULL';
-  if (isDev) console.log(`[DIAGNOSTIC] rescheduleBookingByClient - Token: ${maskedToken}, ${newDate} ${newTime}, Endpoint: /api/public/manage/${maskedToken}/reschedule`);
+  const baseUrl = import.meta.env.VITE_API_URL || 'https://nera-hub-server.up.railway.app';
+  const targetUrl = `${baseUrl}/api/public/manage/${token}/reschedule`;
+  const safeTargetUrl = `${baseUrl}/api/public/manage/${maskedToken}/reschedule`;
+
+  if (isDev) console.log(`[DIAGNOSTIC] rescheduleBookingByClient - Token: ${maskedToken}, ${newDate} ${newTime}, Endpoint: ${safeTargetUrl}`);
   devLog(`[Client] Rescheduling via token ${token} to ${newDate} ${newTime}`);
   try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://nera-hub-server.up.railway.app'}/api/public/manage/${token}/reschedule`, {
+    const response = await fetch(targetUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -600,7 +604,7 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       if (isDev) {
-        console.error(`[DIAGNOSTIC] fetch failed. Status: ${response.status}`, {
+        console.error(`[DIAGNOSTIC] fetch HTTP failed. Status: ${response.status}`, {
           error: errorData.error,
           message: errorData.message,
           code: errorData.code
@@ -617,8 +621,16 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
 
     const responseData = await response.json();
     return responseData;
-  } catch (error) {
-    if (isDev) console.error('[Client Reschedule] Failed:', error);
+  } catch (error: any) {
+    if (isDev) {
+       console.error('[DIAGNOSTIC] [Client Reschedule] Failed:', {
+         name: error.name,
+         message: error.message,
+         hasResponse: !!(error as any).response,
+         originURL: safeTargetUrl
+       });
+    }
+    // Repassar o erro
     throw error;
   }
 }
