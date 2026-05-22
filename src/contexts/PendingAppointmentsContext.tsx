@@ -52,6 +52,7 @@ export const PendingAppointmentsProvider: React.FC<{ children: React.ReactNode }
           const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Appointment));
           setPendingAppointments(docs); 
           setPendingCount(docs.length); 
+          if (import.meta.env.DEV) console.log(`[P0] Dashboard Context: pending requests query finished at ${Date.now()}`);
           setLoading(false);
           setError(null);
         } catch (err) {

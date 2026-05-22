@@ -156,6 +156,16 @@ export default function ClientsPage() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (isDev) console.log(`[P0] ClientsPage: mount at ${Date.now()}`);
+  }, []);
+
+  useEffect(() => {
+    if (isDev && !loading) {
+      console.log(`[P0] ClientsPage: first useful render (loading ended) at ${Date.now()}`);
+    }
+  }, [loading]);
+
   const handleUpdateNotes = async (clientId: string, newNotes: string) => {
     if (!user || clientId.startsWith('derived_')) {
       if (clientId.startsWith('derived_')) {

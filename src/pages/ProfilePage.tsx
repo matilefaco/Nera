@@ -101,6 +101,16 @@ export default function ProfilePage() {
     console.log('[ProfilePage] User:', user?.uid, 'AuthLoading:', authLoading);
   }, [user, authLoading]);
 
+  useEffect(() => {
+    if (isDev) console.log(`[P0] ProfilePage: mount at ${Date.now()}`);
+  }, []);
+
+  useEffect(() => {
+    if (isDev && !authLoading) {
+      console.log(`[P0] ProfilePage: first useful render (loading ended) at ${Date.now()}`);
+    }
+  }, [authLoading]);
+
 
   const profileCompleteness = useMemo(() => {
     if (!profile) return 0;

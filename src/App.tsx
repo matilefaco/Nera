@@ -56,6 +56,7 @@ function RouteLogger() {
 
   React.useEffect(() => {
     if (isDev) {
+      console.log(`[P0] App/Router: route changed to ${location.pathname} at ${Date.now()}`);
       runtimeLogger.log('route_change', { path: location.pathname });
     }
   }, [location.pathname, isDev]);

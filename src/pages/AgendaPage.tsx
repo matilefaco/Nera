@@ -728,6 +728,16 @@ export default function AgendaPage() {
     }
   };
 
+  useEffect(() => {
+    if (isDev) console.log(`[P0] AgendaPage: mount at ${Date.now()}`);
+  }, []);
+
+  useEffect(() => {
+    if (isDev && !isInitialLoading) {
+      console.log(`[P0] AgendaPage: first useful render (loading ended) at ${Date.now()}`);
+    }
+  }, [isInitialLoading]);
+
   if (isInitialLoading) {
     return <AgendaSkeleton />;
   }

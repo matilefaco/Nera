@@ -224,11 +224,19 @@ export default function Dashboard() {
 
   const nextUpcomingAppointment = useMemo(() => {
     const today = getTodayLocale();
-    const confirmed = appointments.filter(a => 
+    
+    const allAppsMap = new Map<string, Appointment>();
+    appointments.forEach(a => allAppsMap.set(a.id, a));
+    confirmedToday.forEach(a => allAppsMap.set(a.id, a));
+    
+    const allAppointments = Array.from(allAppsMap.values());
+    
+    const confirmed = allAppointments.filter(a => 
       a.status === 'confirmed' || a.status === 'accepted' || a.status === 'completed'
     );
-    const nowHour = new Date().getHours().toString().padStart(2, '0');
-    const nowMin = new Date().getMinutes().toString().padStart(2, '0');
+    const now = new Date();
+    const nowHour = now.getHours().toString().padStart(2, '0');
+    const nowMin = now.getMinutes().toString().padStart(2, '0');
     const nowTime = `${nowHour}:${nowMin}`;
 
     const future = confirmed.filter(a => {
@@ -239,8 +247,9 @@ export default function Dashboard() {
       if (a.date !== b.date) return a.date.localeCompare(b.date);
       return safeLocaleCompare(a.time, b.time);
     });
+    if (isDev) console.log(`[P0] Dashboard: nextUpcomingAppointment calculated at ${Date.now()}`);
     return future[0] || null;
-  }, [appointments]);
+  }, [appointments, confirmedToday]);
 
   const displayedDailyRevenue = useMemo(() => {
     return calculateFinancialMetrics(displayedConfirmedToday).monthlyRevenue;
@@ -254,6 +263,7 @@ export default function Dashboard() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isTodayLoading, setIsTodayLoading] = useState(true);
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
@@ -340,7 +350,8 @@ export default function Dashboard() {
       if (!isMounted) return;
       try {
         const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-setAlerts(docs);
+        setAlerts(docs);
+        if (isDev) console.log(`[P0] Dashboard: alerts query finished at ${Date.now()}`);
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
       }
@@ -387,6 +398,7 @@ setAlerts(docs);
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as AnalyticsEvent));
         analyticsEventsCache.set(user.uid, { data: docs, fetchedAt: Date.now() });
         setAnalyticsEvents(docs);
+        if (isDev) console.log(`[P0] Dashboard: analytics query finished at ${Date.now()}`);
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
       }
@@ -444,6 +456,9 @@ setConfirmedToday(relevantToday);
 setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
+      } finally {
+        if (isDev) console.log(`[P0] Dashboard: today query finished at ${Date.now()}`);
+        setIsTodayLoading(false);
       }
     }, (error) => {
       if (isDev) console.error('[Dashboard] Subscription error on qToday:', error);
@@ -522,6 +537,7 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
         fetchValid = false;
       }).finally(() => {
         if (isMounted) {
+          if (isDev) console.log(`[P0] Dashboard: general appointments query finished at ${Date.now()}`);
           setIsInitialLoading(false);
         }
       });
@@ -644,11 +660,17 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       } catch (err) {
         if (isDev) console.error("Error processing getDocs callback:", err);
       } finally {
-        if (isMounted) setIsServicesLoading(false);
+        if (isMounted) {
+          if (isDev) console.log(`[P0] Dashboard: services query finished at ${Date.now()}`);
+          setIsServicesLoading(false);
+        }
       }
     }).catch((error) => { 
       if (isDev) console.error("Firestore getDocs error:", error); 
-      if (isMounted) setIsServicesLoading(false);
+      if (isMounted) {
+        if (isDev) console.log(`[P0] Dashboard: services query finished at ${Date.now()}`);
+        setIsServicesLoading(false);
+      }
     });
 
     // Query: WhatsApp Logs
@@ -968,6 +990,20 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
       setIsReportLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isDev) console.log(`[P0] Dashboard: profile/user ready at ${Date.now()}`);
+  }, [profile]);
+
+  useEffect(() => {
+    if (isDev) console.log(`[P0] Dashboard: mount at ${Date.now()}`);
+  }, []);
+
+  useEffect(() => {
+    if (isDev && !isInitialLoading) {
+      console.log(`[P0] Dashboard: first useful render (loading ended) at ${Date.now()}`);
+    }
+  }, [isInitialLoading]);
 
   if (isInitialLoading) {
     return <DashboardSkeleton />;
@@ -1550,7 +1586,13 @@ setDailyRevenue(calculateFinancialMetrics(relevantToday).monthlyRevenue);
             ) : (
               <div className="bg-[#FCFBF9] p-6 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
                 <div className="flex flex-col">
-                  {displayedConfirmedToday.length === 0 && (
+                  {isTodayLoading ? (
+                    <div className="mb-4 pb-4 border-b border-brand-mist/40">
+                      <p className="text-[14px] font-serif text-brand-stone italic flex items-center gap-2">
+                        <Loader2 size={14} className="animate-spin text-brand-terracotta" /> Atualizando sua agenda...
+                      </p>
+                    </div>
+                  ) : displayedConfirmedToday.length === 0 && (
                     <div className="mb-4 pb-4 border-b border-brand-mist/40">
                       <p className="text-[14px] font-serif text-brand-stone italic">Sua agenda está livre no momento.</p>
                       {nextUpcomingAppointment ? (

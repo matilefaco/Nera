@@ -649,6 +649,17 @@ function PublicProfileContent() {
         image={profile.ogImageUrl || profile.avatar || "https://usenera.com/og-default.png"}
         url={`https://usenera.com/p/${profile.slug}`}
       />
+      {slug === 'helena-prado' && (
+        <div className="w-full bg-brand-white/80 backdrop-blur-sm border-b border-brand-mist/50 py-3 px-6 sticky top-0 z-[200] flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors">
+            <ArrowLeft size={14} /> Voltar para o início
+          </Link>
+          <div className="hidden sm:flex items-center gap-1.5 bg-brand-parchment border border-brand-mist/50 px-3 py-1 rounded-full">
+            <Sparkles size={12} className="text-brand-terracotta" />
+            <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">Exemplo de vitrine profissional</span>
+          </div>
+        </div>
+      )}
       <AnimatePresence>
         {scrolledPastHero &&
           !showInterestPopup &&

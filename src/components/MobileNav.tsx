@@ -33,6 +33,12 @@ export default function MobileNav() {
           <Link 
             key={item.path} 
             to={item.path}
+            onClick={() => {
+              if (import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'))) {
+                console.log(`[P0] MobileNav: touch on ${item.label} (${item.path}) at ${Date.now()}`);
+                console.log(`[P0] MobileNav: current route ${location.pathname} -> dest ${item.path}`);
+              }
+            }}
             className={`flex flex-col items-center gap-1 transition-all ${isActive ? 'text-brand-terracotta scale-110' : 'text-brand-stone'}`}
           >
             <div className={`p-2 rounded-2xl relative ${isActive ? 'bg-brand-linen' : ''}`}>

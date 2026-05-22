@@ -40,6 +40,16 @@ export default function ServicesPage() {
   const [showCustomDuration, setShowCustomDuration] = useState(false);
   const [durationError, setDurationError] = useState(false);
 
+  useEffect(() => {
+    if (isDev) console.log(`[P0] ServicesPage: mount at ${Date.now()}`);
+  }, []);
+
+  useEffect(() => {
+    if (isDev && !isInitialLoading) {
+      console.log(`[P0] ServicesPage: first useful render (loading ended) at ${Date.now()}`);
+    }
+  }, [isInitialLoading]);
+
   const DURATION_OPTIONS = [
     { label: '30 min', value: 30 },
     { label: '45 min', value: 45 },
