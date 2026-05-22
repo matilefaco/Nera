@@ -67,7 +67,11 @@ export default function AgendaPage() {
   const dateFromUrl = searchParams.get('date');
   const appointmentIdFromUrl = searchParams.get('appointment');
 
-  const [allAppointmentsStatus, setAllAppointmentsStatus] = useState<'loading' | 'loaded' | 'error' | 'stalled'>('loading');
+  const [allAppointmentsStatus, setAllAppointmentsStatus] = useState<'loading' | 'loaded' | 'error' | 'stalled'>(() => {
+     const referenceMonth = (dateFromUrl || getTodayLocale()).substring(0, 7);
+     const globalAgendaCacheKey = `agenda_${user?.uid}_${referenceMonth}`;
+     return agendaDocsCache.has(globalAgendaCacheKey) ? 'loaded' : 'loading';
+  });
 
   const [selectedDate, setSelectedDate] = useState(dateFromUrl || getTodayLocale());
   
@@ -80,7 +84,14 @@ export default function AgendaPage() {
      return agendaDocsCache.get(globalAgendaCacheKey) || [];
   });
   
-  const [allBlockedSchedules, setAllBlockedSchedules] = useState<any[]>([]);
+  const [allBlockedSchedules, setAllBlockedSchedules] = useState<any[]>(() => {
+    if (!user) return [];
+    const cached = blockedSchedulesCache.get(user.uid);
+    if (cached && Date.now() - cached.fetchedAt < 5 * 60 * 1000) {
+      return cached.data;
+    }
+    return [];
+  });
   const [loading, setLoading] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(appointmentIdFromUrl);
 
@@ -265,6 +276,7 @@ export default function AgendaPage() {
   // Fetch all appointments for week/month view with a safe window
   useEffect(() => {
     if (!user) return;
+    let isMounted = true;
 
     // We base the window on the 15th of the reference month
     const baseDate = new Date(`${referenceMonth}-15T12:00:00`);
@@ -287,10 +299,11 @@ export default function AgendaPage() {
     );
 
     const timeoutId = setTimeout(() => {
-      setAllAppointmentsStatus(prev => prev === 'loading' ? 'stalled' : prev);
+      if (isMounted) setAllAppointmentsStatus(prev => prev === 'loading' ? 'stalled' : prev);
     }, 2000);
 
     const unsubAll = onSnapshot(q, (snapshot) => {
+      if (!isMounted) return;
       clearTimeout(timeoutId);
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any))
@@ -303,14 +316,21 @@ export default function AgendaPage() {
           return (a.date || '').localeCompare(b.date || '');
         });
         
-        agendaDocsCache.set(globalAgendaCacheKey, docs);
-        setAllAppointments(docs);
+        setAllAppointments(prev => {
+          // Ignorar empty snapshot temporário se já temos cache válido e o disparo vem de cache local incompleto
+          if (snapshot.metadata.fromCache && docs.length === 0 && prev.length > 0) {
+            return prev;
+          }
+          agendaDocsCache.set(globalAgendaCacheKey, docs);
+          return docs;
+        });
         setAllAppointmentsStatus('loaded');
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
         setAllAppointmentsStatus('error');
       }
     }, (error) => {
+      if (!isMounted) return;
       clearTimeout(timeoutId);
       if (isDev) console.error('[AgendaPage] Subscription error (allAppointments):', error);
       setAllAppointmentsStatus('error');
@@ -322,6 +342,8 @@ export default function AgendaPage() {
     });
 
     return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
       unsubAll();
     };
   }, [user, referenceMonth]);

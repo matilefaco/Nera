@@ -176,7 +176,19 @@ export default function Dashboard() {
     localStorage.setItem("nera_dashboard_tab", activeTab);
   }, [activeTab]);
 
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>(() => {
+    if (!user) return [];
+    const todayNum = new Date();
+    const firstDayLastMonth = new Date(todayNum.getFullYear(), todayNum.getMonth() - 1, 1);
+    const thirtyDaysFromNow = new Date(todayNum);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const key = `${user.uid}:${formatDateKey(firstDayLastMonth)}:${formatDateKey(thirtyDaysFromNow)}`;
+    const cache = appointmentsHistoryCache.get(key);
+    if (cache && Date.now() - cache.fetchedAt < APPOINTMENTS_CACHE_TTL_MS) {
+      return cache.data;
+    }
+    return [];
+  });
 
   useEffect(() => {
     if (profile) {
@@ -267,8 +279,19 @@ export default function Dashboard() {
   const [requestToReject, setRequestToReject] = useState<Appointment | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [agendaHojeStatus, setAgendaHojeStatus] = useState<'loading' | 'loaded' | 'error' | 'stalled'>('loading');
+  const [isInitialLoading, setIsInitialLoading] = useState(() => {
+    if (!user) return true;
+    const todayNum = new Date();
+    const firstDayLastMonth = new Date(todayNum.getFullYear(), todayNum.getMonth() - 1, 1);
+    const thirtyDaysFromNow = new Date(todayNum);
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    const key = `${user.uid}:${formatDateKey(firstDayLastMonth)}:${formatDateKey(thirtyDaysFromNow)}`;
+    const cache = appointmentsHistoryCache.get(key);
+    return !(cache && Date.now() - cache.fetchedAt < APPOINTMENTS_CACHE_TTL_MS);
+  });
+  const [agendaHojeStatus, setAgendaHojeStatus] = useState<'loading' | 'loaded' | 'error' | 'stalled'>(() => {
+    return user && dashboardTodayCache.has(user.uid) ? 'loaded' : 'loading';
+  });
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
@@ -464,11 +487,23 @@ export default function Dashboard() {
           .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
         const relevantToday = docs.filter(a => isRevenueStatus(a.status));
         const rev = calculateFinancialMetrics(relevantToday).monthlyRevenue;
-        if (user?.uid) {
-          dashboardTodayCache.set(user.uid, { confirmedToday: relevantToday, revenue: rev });
-        }
-        setConfirmedToday(relevantToday);
-        setDailyRevenue(rev);
+        
+        setConfirmedToday(prev => {
+           if (snapshot.metadata.fromCache && relevantToday.length === 0 && prev.length > 0) {
+             return prev;
+           }
+           if (user?.uid) {
+             dashboardTodayCache.set(user.uid, { confirmedToday: relevantToday, revenue: rev });
+           }
+           return relevantToday;
+        });
+        
+        setDailyRevenue(prev => {
+           if (snapshot.metadata.fromCache && relevantToday.length === 0 && prev > 0) {
+             return prev;
+           }
+           return rev;
+        });
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
         setAgendaHojeStatus('error');

@@ -195,7 +195,9 @@ export default function ProfilePage() {
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaFee, setNewAreaFee] = useState('');
   
-  const [portfolioStatus, setPortfolioStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('loading');
+  const [portfolioStatus, setPortfolioStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>(() => {
+    return user && profilePortfolioCache.has(user.uid) ? 'loaded' : 'loading';
+  });
   const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>(() => {
     return user ? (profilePortfolioCache.get(user.uid) || []) : [];
   });
@@ -296,22 +298,25 @@ export default function ProfilePage() {
   const hasUnsavedChanges = savedSnapshotString !== null && currentSnapshotString !== savedSnapshotString;
 
   useEffect(() => {
+    let isMounted = true;
     if (profile && user) {
       setAvatarPreview(profile.avatar || '');
 
       // Load portfolio from profile array (Single Source of Truth)
       if (profile.portfolio) {
         profilePortfolioCache.set(user.uid, profile.portfolio as any);
-        setPortfolio(profile.portfolio as any);
-        setPortfolioStatus('loaded');
+        if (isMounted) {
+          setPortfolio(profile.portfolio as any);
+          setPortfolioStatus('loaded');
+        }
       } else {
         // Fallback: Fetch portfolio from sub-collection if array is empty
         const fetchPortfolio = async () => {
-          setPortfolioStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
+          if (isMounted) setPortfolioStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
           
           // Timeout to release stalled state
           const stallTimeout = setTimeout(() => {
-            setPortfolioStatus('loaded');
+            if (isMounted) setPortfolioStatus('loaded');
           }, 2000);
           
           try {
@@ -327,21 +332,26 @@ export default function ProfilePage() {
             
             clearTimeout(stallTimeout);
             
-            if (isDev) console.log('[Profile] Portfolio items fetched from sub-collection:', items.length);
-            if (items.length > 0) {
-              profilePortfolioCache.set(user.uid, items);
-              setPortfolio(items);
+            if (isMounted) {
+              if (isDev) console.log('[Profile] Portfolio items fetched from sub-collection:', items.length);
+              if (items.length > 0) {
+                profilePortfolioCache.set(user.uid, items);
+                setPortfolio(items);
+              }
+              setPortfolioStatus('loaded');
             }
-            setPortfolioStatus('loaded');
           } catch (err) {
             clearTimeout(stallTimeout);
             if (isDev) console.error('[Profile] Error fetching portfolio:', err);
-            setPortfolioStatus('error');
+            if (isMounted) setPortfolioStatus('error');
           }
         };
         fetchPortfolio();
       }
     }
+    return () => {
+      isMounted = false;
+    };
   }, [profile, user]);
 
   useEffect(() => {

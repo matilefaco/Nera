@@ -145,7 +145,9 @@ export default function ClientsPage() {
     checkFeatureAccess 
   } = useUpgradeTriggers();
 
-  const [clientsStatus, setClientsStatus] = useState<'idle' | 'loading' | 'loaded' | 'stalled' | 'error'>('loading');
+  const [clientsStatus, setClientsStatus] = useState<'idle' | 'loading' | 'loaded' | 'stalled' | 'error'>(() => {
+    return user && clientsPageCache.has(user.uid) ? 'loaded' : 'loading';
+  });
   const [clients, setClients] = useState<ClientSummary[]>(() => {
     return user ? (clientsPageCache.get(user.uid)?.data || []) : [];
   });
@@ -335,10 +337,10 @@ export default function ClientsPage() {
     // Fallback de segurança para garantir que a tela não fique presa no skeleton
     // se o Firebase demorar para responder (falta de índice ou lentidão extrema)
     const timeout = setTimeout(() => {
-      if (isMounted) setLoading(false);
+      if (isMounted) setClientsStatus('loaded');
     }, 5000);
 
-    fetchClients().finally(() => {
+    fetchClients(false).finally(() => {
       if (isMounted) {
         clearTimeout(timeout);
       }
@@ -348,7 +350,7 @@ export default function ClientsPage() {
       isMounted = false;
       clearTimeout(timeout);
     };
-  }, [fetchClients]);
+  }, [user]);
 
   const handleMigrate = async () => {
     if (!user) return;
