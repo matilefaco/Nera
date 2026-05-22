@@ -586,9 +586,8 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
 
 export async function rescheduleBookingByClient(token: string, newDate: string, newTime: string) {
   const maskedToken = token ? `${token.substring(0, 4)}***${token.substring(token.length - 4)}` : 'NULL';
-  const baseUrl = import.meta.env.VITE_API_URL || 'https://nera-hub-server.up.railway.app';
-  const targetUrl = `${baseUrl}/api/public/manage/${token}/reschedule`;
-  const safeTargetUrl = `${baseUrl}/api/public/manage/${maskedToken}/reschedule`;
+  const targetUrl = `/api/public/manage/${encodeURIComponent(token)}/reschedule`;
+  const safeTargetUrl = `/api/public/manage/${encodeURIComponent(maskedToken)}/reschedule`;
 
   if (isDev) console.log(`[DIAGNOSTIC] rescheduleBookingByClient - Token: ${maskedToken}, ${newDate} ${newTime}, Endpoint: ${safeTargetUrl}`);
   devLog(`[Client] Rescheduling via token ${token} to ${newDate} ${newTime}`);
