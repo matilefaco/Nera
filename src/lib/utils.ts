@@ -81,7 +81,11 @@ export function removeEmptyFields<T>(obj: T): T {
  * Parses a "YYYY-MM-DD" string into a Date object at local midnight.
  */
 export function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
+  if (!dateStr || typeof dateStr !== 'string') return new Date();
+  const splitted = dateStr.split('-');
+  if (splitted.length !== 3) return new Date();
+  const [year, month, day] = splitted.map(Number);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return new Date();
   return new Date(year, month - 1, day);
 }
 

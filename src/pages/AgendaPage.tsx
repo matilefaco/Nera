@@ -69,8 +69,6 @@ export default function AgendaPage() {
 
   const [allAppointmentsStatus, setAllAppointmentsStatus] = useState<'loading' | 'loaded' | 'error' | 'stalled'>('loading');
 
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [conflicts, setConflicts] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState(dateFromUrl || getTodayLocale());
   
   // Extract reference month (YYYY-MM) to avoid re-subscribing daily
@@ -91,7 +89,6 @@ export default function AgendaPage() {
   const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
   const [quickBlockTime, setQuickBlockTime] = useState('');
   
-  const [blockedSchedules, setBlockedSchedules] = useState<any[]>([]);
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [showNavTip, setShowNavTip] = useState(() => {
@@ -238,7 +235,7 @@ export default function AgendaPage() {
   }, [user]);
 
   // Use derived appointments instead of fetching daily
-  useEffect(() => {
+  const { appointments, conflicts, blockedSchedules } = React.useMemo(() => {
     // Derived Appointments
     const dailyAppointments = allAppointments.filter(a => a.date === selectedDate);
     
@@ -250,17 +247,19 @@ export default function AgendaPage() {
         audit[a.time].push(a as any);
       }
     });
-    setConflicts(Object.values(audit).filter(list => list.length > 1) as any);
-    setAppointments(dailyAppointments as any);
-
-    // Derived Blocks
+    
     const dayOfWeek = parseLocalDate(selectedDate).getDay();
     const dailyBlocks = allBlockedSchedules.filter(b => {
       const isToday = b.date === selectedDate;
       const isRecurringToday = b.isRecurring && b.recurringDays?.includes(dayOfWeek);
       return isToday || isRecurringToday;
     });
-    setBlockedSchedules(dailyBlocks as any);
+
+    return {
+      appointments: dailyAppointments as any,
+      conflicts: Object.values(audit).filter(list => list.length > 1) as any,
+      blockedSchedules: dailyBlocks as any
+    };
   }, [allAppointments, allBlockedSchedules, selectedDate]);
 
   // Fetch all appointments for week/month view with a safe window
@@ -1685,7 +1684,7 @@ export default function AgendaPage() {
                             };
                             const safeUpdate = sanitizeAppointment(updatePayload, true);
                             await updateDoc(doc(db, 'appointments', selectedAppointment.id), safeUpdate);
-                            setAppointments(prev => prev.filter(a => a.id !== selectedAppointment.id));
+                            setAllAppointments(prev => prev.filter(a => a.id !== selectedAppointment.id));
                             notify.success('Cliente marcado como No-Show. Isso ficará registrado no histórico.');
                             setIsDetailsOpen(false);
                           } catch (err) {

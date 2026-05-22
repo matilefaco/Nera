@@ -145,11 +145,13 @@ export default function ClientsPage() {
     checkFeatureAccess 
   } = useUpgradeTriggers();
 
-  const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [clientsStatus, setClientsStatus] = useState<'idle' | 'loading' | 'loaded' | 'stalled' | 'error'>('loading');
+  const [clients, setClients] = useState<ClientSummary[]>(() => {
+    return user ? (clientsPageCache.get(user.uid)?.data || []) : [];
+  });
   const [filterService, setFilterService] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -161,10 +163,10 @@ export default function ClientsPage() {
   }, []);
 
   useEffect(() => {
-    if (isDev && !loading) {
+    if (isDev && clientsStatus === 'loaded') {
       console.log(`[P0] ClientsPage: first useful render (loading ended) at ${Date.now()}`);
     }
-  }, [loading]);
+  }, [clientsStatus]);
 
   const handleUpdateNotes = async (clientId: string, newNotes: string) => {
     if (!user || clientId.startsWith('derived_')) {
@@ -242,15 +244,20 @@ export default function ClientsPage() {
 
   const fetchClients = useCallback(async (isLoadMore = false) => {
     if (!user) {
-      setLoading(false);
+      setClientsStatus('error');
       return;
     }
     
     if (isLoadMore) {
       setLoadingMore(true);
     } else {
-      setLoading(true);
+      setClientsStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
     }
+
+    // Fallback to clear stall state
+    const stallTimeout = !isLoadMore ? setTimeout(() => {
+      setClientsStatus(prev => prev === 'loading' ? 'stalled' : prev);
+    }, 2000) : null;
 
     try {
       const collRef = collection(db, 'client_summaries');
@@ -274,6 +281,8 @@ export default function ClientsPage() {
       }
 
       const snapshot = await getDocs(finalQ);
+      
+      if (stallTimeout) clearTimeout(stallTimeout);
       
       const newDocs = snapshot.docs.map(docSnap => {
         const data = docSnap.data() as any;
@@ -302,7 +311,9 @@ export default function ClientsPage() {
         }
         return result;
       });
+      setClientsStatus('loaded');
     } catch (err: any) {
+      if (stallTimeout) clearTimeout(stallTimeout);
       if (isDev) console.error('[ClientsPage] Failed to load clients', err);
       if (err.message && err.message.includes('index')) {
         if (isDev) console.log('[ClientsPage] Composite index required for client_summaries: professionalId ASC, lastAppointmentDate DESC.');
@@ -310,11 +321,10 @@ export default function ClientsPage() {
         notify.error('Erro ao carregar clientes. Tente novamente mais tarde.');
       }
       if (!isLoadMore) {
-        setClients([]);
         setHasMore(false);
+        setClientsStatus('error');
       }
     } finally {
-      setLoading(false);
       setLoadingMore(false);
     }
   }, [user, lastVisible]);
@@ -547,10 +557,16 @@ export default function ClientsPage() {
 
   const visibleClients = filteredClients;
 
-      if (loading && clients.length === 0) {
+      if ((clientsStatus === 'loading' || clientsStatus === 'stalled') && clients.length === 0) {
         return (
           <AppLayout activeRoute="clients">
-            <div className="p-6 md:p-12 pb-32 max-w-5xl mx-auto w-full animate-in fade-in duration-700">
+            <div className="relative p-6 md:p-12 pb-32 max-w-5xl mx-auto w-full animate-in fade-in duration-700">
+              {clientsStatus === 'stalled' && (
+                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-white shadow-xl rounded-2xl p-4 flex gap-3 items-center text-brand-ink text-sm border border-brand-mist animate-in fade-in duration-300">
+                     <AlertCircle size={16} className="text-brand-terracotta" />
+                     <span className="font-serif">Sincronizando clientes...</span>
+                 </div>
+              )}
               <header className="mb-12">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-[#FAF9F8] border border-brand-mist/40 rounded-xl text-brand-stone/40">
@@ -590,7 +606,7 @@ export default function ClientsPage() {
                 Exportar CSV
               </button>
             )}
-            {clients.length === 0 && !loading && (
+            {clients.length === 0 && clientsStatus === 'loaded' && (
               <PremiumButton 
                 onClick={handleMigrate} 
                 disabled={isMigrating}

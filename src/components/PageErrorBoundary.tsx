@@ -41,16 +41,20 @@ export class PageErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center bg-brand-white rounded-3xl border border-brand-mist/50 mt-6 md:mt-12 mx-auto max-w-2xl">
-          <div className="w-16 h-16 bg-brand-linen rounded-full flex items-center justify-center mb-6 text-brand-ink/40">
+          <div className="w-16 h-16 bg-brand-linen rounded-full flex items-center justify-center mb-6 text-brand-terracotta">
             <AlertCircle className="w-8 h-8" />
           </div>
           
           <h2 className="text-xl font-serif text-brand-ink mb-2">
-            {this.props.title || "Não foi possível carregar esta área."}
+            {this.props.title || "Algo saiu do ritmo por um instante."}
           </h2>
           
-          <p className="text-brand-stone mb-8 max-w-sm mx-auto text-sm font-light">
-            {this.props.message || "Tivemos um contratempo. Recarregar costuma resolver."}
+          <p className="text-brand-stone mb-4 max-w-sm mx-auto text-sm font-light">
+            {this.props.message || "Tivemos um pequeno erro ao exibir esta aba."}
+          </p>
+
+          <p className="text-xs text-brand-stone/60 mb-8 max-w-md bg-brand-mist/20 p-2 rounded">
+            Erro: {this.state.error?.message || "Desconhecido"}
           </p>
 
           <button 
@@ -58,7 +62,7 @@ export class PageErrorBoundary extends Component<Props, State> {
             className="flex items-center gap-2 rounded-full font-medium px-6 py-3 border border-brand-mist hover:bg-brand-mist/20 text-brand-ink transition-colors"
           >
             <RefreshCcw className="w-4 h-4" />
-            Recarregar área
+            Recarregar aba
           </button>
         </div>
       );
