@@ -303,7 +303,7 @@ export default function ProfilePage() {
       setAvatarPreview(profile.avatar || '');
 
       // Load portfolio from profile array (Single Source of Truth)
-      if (profile.portfolio) {
+      if (profile.portfolio && profile.portfolio.length > 0) {
         profilePortfolioCache.set(user.uid, profile.portfolio as any);
         if (isMounted) {
           setPortfolio(profile.portfolio as any);
@@ -316,7 +316,7 @@ export default function ProfilePage() {
           
           // Timeout to release stalled state
           const stallTimeout = setTimeout(() => {
-            if (isMounted) setPortfolioStatus('loaded');
+            if (isMounted) setPortfolioStatus(prev => prev === 'loading' ? 'stalled' : prev);
           }, 2000);
           
           try {
@@ -337,8 +337,18 @@ export default function ProfilePage() {
               if (items.length > 0) {
                 profilePortfolioCache.set(user.uid, items);
                 setPortfolio(items);
+                setPortfolioStatus('loaded');
+              } else {
+                // If it came from cache and is empty, we cannot be sure it's TRULY empty (might be offline/not cached yet).
+                // Wait for the real server fetch or just stay stalled.
+                if (snapshot.metadata.fromCache) {
+                  if (isDev) console.log('[Profile] Portfolio fetched as empty from cache, marking as stalled to prevent false zero.');
+                  setPortfolioStatus('stalled');
+                } else {
+                  // Confirmed empty from server
+                  setPortfolioStatus('loaded');
+                }
               }
-              setPortfolioStatus('loaded');
             }
           } catch (err) {
             clearTimeout(stallTimeout);
@@ -1027,7 +1037,7 @@ export default function ProfilePage() {
                 <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Exiba fotos do seu trabalho</p>
               </div>
               
-              {(portfolioStatus === 'loading' || portfolioStatus === 'idle') && portfolio.length === 0 ? (
+              {(portfolioStatus === 'loading' || portfolioStatus === 'idle' || portfolioStatus === 'stalled') && portfolio.length === 0 ? (
                 <div className="bg-brand-white/50 border border-brand-mist/60 rounded-2xl p-8 sm:p-12 flex flex-col items-center justify-center text-center shadow-sm relative overflow-hidden backdrop-blur-sm animate-pulse min-h-[300px]">
                    <div className="w-14 h-14 bg-brand-mist/20 rounded-full mb-4"></div>
                    <div className="h-5 bg-brand-mist/30 w-3/4 max-w-[250px] rounded mb-3"></div>
