@@ -2557,10 +2557,14 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
 
     if (updatedData) {
       // 1. Send the email directly and await before returning success
-      await sendClientRescheduleProfessionalEmailFailSoft(updatedData.id, updatedData.previousDate, updatedData.previousTime, updatedData);
+      const emailDiagnostic = await sendClientRescheduleProfessionalEmailFailSoft(updatedData.id, updatedData.previousDate, updatedData.previousTime, updatedData);
       
       // 2. Call the background actions (Waitlist, Calendar, Notification events) without awaiting for performance
       postRescheduleActions(updatedData.id, updatedData.previousDate, updatedData.previousTime, updatedData, 'client');
+
+      if (process.env.NODE_ENV !== 'production' && emailDiagnostic) {
+        (result as any).debugEmail = emailDiagnostic;
+      }
     }
 
     return res.json(result);
@@ -2572,8 +2576,11 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
   }
 });
 
+type RescheduleEmailDiagnostic = { status: string; eventKey?: string; error?: string };
+
 // Helper that executes fail-soft for professional email when client reschedules
-async function sendClientRescheduleProfessionalEmailFailSoft(appointmentId: string, previousDate: string, previousTime: string, updatedData: any) {
+async function sendClientRescheduleProfessionalEmailFailSoft(appointmentId: string, previousDate: string, previousTime: string, updatedData: any): Promise<RescheduleEmailDiagnostic | undefined> {
+  const eventKey = `bookingRescheduledPro_${updatedData.date}_${updatedData.time}`;
   try {
     const db = getDb();
     logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_START] appointmentId: ${appointmentId}`);
@@ -2581,15 +2588,14 @@ async function sendClientRescheduleProfessionalEmailFailSoft(appointmentId: stri
     const proDoc = await db.collection('users').doc(updatedData.professionalId).get();
     if (!proDoc.exists || !proDoc.data()?.email) {
       logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_FAILED] professional missing email. appointmentId: ${appointmentId}`);
-      return;
+      return { status: 'missing_professional_email', eventKey };
     }
 
     const proData = proDoc.data();
-    const eventKey = `bookingRescheduledPro_${updatedData.date}_${updatedData.time}`;
 
     if (!(await shouldSendEmail(appointmentId, eventKey))) {
       logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_SKIPPED_DUPLICATE] eventKey: ${eventKey}`);
-      return;
+      return { status: 'skipped_duplicate', eventKey };
     }
 
     const formatToBRDate = (d: string) => {
@@ -2614,11 +2620,14 @@ async function sendClientRescheduleProfessionalEmailFailSoft(appointmentId: stri
     if (emailResult && emailResult.success) {
       await markEmailSent(appointmentId, eventKey);
       logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_SUCCESS] eventKey: ${eventKey}`);
+      return { status: 'success', eventKey };
     } else {
       logger.error('EMAIL', `[RESCHEDULE_PRO_EMAIL_FAILED] eventKey: ${eventKey}. Error: ${emailResult?.error || 'Unknown error'}`);
+      return { status: 'send_failed', eventKey, error: emailResult?.error || 'Unknown error' };
     }
   } catch (err: any) {
     logger.error('EMAIL', `[RESCHEDULE_PRO_EMAIL_FAILED] Exception logic. appointmentId: ${appointmentId}, error: ${err.message}`);
+    return { status: 'exception', eventKey, error: err.message };
   }
 }
 

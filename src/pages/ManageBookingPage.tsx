@@ -295,8 +295,18 @@ setBlockedSchedules(dayBlocked);
     
     setActionLoading(true);
     try {
-      await rescheduleBookingByClient(safeManageToken, selectedDate, selectedTime);
+      const result: any = await rescheduleBookingByClient(safeManageToken, selectedDate, selectedTime);
       notify.success('Horário alterado com sucesso!');
+      
+      if (isDev && result && result.debugEmail) {
+        let msg = `E-mail pós-remarcação: ${result.debugEmail.status}`;
+        if (result.debugEmail.error) {
+          msg += ` — ${result.debugEmail.error}`;
+        }
+        notify.info(msg);
+        console.log('[DIAGNOSTIC] debugEmail:', result.debugEmail);
+      }
+      
       setView('main');
     } catch (e: any) {
       const maskedLookupKey = safeManageToken ? `${safeManageToken.substring(0, 4)}***${safeManageToken.substring(safeManageToken.length - 4)}` : 'NULL';
