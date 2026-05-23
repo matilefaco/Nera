@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskPhone, maskToken, maskUid } from "../utils/logger.js";
-import { sendBookingConfirmedEmail, sendDigitalReceiptEmail, sendBookingCancelledClientEmail } from "../emails/sendEmail.js";
+import { sendBookingConfirmedEmail, sendDigitalReceiptEmail, sendBookingCancelledClientEmail, sendProfessionalBookingRescheduledEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent, updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
@@ -2552,9 +2552,16 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
       return { success: true, updatedData };
     });
 
-    // Notify asynchronously
+    // Notify asynchronously setup
     const { updatedData } = result;
-    postRescheduleActions(updatedData.id, updatedData.previousDate, updatedData.previousTime, updatedData, 'client');
+
+    if (updatedData) {
+      // 1. Send the email directly and await before returning success
+      await sendClientRescheduleProfessionalEmailFailSoft(updatedData.id, updatedData.previousDate, updatedData.previousTime, updatedData);
+      
+      // 2. Call the background actions (Waitlist, Calendar, Notification events) without awaiting for performance
+      postRescheduleActions(updatedData.id, updatedData.previousDate, updatedData.previousTime, updatedData, 'client');
+    }
 
     return res.json(result);
   } catch (err: any) {
@@ -2564,6 +2571,56 @@ router.post("/public/manage/:manageSlug/reschedule", async (req: express.Request
     return res.status(status).json({ error: message, code: err.code, step: debugStep });
   }
 });
+
+// Helper that executes fail-soft for professional email when client reschedules
+async function sendClientRescheduleProfessionalEmailFailSoft(appointmentId: string, previousDate: string, previousTime: string, updatedData: any) {
+  try {
+    const db = getDb();
+    logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_START] appointmentId: ${appointmentId}`);
+
+    const proDoc = await db.collection('users').doc(updatedData.professionalId).get();
+    if (!proDoc.exists || !proDoc.data()?.email) {
+      logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_FAILED] professional missing email. appointmentId: ${appointmentId}`);
+      return;
+    }
+
+    const proData = proDoc.data();
+    const eventKey = `bookingRescheduledPro_${updatedData.date}_${updatedData.time}`;
+
+    if (!(await shouldSendEmail(appointmentId, eventKey))) {
+      logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_SKIPPED_DUPLICATE] eventKey: ${eventKey}`);
+      return;
+    }
+
+    const formatToBRDate = (d: string) => {
+      if (!d) return d;
+      const [y, m, day] = d.split('-');
+      if (y && m && day) return `${day}/${m}/${y}`;
+      return d;
+    };
+
+    const emailResult = await sendProfessionalBookingRescheduledEmail({
+      professionalEmail: proData!.email,
+      professionalName: proData!.name || 'Profissional',
+      clientName: updatedData.clientName,
+      serviceName: updatedData.serviceName,
+      oldFormatDate: formatToBRDate(previousDate),
+      oldTime: previousTime,
+      newFormatDate: formatToBRDate(updatedData.date),
+      newTime: updatedData.time,
+      agendaUrl: `${PUBLIC_APP_URL}/dashboard`
+    });
+
+    if (emailResult && emailResult.success) {
+      await markEmailSent(appointmentId, eventKey);
+      logger.info('EMAIL', `[RESCHEDULE_PRO_EMAIL_SUCCESS] eventKey: ${eventKey}`);
+    } else {
+      logger.error('EMAIL', `[RESCHEDULE_PRO_EMAIL_FAILED] eventKey: ${eventKey}. Error: ${emailResult?.error || 'Unknown error'}`);
+    }
+  } catch (err: any) {
+    logger.error('EMAIL', `[RESCHEDULE_PRO_EMAIL_FAILED] Exception logic. appointmentId: ${appointmentId}, error: ${err.message}`);
+  }
+}
 
 // Helper for background notifications/waitlist after reschedule
 async function postRescheduleActions(appointmentId: string, previousDate: string, previousTime: string, updatedData: any, actor: 'client' | 'professional') {
@@ -2578,51 +2635,7 @@ async function postRescheduleActions(appointmentId: string, previousDate: string
       rescheduledBy: actor
     };
     
-    if (actor === 'client') {
-      import('../emails/sendEmail.js').then(async ({ sendProfessionalBookingRescheduledEmail }) => {
-        try {
-          const proDoc = await db.collection('users').doc(updatedData.professionalId).get();
-          if (proDoc.exists && proDoc.data()?.email) {
-            const proData = proDoc.data();
-            const eventKey = `bookingRescheduledPro_${updatedData.date}_${updatedData.time}`;
-            
-            if (await shouldSendEmail(appointmentId, eventKey)) {
-              logger.info('EMAIL', `Enviando e-mail de remarcação concluída para a profissional (actor: client): ${proData!.email}`);
-              
-              const formatToBRDate = (d: string) => {
-                 if (!d) return d;
-                 const [y, m, day] = d.split('-');
-                 if (y && m && day) return `${day}/${m}/${y}`;
-                 return d;
-              };
-
-              const emailResult = await sendProfessionalBookingRescheduledEmail({
-                professionalEmail: proData!.email,
-                professionalName: proData!.name || 'Profissional',
-                clientName: updatedData.clientName,
-                serviceName: updatedData.serviceName,
-                oldFormatDate: formatToBRDate(previousDate),
-                oldTime: previousTime,
-                newFormatDate: formatToBRDate(updatedData.date),
-                newTime: updatedData.time,
-                agendaUrl: `${PUBLIC_APP_URL}/dashboard`
-              });
-              
-              if (emailResult && emailResult.success) {
-                await markEmailSent(appointmentId, eventKey);
-                logger.info('EMAIL', `E-mail de remarcação enviado com sucesso.`);
-              } else {
-                logger.error('EMAIL', `Falha no envio de e-mail de remarcação: ${emailResult?.error}`);
-              }
-            } else {
-               logger.info('EMAIL', `E-mail de remarcação ignorado por idempotência: ${eventKey}`);
-            }
-          }
-        } catch (err: any) {
-           logger.error('EMAIL', `Erro ao preparar e-mail de remarcação para profissional: ${err.message}`);
-        }
-      });
-    } else {
+    if (actor !== 'client') {
       await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
          method: 'POST',
          headers: { 'Content-Type': 'application/json' },
