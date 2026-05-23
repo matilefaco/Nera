@@ -27,7 +27,7 @@ export function buildProfessionalBookingRescheduledEmail(data: ProfessionalBooki
     </p>
 
     <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
-      Uma cliente solicitou remarcação. Acesse seu painel para confirmar ou acompanhar a alteração.
+      A cliente realizou uma alteração no agendamento.
     </p>
 
     ${buildEmailCard(cardItems)}
@@ -43,6 +43,6 @@ export function buildProfessionalBookingRescheduledEmail(data: ProfessionalBooki
     badgeVariant: 'alert',
     bodyHtml,
     ctaText: 'Acessar Agenda',
-    ctaUrl: agendaUrl || '#',
+    ctaUrl: (agendaUrl || '#').replace(/([^:]\/)\/+/g, "$1"),
   });
 }

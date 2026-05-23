@@ -960,10 +960,10 @@ export async function sendProfessionalBookingRescheduledEmail(data: any) {
   try {
     const resend = getResendClient();
     const { data: resendData, error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: FROM_EMAIL, // Utilizando o remetente verificado central
       to: [professionalEmail],
       replyTo: REPLY_TO,
-      subject: `Uma cliente solicitou remarcação • ${clientName}`,
+      subject: `Horário reagendado • ${clientName}`,
       html,
     });
     if (error) {

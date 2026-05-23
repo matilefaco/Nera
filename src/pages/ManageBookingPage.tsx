@@ -298,31 +298,12 @@ setBlockedSchedules(dayBlocked);
       const result: any = await rescheduleBookingByClient(safeManageToken, selectedDate, selectedTime);
       notify.success('Horário alterado com sucesso!');
       
-      if (isDev && result && result.debugEmail) {
-        let msg = `E-mail pós-remarcação: ${result.debugEmail.status}`;
-        if (result.debugEmail.error) {
-          msg += ` — ${result.debugEmail.error}`;
-        }
-        notify.info(msg);
-        console.log('[DIAGNOSTIC] debugEmail:', result.debugEmail);
-      }
-      
       setView('main');
     } catch (e: any) {
-      const maskedLookupKey = safeManageToken ? `${safeManageToken.substring(0, 4)}***${safeManageToken.substring(safeManageToken.length - 4)}` : 'NULL';
-      if (isDev) {
-        console.error(`[DIAGNOSTIC] handleReschedule error. lookupKey: ${maskedLookupKey}, date: ${selectedDate}, time: ${selectedTime}, message: ${e.message}`);
-      }
       if (e.message === 'Horário indisponível') {
         notify.error('Este horário acabou de ser preenchido. Escolha outro.');
       } else {
-        if (isDev) {
-          // A friendly message mapping will intercept "Failed to fetch", so we manipulate the string slightly for the DEV toast.
-          const msg = e.message.replace('fetch', 'f_e_t_c_h');
-          notify.error(`Falha na remarcação: ${msg}`);
-        } else {
-          notify.error('Erro ao remarcar');
-        }
+        notify.error('Erro ao remarcar');
       }
     } finally {
       setActionLoading(false);

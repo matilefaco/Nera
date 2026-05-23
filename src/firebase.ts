@@ -585,11 +585,7 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
 }
 
 export async function rescheduleBookingByClient(token: string, newDate: string, newTime: string) {
-  const maskedToken = token ? `${token.substring(0, 4)}***${token.substring(token.length - 4)}` : 'NULL';
   const targetUrl = `/api/public/manage/${encodeURIComponent(token)}/reschedule`;
-  const safeTargetUrl = `/api/public/manage/${encodeURIComponent(maskedToken)}/reschedule`;
-
-  if (isDev) console.log(`[DIAGNOSTIC] rescheduleBookingByClient - Token: ${maskedToken}, ${newDate} ${newTime}, Endpoint: ${safeTargetUrl}`);
   devLog(`[Client] Rescheduling via token ${token} to ${newDate} ${newTime}`);
   try {
     const response = await fetch(targetUrl, {
@@ -602,13 +598,6 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      if (isDev) {
-        console.error(`[DIAGNOSTIC] fetch HTTP failed. Status: ${response.status}`, {
-          error: errorData.error,
-          message: errorData.message,
-          code: errorData.code
-        });
-      }
       if (errorData.message === "Este horário acabou de ser preenchido. Escolha outro.") {
         throw new Error('Horário indisponível');
       }
@@ -621,14 +610,6 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
     const responseData = await response.json();
     return responseData;
   } catch (error: any) {
-    if (isDev) {
-       console.error('[DIAGNOSTIC] [Client Reschedule] Failed:', {
-         name: error.name,
-         message: error.message,
-         hasResponse: !!(error as any).response,
-         originURL: safeTargetUrl
-       });
-    }
     // Repassar o erro
     throw error;
   }
