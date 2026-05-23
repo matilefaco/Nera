@@ -12,6 +12,7 @@ import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } fr
 import { UserProfile, Service, ServiceArea, Appointment, BlockedSchedule, WaitlistEntry } from '../types';
 import { formatCurrency, cn, buildWhatsappLink, cleanWhatsapp, formatWhatsappDisplay, generateBookingConfirmationMessage, formatDateKey, getTodayLocale } from '../lib/utils';
 import { getAvailableSlots, canBookSlot } from '../lib/bookingUtils';
+import { isActiveSlotStatus } from '../constants/appointmentStatus';
 import { notify } from '../lib/notify';
 import { SERVICE_MODES, getServiceModeShortLabel, getBookingNotificationCopy } from '../lib/copy';
 import PremiumButton from './PremiumButton';
@@ -145,10 +146,11 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
   // Persistence Logic: Saving draft to localStorage
   useEffect(() => {
-    if (!profile?.uid || !open) return;
+    const profId = profile?.professionalId || profile?.uid;
+    if (!profId || !open) return;
 
     const draft = {
-      professionalId: profile.uid,
+      professionalId: profId,
       serviceId: selectedService?.id,
       mode: bookingMode,
       date: selectedDate,
@@ -160,8 +162,9 @@ export default function BookingModal({ profile, services, onClose, open, initial
     };
     
     if (selectedService || selectedDate || clientName || clientPhone) {
+      const profId = profile?.professionalId || profile?.uid;
       const draft = {
-        professionalId: profile.uid,
+        professionalId: profId,
         serviceId: selectedService?.id,
         mode: bookingMode,
         date: selectedDate,
@@ -181,15 +184,16 @@ export default function BookingModal({ profile, services, onClose, open, initial
       };
       localStorage.setItem('booking_draft', JSON.stringify(draft));
     }
-  }, [selectedService, bookingMode, selectedDate, selectedTime, clientName, clientPhone, clientEmail, selectedArea, profile?.uid, open, addressStreet, addressNumber, addressComplement, addressNeighborhood, addressCity, addressReference]);
+  }, [selectedService, bookingMode, selectedDate, selectedTime, clientName, clientPhone, clientEmail, selectedArea, profile?.professionalId, profile?.uid, open, addressStreet, addressNumber, addressComplement, addressNeighborhood, addressCity, addressReference]);
 
   // Persistence Logic: Checking for existing draft
   useEffect(() => {
     const savedDraft = localStorage.getItem('booking_draft');
-    if (savedDraft && profile?.uid && open && step === 2 && !selectedService) {
+    const profId = profile?.professionalId || profile?.uid;
+    if (savedDraft && profId && open && step === 2 && !selectedService) {
       try {
         const parsed = JSON.parse(savedDraft);
-        if (parsed.professionalId === profile.uid) {
+        if (parsed.professionalId === profId) {
           if (parsed.clientPhone) setClientPhone(parsed.clientPhone);
           setShowRestoreDraft(true);
         }
@@ -197,7 +201,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
         localStorage.removeItem('booking_draft');
       }
     }
-  }, [profile?.uid, open, step, selectedService]);
+  }, [profile?.professionalId, profile?.uid, open, step, selectedService]);
 
   const handleRestoreDraft = () => {
     const savedDraft = localStorage.getItem('booking_draft');
@@ -205,9 +209,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
     try {
       const draft = JSON.parse(savedDraft);
+      const profId = profile?.professionalId || profile?.uid;
       
       // Basic profile check to ensure we don't restore drafts from other professionals
-      if (draft.professionalId !== profile.uid) {
+      if (draft.professionalId !== profId) {
         localStorage.removeItem('booking_draft');
         return;
       }
@@ -325,13 +330,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
   };
 
   const handleApplyCoupon = async () => {
-    if (!couponCode.trim() || !profile?.uid) return;
+    const profId = profile?.professionalId || profile?.uid;
+    if (!couponCode.trim() || !profId) return;
     setIsCheckingCoupon(true);
     setCouponError('');
     try {
       const q = query(
         collection(db, 'coupons'),
-        where('professionalId', '==', profile.uid),
+        where('professionalId', '==', profId),
         where('code', '==', couponCode.trim().toUpperCase()),
         where('active', '==', true)
       );
@@ -378,14 +384,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
         const q = query(
           appointmentsRef,
-          where('professionalId', '==', profile.uid),
+          where('professionalId', '==', profId),
           where('appliedCouponCode', '==', coupon.code)
         );
         
         const snap = await getDocs(q);
         const alreadyUsed = snap.docs.some(doc => {
           const data = doc.data();
-          return ['pending', 'confirmed', 'completed'].includes(data.status) && (data.clientWhatsapp === cleanPhone || data.clientEmail === cleanEmail);
+          return isActiveSlotStatus(data.status) && (data.clientWhatsapp === cleanPhone || data.clientEmail === cleanEmail);
         });
 
         if (alreadyUsed) {
@@ -428,12 +434,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
   }, [selectedDate, availableSlots]);
 
   useEffect(() => {
-    if (!selectedDate || !profile?.uid || !open) return;
+    const profId = profile?.professionalId || profile?.uid;
+    if (!selectedDate || !profId || !open) return;
 
     let isMounted = true;
     setIsLoadingSlots(true);
     setSlotsLoadError(null);
-    if (isDev) console.log(`[Slots] start - Date: ${selectedDate}, Pro: ${profile?.uid}`);
+    if (isDev) console.log(`[Slots] start - Date: ${selectedDate}, Pro: ${profId}`);
     if (isDev) console.log(`[Slots] selectedService ID:`, selectedService?.id);
     if (isDev) console.log(`[Slots] serviceDuration:`, Number(selectedService?.duration));
     if (isDev) console.log(`[Slots] businessHours/professional availability:`, profile?.workingHours);
@@ -447,48 +454,37 @@ export default function BookingModal({ profile, services, onClose, open, initial
         try {
           if (isDev) console.log(`[Slots] blockedTimes query start`);
           const blockedRef = collection(db, 'blocked_schedules');
-          const blockedSnap = await getDocs(query(blockedRef, where('professionalId', '==', profile.uid)));
+          const blockedSnap = await getDocs(query(blockedRef, where('professionalId', '==', profId)));
           currentBlocked = blockedSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
           if (isDev) console.log(`[Slots] blockedTimes query success count=${currentBlocked.length}`);
         } catch (err) {
           if (isDev) console.error("[Slots] error actual= blockedTimes query:", err);
         }
 
-        // 2. Fetch Appointments
+        // 2. Fetch Appointments securely via backend
         try {
-          if (isDev) console.log(`[Slots] appointments query start`);
-          const apptsRef = collection(db, 'appointments');
-          const apptsQ = query(
-            apptsRef, 
-            where('professionalId', '==', profile.uid), 
-            where('date', '==', selectedDate)
-          );
+          if (isDev) console.log(`[Slots] fetching occupied slots securely`);
           
-          let getDocsTimeoutId: any;
-          const getDocsTimeoutPromise = new Promise<never>((_, reject) => {
-            getDocsTimeoutId = setTimeout(() => reject(new Error("FIRESTORE_TIMEOUT")), 8000);
+          let fetchTimeoutId: any;
+          const fetchTimeoutPromise = new Promise<never>((_, reject) => {
+            fetchTimeoutId = setTimeout(() => reject(new Error("FETCH_TIMEOUT")), 8000);
           });
-          getDocsTimeoutPromise.catch(() => {});
+          fetchTimeoutPromise.catch(() => {});
 
-          const snapshot = await Promise.race([
-            getDocs(apptsQ),
-            getDocsTimeoutPromise
+          const res = await Promise.race([
+            fetch(`/api/public/occupied-slots/${profId}?start=${selectedDate}&end=${selectedDate}`),
+            fetchTimeoutPromise
           ]);
-          clearTimeout(getDocsTimeoutId);
+          clearTimeout(fetchTimeoutId);
 
-          const allAppts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as Appointment));
-          currentAppts = allAppts.filter(a => ['pending', 'confirmed', 'completed'].includes(a.status));
-          
-          if (isDev) console.log(`[Slots] appointments query success count=${currentAppts.length}`);
-        } catch (error) {
-          if (isDev) {
-            console.error(`[Slots] error actual= appointments query:`, error);
-            if (error instanceof Error && error.message === 'FIRESTORE_TIMEOUT') {
-               if (isDev) console.log(`[Slots] timeout`);
-            }
+          if (res instanceof Response && res.ok) {
+            const data = await res.json();
+            const allAppts = data.slots as Appointment[];
+            currentAppts = allAppts.filter(a => isActiveSlotStatus(a.status));
+            if (isDev) console.log(`[Slots] appointments fetch success count=${currentAppts.length}`);
           }
-          // Do not throw or block the UI, just fall back to base schedule without checking conflicts
-          // so the user can at least see general availability
+        } catch (error) {
+          if (isDev) console.error(`[Slots] error actual= appointments fetch:`, error);
         }
 
         if (!isMounted) return;
@@ -511,7 +507,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
     return () => {
       isMounted = false;
     };
-  }, [selectedDate, profile?.uid, open, retrySlotsCount]);
+  }, [selectedDate, profile?.professionalId, profile?.uid, open, retrySlotsCount]);
 
   const calculateTotalPrice = () => {
     if (!selectedService) return 0;

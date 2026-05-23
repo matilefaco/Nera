@@ -1,10 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { db } from '../firebase';
-import { 
-  collection, query, where, getDocs, doc, 
-  updateDoc, addDoc, getDoc, setDoc, increment 
-} from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { Star, CheckCircle2, Sparkles, AlertCircle, 
   ChevronRight, Heart, MessageSquare, ShieldCheck, User
@@ -65,56 +60,36 @@ export default function ReviewPage() {
       }
 
       try {
-        // 1. Find the review request by token
-        const q = query(collection(db, 'review_requests'), where('token', '==', token));
-        const querySnapshot = await getDocs(q);
-  
-        if (querySnapshot.empty) {
-          setError('Solicitação de avaliação não encontrada.');
-          setLoading(false);
-          return;
+        const response = await fetch(`/api/public/reviews/${token}`);
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || 'Erro ao carregar dados da avaliação.');
         }
-  
-        const docSnap = querySnapshot.docs[0];
-        const requestData = { id: docSnap.id, ...docSnap.data() } as any;
+
+        const data = await response.json();
         
-        if (requestData.status === 'submitted') {
-          setError('Esta avaliação já foi enviada. Obrigado!');
-          setLoading(false);
-          return;
-        }
-  
-        if (requestData.status === 'expired') {
-          setError('Este link de avaliação expirou.');
-          setLoading(false);
-          return;
-        }
-  
-        setRequest(requestData);
-  
-        // 2. Use professional info baked into the request
-        if (requestData.professionalName) {
-          setProfessional({
-            name: requestData.professionalName,
-            avatar: requestData.professionalAvatar
-          } as any);
-        } else {
-          // Fallback legacy (only works if professional allows public read or is logged in)
-          const profDoc = await getDoc(doc(db, 'users', requestData.professionalId));
-          if (profDoc.exists()) {
-            setProfessional(profDoc.data() as any);
-          }
+        setRequest({
+           clientDisplayName: data.clientDisplayName,
+           clientNeighborhood: data.clientNeighborhood,
+        } as any);
+
+        if (data.professionalName) {
+           setProfessional({
+             name: data.professionalName,
+             avatar: data.professionalPhoto
+           } as any);
         }
 
-        // 3. Fetch booking info
-        const bookingDoc = await getDoc(doc(db, 'appointments', requestData.bookingId));
-        if (bookingDoc.exists()) {
-          setBooking(bookingDoc.data() as any);
+        if (data.serviceName) {
+           setBooking({
+             serviceName: data.serviceName,
+             date: data.appointmentDate
+           } as any);
         }
 
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching review data:', err);
-        setError('Erro ao carregar dados da avaliação.');
+        setError(err.message || 'Erro ao carregar dados da avaliação.');
       } finally {
         setLoading(false);
       }
@@ -152,8 +127,8 @@ export default function ReviewPage() {
         tags: selectedTags,
         comment: comment.trim(),
         publicDisplayMode: publicMode,
-        firstName: request.clientDisplayName?.split(' ')[0] || 'Cliente',
-        neighborhood: request.clientNeighborhood || ''
+        firstName: request?.clientDisplayName?.split(' ')[0] || 'Cliente',
+        neighborhood: request?.clientNeighborhood || ''
       };
 
       const res = await fetch(`/api/public/reviews/${token}/submit`, {
@@ -210,7 +185,7 @@ export default function ReviewPage() {
           Sua avaliação ajuda {professional?.name} a crescer e outras clientes a agendarem com mais confiança.
         </p>
         <button onClick={() => navigate('/')} className="bg-brand-ink text-brand-white px-12 py-5 rounded-full text-[11px] font-medium uppercase tracking-widest premium-shadow">
-          Explorar Nera
+          Explorar a Nera
         </button>
       </div>
     );
@@ -228,8 +203,12 @@ export default function ReviewPage() {
         className="w-full max-w-xl bg-brand-white rounded-[40px] border border-brand-mist p-8 md:p-12 shadow-sm"
       >
         <div className="text-center mb-12">
-          <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-brand-linen mx-auto mb-5 shadow-lg">
-            <img src={professional?.avatar} alt={professional?.name} className="w-full h-full object-cover" />
+          <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-brand-linen mx-auto mb-5 shadow-lg bg-brand-linen flex items-center justify-center">
+            {professional?.avatar ? (
+              <img src={professional.avatar} alt={professional?.name} className="w-full h-full object-cover" />
+            ) : (
+              <User size={40} className="text-brand-terracotta" />
+            )}
           </div>
           <h2 className="text-[10px] text-brand-terracotta uppercase tracking-[0.2em] font-medium mb-3">
             O SEU FEEDBACK FAZ A DIFERENÇA

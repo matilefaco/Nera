@@ -618,8 +618,12 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       return res.status(404).json({ error: "Perfil não encontrado." });
     }
 
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    const startStr = startOfMonth.toISOString().split('T')[0];
+
     // 4. Fetch extra public data to consolidate payload (Improves security and performance)
-    const [servicesSnap, reviewsSnap, statsSnap] = await Promise.all([
+    const [servicesSnap, reviewsSnap, statsSnap, apptsSnap] = await Promise.all([
       db.collection("services")
         .where("professionalId", "==", uid)
         .where("active", "==", true)
@@ -631,8 +635,27 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
         .get(),
       db.collection("review_stats")
         .doc(uid)
+        .get(),
+      db.collection("appointments")
+        .where("professionalId", "==", uid)
+        .where("date", ">=", startStr)
         .get()
     ]);
+
+    let monthlyAppointmentsCount = 0;
+    apptsSnap.forEach(doc => {
+      const status = doc.data().status;
+      if (['confirmed', 'completed', 'accepted'].includes(status)) {
+        monthlyAppointmentsCount++;
+      }
+    });
+
+    let roundedBookings = 0;
+    if (monthlyAppointmentsCount >= 100) roundedBookings = 100;
+    else if (monthlyAppointmentsCount >= 50) roundedBookings = 50;
+    else if (monthlyAppointmentsCount >= 20) roundedBookings = 20;
+    else if (monthlyAppointmentsCount >= 10) roundedBookings = 10;
+    else roundedBookings = monthlyAppointmentsCount;
 
     const sanitizedServices = servicesSnap.docs.map(doc => {
       const d = doc.data();
@@ -647,19 +670,29 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       };
     });
 
-    const sanitizedReviews = reviewsSnap.docs.map(doc => {
-      const d = doc.data();
-      return {
-        id: doc.id,
-        rating: d.rating,
-        comment: d.comment,
-        firstName: d.firstName,
-        neighborhood: d.neighborhood,
-        serviceName: d.serviceName,
-        locationLabel: d.locationLabel,
-        submittedAt: d.submittedAt ? (d.submittedAt.toDate ? d.submittedAt.toDate().toISOString() : d.submittedAt) : null
-      };
-    });
+    const sanitizedReviews = reviewsSnap.docs
+      .filter(doc => {
+        const d = doc.data();
+        return d.publicDisplayMode !== 'private' && d.publicDisplayMode !== 'hide';
+      })
+      .map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          rating: d.rating,
+          comment: d.comment,
+          firstName: d.firstName,
+          tags: d.tags || [],
+          publicDisplayMode: d.publicDisplayMode || 'named',
+          neighborhood: d.neighborhood,
+          serviceName: d.serviceName,
+          locationLabel: d.locationLabel,
+          submittedAt: d.submittedAt ? (d.submittedAt.toDate ? d.submittedAt.toDate().toISOString() : d.submittedAt) : null
+        };
+      });
+
+    const statsData = statsSnap.exists ? statsSnap.data() : { averageRating: 0, totalReviews: 0 };
+    statsData.totalCompletedBookings = roundedBookings;
 
     // 5. Sanitize data - Return ONLY what's needed for the public profile
     const sanitizedData: any = {
@@ -687,7 +720,7 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       acceptsInstallments: false, // Default to false, will be gated below
       services: sanitizedServices,
       reviews: sanitizedReviews,
-      stats: statsSnap.exists ? statsSnap.data() : null
+      stats: statsData
     };
 
     // P0 CRITICAL: Only expose WhatsApp if the plan is Pro

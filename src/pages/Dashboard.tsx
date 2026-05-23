@@ -268,6 +268,29 @@ export default function Dashboard() {
     return future[0] || null;
   }, [appointments, confirmedToday]);
 
+  const [pendingReviewsCount, setPendingReviewsCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+    const fetchPendingReviews = async () => {
+      try {
+        const snapshot = await getCountFromServer(
+          query(
+            collection(db, 'reviews'),
+            where('professionalId', '==', user.uid),
+            where('moderationStatus', '==', 'pending')
+          )
+        );
+        if (isMounted) setPendingReviewsCount(snapshot.data().count);
+      } catch (err) {
+        if (isDev) console.error("Error fetching pending reviews count:", err);
+      }
+    };
+    fetchPendingReviews();
+    return () => { isMounted = false; };
+  }, [user]);
+
   const displayedDailyRevenue = useMemo(() => {
     return calculateFinancialMetrics(displayedConfirmedToday).monthlyRevenue;
   }, [displayedConfirmedToday]);
@@ -1236,6 +1259,26 @@ export default function Dashboard() {
             </button>
           </div>
         </header>
+
+        {pendingReviewsCount > 0 && (
+          <div className="bg-brand-parchment border border-brand-mist rounded-[16px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-fade-in my-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-brand-linen flex items-center justify-center text-brand-terracotta flex-shrink-0">
+                <Star size={20} className="fill-brand-terracotta/20 text-brand-terracotta" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-brand-ink">Você possui {pendingReviewsCount} {pendingReviewsCount === 1 ? 'avaliação aguardando' : 'avaliações aguardando'} aprovação.</p>
+                <p className="text-[11px] text-brand-stone mt-0.5">Revise o feedback recebido para exibir no seu perfil.</p>
+              </div>
+            </div>
+            <Link 
+              to="/avaliacoes" 
+              className="text-[10px] font-bold uppercase tracking-widest text-brand-ink bg-brand-white border border-brand-mist/80 hover:bg-brand-mist/20 transition-colors px-6 py-2.5 rounded-full whitespace-nowrap text-center"
+            >
+              Revisar avaliações
+            </Link>
+          </div>
+        )}
 
         {/* DASHBOARD TABS */}
         <div className="grid grid-cols-3 bg-[#FAF9F8] p-1.5 rounded-xl border border-brand-mist/30 text-[9px] md:text-[10px] font-bold uppercase tracking-widest w-full">

@@ -45,6 +45,20 @@ const devLog = (...args: any[]) => isDev && console.log(...args);
 const blockedSchedulesCache = new Map<string, { data: any[], fetchedAt: number }>();
 const agendaDocsCache = new Map<string, any[]>();
 
+function formatTimelineDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.valueOf()) && String(dateStr).includes('T')) {
+      return new Intl.DateTimeFormat('pt-BR', { 
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' 
+      }).format(d);
+    }
+    return formatLocalDate(formatDateKey(d), { day: '2-digit', month: 'short' });
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function AgendaPage() {
   const { user, profile } = useAuth();
   const { 
@@ -1599,7 +1613,7 @@ export default function AgendaPage() {
                         <div key={idx} className="relative pl-4">
                           <div className="absolute -left-[5px] top-[6px] w-[9px] h-[9px] rounded-full bg-brand-mist border-2 border-brand-white" />
                           <p className="text-[11px] text-brand-ink font-medium leading-tight">{event.label}</p>
-                          <p className="text-[9px] text-brand-stone mt-0.5">{formatLocalDate(formatDateKey(new Date(event.createdAt)), { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                          <p className="text-[9px] text-brand-stone mt-0.5">{formatTimelineDate(event.createdAt)}</p>
                         </div>
                       ))}
                     </div>

@@ -33,12 +33,12 @@ export function buildReviewReceivedEmail(data: {
 
   return buildEmailBase({
     topbarText: 'Nova Avaliação',
-    heroVariant: 'clay',
+    heroVariant: 'terracotta',
     heroLabel: 'Feedback',
     heroTitle: 'Parabéns!',
     heroTitleItalic: 'Nova Estrela 🌟',
     bodyHtml,
     ctaText: 'Acessar Meu Painel',
     ctaUrl: dashboardUrl
-  });
+  } as any);
 }

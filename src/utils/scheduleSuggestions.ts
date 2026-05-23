@@ -1,5 +1,6 @@
 
 import { Appointment, WorkingHours, BlockedSchedule } from '../types';
+import { isActiveSlotStatus } from '../constants/appointmentStatus';
 
 interface SuggestionParams {
   date: string;
@@ -62,7 +63,7 @@ export function getAvailableSlots({
   const occupiedSegments: { start: number; end: number }[] = [];
 
   appointments.forEach(appt => {
-    if (appt.date === date && !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'rejected', 'expired'].includes(appt.status)) {
+    if (appt.date === date && isActiveSlotStatus(appt.status)) {
       const [h, m] = appt.time.split(':').map(Number);
       const start = h * 60 + m;
       const duration = Number(appt.duration) || 60;

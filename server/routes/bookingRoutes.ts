@@ -4,7 +4,7 @@ import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskPhone, maskToken, maskUid } from "../utils/logger.js";
-import { sendBookingConfirmedEmail, sendDigitalReceiptEmail, sendBookingCancelledClientEmail, sendProfessionalBookingRescheduledEmail } from "../emails/sendEmail.js";
+import { sendBookingConfirmedEmail, sendDigitalReceiptEmail, sendBookingCancelledClientEmail, sendBookingDeclinedClientEmail, sendProfessionalBookingRescheduledEmail } from "../emails/sendEmail.js";
 import { createGoogleCalendarEvent, updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "./calendarRoutes.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { isRevenueStatus, isCancelledStatus, isPendingStatus, isActiveSlotStatus } from "../constants/appointmentStatus.js";
@@ -819,6 +819,74 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
   }
 });
 
+// --- NEW: PUBLIC ENDPOINT TO FETCH REVIEW REQUEST ---
+router.get("/public/reviews/:token", reviewSubmitLimiter, async (req, res) => {
+  const db = getDb();
+  const { token } = req.params;
+
+  if (!token) {
+    return res.status(400).json({ error: "Token é obrigatório." });
+  }
+
+  try {
+    const q = db.collection('review_requests').where('token', '==', token).limit(1);
+    const requestSnaps = await q.get();
+
+    if (requestSnaps.empty) {
+      return res.status(404).json({ error: 'Solicitação de avaliação não encontrada ou inválida.' });
+    }
+
+    const requestData = requestSnaps.docs[0].data();
+
+    if (requestData.status === 'submitted') {
+      return res.status(400).json({ error: 'Esta avaliação já foi enviada.' });
+    }
+    if (requestData.status === 'expired') {
+      return res.status(400).json({ error: 'Este link de avaliação expirou.' });
+    }
+
+    const professionalId = requestData.professionalId;
+    const bookingId = requestData.bookingId;
+
+    let professionalName = '';
+    let professionalPhoto = '';
+    let serviceName = '';
+    let appointmentDate = '';
+    
+    if (professionalId) {
+      const profSnap = await db.collection('users').doc(professionalId).get();
+      if (profSnap.exists) {
+        const profData = profSnap.data()!;
+        professionalName = profData.displayName || profData.name || '';
+        professionalPhoto = profData.avatar || profData.photoUrl || profData.photoURL || '';
+      }
+    }
+
+    if (bookingId) {
+       const apptSnap = await db.collection('appointments').doc(bookingId).get();
+       if (apptSnap.exists) {
+         const apptData = apptSnap.data()!;
+         serviceName = apptData.serviceName || '';
+         appointmentDate = apptData.date || '';
+       }
+    }
+
+    return res.json({
+      success: true,
+      professionalName,
+      professionalPhoto,
+      serviceName,
+      appointmentDate,
+      clientDisplayName: requestData.clientDisplayName || '',
+      clientNeighborhood: requestData.clientNeighborhood || '',
+      canReview: true
+    });
+  } catch (err: any) {
+    logger.error("REVIEW", "Fetch review error", { error: err });
+    res.status(500).json({ error: "Erro interno ao buscar dados da avaliação." });
+  }
+});
+
 // --- NEW: PUBLIC ENDPOINT TO SUBMIT REVIEW ---
 router.post("/public/reviews/:token/submit", reviewSubmitLimiter, async (req, res) => {
   const db = getDb();
@@ -870,9 +938,16 @@ router.post("/public/reviews/:token/submit", reviewSubmitLimiter, async (req, re
       const profDoc = await transaction.get(profRef);
       
       let locationLabel = '';
+      let safeServiceId = serviceId || '';
+      let safeServiceName = serviceName || '';
+      
       if (profDoc.exists && apptDoc.exists) {
         const prof = profDoc.data()!;
         const appt = apptDoc.data()!;
+        
+        // Harden service parameters from actual appointment
+        safeServiceId = appt.serviceId || safeServiceId;
+        safeServiceName = appt.serviceName || safeServiceName;
         
         const locType = appt.locationType;
         if (locType === 'home' || locType === 'domicilio') {
@@ -889,20 +964,40 @@ router.post("/public/reviews/:token/submit", reviewSubmitLimiter, async (req, re
         }
       }
 
+      // Safe comment
+      const safeComment = comment ? String(comment).trim().slice(0, 500) : '';
+
+      const isAnonymous = publicDisplayMode === 'anonymous';
+      const finalFirstName = isAnonymous ? 'Cliente Anônima' : (firstName || 'Cliente');
+      const finalNeighborhood = isAnonymous ? '' : (neighborhood || '');
+      if (isAnonymous) locationLabel = '';
+
+      const KNOWN_TAGS = [
+        'Pontualidade',
+        'Delicadeza',
+        'Atendimento profissional',
+        'Resultado natural',
+        'Organização',
+        'Praticidade',
+        'Boa comunicação',
+        'Voltaria a agendar'
+      ];
+      const sanitizedTags = Array.isArray(tags) ? tags.filter(t => KNOWN_TAGS.includes(t)) : [];
+
       // 2. Create the review
       transaction.set(reviewRef, {
         bookingId: requestData.bookingId,
         professionalId: professionalId,
-        serviceId: serviceId || '',
-        serviceName: serviceName || '',
+        serviceId: safeServiceId,
+        serviceName: safeServiceName,
         rating: Number(rating),
-        tags: tags || [],
-        comment: comment ? String(comment).trim() : '',
-        publicDisplayMode: publicDisplayMode || 'named',
+        tags: sanitizedTags,
+        comment: safeComment,
+        publicDisplayMode: isAnonymous ? 'anonymous' : 'named',
         publicApproved: false,
         moderationStatus: 'pending',
-        firstName: firstName || 'Cliente',
-        neighborhood: neighborhood || '',
+        firstName: finalFirstName,
+        neighborhood: finalNeighborhood,
         locationLabel: locationLabel,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         submittedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -1682,10 +1777,33 @@ router.post("/appointments/:appointmentId/decline", requireFirebaseAuth, async (
       const updatedData = { ...data, ...safeUpdate };
       await updateClientSummaryInternal(transaction, updatedData, data.professionalId, false, data.status, summarySnap);
 
-      return { success: true, appointmentId };
+      return { success: true, appointmentId, updatedData };
     });
 
-    return res.json(result);
+    // Notify client that professional declined
+    if (result.success && result.updatedData && result.updatedData.clientEmail) {
+      // Find pro doc for their name and slug
+      const proDoc = await db.collection('users').doc(uid as string).get();
+      const proData = proDoc.data();
+      
+      const eventKey = 'bookingDeclinedClient';
+      if (await shouldSendEmail(appointmentId, eventKey)) {
+        await sendBookingDeclinedClientEmail({
+          clientEmail: result.updatedData.clientEmail,
+          clientName: result.updatedData.clientName,
+          professionalName: proData?.name || 'Profissional',
+          bookingId: result.appointmentId,
+          date: result.updatedData.date,
+          time: result.updatedData.time,
+          serviceName: result.updatedData.serviceName,
+          profileUrl: proData?.slug ? `${PUBLIC_APP_URL}/p/${proData.slug}` : PUBLIC_APP_URL,
+          location: result.updatedData.locationType === 'client' ? 'Na sua casa' : (result.updatedData.locationType === 'remote' ? 'Online' : 'No local'),
+        });
+        await markEmailSent(appointmentId, eventKey);
+      }
+    }
+
+    return res.json({ success: true, appointmentId: result.appointmentId });
   } catch (err: any) {
     const status = err.status || 500;
     const message = err.message || "Erro interno do servidor";
@@ -2780,6 +2898,7 @@ router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: Authe
 
   try {
     const result = await db.runTransaction(async (transaction) => {
+      // 1. ALL READS
       const reviewRef = db.collection('reviews').doc(reviewId);
       const reviewSnap = await transaction.get(reviewRef);
 
@@ -2797,7 +2916,39 @@ router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: Authe
         throw { status: 400, message: "Avaliação já foi aprovada." };
       }
 
-      // 1. Update review
+      const statsRef = db.collection('review_stats').doc(uid as string);
+      const statsSnap = await transaction.get(statsRef);
+
+      // 2. CALCULATIONS
+      const rating = Number(reviewData.rating) || 5;
+      const tags = Array.isArray(reviewData.tags) ? reviewData.tags : [];
+
+      let newAverageRating = rating;
+      let newTotalReviews = 1;
+      let newTagAnalytics: Record<string, number> = {};
+
+      tags.forEach((t: string) => {
+        newTagAnalytics[t] = 1;
+      });
+
+      if (statsSnap.exists) {
+        const currentStats = statsSnap.data()!;
+        newTotalReviews = (currentStats.totalReviews || 0) + 1;
+        newAverageRating = ((currentStats.averageRating || 0) * (currentStats.totalReviews || 0) + rating) / newTotalReviews;
+        
+        const existingTagAnalytics = currentStats.tagAnalytics || {};
+        newTagAnalytics = { ...existingTagAnalytics };
+        
+        tags.forEach((tag: string) => {
+          newTagAnalytics[tag] = (newTagAnalytics[tag] || 0) + 1;
+        });
+      }
+      
+      const newTopTags = Object.keys(newTagAnalytics).sort((a, b) => newTagAnalytics[b] - newTagAnalytics[a]).slice(0, 5);
+
+      // 3. ALL WRITES
+      
+      // Update review
       transaction.update(reviewRef, {
         publicApproved: true,
         moderationStatus: 'approved',
@@ -2805,34 +2956,13 @@ router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: Authe
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
 
-      // 2. Update review_stats
-      const statsRef = db.collection('review_stats').doc(uid as string);
-      const statsSnap = await transaction.get(statsRef);
-      
-      const rating = Number(reviewData.rating) || 5;
-      const tags = Array.isArray(reviewData.tags) ? reviewData.tags : [];
-
-      let newAverageRating = rating;
-      let newTotalReviews = 1;
-      let newTopTags = tags.slice(0, 5);
-
+      // Update review_stats
       if (statsSnap.exists) {
-        const currentStats = statsSnap.data()!;
-        newTotalReviews = (currentStats.totalReviews || 0) + 1;
-        newAverageRating = ((currentStats.averageRating || 0) * (currentStats.totalReviews || 0) + rating) / newTotalReviews;
-        
-        const updatedTags = [...(currentStats.topTags || [])];
-        if (tags) {
-          tags.forEach((tag: string) => {
-            if (!updatedTags.includes(tag)) updatedTags.push(tag);
-          });
-        }
-        newTopTags = updatedTags.slice(0, 5);
-
         transaction.update(statsRef, {
           averageRating: Number(newAverageRating.toFixed(1)),
           totalReviews: newTotalReviews,
           topTags: newTopTags,
+          tagAnalytics: newTagAnalytics,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       } else {
@@ -2842,11 +2972,12 @@ router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: Authe
           totalReviews: 1,
           totalCompletedBookings: 1,
           topTags: newTopTags,
+          tagAnalytics: newTagAnalytics,
           updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
 
-      // 3. Sync to user profile
+      // Sync to user profile
       const userRef = db.collection('users').doc(uid as string);
       transaction.update(userRef, {
         averageRating: Number(newAverageRating.toFixed(1)),

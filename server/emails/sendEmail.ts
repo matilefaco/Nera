@@ -7,6 +7,7 @@ import { buildRetentionEmail } from './templates/retention.js';
 import { buildBookingConfirmedEmail } from './templates/bookingConfirmed.js';
 import { buildBookingCancelledEmail } from './templates/bookingCancelled.js';
 import { buildBookingCancelledClientEmail } from './templates/bookingCancelledClient.js';
+import { buildBookingDeclinedClientEmail } from './templates/bookingDeclinedClient.js';
 import { buildReviewRequestEmail } from './templates/reviewRequest.js';
 import { buildWelcomeEmail } from './templates/welcome.js';
 import { buildPasswordResetEmail } from './templates/passwordReset.js';
@@ -402,6 +403,52 @@ export async function sendBookingCancelledClientEmail(data: BookingEmailData) {
     return { success: true, id: resendData?.id };
   } catch (err: any) {
     logEmail('ERROR', 'booking_cancelled_client', { error: err.message });
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * EVENT: booking_declined_client
+ */
+export async function sendBookingDeclinedClientEmail(data: BookingEmailData) {
+  const { clientEmail, professionalName, bookingId } = data;
+
+  logEmail('START', 'booking_declined_client', { to: clientEmail, appointmentId: bookingId });
+
+  if (!isValidEmail(clientEmail)) {
+    logEmail('ERROR', 'booking_declined_client', { error: 'Invalid client email', to: clientEmail });
+    return { success: false, error: 'Invalid email' };
+  }
+
+  const formattedDate = formatDateSafely(data.date);
+
+  const html = buildBookingDeclinedClientEmail({
+    professionalName: professionalName || 'Sua profissional',
+    clientName: data.clientName || 'Cliente',
+    serviceName: data.serviceName || 'Serviço',
+    formattedDate,
+    time: data.time || '',
+    profileUrl: data.profileUrl || APP_URL,
+  });
+
+  try {
+    const resend = getResendClient();
+    const { data: resendData, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [clientEmail!],
+      replyTo: REPLY_TO,
+      subject: `A agenda foi atualizada • ${professionalName || 'Nera'}`,
+      html,
+    });
+
+    if (error) {
+      logEmail('ERROR', 'booking_declined_client', { error });
+      return { success: false, error };
+    }
+    logEmail('SUCCESS', 'booking_declined_client', { resendId: resendData?.id });
+    return { success: true, id: resendData?.id };
+  } catch (err: any) {
+    logEmail('ERROR', 'booking_declined_client', { error: err.message });
     return { success: false, error: err.message };
   }
 }

@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import { motion } from 'motion/react';
 import { Star, Check, X, Clock, MessageSquare, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 interface Review {
   id: string;
@@ -13,14 +14,17 @@ interface Review {
   firstName: string;
   createdAt: any;
   moderationStatus: 'pending' | 'approved' | 'rejected';
+  tags?: string[];
 }
 
 const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
 
+type ReviewsStatus = 'idle' | 'loading' | 'loaded' | 'error';
+
 export function ReviewsModerationPage() {
   const { user } = useAuth();
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<ReviewsStatus>('idle');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +34,9 @@ export function ReviewsModerationPage() {
     let isMounted = true;
     
     const fetchPendingReviews = async () => {
+      if (reviews.length === 0) {
+        setStatus('loading');
+      }
       try {
         const q = query(
           collection(db, 'reviews'),
@@ -50,12 +57,11 @@ export function ReviewsModerationPage() {
         });
         
         setReviews(fetched);
+        setStatus('loaded');
       } catch (err: any) {
         if (!isMounted) return;
         if (isDev) console.error("Error fetching pending reviews:", err);
-        setError("Não foi possível carregar as avaliações pendentes.");
-      } finally {
-        if (isMounted) setLoading(false);
+        setStatus('error');
       }
     };
     
@@ -80,6 +86,7 @@ export function ReviewsModerationPage() {
       if (!res.ok) throw new Error(data.error || 'Erro ao aprovar avaliação');
       
       setReviews(prev => prev.filter(r => r.id !== reviewId));
+      toast.success('Avaliação publicada no perfil.');
     } catch (err: any) {
       if (isDev) console.error(err);
       setError(err.message || 'Erro ao aprovar.');
@@ -104,6 +111,7 @@ export function ReviewsModerationPage() {
       if (!res.ok) throw new Error(data.error || 'Erro ao ocultar avaliação');
       
       setReviews(prev => prev.filter(r => r.id !== reviewId));
+      toast.success('Avaliação ocultada.');
     } catch (err: any) {
       if (isDev) console.error(err);
       setError(err.message || 'Erro ao ocultar.');
@@ -134,13 +142,22 @@ export function ReviewsModerationPage() {
           </div>
         )}
 
-        {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="animate-pulse bg-white rounded-2xl p-6 h-40 border border-brand-mist" />
-            ))}
+        {status === 'error' && !error && (
+          <div className="bg-[#FAF9F8] text-brand-ink p-6 rounded-2xl border border-brand-mist flex items-start gap-4 mb-8">
+            <AlertCircle size={20} className="shrink-0 mt-0.5 text-brand-terracotta" />
+            <div>
+              <p className="font-medium">Ocorreu um erro</p>
+              <p className="text-sm mt-1 text-brand-stone">Não foi possível carregar as avaliações agora.</p>
+            </div>
           </div>
-        ) : reviews.length === 0 ? (
+        )}
+
+        {(status === 'idle' || status === 'loading') && reviews.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 px-8 text-center bg-white rounded-[40px] border border-brand-mist/60 shadow-sm">
+            <div className="w-10 h-10 rounded-full border-2 border-brand-mist border-t-brand-terracotta animate-spin mb-6" />
+            <p className="text-sm font-medium text-brand-ink tracking-wide">Carregando avaliações…</p>
+          </div>
+        ) : status === 'loaded' && reviews.length === 0 ? (
           <div className="bg-white rounded-[40px] border border-dashed border-brand-mist/60 py-20 px-8 text-center shadow-sm flex flex-col items-center">
             <div className="w-16 h-16 bg-[#FAF9F8] rounded-2xl flex items-center justify-center mx-auto mb-6 text-brand-stone/40 border border-brand-mist/40 shadow-sm">
               <Star size={24} strokeWidth={1} />
@@ -148,7 +165,7 @@ export function ReviewsModerationPage() {
             <h3 className="text-xl font-serif text-brand-ink mb-1 italic text-pretty">Nenhuma avaliação pendente</h3>
             <p className="text-[11px] text-brand-stone font-light max-w-xs mx-auto leading-relaxed uppercase tracking-widest">As avaliações das suas clientes aparecerão aqui assim que forem enviadas.</p>
           </div>
-        ) : (
+        ) : reviews.length > 0 ? (
           <div className="space-y-6">
             {reviews.map(review => (
               <motion.div 
@@ -182,13 +199,23 @@ export function ReviewsModerationPage() {
                     </h4>
                     
                     {review.comment ? (
-                      <p className="text-brand-ink/80 text-sm leading-relaxed mb-6 italic border-l-2 border-brand-terracotta/30 pl-3">
+                      <p className="text-brand-ink/80 text-sm leading-relaxed mb-4 italic border-l-2 border-brand-terracotta/30 pl-3">
                         "{review.comment}"
                       </p>
                     ) : (
-                      <p className="text-brand-ink/40 text-sm mb-6 flex items-center gap-2">
+                      <p className="text-brand-ink/40 text-sm mb-4 flex items-center gap-2">
                          <MessageSquare size={14} /> Sem comentário escrito
                       </p>
+                    )}
+
+                    {review.tags && review.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-6">
+                        {review.tags.map(tag => (
+                          <span key={tag} className="px-2.5 py-1 bg-[#FAF9F8] border border-brand-mist/50 text-brand-stone text-[10px] font-medium tracking-wide uppercase rounded-md">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
                     )}
 
                     <div className="flex flex-wrap gap-3">
@@ -214,7 +241,7 @@ export function ReviewsModerationPage() {
               </motion.div>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

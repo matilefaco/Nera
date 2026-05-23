@@ -22,6 +22,7 @@ import { formatCurrency, formatLocalDate, buildWhatsappLink, cn, getTodayLocale 
 import { getBookingNotificationCopy } from '../lib/copy';
 import { isCancelledStatus, isPendingStatus, isRevenueStatus, APPOINTMENT_STATUS } from '../constants/appointmentStatus';
 import { getAvailableSlots } from '../lib/bookingUtils';
+import { isActiveSlotStatus } from '../constants/appointmentStatus';
 import { notify } from '../lib/notify';
 
 const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
@@ -178,7 +179,7 @@ export default function ManageBookingPage() {
     const unsubAppts = onSnapshot(qAppts, (snap) => {
       try {
         const allAppts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
-        setDayAppointments(allAppts.filter(a => ['pending', 'confirmed'].includes(a.status)));
+        setDayAppointments(allAppts.filter(a => isActiveSlotStatus(a.status)));
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
       }

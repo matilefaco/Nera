@@ -409,10 +409,11 @@ function PublicProfileContent() {
 
   useEffect(() => {
     const findAvailabilityData = async () => {
-      if (!profile?.uid || !profile?.workingHours || services.length === 0)
+      const profId = profile?.professionalId || profile?.uid;
+      if (!profId || !profile?.workingHours || services.length === 0)
         return;
 
-      devLog(`[NEXT_SLOT] Starting calculation for pro: ${profile.uid}`);
+      devLog(`[NEXT_SLOT] Starting calculation for pro: ${profId}`);
 
       try {
         const now = new Date();
@@ -421,7 +422,7 @@ function PublicProfileContent() {
         // Fetch all blocked schedules for the week once
         const blockedQ = query(
           collection(db, "blocked_schedules"),
-          where("professionalId", "==", profile.uid),
+          where("professionalId", "==", profId),
         );
         const blockedSnap = await getDocs(blockedQ);
         const blockedSchedules = blockedSnap.docs.map(
@@ -434,7 +435,7 @@ function PublicProfileContent() {
         endGame.setDate(endGame.getDate() + 14);
         const endGameStr = getLocalDateStr(endGame);
   
-        const slotsResponse = await fetch(`/api/public/occupied-slots/${profile.uid}?start=${todayStr}&end=${endGameStr}`);
+        const slotsResponse = await fetch(`/api/public/occupied-slots/${profId}?start=${todayStr}&end=${endGameStr}`);
         const { slots: allAppts } = await slotsResponse.json();
   
         const result = getNextAvailableSlot({
@@ -675,7 +676,8 @@ function PublicProfileContent() {
             >
               <button
                 onClick={() => {
-                  logAnalyticsEvent(profile.uid, "click_book_sticky");
+                  const profId = profile?.professionalId || profile?.uid;
+                  logAnalyticsEvent(profId || '', "click_book_sticky");
                   if (urgencyInfo?.isAgendaFull && features?.waitlist) {
                     setIsWaitlistOpen(true);
                   } else {
@@ -754,7 +756,8 @@ function PublicProfileContent() {
       <WeekAvailability
         availability={weeklyAvailability}
         onSelectDate={(date) => {
-          logAnalyticsEvent(profile.uid, "week_calendar_click");
+          const profId = profile?.professionalId || profile?.uid;
+          logAnalyticsEvent(profId || '', "week_calendar_click");
           const day = weeklyAvailability.find((d) => d.date === date);
           if (day?.status === "full" && features?.waitlist) {
             setIsWaitlistOpen(true);
@@ -773,7 +776,8 @@ function PublicProfileContent() {
           <FinalCTA
             profile={profile}
             onBookingClick={() => {
-              logAnalyticsEvent(profile.uid, "click_book_final");
+              const profId = profile?.professionalId || profile?.uid;
+              logAnalyticsEvent(profId || '', "click_book_final");
               setIsBookingModalOpen(true);
             }}
             completedBookings={stats?.totalCompletedBookings}
