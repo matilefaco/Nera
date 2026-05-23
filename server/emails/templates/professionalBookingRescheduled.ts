@@ -35,12 +35,12 @@ export function buildProfessionalBookingRescheduledEmail(data: ProfessionalBooki
 
   return buildEmailBase({
     topbarText: 'Reagendamento',
-    heroVariant: 'sand',
+    heroVariant: 'parchment',
     heroLabel: 'Aviso',
     heroTitle: 'Horário',
     heroTitleItalic: 'Alterado 📅',
     badgeText: 'Remarcação',
-    badgeVariant: 'warning',
+    badgeVariant: 'alert',
     bodyHtml,
     ctaText: 'Acessar Agenda',
     ctaUrl: agendaUrl || '#',
