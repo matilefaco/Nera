@@ -13,7 +13,7 @@ const isDev = process.env.NODE_ENV !== "production";
 
 let stripeModule: Stripe | null = null;
 
-function getStripe() {
+export function getStripe() {
   if (!stripeModule) {
     const key = process.env.STRIPE_SECRET_KEY;
     if (!key) {

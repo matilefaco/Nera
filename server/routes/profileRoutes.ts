@@ -6,6 +6,7 @@ import { isNonPublicProfile } from "../utils/qualityFilter.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { logger, maskUid } from "../utils/logger.js";
 import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimiter.js";
+import { getStripe } from "./planRoutes.js";
 
 // Duplicated from src/constants/plans.ts to avoid src/ dependency on server
 const PLAN_CONFIGS: any = {
@@ -443,6 +444,10 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
     const proDoc = await db.collection('users').doc(appointmentData.professionalId).get();
     const proData = proDoc.exists ? proDoc.data() : null;
 
+    if (proData && (proData.accountStatus === 'scheduled_for_deletion' || proData.accountStatus === 'deleted')) {
+      return res.status(404).json({ error: "Este profissional não está mais ativo na plataforma." });
+    }
+
     // Return sanitized data for client
     const professionalData = proData ? {
       professionalId: proData.uid || appointmentData.professionalId,
@@ -602,6 +607,10 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
     }
 
     const userData = userDoc.data() || {};
+
+    if (userData.accountStatus === 'scheduled_for_deletion' || userData.accountStatus === 'deleted') {
+      return res.status(404).json({ error: "Perfil não encontrado ou desativado." });
+    }
 
     const isTestProfileData = isNonPublicProfile(userData);
 
@@ -865,6 +874,113 @@ router.get("/referrals", requireFirebaseAuth, async (req: AuthenticatedRequest, 
   } catch (err: any) {
     logger.error("REFERRALS", "Error fetching referrals", { error: err.message });
     res.status(500).json({ error: "Erro ao carregar indicações." });
+  }
+});
+
+/**
+ * POST /api/profile/delete-account
+ * Secure backend handler to queue account deletion, securely handle Stripe billing, 
+ * hide public profile, and disable authentication.
+ */
+router.post("/delete-account", requireFirebaseAuth, authMutationLimiter, async (req: AuthenticatedRequest, res: express.Response) => {
+  const uid = req.uid;
+  if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+  try {
+    const db = getDb();
+    
+    // Check existing request
+    const existingReq = await db.collection("accountDeletionRequests")
+      .where("userId", "==", uid)
+      .where("status", "==", "pending")
+      .limit(1)
+      .get();
+      
+    if (!existingReq.empty) {
+      return res.json({ success: true, already_pending: true, message: "A deletion request is already pending." });
+    }
+
+    const userRef = db.collection("users").doc(uid);
+    const userDoc = await userRef.get();
+    
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "Profile not found." });
+    }
+    
+    const userData = userDoc.data() || {};
+    
+    if (userData.accountStatus === 'scheduled_for_deletion') {
+      return res.json({ success: true, already_pending: true, message: "Account is already scheduled for deletion." });
+    }
+    
+    // 1. Stripe Cleanup
+    if (userData.stripeSubscriptionId) {
+      try {
+        const stripe = getStripe();
+        await stripe.subscriptions.update(userData.stripeSubscriptionId, {
+          cancel_at_period_end: true
+        });
+        logger.info("DELETE_ACCOUNT", "Stripe subscription set to cancel at period end", { uid });
+      } catch (err: any) {
+        logger.error("DELETE_ACCOUNT", "Failed to cancel stripe subscription", { uid, error: err.message });
+      }
+    }
+
+    // 2. Cancel future appointments safely
+    const todayStr = new Date().toISOString().split('T')[0];
+    const futureAppts = await db.collection("appointments")
+      .where("professionalId", "==", uid)
+      .where("date", ">=", todayStr)
+      .where("status", "in", ["pending", "confirmed", "accepted"])
+      .limit(400) // Protect batch limit of 500
+      .get();
+      
+    const batch = db.batch();
+    
+    // Create the deletion request record for auditing
+    const newReqRef = db.collection("accountDeletionRequests").doc();
+    batch.set(newReqRef, {
+      userId: uid,
+      email: userData.email,
+      displayName: userData.name || userData.displayName || null,
+      status: 'pending',
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      source: 'backend_api'
+    });
+
+    // Anonymize/Hide the user
+    batch.update(userRef, {
+      accountStatus: 'scheduled_for_deletion',
+      published: false,
+      deletedAt: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Retain slug reservation to prevent takeover, but mark it
+    if (userData.slug) {
+      const slugRef = db.collection("slugs").doc(userData.slug);
+      batch.set(slugRef, { status: 'scheduled_for_deletion' }, { merge: true });
+    }
+    
+    // Cancel future appointments
+    futureAppts.docs.forEach(doc => {
+      batch.update(doc.ref, { 
+        status: "cancelled_by_professional",
+        cancellationReason: "Conta do profissional desativada."
+      });
+    });
+
+    await batch.commit();
+
+    // 3. Disable the user in Firebase Auth so they can't login anymore
+    await admin.auth().updateUser(uid, { disabled: true });
+    
+    logger.info("DELETE_ACCOUNT", "Account securely queued for deletion", { uid });
+
+    return res.json({ success: true, message: "Conta agendada para exclusão com sucesso." });
+
+  } catch (err: any) {
+    logger.error("DELETE_ACCOUNT", "Failed to process account deletion", { uid, error: err.message });
+    return res.status(500).json({ error: "Erro interno ao processar a solicitação. Tente novamente." });
   }
 });
 

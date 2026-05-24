@@ -64,6 +64,7 @@ export interface PlanFeatures {
 }
 
 export interface UserProfile {
+  accountStatus?: 'active' | 'scheduled_for_deletion' | 'deleted';
   professionalId: string; // Sanitized public ID
   /** @deprecated Use professionalId */
   uid?: string;

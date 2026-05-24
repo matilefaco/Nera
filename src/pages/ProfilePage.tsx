@@ -548,7 +548,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || !profile) {
     return <AppLoadingScreen />;
   }
 

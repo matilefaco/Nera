@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Shield, Key, CreditCard, ChevronRight, User, Monitor, Trash2, Palette, X, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Shield, Key, CreditCard, ChevronRight, User, Monitor, Trash2, Palette, X, AlertTriangle, RefreshCw, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../AuthContext';
@@ -39,6 +39,14 @@ export default function SettingsPage() {
     {
       title: 'Conta',
       items: [
+        {
+          id: 'email',
+          label: 'E-mail da conta',
+          description: user?.email || 'E-mail não disponível',
+          icon: Mail,
+          isReadOnly: true,
+          supportText: 'Usado para login, segurança e comunicações importantes.'
+        },
         {
           id: 'profile',
           label: 'Dados do Perfil',
@@ -83,63 +91,54 @@ export default function SettingsPage() {
   ];
 
   useEffect(() => {
-    async function checkExistingRequest() {
-      if (!user) return;
-      try {
-        const q = query(
-          collection(db, 'accountDeletionRequests'),
-          where('userId', '==', user.uid),
-          where('status', '==', 'pending'),
-          limit(1)
-        );
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          setHasRequested(true);
-        }
-      } catch (err) {
-        if (isDev) console.error('[Settings] Error checking deletion requests:', err);
+    function checkExistingRequest() {
+      if (!user || !profile) return;
+      if (profile.accountStatus === 'scheduled_for_deletion') {
+        setHasRequested(true);
       }
     }
     checkExistingRequest();
-  }, [user]);
+  }, [user, profile]);
 
   const handleRequestDeletion = async () => {
-    if (!user) return;
+    if (!user || isDeleting) return;
     
     setIsDeleting(true);
     try {
-      // Final check for duplicates before writing
-      const q = query(
-        collection(db, 'accountDeletionRequests'),
-        where('userId', '==', user.uid),
-        where('status', '==', 'pending'),
-        limit(1)
-      );
-      const snap = await getDocs(q);
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/profile/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
       
-      if (!snap.empty) {
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Falha ao solicitar exclusão');
+      }
+
+      if (data.already_pending) {
         setHasRequested(true);
         notify.info('Você já possui uma solicitação em análise.');
         setShowDeleteModal(false);
         return;
       }
 
-      await addDoc(collection(db, 'accountDeletionRequests'), {
-        userId: user.uid,
-        email: user.email,
-        displayName: profile?.name || user.displayName || null,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-        source: 'settings_page'
-      });
-
       setHasRequested(true);
-      notify.success('Solicitação enviada.');
+      notify.success('Conta agendada para exclusão com sucesso. Fechando sessão...');
       setShowDeleteModal(false);
+      
+      // Give them a moment to read the success message
+      setTimeout(() => {
+        window.location.href = '/login'; // Or signOut
+      }, 3000);
+
     } catch (err) {
       if (isDev) console.error('[Settings] Error requesting deletion:', err);
       notify.error('Não conseguimos enviar sua solicitação agora. Tente novamente em alguns instantes.');
-      handleFirestoreError(err, OperationType.CREATE, 'accountDeletionRequests');
     } finally {
       setIsDeleting(false);
     }
@@ -164,7 +163,7 @@ export default function SettingsPage() {
                   const content = (
                     <div 
                       onClick={item.onClick}
-                      className="flex items-center gap-4 p-5 w-full text-left transition-colors hover:bg-brand-parchment/30 cursor-pointer"
+                      className={`flex items-center gap-4 p-5 w-full text-left transition-colors ${item.isReadOnly ? 'cursor-default' : 'hover:bg-brand-parchment/30 cursor-pointer'}`}
                     >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${
                         item.isDestructive 
@@ -174,7 +173,7 @@ export default function SettingsPage() {
                         <item.icon size={20} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-1">
                           <h3 className={`text-sm font-semibold ${item.isDestructive ? 'text-red-600' : 'text-brand-ink'}`}>
                             {item.label}
                           </h3>
@@ -184,9 +183,12 @@ export default function SettingsPage() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-brand-stone font-light line-clamp-1">{item.description}</p>
+                        <p className={`text-xs ${item.isReadOnly ? 'text-brand-ink font-medium' : 'text-brand-stone font-light'} line-clamp-1`}>{item.description}</p>
+                        {item.supportText && (
+                          <p className="text-[10px] text-brand-stone font-light mt-1.5">{item.supportText}</p>
+                        )}
                       </div>
-                      {!item.comingSoon && <ChevronRight size={16} className={item.isDestructive ? 'text-red-200' : 'text-brand-mist'} />}
+                      {!item.comingSoon && !item.isReadOnly && <ChevronRight size={16} className={item.isDestructive ? 'text-red-200' : 'text-brand-mist'} />}
                     </div>
                   );
 

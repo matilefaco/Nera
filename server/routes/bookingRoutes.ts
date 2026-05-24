@@ -450,6 +450,11 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
     const proUser = proDoc.data();
     const plan = proUser?.plan || 'free';
 
+    if (proUser?.accountStatus === 'scheduled_for_deletion' || proUser?.accountStatus === 'deleted') {
+      logger.warn("BOOKING", `Attempt to book with disabled professional: ${professionalId}`);
+      return res.status(403).json({ error: "Este profissional não está mais aceitando agendamentos no momento." });
+    }
+
     if (plan === 'free') {
       const now = new Date();
       const currentYear = now.getUTCFullYear();
@@ -967,6 +972,9 @@ router.get("/public/reviews/:token", reviewSubmitLimiter, async (req, res) => {
       const profSnap = await db.collection('users').doc(professionalId).get();
       if (profSnap.exists) {
         const profData = profSnap.data()!;
+        if (profData.accountStatus === 'scheduled_for_deletion' || profData.accountStatus === 'deleted') {
+           return res.status(404).json({ error: 'Este link de avaliação não é mais válido.' });
+        }
         professionalName = profData.displayName || profData.name || '';
         professionalPhoto = profData.avatar || profData.photoUrl || profData.photoURL || '';
       }
