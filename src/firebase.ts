@@ -829,6 +829,17 @@ export async function markWaitlistAsBooked(entryId: string) {
  */
 export async function logAnalyticsEvent(professionalId: string, type: 'visit' | 'click_book' | 'click_book_sticky' | 'click_book_final' | 'week_calendar_click') {
   try {
+    const sessionKey = `analytics_${professionalId}_${type}`;
+    const lastLogged = sessionStorage.getItem(sessionKey);
+    const now = Date.now();
+    
+    // Cooldown of 30 minutes for the same event type on the same professional
+    if (lastLogged && (now - parseInt(lastLogged, 10) < 30 * 60 * 1000)) {
+      return; 
+    }
+
+    sessionStorage.setItem(sessionKey, now.toString());
+
     const referrer = document.referrer;
     let origin: 'instagram' | 'direct' | 'other' = 'other';
     
@@ -838,12 +849,12 @@ export async function logAnalyticsEvent(professionalId: string, type: 'visit' | 
       origin = 'direct';
     }
 
-    await addDoc(collection(db, 'analytics_events'), {
-      professionalId,
-      type,
-      referrer,
-      origin,
-      timestamp: serverTimestamp()
+    fetch('/api/public/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ professionalId, type, referrer, origin })
+    }).catch(err => {
+        if (isDev) console.error('[Analytics] Network fail:', err);
     });
   } catch (err) {
     if (isDev) console.error('[Analytics] Failed to log event:', err);

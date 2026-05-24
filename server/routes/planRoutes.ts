@@ -616,16 +616,31 @@ router.post("/webhook", async (req, res) => {
 
   try {
     const eventRef = db.collection('stripe_webhook_events').doc(eventId);
+    const eventDoc = await eventRef.get();
     
-    await eventRef.create({
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      type: event.type
-    });
-  } catch (err: any) {
-    if (err.code === 6 || (err.message && err.message.includes('ALREADY_EXISTS'))) {
-      logger.info("STRIPE", "Duplicate webhook event ignored", { requestId: req.requestId, meta: { eventId, eventType: event.type } });
-      return res.json({ received: true, duplicate: true });
+    if (eventDoc.exists) {
+      const data = eventDoc.data() || {};
+      if (data.status === 'succeeded') {
+        logger.info("STRIPE", "Duplicate webhook event ignored (already succeeded)", { requestId: req.requestId, meta: { eventId, eventType: event.type } });
+        return res.json({ received: true, duplicate: true });
+      }
+      if (data.status === 'processing') {
+        const createdAt = data.createdAt?.toMillis ? data.createdAt.toMillis() : Date.now();
+        if (Date.now() - createdAt < 5 * 60 * 1000) {
+           logger.warn("STRIPE", "Concurrent webhook processing ignored", { requestId: req.requestId, meta: { eventId } });
+           return res.status(409).send("Conflict: event is currently being processed");
+        }
+        logger.info("STRIPE", "Retrying previously failed or timed-out webhook", { requestId: req.requestId, meta: { eventId } });
+      }
     }
+    
+    await eventRef.set({
+      createdAt: eventDoc.exists ? (eventDoc.data()?.createdAt || admin.firestore.FieldValue.serverTimestamp()) : admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      type: event.type,
+      status: 'processing'
+    }, { merge: true });
+  } catch (err: any) {
     logger.error("STRIPE", "Error checking webhook idempotency", { requestId: req.requestId, error: err, meta: { eventId } });
     return res.status(500).json({ error: 'Internal idempotency error' });
   }
@@ -647,6 +662,7 @@ router.post("/webhook", async (req, res) => {
     if (!session.subscription) {
       // Possible if it's a one-time payment or skipped, but we expect subscription mode
       logger.warn("STRIPE", "Missing subscription in checkout session", { requestId: req.requestId, meta: { sessionId: maskToken(session.id) } });
+      await db.collection('stripe_webhook_events').doc(eventId).update({ status: 'succeeded', completedAt: admin.firestore.FieldValue.serverTimestamp() });
       return res.json({ received: true, warning: 'No subscription found in session' });
     }
 
@@ -769,85 +785,107 @@ router.post("/webhook", async (req, res) => {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId as string) as any;
       const newExpiry = new Date(subscription.current_period_end * 1000);
 
-      const usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
+      let usersSnap = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
       
       if (!usersSnap.empty) {
-        const userDoc = usersSnap.docs[0];
-        const userData = userDoc.data();
-        const userId = userDoc.id;
+        const userRef = usersSnap.docs[0].ref;
+        let rewardAction: any = null;
 
-        const needsUpdate = userData.planExpiresAt !== newExpiry.toISOString() || 
-                           userData.stripeSubscriptionStatus !== subscription.status;
+        await db.runTransaction(async (transaction) => {
+          const userDoc = await transaction.get(userRef);
+          if (!userDoc.exists) return;
+          const userData = userDoc.data() || {};
+          const userId = userDoc.id;
 
-        if (needsUpdate) {
-          const updateData: any = {
-            planExpiresAt: newExpiry.toISOString(),
-            stripeSubscriptionStatus: subscription.status,
-            lastStripeSyncAt: new Date().toISOString(),
-            stripeSyncSource: 'invoice_paid',
-            updatedAt: new Date().toISOString()
-          };
+          const needsUpdate = userData.planExpiresAt !== newExpiry.toISOString() || 
+                             userData.stripeSubscriptionStatus !== subscription.status;
 
-          // Fallback: If plan is still free or missing, update it from subscription
-          const priceId = subscription.items?.data?.[0]?.price?.id;
-          if (priceId && (!userData.plan || userData.plan === 'free')) {
-            const envPro = process.env.STRIPE_PRICE_PRO;
-            const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+          const updateData: any = {};
+          let shouldUpdateUser = false;
 
-            if (priceId === envPro) {
-              updateData.plan = 'pro';
-              updateData.planRank = 2;
-            } else if (priceId === envEssencial) {
-              updateData.plan = 'essencial';
-              updateData.planRank = 1;
-            } else {
-              // Fallback to metadata
-              const metaPlan = (subscription.metadata as any)?.plan;
-              if (metaPlan === 'pro' || metaPlan === 'essencial') {
-                updateData.plan = metaPlan;
-                updateData.planRank = metaPlan === 'pro' ? 2 : 1;
+          if (needsUpdate) {
+            updateData.planExpiresAt = newExpiry.toISOString();
+            updateData.stripeSubscriptionStatus = subscription.status;
+            updateData.lastStripeSyncAt = new Date().toISOString();
+            updateData.stripeSyncSource = 'invoice_paid';
+            updateData.updatedAt = new Date().toISOString();
+            shouldUpdateUser = true;
+
+            // Fallback: If plan is still free or missing, update it from subscription
+            const priceId = subscription.items?.data?.[0]?.price?.id;
+            if (priceId && (!userData.plan || userData.plan === 'free')) {
+              const envPro = process.env.STRIPE_PRICE_PRO;
+              const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+
+              if (envPro && priceId === envPro) {
+                updateData.plan = 'pro';
+                updateData.planRank = 2;
+                updateData.indexable = true;
+              } else if (envEssencial && priceId === envEssencial) {
+                updateData.plan = 'essencial';
+                updateData.planRank = 1;
+                updateData.indexable = true;
+              } else {
+                // Fallback to metadata
+                const metaPlan = (subscription.metadata as any)?.plan;
+                if (metaPlan === 'pro' || metaPlan === 'essencial') {
+                  updateData.plan = metaPlan;
+                  updateData.planRank = metaPlan === 'pro' ? 2 : 1;
+                  updateData.indexable = true;
+                }
               }
             }
           }
 
-          await userDoc.ref.update(updateData);
-          logger.info("STRIPE", "[StripeSync] source=webhook-invoice-paid action=synced_plan_expiry", { professionalId: maskUid(userId) });
-        } else {
-          logger.info("STRIPE", "[StripeSync] source=webhook-invoice-paid action=skipped_redundant_update", { professionalId: maskUid(userId) });
-        }
+          // Handle Referral Reward (10 BRL)
+          const referredBy = userData?.referredBy;
+          const referralRewarded = userData?.referralRewarded;
 
-        // Handle Referral Reward (10 BRL)
-        const referredBy = userData?.referredBy;
-        const referralRewarded = userData?.referralRewarded;
+          if (amountPaid > 0 && referredBy && !referralRewarded) {
+            const referrerQuery = await transaction.get(db.collection('users').where('referralCode', '==', referredBy).limit(1));
+            
+            if (!referrerQuery.empty) {
+              const referrerDoc = referrerQuery.docs[0];
+              const referrerData = referrerDoc.data() || {};
+              const referrerId = referrerDoc.id;
 
-        if (amountPaid > 0 && referredBy && !referralRewarded) {
-          const referrerQuery = await db.collection('users').where('referralCode', '==', referredBy).limit(1).get();
-          
-          if (!referrerQuery.empty) {
-            const referrerDoc = referrerQuery.docs[0];
-            const referrerData = referrerDoc.data();
-            const referrerId = referrerDoc.id;
+              transaction.update(referrerDoc.ref, {
+                credits: admin.firestore.FieldValue.increment(10)
+              });
 
-            await db.collection('users').doc(referrerId).update({
-              credits: admin.firestore.FieldValue.increment(10)
-            });
+              updateData.referralRewarded = true;
+              shouldUpdateUser = true;
 
-            if (referrerData?.email) {
-              await sendReferralRewardEmail({
+              rewardAction = {
                 referrerEmail: referrerData.email,
                 referrerName: referrerData.name || 'Parceira Nera',
                 refereeName: userData?.name || 'Uma nova indicação',
-                amount: 10
-              });
-            }
-            
-            // Mark as rewarded to prevent duplicate rewards on subsequent invoices
-            await userDoc.ref.update({
-              referralRewarded: true
-            });
-            logger.info("STRIPE", "Referral rewarded on first real payment", { professionalId: maskUid(userId) });
+                userId: userId
+              };
+           }
           }
+
+          if (shouldUpdateUser) {
+            transaction.update(userRef, updateData);
+            if (needsUpdate) {
+               logger.info("STRIPE", "[StripeSync-Tx] source=webhook-invoice-paid action=synced_plan_expiry", { professionalId: maskUid(userId) });
+            }
+          } else {
+            logger.info("STRIPE", "[StripeSync-Tx] source=webhook-invoice-paid action=skipped_redundant_update", { professionalId: maskUid(userId) });
+          }
+        });
+
+        // Outside transaction - send emails
+        if (rewardAction && rewardAction.referrerEmail) {
+          await sendReferralRewardEmail({
+            referrerEmail: rewardAction.referrerEmail,
+            referrerName: rewardAction.referrerName,
+            refereeName: rewardAction.refereeName,
+            amount: 10
+          });
+          logger.info("STRIPE", "Referral rewarded on first real payment (Transaction)", { professionalId: maskUid(rewardAction.userId) });
         }
+
       } else {
         logger.warn("STRIPE", "Customer for renewal not found in system", { meta: { customerId: maskToken(customerId) } });
       }
@@ -900,83 +938,85 @@ router.post("/webhook", async (req, res) => {
         userQuery = await db.collection('users').where('stripeCustomerId', '==', customerId).limit(1).get();
       }
 
+      let userRef: admin.firestore.DocumentReference | null = null;
+
       if (userQuery.empty && professionalIdFromMeta) {
-        const docRef = db.collection('users').doc(professionalIdFromMeta);
-        const docSnap = await docRef.get();
-        if (docSnap.exists) {
-          // Wrap it in a pseudo-QuerySnapshot structure to reuse logic below
-          userQuery = { empty: false, docs: [docSnap] } as any;
-        }
+        userRef = db.collection('users').doc(professionalIdFromMeta);
+      } else if (!userQuery.empty) {
+        userRef = userQuery.docs[0].ref;
       }
 
-      if (!userQuery.empty) {
-        const userDoc = userQuery.docs[0];
-        const userData = userDoc.data();
-        const userId = userDoc.id;
+      if (userRef) {
+        await db.runTransaction(async (transaction) => {
+          const userDoc = await transaction.get(userRef!);
+          if (!userDoc.exists) return;
+          const userData = userDoc.data() || {};
+          const userId = userDoc.id;
 
-        const currentExpiry = userData.planExpiresAt;
-        const newExpiryStr = subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toISOString() : null;
+          const currentExpiry = userData.planExpiresAt;
+          const newExpiryStr = subscription.current_period_end ? new Date(subscription.current_period_end * 1000).toISOString() : null;
 
-        // Idempotency: check if update is actually needed
-        const hasStatusChange = userData.stripeSubscriptionStatus !== subscription.status;
-        const hasExpiryChange = newExpiryStr && currentExpiry !== newExpiryStr;
-        const hasCancelChange = userData.cancelAtPeriodEnd !== subscription.cancel_at_period_end;
-        
-        if (!hasStatusChange && !hasExpiryChange && !hasCancelChange) {
-           logger.info("STRIPE", "[StripeSync] source=webhook-subscription-updated action=skipped_redundant_update", { professionalId: maskUid(userId) });
-           return res.json({ received: true });
-        }
+          // Idempotency: check if update is actually needed
+          const hasStatusChange = userData.stripeSubscriptionStatus !== subscription.status;
+          const hasExpiryChange = newExpiryStr && currentExpiry !== newExpiryStr;
+          const hasCancelChange = userData.cancelAtPeriodEnd !== subscription.cancel_at_period_end;
+          
+          if (!hasStatusChange && !hasExpiryChange && !hasCancelChange) {
+             logger.info("STRIPE", "[StripeSync-Tx] source=webhook-subscription-updated action=skipped_redundant_update", { professionalId: maskUid(userId) });
+             return;
+          }
 
-        const updateData: any = {
-          stripeSubscriptionStatus: subscription.status,
-          stripeSubscriptionId: subscriptionId,
-          stripeCustomerId: customerId,
-          cancelAtPeriodEnd: subscription.cancel_at_period_end,
-          lastStripeSyncAt: new Date().toISOString(),
-          stripeSyncSource: 'subscription_updated_webhook',
-          updatedAt: new Date().toISOString()
-        };
+          const updateData: any = {
+            stripeSubscriptionStatus: subscription.status,
+            stripeSubscriptionId: subscriptionId,
+            stripeCustomerId: customerId,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            lastStripeSyncAt: new Date().toISOString(),
+            stripeSyncSource: 'subscription_updated_webhook',
+            updatedAt: new Date().toISOString()
+          };
 
-        if (subscription.current_period_end) {
-          updateData.planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
-        }
+          if (subscription.current_period_end) {
+            updateData.planExpiresAt = new Date(subscription.current_period_end * 1000).toISOString();
+          }
 
-        // P0: If status is 'canceled' or 'unpaid', reset plan to 'free'
-        if (['canceled', 'unpaid', 'incomplete_expired'].includes(subscription.status)) {
-          updateData.plan = 'free';
-          updateData.planRank = 0;
-          updateData.indexable = false;
-          logger.info("STRIPE", "Access revoked via subscription.updated status", { professionalId: userId, status: subscription.status });
-        }
-
-        // Handle Plan Change from Stripe Portal (Upgrade/Downgrade)
-        const priceId = subscription.items?.data?.[0]?.price?.id;
-        if (priceId) {
-          const envPro = process.env.STRIPE_PRICE_PRO;
-          const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
-
-          if (envPro && priceId === envPro) {
-            updateData.plan = 'pro';
-            updateData.planRank = 2;
-            updateData.indexable = true;
-          } else if (envEssencial && priceId === envEssencial) {
-            updateData.plan = 'essencial';
-            updateData.planRank = 1;
-            updateData.indexable = true;
+          // P0: If status is 'canceled' or 'unpaid', reset plan to 'free'
+          if (['canceled', 'unpaid', 'incomplete_expired'].includes(subscription.status)) {
+            updateData.plan = 'free';
+            updateData.planRank = 0;
+            updateData.indexable = false;
+            logger.info("STRIPE", "Access revoked via subscription.updated status", { professionalId: userId, status: subscription.status });
           } else {
-            // Fallback to metadata if price IDs don't match exactly
-            const metaPlan = (subscription.metadata as any)?.plan;
-            if (metaPlan === 'pro' || metaPlan === 'essencial') {
-              updateData.plan = metaPlan;
-              updateData.planRank = metaPlan === 'pro' ? 2 : 1;
-              updateData.indexable = true;
-              logger.info("STRIPE", "Plan synced from subscription metadata", { professionalId: maskUid(userQuery.docs[0].id), plan: metaPlan });
+            // Handle Plan Change from Stripe Portal (Upgrade/Downgrade)
+            const priceId = subscription.items?.data?.[0]?.price?.id;
+            if (priceId) {
+              const envPro = process.env.STRIPE_PRICE_PRO;
+              const envEssencial = process.env.STRIPE_PRICE_ESSENCIAL;
+
+              if (envPro && priceId === envPro) {
+                updateData.plan = 'pro';
+                updateData.planRank = 2;
+                updateData.indexable = true;
+              } else if (envEssencial && priceId === envEssencial) {
+                updateData.plan = 'essencial';
+                updateData.planRank = 1;
+                updateData.indexable = true;
+              } else {
+                // Fallback to metadata if price IDs don't match exactly
+                const metaPlan = (subscription.metadata as any)?.plan;
+                if (metaPlan === 'pro' || metaPlan === 'essencial') {
+                  updateData.plan = metaPlan;
+                  updateData.planRank = metaPlan === 'pro' ? 2 : 1;
+                  updateData.indexable = true;
+                  logger.info("STRIPE", "Plan synced from subscription metadata", { professionalId: maskUid(userId), plan: metaPlan });
+                }
+              }
             }
           }
-        }
 
-        await userQuery.docs[0].ref.update(updateData);
-        logger.info("STRIPE", "Subscription sync updated", { professionalId: maskUid(userQuery.docs[0].id), status: subscription.status });
+          transaction.update(userRef!, updateData);
+          logger.info("STRIPE", "[StripeSync-Tx] Subscription sync updated", { professionalId: maskUid(userId), status: subscription.status });
+        });
       } else {
         logger.warn("STRIPE", "Customer for subscription.updated not found in system", { meta: { customerId: maskToken(customerId as string), subscriptionId } });
       }
@@ -1010,6 +1050,11 @@ router.post("/webhook", async (req, res) => {
       return res.status(500).json({ error: 'Internal error processing deletion' });
     }
   }
+
+  await db.collection('stripe_webhook_events').doc(eventId).update({
+    status: 'succeeded',
+    completedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
 
   res.json({ received: true });
 });

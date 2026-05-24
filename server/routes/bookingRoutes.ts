@@ -694,6 +694,27 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       const summaryRef = db.collection('client_summaries').doc(summaryId);
       const summarySnap = await transaction.get(summaryRef);
 
+      // --- ADDED COUPON & TRAVEL FEE CALCULATION ---
+      let originalPrice = Number(service.price) || 0; // force price from official service
+      let travelFee = 0;
+
+      // Calculate Official Travel Fee
+      if (finalData.locationType === 'home' && proData) {
+        if (proData.travelFeeMode === 'fixed') {
+          travelFee = Number(proData.fixedTravelFee) || 0;
+        } else if (proData.serviceAreas && Array.isArray(proData.serviceAreas) && finalData.neighborhood) {
+          const matchedArea = proData.serviceAreas.find((a: any) => 
+             (a.name || '').toLowerCase().trim() === (finalData.neighborhood || '').toLowerCase().trim()
+          );
+          if (matchedArea) {
+            travelFee = Number(matchedArea.fee) || 0;
+          }
+        }
+      }
+      
+      let subtotalBeforeDiscount = originalPrice + travelFee;
+      let discountAmount = 0;
+
       // 2. LOGIC & WRITES
       if (couponSnap && couponSnap.exists) {
         const coupon = couponSnap.data() as any;
@@ -751,39 +772,44 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           }
         }
 
-        // --- ADDED COUPON CALCULATION ---
-        let originalPrice = Number(finalData.price) || 0; // price from service
-        let travelFee = Number(finalData.travelFee) || 0; // extracted from payload
-        let subtotalBeforeDiscount = originalPrice + travelFee;
-        let discountAmount = 0;
-
-        if (coupon.type === 'percentage') {
-          discountAmount = (subtotalBeforeDiscount * (Number(coupon.value) || 0)) / 100;
-        } else if (coupon.type === 'fixed') {
-          discountAmount = Number(coupon.value) || 0;
+        if (couponSnap && couponSnap.exists) {
+          if (coupon.type === 'percentage') {
+            discountAmount = (subtotalBeforeDiscount * (Number(coupon.value) || 0)) / 100;
+          } else if (coupon.type === 'fixed') {
+            discountAmount = Number(coupon.value) || 0;
+          }
         }
 
-        const calculatedFinalPrice = Math.max(0, subtotalBeforeDiscount - discountAmount);
-
-        // Update appointment finalData to persist coupon values
-        finalData.originalPrice = originalPrice;
-        finalData.travelFee = travelFee;
-        finalData.subtotalBeforeDiscount = subtotalBeforeDiscount;
-        finalData.discountAmount = discountAmount;
-        finalData.finalPrice = calculatedFinalPrice;
         finalData.couponCode = coupon.code || '';
         finalData.appliedCouponCode = coupon.code || ''; // Fallback for legacy frontend queries
         finalData.couponType = coupon.type || '';
         finalData.couponValue = coupon.value || '';
-        
-        // Temporarily override price for compatibility, but it will be the discounted value
-        finalData.price = calculatedFinalPrice;
-        // --- END CALCULATION ---
 
         transaction.update(couponRef!, {
           usedCount: admin.firestore.FieldValue.increment(1)
         });
+      } else {
+        // Clear any spoofed coupon data from the frontend if the coupon wasn't officially validated
+        delete finalData.couponCode;
+        delete finalData.appliedCouponCode;
+        delete finalData.couponType;
+        delete finalData.couponValue;
       }
+
+      const calculatedFinalPrice = Math.max(0, subtotalBeforeDiscount - discountAmount);
+
+      // Safely persist everything on the backend
+      finalData.originalPrice = originalPrice;
+      finalData.travelFee = travelFee;
+      finalData.subtotalBeforeDiscount = subtotalBeforeDiscount;
+      finalData.discountAmount = discountAmount; // Used reliably going forward
+      delete finalData.discount; // Destroy any spoofed "discount" payload from the frontend
+      finalData.finalPrice = calculatedFinalPrice;
+      finalData.totalPrice = calculatedFinalPrice;
+      
+      // Temporarily override price for compatibility, but it will be the discounted value
+      finalData.price = calculatedFinalPrice;
+      // --- END CALCULATION ---
 
       // Create Booking Lock
       if (lockRef) {

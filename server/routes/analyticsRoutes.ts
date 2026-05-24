@@ -21,6 +21,38 @@ const debugOnly = (req: any, res: any, next: any) => {
   return next();
 };
 
+/**
+ * PUBLIC: Track Analytics Event
+ * Protected by analyticsLimiter in server.ts
+ */
+router.post("/public/track", async (req, res) => {
+  try {
+    const { professionalId, type, referrer, origin } = req.body;
+
+    if (!professionalId || !type) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    const db = getDb();
+    if (!db) throw new Error("Database not connected");
+
+    // Add document to Firestore (write)
+    await db.collection("analytics_events").add({
+      professionalId,
+      type,
+      referrer: referrer || "",
+      origin: origin || "other",
+      timestamp: new Date()
+    });
+
+    res.status(200).json({ ok: true });
+  } catch (err: any) {
+    logger.error("ANALYTICS", "Failed to track event", { error: err.message });
+    // Fail-soft: we respond with 200 basically, so we don't break frontend
+    res.status(200).json({ ok: false });
+  }
+});
+
 router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
   const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
   logger.info("AI", "[BioAI] Entry /generate-content", { meta: { name, specialty } });
