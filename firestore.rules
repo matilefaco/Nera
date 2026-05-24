@@ -164,13 +164,13 @@ service cloud.firestore {
     }
 
     match /review_stats/{statsId} {
-      allow get, list: if true;
+      allow get, list: if (isSignedIn() && statsId == request.auth.uid) || isAdmin();
       allow write: if isAdmin();
     }
 
     // Supporting collections
     match /reviews/{reviewId} {
-      allow get, list: if true;
+      allow get, list: if (isSignedIn() && resource.data.professionalId == request.auth.uid) || isAdmin();
       allow write: if isAdmin();
     }
 
@@ -203,7 +203,7 @@ service cloud.firestore {
     }
 
     match /booking_locks/{lockId} {
-      allow get, list: if true;
+      allow get, list: if (isSignedIn() && resource.data.professionalId == request.auth.uid) || isAdmin();
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
       allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || (isSignedIn() && incoming().professionalId == request.auth.uid);
       allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();

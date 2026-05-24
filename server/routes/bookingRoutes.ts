@@ -101,9 +101,16 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
 
     // 2. High-Performance Query with Dynamic Fallback if Composite Index is missing
     let snapshot;
+    let locksSnapshot;
     try {
       // Primary Optimized Query: Restricts the retrieval window in the database natively (Requires professionalId + date index)
       snapshot = await db.collection('appointments')
+        .where('professionalId', '==', professionalId)
+        .where('date', '>=', startStr)
+        .where('date', '<=', endStr)
+        .get();
+        
+      locksSnapshot = await db.collection('booking_locks')
         .where('professionalId', '==', professionalId)
         .where('date', '>=', startStr)
         .where('date', '<=', endStr)
@@ -119,15 +126,33 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
         snapshot = await db.collection('appointments')
           .where('professionalId', '==', professionalId)
           .get();
+          
+        locksSnapshot = await db.collection('booking_locks')
+          .where('professionalId', '==', professionalId)
+          .get();
       } else {
         throw queryErr;
       }
     }
 
     const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
+    const nowMs = Date.now();
+    
+    // Create a dictionary of locks for fast lookup
+    const lockDict: Record<string, any> = {};
+    if (locksSnapshot) {
+      locksSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data && data.date && data.time) {
+          const cleanTime = data.time.replace(':', '');
+          const lockId = `${professionalId}_${data.date}_${cleanTime}`;
+          lockDict[lockId] = data;
+        }
+      });
+    }
     
     // 3. Resilient Mapping, In-Memory filtering, and Sanitization of Corrupt Data
-    const slots = snapshot.docs
+    const apptSlots = snapshot.docs
       .map(doc => {
         const data = doc.data();
         if (!data) return null;
@@ -149,6 +174,28 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
         
         // Only include slots that are relevant for active booking/availability tracking
         if (countingStatuses.includes(rawStatus)) {
+          // Additional safety check: If it's a pending status, check if an associated lock exists and is expired.
+          // If the lock has expired, THIS pending appointment is invalid and should NOT block the slot!
+          const isPending = rawStatus === 'pending' || rawStatus === 'pending_confirmation' || rawStatus === 'pending_conflict';
+          if (isPending) {
+            const cleanTime = time.replace(':', '');
+            const lockId = `${professionalId}_${date}_${cleanTime}`;
+            const lockData = lockDict[lockId];
+            if (lockData) {
+              let isExpired = false;
+              if (lockData.expiresAt) {
+                if (typeof lockData.expiresAt.toMillis === 'function') {
+                  isExpired = lockData.expiresAt.toMillis() <= nowMs;
+                } else if (typeof lockData.expiresAt === 'string' || typeof lockData.expiresAt === 'number') {
+                  isExpired = new Date(lockData.expiresAt).getTime() <= nowMs;
+                } else if (lockData.expiresAt instanceof Date) {
+                  isExpired = lockData.expiresAt.getTime() <= nowMs;
+                }
+              }
+              if (isExpired) return null; // Ignore pending appointment whose lock expired
+            }
+          }
+
           return {
             date,
             time,
@@ -159,6 +206,43 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
         return null;
       })
       .filter((s: any) => s && s.date && s.time);
+      
+    const lockSlots = locksSnapshot ? locksSnapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        if (!data) return null;
+        
+        const date = typeof data.date === 'string' ? data.date.trim() : '';
+        const time = typeof data.time === 'string' ? data.time.trim() : '';
+        
+        if (!date || date < startStr || date > endStr) return null;
+        if (!time) return null;
+        
+        let isExpired = false;
+        if (data.expiresAt) {
+          if (typeof data.expiresAt.toMillis === 'function') {
+            isExpired = data.expiresAt.toMillis() <= nowMs;
+          } else if (typeof data.expiresAt === 'string' || typeof data.expiresAt === 'number') {
+            isExpired = new Date(data.expiresAt).getTime() <= nowMs;
+          } else if (data.expiresAt instanceof Date) {
+            isExpired = data.expiresAt.getTime() <= nowMs;
+          }
+        }
+        
+        // Se já expirou, não bloqueia
+        if (isExpired) return null;
+        
+        // Consider possible active locks mapping to pending
+        return {
+          date,
+          time,
+          duration: Number(data.duration) || 60,
+          status: 'pending' // forces block on frontend
+        };
+      })
+      .filter((s: any) => s && s.date && s.time) : [];
+
+    const slots = [...apptSlots, ...lockSlots];
 
     res.json({ slots });
   } catch (err: any) {
@@ -712,7 +796,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           status: 'pending',
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
+          expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000)
         });
       }
 
@@ -967,7 +1051,13 @@ router.post("/public/reviews/:token/submit", reviewSubmitLimiter, async (req, re
       // Safe comment
       const safeComment = comment ? String(comment).trim().slice(0, 500) : '';
 
-      const isAnonymous = publicDisplayMode === 'anonymous';
+      // Normalize display mode (fallback to 'anonymous' for safety)
+      let finalDisplayMode = 'anonymous';
+      if (publicDisplayMode === 'named' || publicDisplayMode === 'private') {
+        finalDisplayMode = publicDisplayMode;
+      }
+
+      const isAnonymous = finalDisplayMode === 'anonymous';
       const finalFirstName = isAnonymous ? 'Cliente Anônima' : (firstName || 'Cliente');
       const finalNeighborhood = isAnonymous ? '' : (neighborhood || '');
       if (isAnonymous) locationLabel = '';
@@ -993,7 +1083,7 @@ router.post("/public/reviews/:token/submit", reviewSubmitLimiter, async (req, re
         rating: Number(rating),
         tags: sanitizedTags,
         comment: safeComment,
-        publicDisplayMode: isAnonymous ? 'anonymous' : 'named',
+        publicDisplayMode: finalDisplayMode,
         publicApproved: false,
         moderationStatus: 'pending',
         firstName: finalFirstName,
@@ -2243,21 +2333,32 @@ router.post("/public/manage/:manageSlug/confirm-presence", async (req, res) => {
 
   try {
     const result = await db.runTransaction(async (transaction) => {
-      // 1. Validate slug
+      // 1. Validate slug using only explicit token fields
       const linkRef = db.collection('reservation_links').doc(manageSlug);
       const linkDoc = await transaction.get(linkRef);
       
-      if (!linkDoc.exists) {
-        throw { status: 404, message: "Link de gerenciamento inválido." };
+      let appointmentId = linkDoc.exists ? linkDoc.data()?.appointmentId : null;
+      let apptRef = null;
+      let apptDoc = null;
+
+      if (!appointmentId) {
+         const strategies = ['manageSlug', 'token', 'publicToken', 'manageToken'];
+         for (const field of strategies) {
+           const q = await transaction.get(db.collection('appointments').where(field, '==', manageSlug).limit(1));
+           if (!q.empty) {
+             appointmentId = q.docs[0].id;
+             apptRef = db.collection('appointments').doc(appointmentId);
+             apptDoc = await transaction.get(apptRef);
+             break;
+           }
+         }
+         if (!appointmentId) throw { status: 404, message: "Link de gerenciamento inválido." };
+      } else {
+        apptRef = db.collection('appointments').doc(appointmentId);
+        apptDoc = await transaction.get(apptRef);
       }
-      
-      const appointmentId = linkDoc.data()?.appointmentId;
-      if (!appointmentId) throw { status: 404, message: "Reserva não encontrada no link." };
 
-      const apptRef = db.collection('appointments').doc(appointmentId);
-      const apptDoc = await transaction.get(apptRef);
-
-      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
+      if (!apptDoc || !apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
       const data: any = apptDoc.data();
 
       // Read Client Summary
@@ -2330,21 +2431,32 @@ router.post("/public/manage/:manageSlug/cancel", async (req: express.Request, re
 
   try {
     const result = await db.runTransaction(async (transaction) => {
-      // 1. Validate slug
+      // 1. Validate slug using only explicit token fields
       const linkRef = db.collection('reservation_links').doc(manageSlug);
       const linkDoc = await transaction.get(linkRef);
       
-      if (!linkDoc.exists) {
-        throw { status: 404, message: "Link de gerenciamento inválido." };
+      let appointmentId = linkDoc.exists ? linkDoc.data()?.appointmentId : null;
+      let apptRef = null;
+      let apptDoc = null;
+
+      if (!appointmentId) {
+         const strategies = ['manageSlug', 'token', 'publicToken', 'manageToken'];
+         for (const field of strategies) {
+           const q = await transaction.get(db.collection('appointments').where(field, '==', manageSlug).limit(1));
+           if (!q.empty) {
+             appointmentId = q.docs[0].id;
+             apptRef = db.collection('appointments').doc(appointmentId);
+             apptDoc = await transaction.get(apptRef);
+             break;
+           }
+         }
+         if (!appointmentId) throw { status: 404, message: "Link de gerenciamento inválido." };
+      } else {
+        apptRef = db.collection('appointments').doc(appointmentId);
+        apptDoc = await transaction.get(apptRef);
       }
-      
-      const appointmentId = linkDoc.data()?.appointmentId;
-      if (!appointmentId) throw { status: 404, message: "Reserva não encontrada no link." };
 
-      const apptRef = db.collection('appointments').doc(appointmentId);
-      const apptDoc = await transaction.get(apptRef);
-
-      if (!apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
+      if (!apptDoc || !apptDoc.exists) throw { status: 404, message: "Reserva não encontrada." };
       const data: any = apptDoc.data();
 
       if (['cancelled', 'cancelled_by_client', 'cancelled_by_professional'].includes(data.status)) {
@@ -2891,6 +3003,56 @@ async function triggerWaitlistCheckBackend(db: admin.firestore.Firestore, profes
 }
 
 // --- NEW: REVIEW MODERATION ROUTES ---
+router.get("/reviews/pending", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const db = getDb();
+  const uid = req.uid;
+
+  try {
+    const q = db.collection('reviews')
+      .where('professionalId', '==', uid)
+      .where('moderationStatus', '==', 'pending');
+      
+    const snapshot = await q.get();
+    
+    const fetched = snapshot.docs.map(doc => {
+      const data = doc.data();
+      const isPrivate = data.publicDisplayMode === 'private';
+      const isAnonymous = data.publicDisplayMode === 'anonymous';
+      
+      let safeFirstName = data.firstName;
+      if (isPrivate) safeFirstName = 'Cliente Privada';
+      else if (isAnonymous) safeFirstName = 'Cliente Anônima';
+      
+      const payload: any = {
+        id: doc.id,
+        ...data,
+        firstName: safeFirstName,
+      };
+      
+      if (isPrivate || isAnonymous) {
+        delete payload.clientName;
+        delete payload.neighborhood;
+        delete payload.locationLabel;
+        delete payload.avatar;
+        delete payload.photo;
+        delete payload.email;
+        delete payload.phone;
+      }
+      
+      if (payload.createdAt && payload.createdAt.toDate) {
+        payload.createdAt = payload.createdAt.toDate().toISOString();
+      }
+      
+      return payload;
+    });
+    
+    res.json(fetched);
+  } catch (err: any) {
+    console.error("Error fetching pending reviews:", err);
+    res.status(500).json({ error: "Erro ao buscar avaliações pendentes." });
+  }
+});
+
 router.post("/reviews/:reviewId/approve", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const db = getDb();
   const { reviewId } = req.params;

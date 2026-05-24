@@ -15,6 +15,7 @@ interface Review {
   createdAt: any;
   moderationStatus: 'pending' | 'approved' | 'rejected';
   tags?: string[];
+  publicDisplayMode?: 'named' | 'anonymous' | 'private';
 }
 
 const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
@@ -38,21 +39,21 @@ export function ReviewsModerationPage() {
         setStatus('loading');
       }
       try {
-        const q = query(
-          collection(db, 'reviews'),
-          where('professionalId', '==', user.uid),
-          where('moderationStatus', '==', 'pending')
-        );
+        const token = await user.getIdToken();
+        const res = await fetch(`/api/reviews/pending`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         
-        const snapshot = await getDocs(q);
+        if (!res.ok) throw new Error('Erro ao buscar avaliações');
+        const data = await res.json();
         if (!isMounted) return;
         
-        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Review);
+        const fetched = data as Review[];
         
         // Sort in memory to avoid needing a composite index
         fetched.sort((a, b) => {
-          const aTime = a.createdAt?.toMillis() || 0;
-          const bTime = b.createdAt?.toMillis() || 0;
+          const aTime = new Date(a.createdAt || 0).getTime();
+          const bTime = new Date(b.createdAt || 0).getTime();
           return bTime - aTime;
         });
         
@@ -85,8 +86,13 @@ export function ReviewsModerationPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao aprovar avaliação');
       
+      const targetReview = reviews.find(r => r.id === reviewId);
       setReviews(prev => prev.filter(r => r.id !== reviewId));
-      toast.success('Avaliação publicada no perfil.');
+      if (targetReview?.publicDisplayMode === 'private') {
+        toast.success('Avaliação registrada internamente para métricas.');
+      } else {
+        toast.success('Avaliação publicada no perfil.');
+      }
     } catch (err: any) {
       if (isDev) console.error(err);
       setError(err.message || 'Erro ao aprovar.');
@@ -190,12 +196,18 @@ export function ReviewsModerationPage() {
                         ))}
                       </div>
                       <span className="text-sm text-brand-ink/50 whitespace-nowrap">
-                        {review.createdAt ? new Date(review.createdAt.toMillis()).toLocaleDateString('pt-BR') : 'Recente'}
+                        {review.createdAt ? new Date(review.createdAt.toMillis ? review.createdAt.toMillis() : review.createdAt).toLocaleDateString('pt-BR') : 'Recente'}
                       </span>
                     </div>
                     
                     <h4 className="font-medium text-brand-ink mb-2 flex items-center gap-2">
                        {review.firstName || 'Cliente'}
+                       {review.publicDisplayMode === 'private' && (
+                         <span className="px-2 py-0.5 rounded-full bg-brand-stone/10 text-brand-stone text-[10px] font-medium tracking-wider uppercase">Privado</span>
+                       )}
+                       {review.publicDisplayMode === 'anonymous' && (
+                         <span className="px-2 py-0.5 rounded-full bg-brand-stone/10 text-brand-stone text-[10px] font-medium tracking-wider uppercase">Anônimo</span>
+                       )}
                     </h4>
                     
                     {review.comment ? (
@@ -225,7 +237,7 @@ export function ReviewsModerationPage() {
                         className="px-5 py-2.5 bg-brand-terracotta text-white rounded-xl text-sm font-medium hover:bg-brand-espresso transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                       >
                         {processingId === review.id ? <Clock size={16} className="animate-spin" /> : <Check size={16} />}
-                        Aprovar e Publicar
+                        {review.publicDisplayMode === 'private' ? 'Registrar Feedbacks' : 'Aprovar e Publicar'}
                       </button>
                       <button
                         onClick={() => handleReject(review.id)}

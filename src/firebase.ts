@@ -570,16 +570,6 @@ export async function getAppointmentByToken(token: string): Promise<Appointment 
     }
   }
   
-  // Fallback: ID
-  if (token.length >= 20) {
-    const docRef = doc(db, 'appointments', token);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      devLog(`[BOOKING_MANAGEMENT] Found by Document ID: ${docSnap.id}`);
-      return { id: docSnap.id, ...docSnap.data() } as Appointment;
-    }
-  }
-
   if (isDev) console.warn(`[BOOKING_MANAGEMENT] No appointment found for: ${token}`);
   return null;
 }

@@ -433,14 +433,7 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
       }
     }
 
-    // Strategy 4: Doc ID
-    if (!appointmentData && slug.length >= 20) {
-      const q = await db.collection('appointments').doc(slug).get();
-      if (q.exists) {
-        appointmentId = q.id;
-        appointmentData = q.data();
-      }
-    }
+    // Strategy 4 was removed to prevent insecure document ID lookups.
 
     if (!appointmentData) {
       return res.status(404).json({ found: false, error: "Reservation not found" });
@@ -677,16 +670,17 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       })
       .map(doc => {
         const d = doc.data();
+        const isAnonymous = d.publicDisplayMode === 'anonymous';
         return {
           id: doc.id,
           rating: d.rating,
           comment: d.comment,
-          firstName: d.firstName,
+          firstName: isAnonymous ? 'Cliente Anônima' : d.firstName,
           tags: d.tags || [],
           publicDisplayMode: d.publicDisplayMode || 'named',
-          neighborhood: d.neighborhood,
+          neighborhood: isAnonymous ? '' : d.neighborhood,
           serviceName: d.serviceName,
-          locationLabel: d.locationLabel,
+          locationLabel: isAnonymous ? '' : d.locationLabel,
           submittedAt: d.submittedAt ? (d.submittedAt.toDate ? d.submittedAt.toDate().toISOString() : d.submittedAt) : null
         };
       });

@@ -29,7 +29,7 @@ const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.lo
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
 export default function ManageBookingPage() {
-  const { id, token } = useParams<{ id?: string, token?: string }>();
+  const { token } = useParams<{ token?: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const action = searchParams.get('action');
@@ -62,7 +62,7 @@ export default function ManageBookingPage() {
       if (action === 'confirm-presence' && !appointment.clientConfirmed24h) {
         setActionLoading(true);
         try {
-          const manageSlug = token || appointment.manageSlug || appointment.token || appointment.id;
+          const manageSlug = token || appointment.manageSlug || appointment.token || appointment.manageToken;
           await confirmPresenceByClient(manageSlug);
           setAppointment(prev => prev ? { 
             ...prev, 
@@ -95,10 +95,10 @@ export default function ManageBookingPage() {
   }, [appointment, action, isAutoProcessed, searchParams, setSearchParams]);
 
   useEffect(() => {
-    if (!id && !token) return;
+    if (!token) return;
 
     const fetchBooking = async () => {
-      const lookupKey = token || id;
+      const lookupKey = token;
       if (!lookupKey) return;
 
       if (isDev) console.log(`[BOOKING_MANAGEMENT] Fetching via API for: ${lookupKey}`);
@@ -164,7 +164,7 @@ export default function ManageBookingPage() {
     };
 
     fetchBooking();
-  }, [id, token]);
+  }, [token]);
 
   // Subscription for slots validation during reschedule
   useEffect(() => {
@@ -235,12 +235,11 @@ setBlockedSchedules(dayBlocked);
   }, [selectedDate, appointment, professional, dayAppointments, blockedSchedules]);
 
   const handleConfirmPresence = async () => {
-    const aid = appointment?.appointmentId || appointment?.id;
-    if (!aid) return;
+    const manageToken = token || appointment?.manageSlug || appointment?.token || appointment?.manageToken;
+    if (!manageToken) return;
     setActionLoading(true);
     try {
-      const manageSlug = token || appointment.manageSlug || appointment.token || aid;
-      await confirmPresenceByClient(manageSlug);
+      await confirmPresenceByClient(manageToken);
       notify.success('Presença confirmada! Nos vemos em breve. 💛');
     } catch (e) {
       notify.error('Erro ao confirmar presença');
@@ -250,11 +249,11 @@ setBlockedSchedules(dayBlocked);
   };
 
   const handleCancel = async (reason: string) => {
-    const aid = appointment?.appointmentId || appointment?.id;
-    if (!aid) return;
+    const manageToken = token || appointment?.manageSlug || appointment?.token || appointment?.manageToken;
+    if (!manageToken) return;
     setActionLoading(true);
     try {
-      await cancelBookingByClient(token || appointment.manageSlug || appointment.token || aid, reason);
+      await cancelBookingByClient(manageToken, reason);
       notify.success('Reserva cancelada.');
       setView('main');
     } catch (e) {

@@ -133,7 +133,6 @@ export default function App() {
               <Route path="/p/:slug" element={<PublicProfile />} />
               <Route path="/verificar-email" element={<VerifyEmailPage />} />
               <Route path="/auth/action" element={<AuthActionPage />} />
-              <Route path="/reserva/:id/gerenciar" element={<ManageBookingPage />} />
               <Route path="/r/:token" element={<ManageBookingPage />} />
               <Route path="/profissionais" element={<DirectoryPage />} />
               <Route path="/review/:token" element={<ReviewPage />} />
