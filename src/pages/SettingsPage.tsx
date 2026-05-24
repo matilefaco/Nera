@@ -4,7 +4,8 @@ import { Shield, Key, CreditCard, ChevronRight, User, Monitor, Trash2, Palette, 
 import { Link } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../AuthContext';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { db, auth, handleFirestoreError, OperationType } from '../firebase';
+import { signOut } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, limit } from 'firebase/firestore';
 import { notify } from '../lib/notify';
 
@@ -100,6 +101,14 @@ export default function SettingsPage() {
     checkExistingRequest();
   }, [user, profile]);
 
+  const handleCloseModal = async () => {
+    setShowDeleteModal(false);
+    if (hasRequested) {
+      await signOut(auth);
+      window.location.href = '/login';
+    }
+  };
+
   const handleRequestDeletion = async () => {
     if (!user || isDeleting) return;
     
@@ -122,19 +131,11 @@ export default function SettingsPage() {
 
       if (data.already_pending) {
         setHasRequested(true);
-        notify.info('Você já possui uma solicitação em análise.');
-        setShowDeleteModal(false);
         return;
       }
 
       setHasRequested(true);
-      notify.success('Conta agendada para exclusão com sucesso. Fechando sessão...');
-      setShowDeleteModal(false);
-      
-      // Give them a moment to read the success message
-      setTimeout(() => {
-        window.location.href = '/login'; // Or signOut
-      }, 3000);
+      notify.success('Pedido recebido com segurança.');
 
     } catch (err) {
       if (isDev) console.error('[Settings] Error requesting deletion:', err);
@@ -240,28 +241,30 @@ export default function SettingsPage() {
             >
               <div className="p-8">
                 <div className="flex justify-between items-start mb-6">
-                  <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center border border-red-100">
-                    <AlertTriangle size={24} />
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${hasRequested ? 'bg-brand-parchment text-brand-terracotta border-brand-mist' : 'bg-red-50 text-red-500 border-red-100'}`}>
+                    {hasRequested ? <Shield size={24} /> : <AlertTriangle size={24} />}
                   </div>
                   <button 
-                    onClick={() => setShowDeleteModal(false)}
+                    onClick={handleCloseModal}
                     className="p-2 text-brand-stone hover:text-brand-ink transition-colors"
                   >
                     <X size={20} />
                   </button>
                 </div>
 
-                <h3 className="text-xl font-serif text-brand-ink mb-4">Solicitar exclusão da conta</h3>
+                <h3 className="text-xl font-serif text-brand-ink mb-4">
+                  {hasRequested ? "Seu pedido foi recebido com segurança" : "Solicitar exclusão da conta"}
+                </h3>
                 <p className="text-sm text-brand-stone font-light leading-relaxed mb-8">
                   {hasRequested 
-                    ? "Sua solicitação de exclusão já foi recebida e está em processamento. Nossa equipe entrará em contato em breve para concluir o processo com segurança."
-                    : "Entendemos. A exclusão da sua conta será feita com cuidado para proteger seus dados, agenda e assinatura. Ao confirmar, nossa equipe receberá sua solicitação e entrará em contato para concluir o processo com segurança."}
+                    ? "A sua conta já foi protegida e removida da experiência pública da Nera. Enviamos um e-mail com os próximos passos do processo."
+                    : "A exclusão da sua conta será feita com cuidado para proteger seus dados, agenda e assinatura. Ao confirmar, sua vitrine será desativada com segurança e o processo administrativo será iniciado."}
                 </p>
 
                 <div className="flex flex-col gap-3">
                   {hasRequested ? (
                     <button
-                      onClick={() => setShowDeleteModal(false)}
+                      onClick={handleCloseModal}
                       className="w-full bg-brand-ink text-brand-white py-4 rounded-2xl text-[11px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md active:scale-[0.98]"
                     >
                       Entendi
@@ -276,7 +279,7 @@ export default function SettingsPage() {
                         {isDeleting ? <RefreshCw size={16} className="animate-spin" /> : "Solicitar exclusão"}
                       </button>
                       <button
-                        onClick={() => setShowDeleteModal(false)}
+                        onClick={handleCloseModal}
                         disabled={isDeleting}
                         className="w-full bg-brand-white text-brand-stone border border-brand-mist py-4 rounded-2xl text-[11px] font-bold uppercase tracking-widest hover:bg-brand-parchment transition-all active:scale-[0.98] disabled:opacity-50"
                       >

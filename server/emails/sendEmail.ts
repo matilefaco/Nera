@@ -1219,3 +1219,84 @@ export async function sendRescheduleRequestedEmail(data: {
     return { success: false, error: err.message };
   }
 }
+
+export async function sendAccountDeletionRequestEmail(data: { email: string, name: string }) {
+  const { email, name } = data;
+  
+  logEmail('START', 'account_deletion_request', { to: email });
+
+  if (!isValidEmail(email)) {
+    logEmail('ERROR', 'account_deletion_request', { error: 'Invalid email', to: email });
+    return { success: false, error: 'Invalid email' };
+  }
+
+  const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Solicitação recebida</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; line-height: 1.6; color: #1e1e1e; background-color: #f7f3ec; margin: 0; padding: 0; }
+    .container { max-width: 500px; margin: 40px auto; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); }
+    .header { background-color: #2b2626; padding: 30px; text-align: center; }
+    .logo { color: #f7f3ec; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 0; }
+    .content { padding: 40px 30px; }
+    h1 { font-size: 22px; font-weight: 600; margin-top: 0; margin-bottom: 20px; color: #2b2626; letter-spacing: -0.5px; }
+    p { font-size: 15px; margin-bottom: 20px; color: #5a5652; }
+    .footer { text-align: center; padding: 30px; background-color: #faf8f5; color: #8a8652; font-size: 12px; border-top: 1px solid #f0ece3; }
+    .help-link { color: #2b2626; text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 class="logo">NERA</h2>
+    </div>
+    <div class="content">
+      <h1>Olá${name ? `, ${name}` : ''}. O seu pedido foi recebido com segurança.</h1>
+      
+      <p>A sua conta já foi protegida e removida da experiência pública da Nera.</p>
+      
+      <p>A partir de agora:<br>
+      • Sua vitrine pública não está mais acessível.<br>
+      • Novos agendamentos públicos estão bloqueados.<br>
+      • A sua assinatura não gerará novas cobranças.<br>
+      • O acesso ao seu painel foi encerrado com segurança.</p>
+
+      <p>Nossa equipe conduzirá a exclusão definitiva dos seus dados com o máximo cuidado nos próximos dias, mantendo nosso compromisso com a sua privacidade.</p>
+      
+      <p>Se você solicitou esta exclusão por engano ou precisar de qualquer ajuda, basta responder a este e-mail. Nossa equipe continua totalmente disponível para apoiar você.</p>
+
+      <p>Agradecemos pela confiança na Nera.</p>
+
+      <p style="margin-top: 40px; margin-bottom: 0;">Equipe Nera</p>
+    </div>
+    <div class="footer">
+      <p>Se você tem dúvidas sobre retenção de dados ou faturamento, envie-nos uma mensagem em <a href="mailto:ajuda@nera.io" class="help-link">ajuda@nera.io</a>.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  try {
+    const resend = getResendClient();
+    const { data: resendData, error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: [email],
+      replyTo: REPLY_TO,
+      subject: `O seu pedido foi recebido com segurança.`,
+      html,
+    });
+    
+    if (error) {
+      logEmail('ERROR', 'account_deletion_request', { error });
+      return { success: false, error };
+    }
+    
+    logEmail('SUCCESS', 'account_deletion_request', { resendId: resendData?.id });
+    return { success: true, id: resendData?.id };
+  } catch (err: any) {
+    logEmail('ERROR', 'account_deletion_request', { error: err.message });
+    return { success: false, error: err.message };
+  }
+}

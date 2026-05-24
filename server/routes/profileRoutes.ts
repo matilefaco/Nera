@@ -7,6 +7,7 @@ import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMid
 import { logger, maskUid } from "../utils/logger.js";
 import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimiter.js";
 import { getStripe } from "./planRoutes.js";
+import { sendAccountDeletionRequestEmail } from "../emails/sendEmail.js";
 
 // Duplicated from src/constants/plans.ts to avoid src/ dependency on server
 const PLAN_CONFIGS: any = {
@@ -974,6 +975,16 @@ router.post("/delete-account", requireFirebaseAuth, authMutationLimiter, async (
     // 3. Disable the user in Firebase Auth so they can't login anymore
     await admin.auth().updateUser(uid, { disabled: true });
     
+    // 4. Send email asynchronously (fail-soft)
+    if (userData.email) {
+      sendAccountDeletionRequestEmail({
+        email: userData.email,
+        name: userData.name || userData.displayName || ''
+      }).catch(err => {
+        logger.error("DELETE_ACCOUNT", "Failed to send deletion request email", { uid, error: err.message });
+      });
+    }
+
     logger.info("DELETE_ACCOUNT", "Account securely queued for deletion", { uid });
 
     return res.json({ success: true, message: "Conta agendada para exclusão com sucesso." });
