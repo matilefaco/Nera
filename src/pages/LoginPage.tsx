@@ -92,11 +92,15 @@ export default function LoginPage() {
       navigate(returnUrl || '/dashboard');
     } catch (error: any) {
       if (error.message === 'TIMEOUT_FIREBASE') {
-         notify.error('O login demorou muito para responder. Por favor, recarregue a página e tente novamente.');
-      } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
-         notify.error('E-mail ou senha incorretos.');
+         notify.error('O login demorou muito para responder. Verifique sua conexão e tente novamente.');
+      } else if (error.code === 'auth/user-disabled') {
+         notify.error('Esta conta está em processo de exclusão ou foi desativada.');
+      } else if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-login-credentials' || error.code === 'auth/user-not-found') {
+         notify.error('E-mail ou senha inválidos.');
       } else if (error.code === 'auth/network-request-failed') {
-         notify.error('Conexão instável. Tente novamente.');
+         notify.error('Não conseguimos conectar agora. Verifique sua conexão e tente novamente.');
+      } else if (error.code === 'auth/too-many-requests') {
+         notify.error('Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.');
       } else {
          notify.error(getHumanError(error.code));
       }

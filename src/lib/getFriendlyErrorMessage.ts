@@ -41,7 +41,7 @@ export function getFriendlyErrorMessage(
     code === 'auth/network-request-failed' ||
     str.includes('network-request-failed')
   ) {
-    return "Sem conexão com a internet.";
+    return "Não conseguimos conectar agora. Verifique sua conexão e tente novamente.";
   }
 
   // 2. Auth / Sessão / Permissões
@@ -72,19 +72,21 @@ export function getFriendlyErrorMessage(
 
   if (
     code === 'auth/invalid-credential' ||
+    code === 'auth/invalid-login-credentials' ||
     code === 'auth/wrong-password' ||
     code === 'auth/user-not-found' ||
-    str.includes('invalid-credential')
+    str.includes('invalid-credential') ||
+    str.includes('invalid-login-credentials')
   ) {
-    return "Dados incorretos. Verifique e tente novamente.";
+    return "E-mail ou senha inválidos.";
   }
 
   if (code === 'auth/too-many-requests' || str.includes('too-many-requests')) {
-    return "Muitas tentativas. Tente novamente em instantes.";
+    return "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente.";
   }
 
   if (code === 'auth/user-disabled' || str.includes('user-disabled')) {
-    return "Acesso indisponível.";
+    return "Esta conta está em processo de exclusão ou foi desativada.";
   }
 
   if (code === 'auth/popup-closed-by-user' || str.includes('popup-closed')) {
@@ -112,7 +114,7 @@ export function getFriendlyErrorMessage(
   if (
     message &&
     message.length >= 3 &&
-    message.length < 80 &&
+    message.length < 140 &&
     !message.includes('{"') &&
     !message.includes('Firebase') &&
     !message.includes('Error:') &&

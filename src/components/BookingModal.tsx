@@ -482,9 +482,15 @@ export default function BookingModal({ profile, services, onClose, open, initial
             const allAppts = data.slots as Appointment[];
             currentAppts = allAppts.filter(a => isActiveSlotStatus(a.status));
             if (isDev) console.log(`[Slots] appointments fetch success count=${currentAppts.length}`);
+          } else {
+            console.error("[Slots] Error fetching occupied slots, res not ok", res);
+            setSlotsLoadError('timeout');
+            return; // Abort loading slots if backend request failed
           }
         } catch (error) {
           if (isDev) console.error(`[Slots] error actual= appointments fetch:`, error);
+          setSlotsLoadError('timeout');
+          return; // Abort loading slots on network error/timeout
         }
 
         if (!isMounted) return;

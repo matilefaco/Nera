@@ -103,14 +103,8 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
     let snapshot;
     let locksSnapshot;
     try {
-      // Primary Optimized Query: Restricts the retrieval window in the database natively (Requires professionalId + date index)
+      // Primary Optimized Query: Restricts the retrieval window natively (Requires professionalId + date index)
       snapshot = await db.collection('appointments')
-        .where('professionalId', '==', professionalId)
-        .where('date', '>=', startStr)
-        .where('date', '<=', endStr)
-        .get();
-        
-      locksSnapshot = await db.collection('booking_locks')
         .where('professionalId', '==', professionalId)
         .where('date', '>=', startStr)
         .where('date', '<=', endStr)
@@ -118,21 +112,26 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
     } catch (queryErr: any) {
       const isIndexError = queryErr.message && (queryErr.message.includes('index') || queryErr.code === 'FAILED_PRECONDITION' || queryErr.code === 9);
       if (isIndexError) {
-        logger.warn("BOOKING", "occupied-slots primary query failed (missing composite index) - Retrying with resilient single-field query", {
+        logger.warn("BOOKING", "occupied-slots appointments query failed (missing composite index) - Retrying with resilient single-field query", {
           professionalId,
           error: queryErr.message
         });
-        // Resilient Fallback Query: Query on single field and rely entirely on in-memory mapping to filter dates
         snapshot = await db.collection('appointments')
-          .where('professionalId', '==', professionalId)
-          .get();
-          
-        locksSnapshot = await db.collection('booking_locks')
           .where('professionalId', '==', professionalId)
           .get();
       } else {
         throw queryErr;
       }
+    }
+
+    try {
+      // Fast single-field query for locks (no composite index needed)
+      locksSnapshot = await db.collection('booking_locks')
+        .where('professionalId', '==', professionalId)
+        .get();
+    } catch (err: any) {
+      logger.error("BOOKING", "Failed to fetch booking locks in occupied-slots", { professionalId, error: err.message });
+      locksSnapshot = null;
     }
 
     const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
