@@ -17,6 +17,7 @@ export default function PlansPage() {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [upgradeStatus, setUpgradeStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+  const [showLegacyReset, setShowLegacyReset] = useState(false);
 
   useEffect(() => {
     if (searchParams.get('success')) {
@@ -26,6 +27,35 @@ export default function PlansPage() {
       notify.error('O processo de assinatura foi cancelado.');
     }
   }, [searchParams]);
+
+  const handleLegacyReset = async () => {
+    if (!user) return;
+    try {
+      setLoadingPortal(true);
+      const token = await user.getIdToken();
+      const response = await fetch('/api/plans/reconcile-user', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ targetUid: user.uid, forceReset: true })
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(data.message || 'Plano resetado com sucesso.');
+        setShowLegacyReset(false);
+        refreshProfile();
+      } else {
+        notify.error(data.error || 'Erro ao resetar plano.');
+      }
+    } catch (err) {
+      if (isDev) console.error('Reset error:', err);
+      notify.error('Erro de conexão ao tentar resetar plano.');
+    } finally {
+      setLoadingPortal(false);
+    }
+  };
 
   const handleManageSubscription = async () => {
     if (!user) return;
@@ -44,6 +74,10 @@ export default function PlansPage() {
         window.location.href = data.url;
       } else {
         if (isDev) console.error("Portal API Error Response:", data);
+        if (response.status === 409 && data.legacyBillingConflict) {
+           setShowLegacyReset(true);
+           return;
+        }
         if (data.autoReset) {
           toast.info(data.error || "Ajustamos sua conta para que você possa assinar.");
           refreshProfile();
@@ -143,6 +177,43 @@ export default function PlansPage() {
   return (
     <AppLayout>
       <AnimatePresence>
+        {showLegacyReset && (
+          <motion.div 
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-brand-ink/40 backdrop-blur-sm"
+          >
+             <motion.div 
+               initial={{ opacity: 0, y: 20 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="bg-brand-white p-8 rounded-3xl shadow-xl max-w-sm w-full border border-brand-mist/20"
+             >
+               <h3 className="text-xl font-serif text-brand-ink mb-3 italic">Revisão de Ambiente</h3>
+               <p className="text-[12px] text-brand-stone leading-relaxed mb-6">
+                 Foi detectado que você possui um <strong>plano premium legado</strong> ou de testes que não pode ser migrado automaticamente para o novo sistema seguro da Nera.
+                 <br/><br/>
+                 Para evitar problemas com seus clientes, pedimos que você resete seu status para o plano gratuito. Nenhum agendamento ou dado será perdido. Em seguida, basta escolher e assinar um novo plano pro.
+               </p>
+               <div className="flex flex-col gap-3">
+                 <button 
+                   onClick={() => handleLegacyReset()}
+                   disabled={loadingPortal}
+                   className="w-full py-3.5 bg-brand-terracotta text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-[#b04030] transition-all"
+                 >
+                   {loadingPortal ? 'Resetando...' : 'Resetar e Continuar'}
+                 </button>
+                 <button 
+                   onClick={() => setShowLegacyReset(false)}
+                   className="w-full py-3.5 bg-transparent text-brand-stone rounded-2xl text-[10px] uppercase font-bold tracking-widest border border-transparent hover:bg-brand-mist/10"
+                 >
+                   Cancelar
+                 </button>
+               </div>
+             </motion.div>
+          </motion.div>
+        )}
+
         {upgradeStatus !== 'idle' && (
           <motion.div 
             initial={{ opacity: 0 }}

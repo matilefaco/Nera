@@ -439,56 +439,6 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
   }
 
   try {
-    // Plan Limit Check for Free Plan
-    const professionalId = appointmentData.professionalId;
-    const proDoc = await db.collection('users').doc(professionalId).get();
-    if (!proDoc.exists) {
-      logger.error("BOOKING", `Professional not found for limit check: ${professionalId}`);
-      return res.status(404).json({ error: `Profissional não encontrado (${professionalId}).` });
-    }
-    
-    const proUser = proDoc.data();
-    const plan = proUser?.plan || 'free';
-
-    if (proUser?.accountStatus === 'scheduled_for_deletion' || proUser?.accountStatus === 'deleted') {
-      logger.warn("BOOKING", `Attempt to book with disabled professional: ${professionalId}`);
-      return res.status(403).json({ error: "Este profissional não está mais aceitando agendamentos no momento." });
-    }
-
-    if (plan === 'free') {
-      const now = new Date();
-      const currentYear = now.getUTCFullYear();
-      const currentMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
-      const startOfMonth = `${currentYear}-${currentMonth}-01`;
-      // Calcula o último dia real do mês atual para evitar bug em meses com menos de 31 dias
-      const endOfM = new Date(Date.UTC(currentYear, now.getUTCMonth() + 1, 0));
-      const endOfMonth = endOfM.toISOString().split('T')[0];
-
-      const snapshot = await db.collection('appointments')
-        .where('professionalId', '==', professionalId)
-        .where('date', '>=', startOfMonth)
-        .where('date', '<=', endOfMonth)
-        .get();
-        
-      const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
-      
-      let bookingCountOfMonth = 0;
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        if (countingStatuses.includes(data.status)) {
-          bookingCountOfMonth++;
-        }
-      });
-      
-      if (bookingCountOfMonth >= 15) {
-        logger.warn("BOOKING", `Booking limit reached for free plan`, { professionalId: maskUid(professionalId), meta: { currentCount: bookingCountOfMonth } });
-        return res.status(403).json({
-          error: "A agenda desta profissional já está lotada para este mês ✨ Entre em contato diretamente com ela para verificar possibilidades de encaixe.",
-          code: "BOOKING_LIMIT_REACHED"
-        });
-      }
-    }
-
     const cleanedData = removeEmptyFields(appointmentData);
     const apptRef = db.collection('appointments').doc();
     const reservationCode = generateReservationCode(appointmentData.date);
@@ -515,6 +465,79 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       if (!proSnap.exists) {
         logger.error("BOOKING", `Professional not found: ${appointmentData.professionalId}`);
         throw new Error(`Profissional não encontrado (${appointmentData.professionalId}). Verifique se o perfil existe.`);
+      }
+      
+      const proData = proSnap.data() as any;
+      
+      if (proData?.accountStatus === 'scheduled_for_deletion' || proData?.accountStatus === 'deleted') {
+        logger.warn("BOOKING", `Attempt to book with disabled professional: ${appointmentData.professionalId}`);
+        const err = new Error("Este profissional não está mais aceitando agendamentos no momento.");
+        (err as any).status = 403;
+        throw err;
+      }
+      
+      // Enforce Active Plan Limits Securely Inside Transaction
+      const basePlan = proData?.plan || 'free';
+      const expiresAt = proData?.planExpiresAt;
+      const subStatus = proData?.stripeSubscriptionStatus;
+      
+      let isExpired = false;
+      if (basePlan !== 'free') {
+        const timeIsExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+        const hasActiveSub = subStatus === 'active' || subStatus === 'trialing';
+        
+        if (expiresAt && timeIsExpired) {
+          isExpired = true;
+        } else if (!hasActiveSub) {
+          if (!expiresAt || timeIsExpired) {
+            isExpired = true;
+          }
+        }
+      }
+      
+      const activePlan = isExpired ? 'free' : basePlan;
+      const hasUnlimitedBookings = activePlan === 'essencial' || activePlan === 'pro';
+
+      let quotaLockRef: admin.firestore.DocumentReference | null = null;
+      let limitHit = false;
+
+      if (!hasUnlimitedBookings) {
+        const now = new Date();
+        const currentYear = now.getUTCFullYear();
+        const currentMonth = String(now.getUTCMonth() + 1).padStart(2, '0');
+        const startOfMonth = `${currentYear}-${currentMonth}-01`;
+        const endOfM = new Date(Date.UTC(currentYear, now.getUTCMonth() + 1, 0));
+        const endOfMonth = endOfM.toISOString().split('T')[0];
+
+        // Read a deterministic quota lock doc to ensure atomic concurrency tracking for this month
+        quotaLockRef = db.collection('quota_locks').doc(`${appointmentData.professionalId}_${currentYear}_${currentMonth}`);
+        await transaction.get(quotaLockRef);
+
+        const snapshot = await transaction.get(
+          db.collection('appointments')
+            .where('professionalId', '==', appointmentData.professionalId)
+            .where('date', '>=', startOfMonth)
+            .where('date', '<=', endOfMonth)
+        );
+        
+        const countingStatuses = ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'completed', 'concluido'];
+        
+        // Prevent high cost by capping iterations if there are somehow thousands of cancelled
+        let bookingCountOfMonth = 0;
+        for (const doc of snapshot.docs) {
+          const data = doc.data();
+          if (countingStatuses.includes(data.status)) {
+            bookingCountOfMonth++;
+          }
+        }
+        
+        if (bookingCountOfMonth >= 15) {
+          logger.warn("BOOKING", `Booking limit reached for free plan`, { professionalId: maskUid(appointmentData.professionalId), meta: { currentCount: bookingCountOfMonth } });
+          const err = new Error("A agenda desta profissional já está lotada para este mês ✨ Entre em contato diretamente com ela para verificar possibilidades de encaixe.");
+          (err as any).status = 403;
+          (err as any).code = "BOOKING_LIMIT_REACHED";
+          throw err;
+        }
       }
 
       // Service Check & Official Price
@@ -551,7 +574,6 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       const apptStartMin = timeToMinutes(finalData.time);
       const apptEndMin = apptStartMin + finalData.duration;
 
-      const proData = proSnap.data() as any;
       if (proData && proData.workingHours) {
         if (Array.isArray(proData.workingHours.workingDays) && proData.workingHours.workingDays.length > 0) {
           if (!proData.workingHours.workingDays.includes(apptDayOfWeek)) {
@@ -829,6 +851,13 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000)
         });
+      }
+
+      // If quota was checked, write to the lock doc to ensure Firestore transaction validation (race condition prevention)
+      if (quotaLockRef) {
+        transaction.set(quotaLockRef, { 
+          lastBookingAt: admin.firestore.FieldValue.serverTimestamp() 
+        }, { merge: true });
       }
 
       // Sanitize before inserting to enforce schemas
@@ -1907,8 +1936,7 @@ router.post("/appointments/:appointmentId/decline", requireFirebaseAuth, async (
     // Notify client that professional declined
     if (result.success && result.updatedData && result.updatedData.clientEmail) {
       // Find pro doc for their name and slug
-      const proDoc = await db.collection('users').doc(uid as string).get();
-      const proData = proDoc.data();
+      const proData = req.userData;
       
       const eventKey = 'bookingDeclinedClient';
       if (await shouldSendEmail(appointmentId, eventKey)) {
@@ -2014,9 +2042,7 @@ router.post("/appointments/:appointmentId/cancel-by-professional", requireFireba
 
     // Notify client that professional cancelled
     if (result.success && result.updatedData && result.updatedData.clientEmail) {
-      // Find pro doc for their name
-      const proDoc = await db.collection('users').doc(uid).get();
-      const proData = proDoc.data();
+      const proData = req.userData;
       
       const eventKey = 'bookingCancelledClient';
       if (await shouldSendEmail(appointmentId, eventKey)) {

@@ -50,6 +50,8 @@ const ReviewsModerationPage = React.lazy(() =>
   import('./pages/ReviewsModerationPage').then(m => ({ default: m.ReviewsModerationPage }))
 );
 
+import { DeleteAccountState } from './components/DeleteAccountState';
+
 function RouteLogger() {
   const location = useLocation();
   const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
@@ -87,9 +89,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   // Account status block
-  if (profile?.accountStatus === 'scheduled_for_deletion' && location.pathname !== '/configuracoes') {
-    // Only allow them into settings to cancel deletion or logout
-    return <Navigate to="/configuracoes" />;
+  if (profile?.accountStatus === 'scheduled_for_deletion') {
+    return <DeleteAccountState />;
   }
 
   // CRITICAL: Single Source of Truth for Onboarding

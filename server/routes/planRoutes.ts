@@ -418,7 +418,10 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
       if (userData.plan !== 'free' && userData.planExpiresAt && new Date(userData.planExpiresAt) > new Date()) {
          logger.error("STRIPE", "DANGER: Attempted to reset user with valid active local plan. Aborting reset to prevent data loss.", { userId: maskUid(uid), customerId });
          await db.collection("users").doc(uid).update({ portalLock: admin.firestore.FieldValue.delete() });
-         return res.status(500).json({ error: "Sua conta de cobrança não foi localizada, mas você possui um plano ativo. Contate o suporte técnico." });
+         return res.status(409).json({ 
+           legacyBillingConflict: true,
+           error: "Sua conta de cobrança não foi localizada, mas você possui um plano premium legado." 
+         });
       }
 
       // Safe to Auto-reset stale or non-existent customers
@@ -1292,7 +1295,7 @@ router.post("/confirm-checkout", requireFirebaseAuth, async (req: AuthenticatedR
 router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
   const db = getDb();
   const callerUid = req.uid;
-  const { targetUid, targetEmail } = req.body;
+  const { targetUid, targetEmail, forceReset } = req.body;
 
   try {
     // 1. Verify caller is Admin OR targeting themselves
@@ -1310,6 +1313,26 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
     }
 
     const effectiveTargetUid = targetUid || callerUid;
+
+    // SAFE FALLBACK FOR LEGACY BILLING RESET
+    if (forceReset) {
+      logger.info("ADMIN", "Manual force reset of legacy billing via reconcile-user", { targetUid: effectiveTargetUid });
+      await db.collection("users").doc(effectiveTargetUid).update({
+        plan: 'free',
+        planRank: 0,
+        planExpiresAt: null,
+        stripeCustomerId: admin.firestore.FieldValue.delete(),
+        stripeSubscriptionId: admin.firestore.FieldValue.delete(),
+        stripeSubscriptionStatus: 'canceled_or_none',
+        lastStripeSyncAt: new Date().toISOString(),
+        stripeSyncSource: 'admin_force_reset',
+        updatedAt: new Date().toISOString()
+      });
+      return res.status(200).json({
+        success: true,
+        message: "Legacy billing forcibly reset to free. You can agora assinar um novo plano."
+      });
+    }
 
     // 2. Find Target User
     let userDoc: admin.firestore.DocumentSnapshot | null = null;
@@ -1347,24 +1370,39 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
     }
 
     // 4. Find Active Subscriptions
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: 'active',
-      limit: 5
-    });
-    
-    // Also check trialing and past_due
-    const trialing = await stripe.subscriptions.list({
-      customer: customerId,
-      status: 'trialing',
-      limit: 1
-    });
+    let subscriptions = { data: [] as any[] };
+    let trialing = { data: [] as any[] };
+    let pastDue = { data: [] as any[] };
 
-    const pastDue = await stripe.subscriptions.list({
-      customer: customerId,
-      status: 'past_due',
-      limit: 1
-    });
+    try {
+      subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'active',
+        limit: 5
+      });
+      
+      // Also check trialing and past_due
+      trialing = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'trialing',
+        limit: 1
+      });
+
+      pastDue = await stripe.subscriptions.list({
+        customer: customerId,
+        status: 'past_due',
+        limit: 1
+      });
+    } catch (err: any) {
+      if (err.type === 'StripeInvalidRequestError' && err.message.includes('No such customer')) {
+        logger.warn("ADMIN", "Legacy customer ID detected during reconcile. Prompting for force reset.", { targetUid: effectiveTargetUid, customerId });
+        return res.status(409).json({
+          error: "Sua conta de cobrança não foi localizada (provavelmente um plano de testes antigo). Você precisa forçar um reset para poder assinar o plano oficial.",
+          legacyBillingConflict: true
+        });
+      }
+      throw err;
+    }
 
     const allSubs = [...subscriptions.data, ...trialing.data, ...pastDue.data];
 

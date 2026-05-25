@@ -624,6 +624,10 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     const startStr = startOfMonth.toISOString().split('T')[0];
+    
+    // Add end of month bound to prevent reading months in the future
+    const endOfMonth = new Date(startOfMonth.getFullYear(), startOfMonth.getMonth() + 1, 0);
+    const endStr = endOfMonth.toISOString().split('T')[0];
 
     // 4. Fetch extra public data to consolidate payload (Improves security and performance)
     const [servicesSnap, reviewsSnap, statsSnap, apptsSnap] = await Promise.all([
@@ -642,6 +646,8 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       db.collection("appointments")
         .where("professionalId", "==", uid)
         .where("date", ">=", startStr)
+        .where("date", "<=", endStr)
+        .limit(300)
         .get()
     ]);
 
@@ -711,7 +717,21 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       specialty: userData.specialty,
       city: userData.city,
       neighborhood: userData.neighborhood,
-      address: userData.address || userData.publicAddress,
+      
+      // P1 PRIVACY PATTERN: Never leak raw, full private address on public routes.
+      // We explicitly omit 'userData.address' because it may contain exact street/number.
+      // Instead, we only expose safe public alternatives if present.
+      publicAddress: userData.publicAddress || null,
+      
+      // Sanitized 'studioAddress' specifically for public consumption
+      studioAddress: userData.studioAddress?.privacyMode === 'public_full' 
+        ? userData.studioAddress 
+        : (userData.studioAddress ? { 
+            neighborhood: userData.studioAddress.neighborhood || userData.neighborhood,
+            city: userData.studioAddress.city || userData.city,
+            privacyMode: userData.studioAddress.privacyMode || 'reveal_after_booking'
+          } : null),
+          
       serviceMode: userData.serviceMode,
       workingHours: userData.workingHours,
       professionalIdentity: userData.professionalIdentity,
@@ -749,8 +769,14 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
 
     // Additional P1 protection: mask address or other details for demo (helena-prado) or any test files to not expose real info
     if (isTestProfileData) {
-      if (sanitizedData.address) {
-        sanitizedData.address = "Endereço Demonstrativo, São Paulo - SP";
+      if (sanitizedData.publicAddress) {
+        sanitizedData.publicAddress = "Endereço Demonstrativo, São Paulo - SP";
+      }
+      if (sanitizedData.studioAddress && sanitizedData.studioAddress.privacyMode === 'public_full') {
+        sanitizedData.studioAddress.street = "Avenida Demonstrativa";
+        sanitizedData.studioAddress.number = "1000";
+        sanitizedData.studioAddress.neighborhood = "Centro";
+        sanitizedData.studioAddress.city = "São Paulo";
       }
       sanitizedData.instagram = "nera_demo";
     }
@@ -849,10 +875,10 @@ router.get("/referrals", requireFirebaseAuth, async (req: AuthenticatedRequest, 
     const uid = req.uid;
     
     // Get current user's referral code
-    const userDoc = await db.collection("users").doc(uid).get();
-    if (!userDoc.exists) return res.status(404).json({ error: "Usuário não encontrado." });
+    const userData = req.userData;
+    if (!userData) return res.status(404).json({ error: "Usuário não encontrado." });
     
-    const referralCode = userDoc.data()?.referralCode;
+    const referralCode = userData.referralCode;
     if (!referralCode) return res.json([]);
 
     const snapshot = await db.collection("users")
@@ -902,13 +928,11 @@ router.post("/delete-account", requireFirebaseAuth, authMutationLimiter, async (
     }
 
     const userRef = db.collection("users").doc(uid);
-    const userDoc = await userRef.get();
+    const userData = req.userData;
     
-    if (!userDoc.exists) {
+    if (!userData) {
       return res.status(404).json({ error: "Profile not found." });
     }
-    
-    const userData = userDoc.data() || {};
     
     if (userData.accountStatus === 'scheduled_for_deletion') {
       return res.json({ success: true, already_pending: true, message: "Account is already scheduled for deletion." });
@@ -970,10 +994,27 @@ router.post("/delete-account", requireFirebaseAuth, authMutationLimiter, async (
       });
     });
 
+    // Clean up any booking locks active for this professional
+    const activeLocks = await db.collection("booking_locks")
+      .where("professionalId", "==", uid)
+      .limit(80)
+      .get();
+      
+    activeLocks.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+
     await batch.commit();
 
     // 3. Disable the user in Firebase Auth so they can't login anymore
     await admin.auth().updateUser(uid, { disabled: true });
+    
+    try {
+      await admin.auth().revokeRefreshTokens(uid);
+      logger.info("DELETE_ACCOUNT", "Successfully revoked all refresh tokens", { uid });
+    } catch (revokeErr: any) {
+      logger.error("DELETE_ACCOUNT", "Failed to revoke refresh tokens", { uid, error: revokeErr.message });
+    }
     
     // 4. Send email asynchronously (fail-soft)
     if (userData.email) {

@@ -157,7 +157,7 @@ export const PublicHero = ({
                       <Users size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
                       <span className="text-[10px] font-bold text-brand-ink">+{stats?.totalCompletedBookings}</span>
                       <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">
-                        {stats?.totalCompletedBookings === 1 ? 'Atendimento' : 'Atendimentos'}
+                        {stats?.totalCompletedBookings === 1 ? 'atendimento pela Nera' : 'atendimentos pela Nera'}
                       </span>
                     </div>
                   );
