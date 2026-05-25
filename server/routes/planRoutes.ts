@@ -13,6 +13,47 @@ const isDev = process.env.NODE_ENV !== "production";
 
 let stripeModule: Stripe | null = null;
 
+// ============================================================================
+// OPÇÃO B IMPLEMENTADA: ENDPOINT DEV-ONLY PARA OVERRIDE DE PLANOS
+// Este endpoint permite simular planos Essential/Pro em preview sem usar Stripe.
+// Somente ativo se ALLOW_DEV_PLAN_OVERRIDE=true e travado via isProdEnv.
+// ============================================================================
+router.post("/dev/set-plan", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
+  const appUrl = (process.env.APP_URL || PUBLIC_APP_URL || "").toLowerCase();
+  const isPreviewEnv = appUrl.includes("ais-") || appUrl.includes("localhost") || appUrl.includes("ngrok");
+  const isProdEnv = !isPreviewEnv && (appUrl.includes("usenera.com") || appUrl.includes("nera.io"));
+
+  if (isProdEnv) {
+    logger.error("SEC", "Tentativa de acesso a rota dev-only em PROD", { uid: req.uid });
+    return res.status(403).json({ error: "Endpoint bloqueado em produção." });
+  }
+
+  if (process.env.ALLOW_DEV_PLAN_OVERRIDE !== "true") {
+    return res.status(403).json({ error: "Set ALLOW_DEV_PLAN_OVERRIDE=true no .env para usar este mock." });
+  }
+
+  const { targetUid, plan } = req.body;
+  if (!targetUid || !["free", "essencial", "pro"].includes(plan)) {
+    return res.status(400).json({ error: "uid e plan validos requeridos." });
+  }
+
+  logger.info("ADMIN", `[DEV OVERRIDE] Alterando plano do usuário ${maskUid(targetUid)} para ${plan}`, { byAdmin: req.uid });
+
+  const db = getDb();
+  const futureExpiry = new Date();
+  futureExpiry.setMonth(futureExpiry.getMonth() + 1);
+
+  await db.collection("users").doc(targetUid).update({
+    plan: plan,
+    planExpiresAt: plan === "free" ? null : futureExpiry.toISOString(),
+    stripeSubscriptionStatus: plan === "free" ? "canceled_or_none" : "active",
+    planRank: plan === "pro" ? 20_000 : plan === "essencial" ? 10_000 : 0
+  });
+
+  return res.json({ success: true, message: `Plano alterado para ${plan} pelo override dev.` });
+});
+// ============================================================================
+
 export function getStripe() {
   if (!stripeModule) {
     const key = process.env.STRIPE_SECRET_KEY;
@@ -20,24 +61,41 @@ export function getStripe() {
       throw new Error("STRIPE_SECRET_KEY is missing in environment");
     }
     
-    // Audit log for environment mode
+    // Environment mode detection
     const isTestMode = key.startsWith("sk_test");
     const isLiveMode = !isTestMode;
-    const isNotProd = process.env.NODE_ENV !== "production" || isDev;
+    
+    // Explicit environment detection
+    const appUrl = (process.env.APP_URL || PUBLIC_APP_URL || "").toLowerCase();
+    const isPreviewEnv = appUrl.includes("ais-") || appUrl.includes("localhost") || appUrl.includes("ngrok");
+    const isProdEnv = !isPreviewEnv && (appUrl.includes("usenera.com") || appUrl.includes("nera.io"));
 
     logger.info("STRIPE", "Initializing Stripe SDK", { 
       meta: { 
         mode: isTestMode ? "test" : "live",
-        nodeEnv: process.env.NODE_ENV,
+        envMode: isProdEnv ? "production" : "preview",
+        appUrlDetected: appUrl,
         apiVersion: "2023-10-16"
       } 
     });
 
-    if (isLiveMode && isNotProd) {
-      logger.error("STRIPE", "BLOCKED: Stripe is in LIVE mode but running in non-production environment!", { 
-        meta: { nodeEnv: process.env.NODE_ENV } 
+    if (isProdEnv && isTestMode) {
+      logger.error("STRIPE", "CRITICAL SECURITY BLOCKED: Stripe is in TEST mode but running in REAL PRODUCTION environment!", { 
+        meta: { appUrl } 
       });
-      throw new Error("Segurança Nera: Chave LIVE do Stripe detectada em ambiente de desenvolvimento/homologação. Checkout bloqueado.");
+      throw new Error("Segurança Nera: Chave TEST do Stripe detectada em ambiente Mestre (Produção). Checkout bloqueado por segurança financeira.");
+    }
+
+    if (!isProdEnv && isLiveMode) {
+      logger.error("STRIPE", "BLOCKED: Stripe is in LIVE mode but running in PREVIEW/DEV environment!", { 
+        meta: { appUrl } 
+      });
+      // Allow explicit unlock if needed for testing live migrations
+      if (process.env.ALLOW_LIVE_IN_DEV !== "true") {
+         throw new Error("Segurança Nera: Chave LIVE do Stripe detectada em ambiente de testes. Checkout bloqueado para proteger clientes reais.");
+      } else {
+         logger.warn("STRIPE", "WARNING: MODO LIVE LIBERADO EM DEV DEVIDO A ALLOW_LIVE_IN_DEV=true");
+      }
     }
 
     stripeModule = new Stripe(key, {

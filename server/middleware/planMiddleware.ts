@@ -44,8 +44,25 @@ export const checkPlanFeature = (featureName: keyof PlanFeatures) => {
       const pro = proDoc.data();
       const plan = pro?.plan || 'free';
       const expiresAt = pro?.planExpiresAt;
+      const subStatus = pro?.stripeSubscriptionStatus;
       
-      const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+      let isExpired = false;
+      
+      if (pro?.accountStatus === 'scheduled_for_deletion' || pro?.accountStatus === 'deleted') {
+        isExpired = true;
+      } else if (plan !== 'free') {
+        const timeIsExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+        const hasActiveSub = subStatus === 'active' || subStatus === 'trialing';
+        
+        if (expiresAt && timeIsExpired) {
+          isExpired = true;
+        } else if (!hasActiveSub) {
+          if (!expiresAt || timeIsExpired) {
+            isExpired = true;
+          }
+        }
+      }
+      
       const activePlan = isExpired ? 'free' : plan;
 
       const features: any = {
