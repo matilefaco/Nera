@@ -19,9 +19,12 @@ let stripeModule: Stripe | null = null;
 // Somente ativo se ALLOW_DEV_PLAN_OVERRIDE=true e travado via isProdEnv.
 // ============================================================================
 router.post("/dev/set-plan", requireFirebaseAuth, async (req: AuthenticatedRequest, res: express.Response) => {
-  const appUrl = (process.env.APP_URL || PUBLIC_APP_URL || "").toLowerCase();
-  const isPreviewEnv = appUrl.includes("ais-") || appUrl.includes("localhost") || appUrl.includes("ngrok");
-  const isProdEnv = !isPreviewEnv && (appUrl.includes("usenera.com") || appUrl.includes("nera.io"));
+  const explicitAppUrl = process.env.APP_URL?.toLowerCase() || "";
+  const isAisHost = explicitAppUrl.includes("ais-") || (process.env.K_SERVICE && process.env.K_SERVICE.includes("ais-"));
+  const isNodeEnvDev = process.env.NODE_ENV !== "production";
+  
+  const isPreviewEnv = isNodeEnvDev || isAisHost || explicitAppUrl.includes("localhost") || explicitAppUrl.includes("ngrok") || (!explicitAppUrl && !process.env.K_SERVICE);
+  const isProdEnv = !isPreviewEnv && (explicitAppUrl.includes("usenera.com") || explicitAppUrl.includes("nera.io") || (!!process.env.K_SERVICE && !isAisHost));
 
   if (isProdEnv) {
     logger.error("SEC", "Tentativa de acesso a rota dev-only em PROD", { uid: req.uid });
@@ -65,30 +68,43 @@ export function getStripe() {
     const isTestMode = key.startsWith("sk_test");
     const isLiveMode = !isTestMode;
     
-    // Explicit environment detection
-    const appUrl = (process.env.APP_URL || PUBLIC_APP_URL || "").toLowerCase();
-    const isPreviewEnv = appUrl.includes("ais-") || appUrl.includes("localhost") || appUrl.includes("ngrok");
-    const isProdEnv = !isPreviewEnv && (appUrl.includes("usenera.com") || appUrl.includes("nera.io"));
+    const explicitAppUrl = process.env.APP_URL?.toLowerCase() || "";
+    const isAisHost = explicitAppUrl.includes("ais-") || (process.env.K_SERVICE && process.env.K_SERVICE.includes("ais-"));
+    const isNodeEnvDev = process.env.NODE_ENV !== "production";
+    
+    // An environment is PREVIEW/DEV if:
+    // 1. It explicitly runs in development mode
+    // 2. It contains AI Studio signature hostnames
+    // 3. It runs locally (localhost/ngrok)
+    // 4. It lacks K_SERVICE entirely (local machine emulation), unless they forced APP_URL completely
+    const isPreviewEnv = isNodeEnvDev || isAisHost || explicitAppUrl.includes("localhost") || explicitAppUrl.includes("ngrok") || (!explicitAppUrl && !process.env.K_SERVICE);
+    
+    // An environment is PRODUCTION strictly if it's NOT a preview and has the production domain
+    const isProdEnv = !isPreviewEnv && (explicitAppUrl.includes("usenera.com") || explicitAppUrl.includes("nera.io") || (!!process.env.K_SERVICE && !isAisHost));
 
     logger.info("STRIPE", "Initializing Stripe SDK", { 
       meta: { 
         mode: isTestMode ? "test" : "live",
         envMode: isProdEnv ? "production" : "preview",
-        appUrlDetected: appUrl,
+        explicitAppUrl,
+        kService: process.env.K_SERVICE || "none",
         apiVersion: "2023-10-16"
       } 
     });
 
     if (isProdEnv && isTestMode) {
       logger.error("STRIPE", "CRITICAL SECURITY BLOCKED: Stripe is in TEST mode but running in REAL PRODUCTION environment!", { 
-        meta: { appUrl } 
+        meta: { explicitAppUrl, kService: process.env.K_SERVICE || "none" } 
       });
-      throw new Error("Segurança Nera: Chave TEST do Stripe detectada em ambiente Mestre (Produção). Checkout bloqueado por segurança financeira.");
+      // Safety hatch: if we got false positive, we can override with ALLOW_TEST_IN_PROD=true
+      if (process.env.ALLOW_TEST_IN_PROD !== "true") {
+        throw new Error("Segurança Nera: Chave TEST do Stripe detectada em ambiente Mestre (Produção). Checkout bloqueado por segurança financeira.");
+      }
     }
 
     if (!isProdEnv && isLiveMode) {
       logger.error("STRIPE", "BLOCKED: Stripe is in LIVE mode but running in PREVIEW/DEV environment!", { 
-        meta: { appUrl } 
+        meta: { explicitAppUrl, kService: process.env.K_SERVICE || "none" } 
       });
       // Allow explicit unlock if needed for testing live migrations
       if (process.env.ALLOW_LIVE_IN_DEV !== "true") {

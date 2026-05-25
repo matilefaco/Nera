@@ -6,7 +6,7 @@ import { UserProfile } from './types';
 
 interface AuthContextType {
   user: User | null;
-  profile: UserProfile | null;
+  profile: UserProfile | null | undefined;
   loading: boolean;
   isAuthReady: boolean;
   refreshProfile: () => Promise<UserProfile | null>;
@@ -14,7 +14,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
-  profile: null,
+  profile: undefined,
   loading: true,
   isAuthReady: false,
   refreshProfile: async () => null,
@@ -25,7 +25,7 @@ const devLog = (...args: any[]) => isDev && console.log(...args);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
 
@@ -83,6 +83,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         if (currentUser) {
+          setLoading(true);
           const docRef = doc(db, 'users', currentUser.uid);
           
           let isFirstSnapshot = true;
@@ -115,7 +116,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }
           });
         } else {
-          setProfile(null);
+          setProfile(undefined);
           setLoading(false);
           clearTimeout(safetyTimeout);
         }

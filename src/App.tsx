@@ -74,17 +74,29 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to={`/login?returnUrl=${returnUrl}`} replace />;
   }
 
+  // If user is here but profile is undefined, it means we had a network error or snapshot hasn't resolved.
+  // We MUST NOT let them fall through to either Dashboard (it would crash) or Onboarding (it would wrongly recreate profile).
+  if (profile === undefined) {
+    return <AppLoadingScreen />;
+  }
+
   // Verification Check
   const isPasswordProvider = user.providerData.some(p => p.providerId === 'password');
   if (isPasswordProvider && !user.emailVerified && location.pathname !== '/verificar-email') {
     return <Navigate to="/verificar-email" />;
   }
 
+  // Account status block
+  if (profile?.accountStatus === 'scheduled_for_deletion' && location.pathname !== '/configuracoes') {
+    // Only allow them into settings to cancel deletion or logout
+    return <Navigate to="/configuracoes" />;
+  }
+
   // CRITICAL: Single Source of Truth for Onboarding
   const isCompleted = profile?.onboardingCompleted === true;
   
-  // If user is logged in but hasn't finished onboarding, redirect to onboarding
-  if (profile && !isCompleted && location.pathname !== '/onboarding') {
+  // If user is logged in but hasn't finished onboarding (or profile missing), redirect to onboarding
+  if (!isCompleted && location.pathname !== '/onboarding' && location.pathname !== '/configuracoes' && location.pathname !== '/trocar-senha') {
     return <Navigate to="/onboarding" />;
   }
 
@@ -93,6 +105,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
     return <Navigate to="/dashboard?tab=hoje" />;
   }
 
+  // Safe to render: at this point, if they are on a protected app route, profile must be present and onboarding complete.
+  // We NEVER pass null profile to Dashboard here because if profile was null, isCompleted would be false, redirecting them to onboarding.
   return <>{children}</>;
 };
 
@@ -103,6 +117,10 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   
   if (!user) {
     return <Navigate to="/login" />;
+  }
+
+  if (profile === undefined) {
+    return <AppLoadingScreen />;
   }
 
   if (profile?.role !== 'admin') {
