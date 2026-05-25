@@ -349,42 +349,81 @@ router.post("/create-portal", requireFirebaseAuth, async (req: AuthenticatedRequ
 
     // 3. DEFENSIVE CUSTOMER VALIDATION: Retrieve the customer to ensure they weren't deleted or belong to a deleted environment
     let stripeCustomer;
+    let isCustomerMissingOrDeleted = false;
+
     try {
       stripeCustomer = await stripe.customers.retrieve(customerId);
+      if ((stripeCustomer as any).deleted) {
+        isCustomerMissingOrDeleted = true;
+      }
     } catch (retrieveErr: any) {
-      logger.warn("STRIPE", "Failed to retrieve billing customer from Stripe. Attempting email fallback...", { 
-        userId: maskUid(uid), 
-        customerId, 
-        error: retrieveErr.message 
-      });
+      // Only proceed with fallback/reset if the error is explicitly a 404 / missing resource
+      const isMissingResource = retrieveErr.statusCode === 404 || retrieveErr.code === 'resource_missing' || (retrieveErr.type === 'invalid_request_error' && retrieveErr.message?.includes('No such customer'));
+      
+      if (isMissingResource) {
+        isCustomerMissingOrDeleted = true;
+        logger.warn("STRIPE", "Customer missing or invalid on Stripe. Attempting email fallback...", { 
+          userId: maskUid(uid), 
+          customerId, 
+          error: retrieveErr.message 
+        });
 
-      // If key is stale but email is there, trigger self-handling lookup
-      if (userData.email) {
-        try {
-          const resCustomers = await stripe.customers.list({ email: userData.email, limit: 1 });
-          if (resCustomers.data.length > 0) {
-            customerId = resCustomers.data[0].id;
-            await db.collection("users").doc(uid).update({ 
-              stripeCustomerId: customerId,
-              updatedAt: new Date().toISOString()
-            });
-            stripeCustomer = resCustomers.data[0];
-            logger.info("STRIPE", "Stripe customer reconciled after stale lookup recovery.", { userId: maskUid(uid), customerId });
+        // If key is stale but email is there, trigger self-handling lookup
+        if (userData.email) {
+          try {
+            const resCustomers = await stripe.customers.list({ email: userData.email, limit: 1 });
+            if (resCustomers.data.length > 0) {
+              customerId = resCustomers.data[0].id;
+              await db.collection("users").doc(uid).update({ 
+                stripeCustomerId: customerId,
+                updatedAt: new Date().toISOString()
+              });
+              stripeCustomer = resCustomers.data[0];
+              isCustomerMissingOrDeleted = false; // Successfully recovered
+              logger.info("STRIPE", "Stripe customer reconciled after stale lookup recovery.", { userId: maskUid(uid), customerId });
+            }
+          } catch (recoverErr: any) {
+            // Transient error in list -> do NOT reset
+            logger.error("STRIPE", "Transient error during email fallback. Aborting without reset.", { userId: maskUid(uid), error: recoverErr.message });
+            await db.collection("users").doc(uid).update({ portalLock: admin.firestore.FieldValue.delete() });
+            return res.status(500).json({ error: "Erro temporário ao acessar sistema de pagamentos. Tente novamente mais tarde." });
           }
-        } catch (recoverErr: any) {
-          logger.error("STRIPE", "Stale customer lookup recovery failed.", { userId: maskUid(uid), error: recoverErr.message });
         }
+      } else {
+        // This is a transient error (500, network, rate limit, etc.)
+        logger.error("STRIPE", "Transient error retrieving customer. Aborting without reset.", { userId: maskUid(uid), error: retrieveErr.message });
+        await db.collection("users").doc(uid).update({ portalLock: admin.firestore.FieldValue.delete() });
+        return res.status(500).json({ error: "Erro temporário ao tentar acessar portal de pagamentos. Tente novamente mais tarde." });
       }
     }
 
-    if (!stripeCustomer || (stripeCustomer as any).deleted) {
-      // Release dynamic lock
+    if (isCustomerMissingOrDeleted) {
+      // DANGER GUARD: Do not reset if they have a non-expired local plan to avoid taking down real users
+      if (userData.plan !== 'free' && userData.planExpiresAt && new Date(userData.planExpiresAt) > new Date()) {
+         logger.error("STRIPE", "DANGER: Attempted to reset user with valid active local plan. Aborting reset to prevent data loss.", { userId: maskUid(uid), customerId });
+         await db.collection("users").doc(uid).update({ portalLock: admin.firestore.FieldValue.delete() });
+         return res.status(500).json({ error: "Sua conta de cobrança não foi localizada, mas você possui um plano ativo. Contate o suporte técnico." });
+      }
+
+      // Safe to Auto-reset stale or non-existent customers
       await db.collection("users").doc(uid).update({
-        portalLock: admin.firestore.FieldValue.delete()
+        portalLock: admin.firestore.FieldValue.delete(),
+        plan: 'free',
+        planExpiresAt: null,
+        stripeSubscriptionStatus: 'canceled_or_none',
+        stripeCustomerId: admin.firestore.FieldValue.delete()
       });
-      logger.warn("STRIPE", "Billing customer account not found or deleted on Stripe", { userId: maskUid(uid), customerId });
+
+      logger.warn("STRIPE", "Billing customer not found (likely test mode stale). Resetting plan to free to allow new checkout.", { 
+        userId: maskUid(uid), 
+        customerId,
+        stripeCustomerReset: true,
+        reason: 'customer_missing_or_deleted'
+      });
+      
       return res.status(400).json({
-        error: "Sua conta de cobrança não foi localizada no processador de pagamentos (Stripe). Por favor, contate nosso suporte para reconfigurar seu cadastro e redefinir sua assinatura."
+        autoReset: true,
+        error: "Não encontramos uma assinatura ativa para gerenciar. Ajustamos sua conta para que você possa escolher um plano e iniciar uma nova assinatura."
       });
     }
 

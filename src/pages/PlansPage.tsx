@@ -4,6 +4,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../AuthContext';
 import { notify } from '../lib/notify';
+import { toast } from 'sonner';
 import PricingGrid from '../components/PricingGrid';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -11,7 +12,7 @@ const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.lo
 
 export default function PlansPage() {
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [searchParams] = useSearchParams();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [loadingPortal, setLoadingPortal] = useState(false);
@@ -43,10 +44,15 @@ export default function PlansPage() {
         window.location.href = data.url;
       } else {
         if (isDev) console.error("Portal API Error Response:", data);
-        if (data.error && data.error.startsWith('Ocorreu um erro ao abrir o portal')) {
+        if (data.autoReset) {
+          toast.info(data.error || "Ajustamos sua conta para que você possa assinar.");
+          refreshProfile();
+        } else if (data.error && data.error.startsWith('Ocorreu um erro ao abrir o portal')) {
           notify.error(data.error); // shows the Stripe message directly
         } else {
-          notify.error(data.error || 'Erro ao abrir o portal de assinaturas.');
+          // Fallback message should not intercept specific long strings if we want to show them
+          // notify.error uses getFriendlyErrorMessage which might suppress this if too long
+          toast.error(data.error || 'Erro ao abrir o portal de assinaturas.');
         }
       }
     } catch (err) {

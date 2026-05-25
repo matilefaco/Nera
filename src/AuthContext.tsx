@@ -83,13 +83,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         if (currentUser) {
-          // User is logged in, release global loading immediately to let App load
-          setLoading(false);
-          clearTimeout(safetyTimeout);
-          
           const docRef = doc(db, 'users', currentUser.uid);
           
-          // Use onSnapshot for real-time updates without blocking
+          let isFirstSnapshot = true;
+
+          // Use onSnapshot for real-time updates
           unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
             try {
               devLog('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());
@@ -101,9 +99,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               }
             } catch (err) {
               if (isDev) console.error("Error in onSnapshot callback:", err);
+            } finally {
+              if (isFirstSnapshot) {
+                setLoading(false);
+                clearTimeout(safetyTimeout);
+                isFirstSnapshot = false;
+              }
             }
           }, (error) => {
             if (isDev) console.error("[AuthContext] Error listening to profile:", error);
+            if (isFirstSnapshot) {
+              setLoading(false);
+              clearTimeout(safetyTimeout);
+              isFirstSnapshot = false;
+            }
           });
         } else {
           setProfile(null);
