@@ -179,6 +179,8 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     return res.status(500).json({ error: "Erro de processamento interno ao iniciar checkout." });
   }
 
+  let priceId: string | undefined;
+
   try {
     const email = userData?.email;
 
@@ -230,7 +232,11 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       }
     }
 
-    const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
+    if (plan === 'pro') {
+      priceId = process.env.STRIPE_PRICE_PRO;
+    } else if (plan === 'essencial') {
+      priceId = process.env.STRIPE_PRICE_ESSENCIAL;
+    }
 
     if (!priceId) {
       // Release lock since price ID is unconfigured
@@ -317,7 +323,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
     });
     
     let userMsg = "Erro ao gerar a sessão de checkout no Stripe. Por favor, tente novamente de forma pausada.";
-    if (err.type && err.type.includes('Stripe')) {
+    if (err && typeof err.type === 'string' && err.type.includes('Stripe')) {
       userMsg = `Limite ou restrição do Stripe: ${err.message}`;
     }
     
@@ -1424,6 +1430,30 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
     }
 
     if (!customerId) {
+      if ((userData.plan && userData.plan !== 'free') || userData.signupPlan || userData.pendingPlan) {
+        const updateData: any = {
+          plan: 'free',
+          planRank: 0,
+          indexable: false,
+          stripeSubscriptionStatus: 'canceled_or_none',
+          lastStripeSyncAt: new Date().toISOString(),
+          stripeSyncSource: 'reconcile_reset_no_customer',
+          updatedAt: new Date().toISOString(),
+          stripeCheckoutSessionId: admin.firestore.FieldValue.delete(),
+          stripePortalSessionId: admin.firestore.FieldValue.delete(),
+          stripeCheckoutUrl: admin.firestore.FieldValue.delete(),
+          checkoutStatus: admin.firestore.FieldValue.delete(),
+          billingSyncStatus: admin.firestore.FieldValue.delete(),
+          stripeSyncPending: admin.firestore.FieldValue.delete(),
+          signupPlan: admin.firestore.FieldValue.delete(),
+          pendingPlan: admin.firestore.FieldValue.delete(),
+          pendingPlanId: admin.firestore.FieldValue.delete(),
+          checkoutLock: admin.firestore.FieldValue.delete(),
+          portalLock: admin.firestore.FieldValue.delete()
+        };
+        await db.collection("users").doc(userId).update(updateData);
+      }
+
       return res.status(404).json({ 
         error: "Stripe customer not found for this user",
         details: "No stripeCustomerId in DB and no matching email in Stripe."
