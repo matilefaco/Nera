@@ -2,7 +2,7 @@ import express from "express";
 import { db, getDb } from "../firebaseAdmin.js";
 import admin from "firebase-admin";
 import { isValidWhatsapp, isDataUriImage } from "../utils.js";
-import { isNonPublicProfile } from "../utils/qualityFilter.js";
+import { isNonPublicProfile, isFakeOrTestProfile, isPublicProfileAccessibleByDirectLink } from "../utils/qualityFilter.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { logger, maskUid } from "../utils/logger.js";
 import { publicReadLimiter, authMutationLimiter } from "../middleware/rateLimiter.js";
@@ -247,7 +247,7 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       let isPublished = filteredProfile.published !== false && (userData?.published !== false || isFinishingOnboarding);
 
       const combinedData = { ...userData, ...filteredProfile };
-      const isTestProfileData = isNonPublicProfile(combinedData);
+      const isTestProfileData = isFakeOrTestProfile(combinedData);
 
       // Only perform strict publication validation if the profile is attempting to be published/indexable,
       // or if it implicitly tries to publish during onboarding.
@@ -269,7 +269,7 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
         if (Array.isArray(services) && services.length > 0) {
            for (const svc of services) {
               const sName = svc?.name?.toLowerCase().trim();
-              const isTestSvc = isNonPublicProfile({name: sName, slug: "valid", specialty: "valid", onboardingCompleted: true, indexable: true});
+              const isTestSvc = isFakeOrTestProfile({name: sName});
               if (sName && sName.length >= 3 && !isTestSvc) {
                   hasValidService = true;
                   break;
@@ -613,11 +613,13 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       return res.status(404).json({ error: "Perfil não encontrado ou desativado." });
     }
 
-    const isTestProfileData = isNonPublicProfile(userData);
+    const isNonPublic = isNonPublicProfile(userData);
+    const isTestProfileData = isFakeOrTestProfile(userData);
+    const isAccessibleViaLink = isPublicProfileAccessibleByDirectLink(userData);
 
-    // If it is classified as a non-public/test/fake profile and is NOT the official 'helena-prado' demo, return secure 404
-    if (isTestProfileData && cleanSlug !== "helena-prado") {
-      logger.warn("PUBLIC_PROFILE", "Blocked access to non-public/test profile", { slug: cleanSlug });
+    // If it is classified as inaccessible via direct link and is NOT the official 'helena-prado' demo, return secure 404
+    if (!isAccessibleViaLink && cleanSlug !== "helena-prado") {
+      logger.warn("PUBLIC_PROFILE", "Blocked access to unavailable/test profile", { slug: cleanSlug });
       return res.status(404).json({ error: "Perfil não encontrado." });
     }
 
