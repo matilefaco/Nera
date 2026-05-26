@@ -345,9 +345,9 @@ export default function FinancialPage() {
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Recebido
                       </p>
-                      <div className="flex items-baseline max-w-full text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-[64px] font-serif text-brand-ink tracking-tight leading-none whitespace-nowrap tabular-nums">
-                        <span className="text-[0.45em] font-sans text-brand-stone/60 mr-1.5 md:mr-2 tracking-widest font-medium uppercase shrink-0">R$</span>
-                        <span className="truncate min-w-0">
+                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-2xl xs:text-3xl sm:text-4xl md:text-5xl xl:text-[56px] font-serif text-brand-ink tracking-tight leading-none whitespace-nowrap tabular-nums">
+                        <span className="text-[0.45em] font-sans text-brand-stone/60 tracking-wider font-medium uppercase shrink-0">R$</span>
+                        <span>
                           {formatCurrency(currentMonthData.current?.revenue || 0).replace(/^[^\d-]+/, '')}
                         </span>
                       </div>
@@ -360,9 +360,9 @@ export default function FinancialPage() {
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Previsto
                       </p>
-                      <div className="flex items-baseline max-w-full text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-4xl font-serif text-brand-ink/80 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
-                        <span className="text-[0.5em] font-sans text-brand-stone/50 mr-1 md:mr-1.5 tracking-widest font-medium uppercase shrink-0">R$</span>
-                        <span className="truncate min-w-0">
+                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-lg xs:text-xl sm:text-2xl md:text-3xl xl:text-4xl font-serif text-brand-ink/80 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
+                        <span className="text-[0.5em] font-sans text-brand-stone/50 tracking-wider font-medium uppercase shrink-0">R$</span>
+                        <span>
                           {formatCurrency(currentMonthData.current?.plannedRevenue || 0).replace(/^[^\d-]+/, '')}
                         </span>
                       </div>
@@ -378,9 +378,9 @@ export default function FinancialPage() {
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Aguardando
                       </p>
-                      <div className="flex items-baseline max-w-full text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-serif text-brand-ink/60 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
-                        <span className="text-[0.5em] font-sans text-brand-stone/50 mr-1 tracking-widest font-medium uppercase shrink-0">R$</span>
-                        <span className="truncate min-w-0">
+                      <div className="flex items-baseline gap-1 max-w-full text-base xs:text-lg sm:text-xl md:text-2xl xl:text-3xl font-serif text-brand-ink/60 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
+                        <span className="text-[0.5em] font-sans text-brand-stone/50 tracking-wider font-medium uppercase shrink-0">R$</span>
+                        <span>
                           {formatCurrency(currentMonthData.current?.pendingRevenue || 0).replace(/^[^\d-]+/, '')}
                         </span>
                       </div>
@@ -404,9 +404,9 @@ export default function FinancialPage() {
                       <PieChart size={12} className="text-brand-terracotta" /> Ticket Médio
                     </p>
                   </div>
-                  <div className="flex items-baseline max-w-full text-3xl md:text-[40px] font-serif text-brand-ink tracking-tight mb-1.5 md:mb-2 whitespace-nowrap tabular-nums">
-                    <span className="text-[0.5em] font-sans text-brand-stone/60 mr-1.5 font-medium tracking-widest uppercase shrink-0">R$</span>
-                    <span className="truncate min-w-0">
+                  <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-3xl md:text-[32px] xl:text-[40px] font-serif text-brand-ink tracking-tight mb-1.5 md:mb-2 whitespace-nowrap tabular-nums">
+                    <span className="text-[0.5em] font-sans text-brand-stone/60 font-medium tracking-wider uppercase shrink-0">R$</span>
+                    <span>
                       {formatCurrency(currentMonthData.current?.ticketAverage || 0).replace(/^[^\d-]+/, '')}
                     </span>
                   </div>
@@ -455,7 +455,7 @@ export default function FinancialPage() {
                         <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone mb-2 line-clamp-1 group-hover:text-brand-ink transition-colors">
                           {srv.name}
                         </p>
-                        <p className="text-2xl md:text-3xl font-serif text-brand-ink tracking-tight whitespace-nowrap tabular-nums truncate">
+                        <p className="text-2xl md:text-3xl font-serif text-brand-ink tracking-tight whitespace-nowrap tabular-nums">
                           {formatCurrency(srv.revenue)}
                         </p>
                       </div>
@@ -506,27 +506,27 @@ export default function FinancialPage() {
                       <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8 flex-1 min-w-0">
                         <div className="min-w-0 md:min-w-[140px]">
                           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Mês</span>
-                          <span className="text-lg sm:text-xl font-serif text-brand-ink tracking-tight truncate block">{group.monthLabel}</span>
+                          <span className="text-lg sm:text-xl font-serif text-brand-ink tracking-tight block">{group.monthLabel}</span>
                         </div>
                         
                         <div className="min-w-0 md:min-w-[130px]">
                           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1 flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-brand-terracotta/80"></span> Recebido</span>
-                          <span className="text-base sm:text-lg font-serif text-brand-ink tracking-tight truncate block whitespace-nowrap tabular-nums">{formatCurrency(group.revenue)}</span>
+                          <span className="text-base sm:text-lg font-serif text-brand-ink tracking-tight block whitespace-nowrap tabular-nums">{formatCurrency(group.revenue)}</span>
                         </div>
                         
                         <div className="hidden sm:block min-w-[120px]">
                           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Previsto</span>
-                          <span className="text-base font-medium text-brand-ink/80 truncate block whitespace-nowrap tabular-nums">{formatCurrency(group.plannedRevenue)}</span>
+                          <span className="text-base font-medium text-brand-ink/80 block whitespace-nowrap tabular-nums">{formatCurrency(group.plannedRevenue)}</span>
                         </div>
                         
                         <div className="hidden xl:block min-w-[140px]">
                           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Aguardando</span>
-                          <span className="text-base font-medium text-brand-stone truncate block whitespace-nowrap tabular-nums">{formatCurrency(group.pendingRevenue)}</span>
+                          <span className="text-base font-medium text-brand-stone block whitespace-nowrap tabular-nums">{formatCurrency(group.pendingRevenue)}</span>
                         </div>
                         
                         <div className="hidden lg:block min-w-[100px]">
                           <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Cancelado</span>
-                          <span className="text-base font-medium text-brand-stone/60 truncate block whitespace-nowrap tabular-nums">{formatCurrency(group.cancelledRevenue)}</span>
+                          <span className="text-base font-medium text-brand-stone/60 block whitespace-nowrap tabular-nums">{formatCurrency(group.cancelledRevenue)}</span>
                         </div>
                         
                         <div className="hidden md:block ml-auto text-right">
