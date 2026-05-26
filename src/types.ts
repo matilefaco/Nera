@@ -16,6 +16,13 @@ export interface Service {
   price: number;
   duration: number;
   description?: string;
+  category?: string;
+  categoryData?: {
+    slug: string;
+    label: string;
+  };
+  badge?: string;
+  order?: number;
   active?: boolean;
   professionalId?: string;
   createdAt?: string;

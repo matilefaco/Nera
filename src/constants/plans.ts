@@ -3,6 +3,7 @@ export type PlanType = 'free' | 'essencial' | 'pro';
 
 export interface PlanConfig {
   themes: string[];
+  portfolioLimit: number;
   features: {
     unlimitedBookings: boolean;
     whatsappNotifications: boolean;
@@ -19,6 +20,7 @@ export interface PlanConfig {
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   free: {
     themes: ['terracotta'],
+    portfolioLimit: 3,
     features: {
       unlimitedBookings: false,
       whatsappNotifications: false,
@@ -33,6 +35,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   },
   essencial: {
     themes: ['terracotta', 'rose', 'sage'],
+    portfolioLimit: 9,
     features: {
       unlimitedBookings: true,
       whatsappNotifications: false,
@@ -47,6 +50,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   },
   pro: {
     themes: ['terracotta', 'rose', 'sage', 'navy', 'plum'],
+    portfolioLimit: 18,
     features: {
       unlimitedBookings: true,
       whatsappNotifications: true,

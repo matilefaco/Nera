@@ -7,7 +7,7 @@ import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } 
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
-  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, Key, Check
+  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, ChevronLeft, Key, Check
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { notify } from '../lib/notify';
@@ -140,7 +140,7 @@ export default function ProfilePage() {
     profileTheme, setProfileTheme
   } = useProfileForm(profile);
 
-  const { plan, allowedThemes } = usePlanFeatures();
+  const { plan, allowedThemes, portfolioLimit } = usePlanFeatures();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [upgradeFeature, setUpgradeFeature] = useState<'analytics' | 'advancedDashboard' | 'unlimitedBookings' | 'whatsappNotifications' | 'waitlist' | 'antiNoShow' | 'coupons' | 'reports' | 'theme'>('advancedDashboard');
 
@@ -781,7 +781,34 @@ export default function ProfilePage() {
     }
   };
 
+  const movePortfolioItem = async (index: number, direction: 'left' | 'right') => {
+    if (direction === 'left' && index === 0) return;
+    if (direction === 'right' && index === portfolio.length - 1) return;
+    
+    const newPortfolio = [...portfolio];
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    const temp = newPortfolio[index];
+    newPortfolio[index] = newPortfolio[targetIndex];
+    newPortfolio[targetIndex] = temp;
+    
+    setPortfolio(newPortfolio);
+    if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
+    if (user) {
+      try {
+        const userRef = doc(db, 'users', user.uid);
+        await updateDoc(userRef, { portfolio: newPortfolio });
+      } catch (err) {
+        if (isDev) console.error('[Portfolio] Error updating order:', err);
+      }
+    }
+  };
+
   const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (portfolio.length >= portfolioLimit) {
+      notify.warning(`O seu plano atual permite um limite de ${portfolioLimit} fotos.`);
+      return;
+    }
+
     const files = e.target.files;
 
     if (files && files.length > 0 && user) {
@@ -801,6 +828,31 @@ export default function ProfilePage() {
       const file = files[0];
       const tempId = 'temp-' + Date.now();
       
+      // Basic aesthetic / quality heuristics
+      if (file.size < 60 * 1024) {
+        const hasShownSizeWarning = sessionStorage.getItem('has_shown_portfolio_size_warning');
+        if (!hasShownSizeWarning) {
+          toast('Imagens com um pouco mais de resolução costumam transmitir mais confiança.', {
+            icon: '✨',
+            style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
+          });
+          sessionStorage.setItem('has_shown_portfolio_size_warning', 'true');
+        }
+      }
+      
+      const lastUploadName = sessionStorage.getItem('last_portfolio_upload');
+      if (lastUploadName === file.name) {
+        const hasShownDuplicateWarning = sessionStorage.getItem('has_shown_portfolio_duplicate_warning');
+        if (!hasShownDuplicateWarning) {
+          toast('Essa imagem parece muito semelhante a uma que você já adicionou.', {
+            icon: '💡',
+            style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
+          });
+          sessionStorage.setItem('has_shown_portfolio_duplicate_warning', 'true');
+        }
+      }
+      sessionStorage.setItem('last_portfolio_upload', file.name);
+
       // 1. Immediate Local Preview
       try {
         const localUrl = URL.createObjectURL(file);
@@ -982,8 +1034,14 @@ export default function ProfilePage() {
           </div>
         )}
 
-        <nav className="mb-10 w-full overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0">
-          <ul className="flex items-center gap-2 pb-2 min-w-max md:flex-wrap md:pb-0">
+        <div className="relative mb-8 md:mb-10 -mx-5 md:mx-0">
+          {/* Subtle fade overlay for scroll discoverability on mobile */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-brand-parchment via-brand-parchment/60 to-transparent pointer-events-none z-10 md:hidden" />
+          
+          <nav 
+            className="w-full overflow-x-auto no-scrollbar px-5 md:px-0"
+          >
+            <ul className="flex items-center gap-2 pb-1 min-w-max md:flex-wrap md:pb-0 pr-10 md:pr-0">
             {[
               { id: 'profile-identidade', label: '1. Identidade' },
               { id: 'profile-vitrine', label: '2. Vitrine' },
@@ -1008,7 +1066,8 @@ export default function ProfilePage() {
               </li>
             ))}
           </ul>
-        </nav>
+          </nav>
+        </div>
 
         <form 
           onSubmit={handleSave} 
@@ -1055,10 +1114,15 @@ export default function ProfilePage() {
 
             {/* Portfolio Section */}
             <div className="space-y-4 px-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4">
                 <div className="flex items-center gap-3 mb-2 sm:mb-0">
                   <Camera size={18} className="text-brand-terracotta/70" />
                   <h3 className="font-serif italic text-lg text-brand-ink">Meu Portfólio</h3>
+                  {portfolio.length > 0 && (
+                    <span className="ml-2 px-2 py-0.5 bg-brand-linen/80 text-brand-stone text-[10px] font-medium rounded-full border border-brand-mist/50">
+                      {portfolio.length} de {portfolioLimit}
+                    </span>
+                  )}
                 </div>
                 <p className="text-[10px] text-brand-stone font-medium uppercase tracking-widest">Exiba fotos do seu trabalho</p>
               </div>
@@ -1116,25 +1180,63 @@ export default function ProfilePage() {
                   />
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 auto-rows-min">
                   {portfolio.map((item, idx) => (
-                    <div key={item.id || idx} className="bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist flex flex-col h-[200px] sm:h-[240px]">
+                    <div 
+                      key={item.id || idx} 
+                      className={cn(
+                        "bg-brand-parchment rounded-2xl overflow-hidden relative group border border-brand-mist flex flex-col",
+                        idx === 0 && portfolio.length >= 4
+                          ? "col-span-2 row-span-2 h-[416px] sm:h-[496px]" 
+                          : "col-span-1 h-[200px] sm:h-[240px]"
+                      )}
+                    >
                       <div className="relative flex-1 bg-brand-stone/5 overflow-hidden">
-                        <img src={item.url} className={`absolute inset-0 w-full h-full object-cover ${item.isUploading ? 'opacity-50 blur-sm' : ''}`} referrerPolicy="no-referrer" alt={`Portfolio ${idx}`} />
+                        <img 
+                          src={item.url} 
+                          className={cn(
+                            "absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105",
+                            item.isUploading ? "opacity-50 blur-sm" : ""
+                          )}
+                          referrerPolicy="no-referrer" 
+                          alt={`Portfolio ${idx}`} 
+                        />
                         
                         {!item.isUploading && (
-                          <button 
-                            type="button"
-                            onClick={() => item.id && removePortfolioImage(item.id)}
-                            disabled={deletingId === item.id}
-                            className="absolute top-2 right-2 w-10 h-10 bg-brand-white/90 backdrop-blur-sm text-red-500 rounded-full shadow-md flex items-center justify-center opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-105 disabled:opacity-50 z-20"
-                          >
-                            {deletingId === item.id ? (
-                              <RefreshCw size={16} className="animate-spin" />
-                            ) : (
-                              <Trash2 size={16} />
-                            )}
-                          </button>
+                          <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
+                            <button 
+                              type="button"
+                              onClick={() => item.id && removePortfolioImage(item.id)}
+                              disabled={deletingId === item.id}
+                              className="w-10 h-10 bg-brand-white/90 backdrop-blur-sm text-red-500 rounded-full shadow-md flex items-center justify-center opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all hover:scale-105 disabled:opacity-50"
+                            >
+                              {deletingId === item.id ? (
+                                <RefreshCw size={16} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={16} />
+                              )}
+                            </button>
+                            <div className="flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all">
+                              {idx > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => movePortfolioItem(idx, 'left')}
+                                  className="w-8 h-8 bg-brand-white/90 backdrop-blur-sm text-brand-ink rounded-full shadow-md flex items-center justify-center hover:scale-105"
+                                >
+                                  <ChevronLeft size={16} />
+                                </button>
+                              )}
+                              {idx < portfolio.length - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => movePortfolioItem(idx, 'right')}
+                                  className="w-8 h-8 bg-brand-white/90 backdrop-blur-sm text-brand-ink rounded-full shadow-md flex items-center justify-center hover:scale-105"
+                                >
+                                  <ChevronRight size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         )}
 
                         {item.isUploading && (
@@ -1172,29 +1274,31 @@ export default function ProfilePage() {
                       </div>
                     </div>
                   ))}
-                  <div 
-                    onClick={() => portfolioInputRef.current?.click()}
-                    className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all duration-300 text-brand-terracotta hover:border-brand-terracotta/60 hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    {uploadingImage ? (
-                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
-                        <Sparkles size={24} />
-                      </motion.div>
-                    ) : (
-                      <>
-                        <Plus size={24} />
-                        <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
-                      </>
-                    )}
-                    <input 
-                      ref={portfolioInputRef}
-                      type="file" 
-                      accept="image/*" 
-                      className="hidden" 
-                      onChange={handlePortfolioUpload} 
-                      disabled={uploadingImage} 
-                    />
-                  </div>
+                  {portfolio.length < portfolioLimit && (
+                    <div 
+                      onClick={() => portfolioInputRef.current?.click()}
+                      className="aspect-square border border-dashed border-brand-terracotta/30 rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-brand-linen transition-all duration-300 text-brand-terracotta hover:border-brand-terracotta/60 hover:scale-[1.02] active:scale-[0.98]"
+                    >
+                      {uploadingImage ? (
+                        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}>
+                          <Sparkles size={24} />
+                        </motion.div>
+                      ) : (
+                        <>
+                          <Plus size={24} />
+                          <span className="text-[10px] font-medium uppercase tracking-widest">Adicionar</span>
+                        </>
+                      )}
+                      <input 
+                        ref={portfolioInputRef}
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handlePortfolioUpload} 
+                        disabled={uploadingImage} 
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

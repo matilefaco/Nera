@@ -13,25 +13,60 @@ interface ServicesSectionProps {
 
 export const ServicesSection = ({ services, profile, onSelectService }: ServicesSectionProps) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Todos');
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+
+  const getServiceCategoryLabel = (service: Service): string => {
+    if (service.categoryData?.label) return service.categoryData.label;
+    if (service.category && typeof service.category === 'string' && service.category !== 'Geral') return service.category;
+    // Fallback if needed, but we don't want to break if there is no category
+    return 'Outros'; 
+  };
 
   const categories = useMemo(() => {
-    const activeCats = new Set(['Todos']);
-    services.forEach(s => activeCats.add(categorizeService(s.name)));
+    const defaultOrdered = ['Todos'];
+    const dynamicCats = new Set<string>();
     
-    // Explicit order based on product direction
-    const ordered = ['Todos', 'Unhas', 'Sobrancelhas', 'Cílios', 'Cabelo', 'Estética', 'Outros'];
-    const filtered = ordered.filter(cat => activeCats.has(cat));
+    services.forEach(s => {
+      const cat = getServiceCategoryLabel(s);
+      dynamicCats.add(cat);
+    });
+
+    // Array.from(dynamicCats) but we can sort them alphabetically or order by some logic,
+    // lets just keep the order they appear but ensure 'Todos' is first and 'Outros' is last.
+    const arr = Array.from(dynamicCats).filter(c => c !== 'Outros').sort();
+    if (dynamicCats.has('Outros')) {
+      arr.push('Outros');
+    }
     
-    // Hide if only 'Todos' would show
-    return filtered.length > 1 ? filtered : [];
+    const finalCats = ['Todos', ...arr];
+    return finalCats.length > 2 || (finalCats.length === 2 && finalCats[1] !== 'Outros') ? finalCats : [];
   }, [services]);
 
   const filteredServices = useMemo(() => {
-    if (selectedCategory === 'Todos') return services;
-    return services.filter(s => categorizeService(s.name) === selectedCategory);
+    let list = services;
+    if (selectedCategory !== 'Todos') {
+      list = services.filter(s => getServiceCategoryLabel(s) === selectedCategory);
+    }
+    return list;
   }, [services, selectedCategory]);
 
+  const isValidBadge = (badge: string | undefined): badge is string => {
+    if (!badge) return false;
+    // Only 'Mais procurado' is permitted to show visually
+    return badge === 'Mais procurado';
+  };
+
   const isCompact = services.length > 4;
+  const displayLimit = isCompact ? 6 : 4;
+  
+  const displayServices = isExpanded ? filteredServices : filteredServices.slice(0, displayLimit);
+  const showMoreCTA = !isExpanded && filteredServices.length > displayLimit;
+
+  // Whenever category changes, reset expansion
+  const handleCategorySelect = (cat: string) => {
+    setSelectedCategory(cat);
+    setIsExpanded(false);
+  };
 
   if (services.length === 0) return null;
 
@@ -42,19 +77,19 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
         <div className="flex-1 h-px bg-brand-mist/50" />
       </div>
       
-      <div className="flex flex-col gap-6 md:gap-8 mb-8 md:mb-12">
+      <div className="flex flex-col gap-6 md:gap-8 mb-10 md:mb-16">
         <h2 className="heading-section text-brand-ink">
           Escolha sua<br />
           <em className="font-serif italic text-brand-stone">experiência</em>
         </h2>
 
         {categories.length > 1 && (
-          <div className="sticky top-0 z-[100] bg-brand-parchment/80 backdrop-blur-xl pt-4 pb-2 -mx-4 px-4 sm:-mx-6 sm:px-6 space-y-4">
+          <div className="sticky top-0 z-[100] bg-brand-parchment/90 backdrop-blur-xl pt-6 pb-4 -mx-4 px-4 sm:-mx-6 sm:px-6 space-y-5 border-b border-brand-mist/30">
             <div className="flex items-center gap-3 overflow-x-auto scrollbar-none no-scrollbar">
               {categories.map(cat => (
                 <button
                   key={cat}
-                  onClick={() => setSelectedCategory(cat)}
+                  onClick={() => handleCategorySelect(cat)}
                   className={cn(
                     "px-6 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-widest whitespace-nowrap transition-all border",
                     selectedCategory === cat 
@@ -82,14 +117,14 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
           : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
       )}>
         <AnimatePresence mode="popLayout">
-          {filteredServices.map((service, i) => (
+          {displayServices.map((service, i) => (
             <motion.div
               key={service.id}
               layout
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.3, delay: i * 0.05 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.4, delay: i * 0.03, ease: [0.23, 1, 0.32, 1] }}
               onClick={() => onSelectService(service)}
               className={cn(
                 "group relative bg-brand-white border border-brand-mist rounded-[32px] overflow-hidden cursor-pointer transition-all duration-500 hover:-translate-y-1 hover:shadow-2xl hover:shadow-brand-terracotta/10",
@@ -97,48 +132,60 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
               )}
             >
               <div className="relative z-10 flex flex-col flex-1">
-                {!isCompact && i === 0 && selectedCategory === 'Todos' && (
-                  <span className="inline-block px-3 py-1 bg-brand-blush text-[var(--theme-accent,var(--color-brand-terracotta))] text-[8px] font-bold uppercase tracking-[0.25em] rounded-full mb-6 max-w-fit">
+                {isValidBadge(service.badge) && (
+                  <span className={cn(
+                    "inline-block border border-[var(--theme-accent,var(--color-brand-terracotta))]/20 text-[var(--theme-accent,var(--color-brand-terracotta))] font-bold uppercase tracking-[0.25em] rounded-full max-w-fit shadow-sm bg-brand-white/50 backdrop-blur-sm",
+                    isCompact ? "px-2.5 py-1 text-[7px] mb-2" : "px-3.5 py-1.5 text-[8px] mb-4"
+                  )}>
+                    {service.badge}
+                  </span>
+                )}
+                {!isValidBadge(service.badge) && i === 0 && selectedCategory === 'Todos' && (
+                  <span className={cn(
+                    "inline-block border border-[var(--theme-accent,var(--color-brand-terracotta))]/20 text-[var(--theme-accent,var(--color-brand-terracotta))] font-bold uppercase tracking-[0.25em] rounded-full max-w-fit shadow-sm bg-brand-white/50 backdrop-blur-sm",
+                    isCompact ? "px-2.5 py-1 text-[7px] mb-2" : "px-3.5 py-1.5 text-[8px] mb-4"
+                  )}>
                     Mais procurado
                   </span>
                 )}
 
-                <div className="flex-1">
+                <div className="flex-1 pr-4 md:pr-6">
                   <h3 className={cn(
-                    "font-serif text-brand-ink leading-tight mb-2",
-                    isCompact ? "text-lg" : "text-2xl"
+                    "font-serif text-brand-ink leading-snug mb-1.5",
+                    isCompact ? "text-lg md:text-xl" : "text-2xl mb-3"
                   )}>
                     {service.name || "Serviço"}
                   </h3>
 
                   {service.description && (
                     <p className={cn(
-                      "font-light leading-relaxed text-brand-stone line-clamp-2",
-                      isCompact ? "text-[11px] max-w-[200px] md:max-w-md" : "text-[13px] mb-6"
+                      "font-light leading-relaxed text-brand-stone",
+                      isCompact ? "text-[11px] md:text-xs max-w-[280px] line-clamp-2" : "text-[13px] mb-6 line-clamp-3"
                     )}>
                       {service.description}
                     </p>
                   )}
 
                   {isCompact && (
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--theme-accent,var(--color-brand-terracotta))] mt-1">
+                    <div className="flex items-center gap-1.5 text-[9px] uppercase tracking-widest font-semibold text-[var(--theme-accent,var(--color-brand-terracotta))] mt-3">
+                      <Clock size={10} />
                       {service.duration} min
                     </div>
                   )}
                 </div>
 
                 {!isCompact && (
-                  <div className="mt-6 flex items-end justify-between border-t border-brand-mist/50 pt-6">
+                  <div className="mt-6 flex items-end justify-between border-t border-brand-mist/30 pt-6">
                     <div>
                       <div className="font-serif text-2xl text-brand-ink">
                         {formatCurrency(service.price || 0)}
                       </div>
-                      <div className="text-[9px] font-semibold uppercase tracking-[0.18em] text-brand-stone">
+                      <div className="text-[9px] font-medium uppercase tracking-[0.18em] text-brand-stone mt-1">
                         {service.duration || 0} minutos
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2 bg-brand-ink text-brand-white px-5 py-2.5 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] transition-transform active:scale-95">
+                    <div className="flex items-center gap-2 bg-brand-ink text-brand-white px-5 py-2.5 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] hover:bg-[var(--theme-accent,var(--color-brand-terracotta))] transition-colors border border-transparent shadow-sm">
                       Reservar
                       <ChevronRight size={12} />
                     </div>
@@ -147,13 +194,13 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
               </div>
 
               {isCompact && (
-                <div className="relative z-10 flex flex-col items-end gap-3 ml-4">
-                  <div className="font-serif text-xl border-b border-brand-mist/30 pb-0.5">
+                <div className="relative z-10 flex flex-col items-end justify-center ml-4 shrink-0 h-full">
+                  <div className="font-serif text-xl sm:text-2xl text-brand-ink whitespace-nowrap">
                     {formatCurrency(service.price || 0)}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:translate-x-1 transition-transform">
+                  <div className="flex items-center gap-1 text-[8px] sm:text-[9px] font-bold uppercase tracking-[0.2em] text-brand-ink mt-3 min-w-max">
                     Reservar
-                    <ChevronRight size={12} />
+                    <ChevronRight size={12} className="text-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
               )}
@@ -161,6 +208,20 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
           ))}
         </AnimatePresence>
       </div>
+
+      {showMoreCTA && (
+        <div className="mt-12 flex justify-center">
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="group px-8 py-4 bg-brand-white border border-brand-mist rounded-full flex items-center justify-center gap-3 transition-all duration-300 hover:border-brand-ink hover:shadow-lg active:scale-95"
+          >
+            <span className="text-[11px] font-bold uppercase tracking-widest text-brand-stone group-hover:text-brand-ink transition-colors">
+              Explorar todas as {filteredServices.length} experiências
+            </span>
+            <ChevronRight size={16} className="text-brand-stone group-hover:text-[var(--theme-accent,var(--color-brand-terracotta))] transition-colors" />
+          </button>
+        </div>
+      )}
 
     </section>
   );

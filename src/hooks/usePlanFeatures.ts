@@ -52,5 +52,6 @@ export function usePlanFeatures() {
     isPremium,
     isProPlan,
     allowedThemes: config.themes,
+    portfolioLimit: config.portfolioLimit,
   };
 }

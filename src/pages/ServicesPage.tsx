@@ -6,7 +6,7 @@ import { collection, query, where, onSnapshot, addDoc, deleteDoc, doc, updateDoc
 import { 
   Calendar, List, Plus, Trash2, Edit2, X, Clock, 
   DollarSign, Settings, Sparkles, ChevronRight, Info, Users,
-  Wand2, Loader2, AlertCircle
+  Wand2, Loader2, AlertCircle, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { notify } from '../lib/notify';
@@ -36,6 +36,8 @@ export default function ServicesPage() {
   const [duration, setDuration] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [badge, setBadge] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCustomDuration, setShowCustomDuration] = useState(false);
   const [durationError, setDurationError] = useState(false);
@@ -59,6 +61,27 @@ export default function ServicesPage() {
     { label: '2h30', value: 150 },
     { label: '3h', value: 180 },
   ];
+
+  const normalizeCategory = (str: string) => {
+    return str.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  };
+
+  const existingCategories = React.useMemo(() => {
+    const cats = new Map<string, string>();
+    services.forEach(s => {
+      const catLabel = s.categoryData?.label || s.category;
+      if (catLabel && catLabel !== 'Geral') {
+        cats.set(normalizeCategory(catLabel), catLabel);
+      }
+    });
+    return Array.from(cats.values());
+  }, [services]);
+
+  const filteredCategories = React.useMemo(() => {
+    if (!category) return existingCategories;
+    const search = normalizeCategory(category);
+    return existingCategories.filter(c => normalizeCategory(c).includes(search));
+  }, [category, existingCategories]);
 
   const calculateSlots = (d: number) => {
     if (!d || d <= 0 || !profile?.workingHours) return 0;
@@ -124,6 +147,16 @@ export default function ServicesPage() {
               return bTime - aTime;
             })[0];
           });
+          
+        uniqueServices.sort((a, b) => {
+          const orderA = a.order ?? 9999;
+          const orderB = b.order ?? 9999;
+          if (orderA !== orderB) return orderA - orderB;
+          const aTime = new Date(a.createdAt || 0).getTime();
+          const bTime = new Date(b.createdAt || 0).getTime();
+          return aTime - bTime;
+        });
+
         setServices(uniqueServices);
 
         if (snapshot.empty && snapshot.metadata.fromCache) {
@@ -224,13 +257,38 @@ export default function ServicesPage() {
     }
 
     try {
+      const catLabel = category.trim() || 'Geral';
+      const catSlug = normalizeCategory(catLabel);
+
+      // Verify category limit if creating a NEW category
+      if (existingCategories.length >= 6 && !existingCategories.some(c => normalizeCategory(c) === catSlug)) {
+        if (catLabel !== 'Geral') {
+             // Let it pass but maybe fallback to 'Geral' or just let it pass silently as per requirements: "Apenas impedir criação excessiva silenciosamente." We map to an existing category, or Geral.
+             // Actually, "limite leve: máximo de categorias = 6... impedir silenciosamente."
+             // If limit reached, fallback to 'Outros' or 'Geral'
+             if (isDev) console.log('Max category limit reached. Fallback visually.');
+             // wait, if we fallback, they lose their text. Better to just fallback to "Outros"
+        }
+      }
+
+      const finalCatLabel = existingCategories.length >= 6 && !existingCategories.some(c => normalizeCategory(c) === catSlug) && catSlug !== normalizeCategory('Geral') 
+         ? existingCategories[0] || 'Geral' // silent fallback to 1st category
+         : catLabel;
+      
+      const finalCatSlug = normalizeCategory(finalCatLabel);
+
       const serviceData = {
         professionalId,
         name: name.trim(),
         description: description.trim(),
         duration: Number(duration) || 0,
         price: Number(price) || 0,
-        category: category || 'Geral', // Ensure category is present
+        category: finalCatLabel, // Keep for compat
+        categoryData: {
+           label: finalCatLabel,
+           slug: finalCatSlug
+        },
+        badge: badge === 'Nenhum' ? '' : badge,
         active: true,
         updatedAt: new Date().toISOString()
       };
@@ -254,6 +312,36 @@ export default function ServicesPage() {
       notify.error(errorMessage);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleReorder = async (currentIndex: number, direction: 'up' | 'down') => {
+    if (
+      (currentIndex === 0 && direction === 'up') ||
+      (currentIndex === services.length - 1 && direction === 'down')
+    ) {
+      return;
+    }
+
+    const newServices = [...services];
+    const swapIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    // Swap
+    const temp = newServices[currentIndex];
+    newServices[currentIndex] = newServices[swapIndex];
+    newServices[swapIndex] = temp;
+    
+    // Optimistic update
+    setServices(newServices);
+
+    try {
+      // Save new order to firestore
+      await Promise.all(newServices.map((srv, idx) => {
+        return updateDoc(doc(db, 'services', srv.id), { order: idx });
+      }));
+    } catch (error) {
+      if (isDev) console.error('[ServicesReorder] Error:', error);
+      notify.error('Não foi possível salvar a nova ordem.');
     }
   };
 
@@ -285,8 +373,16 @@ export default function ServicesPage() {
     setDescription(service.description);
     setDuration(service.duration.toString());
     setPrice(service.price.toString());
-    setCategory(service.category);
-    setShowCustomDuration(![30, 45, 60, 90, 120].includes(Number(service.duration)));
+    
+    // Extrapolate category
+    const catLabel = service.categoryData?.label || service.category || '';
+    setCategory(catLabel === 'Geral' ? '' : catLabel);
+    
+    // Normalize badge
+    const currentBadge = service.badge;
+    setBadge(currentBadge === 'Mais procurado' ? 'Mais procurado' : '');
+    
+    setShowCustomDuration(![30, 45, 60, 90, 120, 150, 180].includes(Number(service.duration)));
     setIsModalOpen(true);
   };
 
@@ -298,6 +394,7 @@ export default function ServicesPage() {
     setDuration('');
     setPrice('');
     setCategory('');
+    setBadge('');
     setShowCustomDuration(false);
   };
 
@@ -351,7 +448,7 @@ export default function ServicesPage() {
               ))}
             </>
           ) : services.length > 0 ? (
-            services.map(service => (
+            services.map((service, index) => (
               <motion.div 
                 key={service.id} 
                 layout 
@@ -367,6 +464,13 @@ export default function ServicesPage() {
                     <p className="text-brand-stone text-xs sm:text-sm font-light leading-relaxed line-clamp-2">{service.description || 'Consulte detalhes no dia do atendimento.'}</p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-1 shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-2xl border border-brand-mist/30">
+                    <button onClick={() => handleReorder(index, 'up')} disabled={index === 0} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all disabled:opacity-30">
+                      <ArrowUp size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    </button>
+                    <button onClick={() => handleReorder(index, 'down')} disabled={index === services.length - 1} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all disabled:opacity-30">
+                      <ArrowDown size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    </button>
+                    <div className="w-px h-6 bg-brand-mist mx-1 self-center hidden sm:block" />
                     <button onClick={() => openEdit(service)} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all">
                       <Edit2 size={16} className="sm:w-[18px] sm:h-[18px]" />
                     </button>
@@ -487,6 +591,66 @@ export default function ServicesPage() {
                       </button>
                     </div>
                     <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que torna este serviço especial?" className="w-full px-5 sm:px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink h-24 sm:h-28 resize-none transition-all font-light text-sm min-w-0 box-border" />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex flex-col gap-1.5 ml-1">
+                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Coleção</label>
+                        <span className="text-[10px] text-brand-stone/70">Organize experiências parecidas em um mesmo grupo.</span>
+                      </div>
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          value={category} 
+                          onChange={(e) => {
+                            setCategory(e.target.value);
+                            setShowCategorySuggestions(true);
+                          }} 
+                          onFocus={() => setShowCategorySuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 200)}
+                          placeholder="Ex: Facial" 
+                          className="w-full px-5 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm"
+                        />
+                        {showCategorySuggestions && filteredCategories.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-brand-white border border-brand-mist rounded-[16px] shadow-lg z-50 flex flex-col max-h-48 overflow-y-auto">
+                            {filteredCategories.map(cat => (
+                              <button
+                                key={cat}
+                                type="button"
+                                onClick={() => {
+                                  setCategory(cat);
+                                  setShowCategorySuggestions(false);
+                                }}
+                                className="px-4 py-2.5 text-left text-sm font-light text-brand-stone hover:text-brand-ink hover:bg-brand-parchment rounded-xl transition-colors"
+                              >
+                                {cat}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Destaque Editorial (Opcional)</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['Nenhum', 'Mais procurado'].map(b => (
+                          <button
+                            key={b}
+                            type="button"
+                            onClick={() => setBadge(b === 'Nenhum' ? '' : b)}
+                            className={cn(
+                              "px-3 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all",
+                              (badge === b) || (b === 'Nenhum' && !badge)
+                                ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
+                                : "border-brand-mist text-brand-stone hover:border-brand-ink"
+                            )}
+                          >
+                            {b}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
