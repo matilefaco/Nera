@@ -107,22 +107,23 @@ router.post("/grant-plan", requireAdminSecret, async (req, res) => {
       updateData.manualPlanGrant = admin.firestore.FieldValue.delete();
     }
 
-    await db.collection("users").doc(uid).update(updateData);
+    const batch = db.batch();
+    
+    const userRef = db.collection("users").doc(uid);
+    batch.update(userRef, updateData);
 
-    // Audit Log
-    try {
-      await db.collection("audit_logs").doc("admin_plan_grants").collection("events").add({
-        targetUid: uid,
-        targetEmail: prefixEmail(userEmail),
-        plan,
-        durationDays: plan === "free" ? 0 : durationDays,
-        reason,
-        grantedAt: now,
-        grantedBy: "admin_api"
-      });
-    } catch (err) {
-      logger.error("ADMIN", "Failed to write audit log for manual grant", { error: err });
-    }
+    const auditRef = db.collection("audit_logs").doc("admin_plan_grants").collection("events").doc();
+    batch.set(auditRef, {
+      targetUid: uid,
+      targetEmail: prefixEmail(userEmail),
+      plan,
+      durationDays: plan === "free" ? 0 : durationDays,
+      reason,
+      grantedAt: now,
+      grantedBy: "admin_api"
+    });
+
+    await batch.commit();
 
     logger.info("ADMIN", `Manual ${plan} grant applied`, { targetUid: maskUid(uid), reason });
 

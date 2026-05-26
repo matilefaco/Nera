@@ -485,11 +485,13 @@ export default function BookingModal({ profile, services, onClose, open, initial
           } else {
             console.error("[Slots] Error fetching occupied slots, res not ok", res);
             setSlotsLoadError('timeout');
+            setSelectedTime('');
             return; // Abort loading slots if backend request failed
           }
         } catch (error) {
           if (isDev) console.error(`[Slots] error actual= appointments fetch:`, error);
           setSlotsLoadError('timeout');
+          setSelectedTime('');
           return; // Abort loading slots on network error/timeout
         }
 
@@ -760,7 +762,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                           const dayOfWeek = date.getDay();
                           const isWorkingDay = profile?.workingHours?.workingDays?.includes(dayOfWeek);
                           return (
-                            <button key={offset} onClick={() => { if (!isWorkingDay) { notify.info('A profissional não atende neste dia'); return; } setSelectedDate(dateStr); }} className={cn("min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0", isSelected ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105" : isWorkingDay ? "bg-brand-parchment border-brand-mist hover:border-brand-ink" : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed")}>
+                            <button key={offset} onClick={() => { if (!isWorkingDay) { notify.info('A profissional não atende neste dia'); return; } setSelectedDate(dateStr); setSelectedTime(''); }} className={cn("min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0", isSelected ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105" : isWorkingDay ? "bg-brand-parchment border-brand-mist hover:border-brand-ink" : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed")}>
                               <span className={cn("text-[8px] font-bold uppercase tracking-widest mb-1", isWorkingDay ? "opacity-40" : "opacity-20")}>{date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')}</span>
                               <span className={cn("text-lg font-serif", !isWorkingDay && "opacity-40")}>{date.getDate()}</span>
                             </button>
@@ -821,7 +823,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                       </div>
                     </div>
 
-                    <PremiumButton className="w-full mt-8 hidden md:flex" variant="terracotta" disabled={!selectedService || !selectedDate || !selectedTime || isLoadingSlots} onClick={() => setStep(2)}>
+                    <PremiumButton className="w-full mt-8 hidden md:flex" variant="terracotta" disabled={!selectedService || !selectedDate || !selectedTime || isLoadingSlots || !!slotsLoadError} onClick={() => setStep(2)}>
                       Próximo Passo <ArrowRight size={18} className="ml-1" />
                     </PremiumButton>
                   </div>
@@ -1127,7 +1129,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                 variant="terracotta" 
                 className="w-full py-7" 
                 disabled={
-                  (step === 1 && (!selectedService || !selectedDate || !selectedTime || isLoadingSlots)) || 
+                  (step === 1 && (!selectedService || !selectedDate || !selectedTime || isLoadingSlots || !!slotsLoadError)) || 
                   (step === 2 && (!clientName || !clientPhone || !clientEmail || (isHomeService && (!addressStreet || !addressNumber))))
                 } 
                 loading={step === 3 && bookingLoading} 

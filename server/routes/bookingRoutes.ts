@@ -744,6 +744,39 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       // 2. LOGIC & WRITES
       if (couponSnap && couponSnap.exists) {
         const coupon = couponSnap.data() as any;
+        
+        // P0: Tenant Isolation
+        if (coupon.professionalId !== finalData.professionalId) {
+          throw new Error('Cupom inválido para este profissional.');
+        }
+
+        // P0: Active Validation
+        if (coupon.active !== true) {
+          throw new Error('Este cupom não está mais ativo.');
+        }
+
+        // P0: Expiration Validation
+        if (coupon.expiresAt) {
+          let isExpired = false;
+          if (typeof coupon.expiresAt.toMillis === 'function') {
+            isExpired = coupon.expiresAt.toMillis() <= Date.now();
+          } else if (typeof coupon.expiresAt === 'string' || typeof coupon.expiresAt === 'number') {
+            isExpired = new Date(coupon.expiresAt).getTime() <= Date.now();
+          } else if (coupon.expiresAt instanceof Date) {
+            isExpired = coupon.expiresAt.getTime() <= Date.now();
+          }
+          if (isExpired) {
+            throw new Error('Este cupom já expirou.');
+          }
+        }
+
+        // P0: Service Applicability Validation
+        if (coupon.applicableServiceIds && Array.isArray(coupon.applicableServiceIds) && coupon.applicableServiceIds.length > 0) {
+          if (!coupon.applicableServiceIds.includes(finalData.serviceId)) {
+            throw new Error('Este cupom não é válido para o serviço selecionado.');
+          }
+        }
+
         if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) {
           throw new Error('Este cupom atingiu o limite de usos.');
         }
@@ -798,12 +831,11 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           }
         }
 
-        if (couponSnap && couponSnap.exists) {
-          if (coupon.type === 'percentage') {
-            discountAmount = (subtotalBeforeDiscount * (Number(coupon.value) || 0)) / 100;
-          } else if (coupon.type === 'fixed') {
-            discountAmount = Number(coupon.value) || 0;
-          }
+        // P1: Travel Fee Isolation
+        if (coupon.type === 'percentage') {
+          discountAmount = (originalPrice * (Number(coupon.value) || 0)) / 100;
+        } else if (coupon.type === 'fixed') {
+          discountAmount = Math.min(Number(coupon.value) || 0, originalPrice);
         }
 
         finalData.couponCode = coupon.code || '';

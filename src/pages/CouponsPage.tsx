@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, Tag, Calendar, Users, 
@@ -288,19 +288,26 @@ export default function CouponsPage() {
           </div>
         ) : (
           <>
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-8 h-8 rounded-xl bg-brand-terracotta/10 flex items-center justify-center text-brand-terracotta">
-                <Tag size={18} />
-              </div>
-              <h1 className="text-3xl font-serif text-brand-ink">Cupons de Desconto</h1>
-            </div>
-            <p className="text-sm text-brand-stone font-light italic">
-              Crie incentivos exclusivos para suas clientes.
-            </p>
-          </div>
-          <PremiumButton 
+            <header className="mb-8 md:mb-12">
+              <Link 
+                to="/dashboard" 
+                className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors mb-8"
+              >
+                <ArrowLeft size={14} /> Voltar ao Painel
+              </Link>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-brand-terracotta/10 flex items-center justify-center text-brand-terracotta">
+                      <Tag size={18} />
+                    </div>
+                    <h1 className="text-3xl font-serif text-brand-ink">Cupons de Desconto</h1>
+                  </div>
+                  <p className="text-sm text-brand-stone font-light italic">
+                    Crie incentivos exclusivos para suas clientes.
+                  </p>
+                </div>
+                <PremiumButton 
             variant="terracotta" 
             onClick={() => {
               if (checkFeatureAccess('coupons')) {
@@ -311,6 +318,7 @@ export default function CouponsPage() {
           >
             <Plus size={18} className="mr-2" /> Criar Cupom
           </PremiumButton>
+              </div>
         </header>
 
         {error ? (

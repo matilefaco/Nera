@@ -257,12 +257,12 @@ export default function ReferralsPage() {
               </button>
               <button 
                 onClick={() => {
-                  const url = encodeURIComponent(referralLink);
-                  window.open(`https://wa.me/?text=${encodeURIComponent(`Oie! Descobri a Nera, uma plataforma incrível para vitrine e agendamento. Se cadastre pelo meu link: ${referralLink}`)}`, '_blank');
+                  const whatsappMessage = `Descobri uma plataforma linda para profissionais da beleza ✨\n\nA Nera organiza agenda, atendimento e vitrine de forma muito mais profissional.\n\nSe quiser conhecer:\n${referralLink}`;
+                  window.open(`https://wa.me/?text=${encodeURIComponent(whatsappMessage)}`, '_blank');
                 }}
-                className="inline-flex items-center justify-center gap-2 bg-emerald-500 text-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md"
+                className="inline-flex items-center justify-center gap-2 bg-brand-ink text-brand-white px-8 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md group border border-brand-ink"
               >
-                <MessageCircle size={14} />
+                <MessageCircle size={14} className="text-[#25D366] group-hover:scale-110 transition-transform" />
                 Compartilhar no WhatsApp
               </button>
             </div>
