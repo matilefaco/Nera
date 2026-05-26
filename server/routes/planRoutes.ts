@@ -195,6 +195,41 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       logger.info("STRIPE", "Initiating checkout session", { professionalId: maskUid(uid), meta: { plan } });
     }
     
+    // 1.5 Handle Customer Creation/Reuse Securely
+    let customerId = userData?.stripeCustomerId;
+    if (customerId) {
+      try {
+        const existingCustomer = await stripe.customers.retrieve(customerId);
+        if ((existingCustomer as any).deleted) {
+          customerId = null;
+        } else {
+          // If the customer exists but belongs to a different mode (Test vs Live), Stripe will throw an error above (resource_missing or invalid API key context).
+        }
+      } catch (err: any) {
+        logger.warn("STRIPE", "Failed to retrieve existing customer, resetting for checkout", { professionalId: maskUid(uid), error: err.message });
+        customerId = null;
+      }
+    }
+
+    if (!customerId) {
+      try {
+        // Check if a customer with this email already exists in Stripe to avoid duplicates
+        const existingCustomers = await stripe.customers.list({ email: email, limit: 1 });
+        if (existingCustomers.data.length > 0) {
+          customerId = existingCustomers.data[0].id;
+        } else {
+          const newCustomer = await stripe.customers.create({ email: email });
+          customerId = newCustomer.id;
+        }
+        await db.collection("users").doc(uid).update({ stripeCustomerId: customerId });
+      } catch (err: any) {
+        // Release lock
+        await db.collection("users").doc(uid).update({ checkoutLock: admin.firestore.FieldValue.delete() });
+        logger.error("STRIPE", "Failed to resolve Stripe customer", { professionalId: maskUid(uid), error: err.message });
+        return res.status(500).json({ error: "Erro ao gerar identificador de pagamento.", details: "CHECKOUT_STRIPE_CUSTOMER_INVALID" });
+      }
+    }
+
     const priceId = plan === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_ESSENCIAL;
 
     if (!priceId) {
@@ -203,7 +238,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
         checkoutLock: admin.firestore.FieldValue.delete()
       });
       logger.error("STRIPE", "Price ID not configured", { professionalId: maskUid(uid), meta: { plan } });
-      return res.status(400).json({ error: `O plano ${plan} não está configurado corretamente (Price ID ausente no ambiente). Por favor, contate o suporte.` });
+      return res.status(500).json({ error: `O plano ${plan} não está configurado corretamente (Price ID ausente no ambiente). Por favor, contate o suporte.`, details: "CHECKOUT_PRICE_MISSING" });
     }
 
     // Check for credits before creating session params
@@ -220,7 +255,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
         },
       ],
       mode: "subscription",
-      customer_email: email,
+      customer: customerId,
       client_reference_id: uid,
       payment_method_collection: "always",
       success_url: `${PUBLIC_APP_URL}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -270,9 +305,24 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       logger.error("STRIPE", "Failed to release checkoutLock on checkout error", { professionalId: maskUid(uid), error: lockErr.message });
     }
 
-    logger.error("STRIPE", "Failed to create checkout session", { requestId: req.requestId, error: err });
+    logger.error("STRIPE", "Failed to create checkout session", { 
+      requestId: req.requestId, 
+      professionalId: maskUid(uid),
+      error: err,
+      code: err.code,
+      type: err.type,
+      statusCode: err.statusCode,
+      priceId: priceId ? "exists" : "missing",
+      mode: isDev ? "test" : "live"
+    });
+    
+    let userMsg = "Erro ao gerar a sessão de checkout no Stripe. Por favor, tente novamente de forma pausada.";
+    if (err.type && err.type.includes('Stripe')) {
+      userMsg = `Limite ou restrição do Stripe: ${err.message}`;
+    }
+    
     res.status(500).json({ 
-      error: "Erro ao gerar a sessão de checkout no Stripe. Por favor, tente novamente de forma pausada.",
+      error: userMsg,
       details: err.message
     });
   }
@@ -1323,7 +1373,18 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
         planExpiresAt: null,
         stripeCustomerId: admin.firestore.FieldValue.delete(),
         stripeSubscriptionId: admin.firestore.FieldValue.delete(),
+        stripeCheckoutSessionId: admin.firestore.FieldValue.delete(),
+        stripePortalSessionId: admin.firestore.FieldValue.delete(),
+        stripeCheckoutUrl: admin.firestore.FieldValue.delete(),
         stripeSubscriptionStatus: 'canceled_or_none',
+        checkoutStatus: admin.firestore.FieldValue.delete(),
+        billingSyncStatus: admin.firestore.FieldValue.delete(),
+        stripeSyncPending: admin.firestore.FieldValue.delete(),
+        signupPlan: admin.firestore.FieldValue.delete(),
+        pendingPlan: admin.firestore.FieldValue.delete(),
+        pendingPlanId: admin.firestore.FieldValue.delete(),
+        checkoutLock: admin.firestore.FieldValue.delete(),
+        portalLock: admin.firestore.FieldValue.delete(),
         lastStripeSyncAt: new Date().toISOString(),
         stripeSyncSource: 'admin_force_reset',
         updatedAt: new Date().toISOString()
@@ -1408,15 +1469,26 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
 
     if (allSubs.length === 0) {
       // If no active, trialing or past_due subs, but user has premium, reset them
-      if (userData.plan && userData.plan !== 'free') {
-        const updateData = {
+      if ((userData.plan && userData.plan !== 'free') || userData.signupPlan || userData.pendingPlan) {
+        const updateData: any = {
           plan: 'free',
           planRank: 0,
           indexable: false,
           stripeSubscriptionStatus: 'canceled_or_none',
           lastStripeSyncAt: new Date().toISOString(),
           stripeSyncSource: 'reconcile_reset',
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
+          stripeCheckoutSessionId: admin.firestore.FieldValue.delete(),
+          stripePortalSessionId: admin.firestore.FieldValue.delete(),
+          stripeCheckoutUrl: admin.firestore.FieldValue.delete(),
+          checkoutStatus: admin.firestore.FieldValue.delete(),
+          billingSyncStatus: admin.firestore.FieldValue.delete(),
+          stripeSyncPending: admin.firestore.FieldValue.delete(),
+          signupPlan: admin.firestore.FieldValue.delete(),
+          pendingPlan: admin.firestore.FieldValue.delete(),
+          pendingPlanId: admin.firestore.FieldValue.delete(),
+          checkoutLock: admin.firestore.FieldValue.delete(),
+          portalLock: admin.firestore.FieldValue.delete()
         };
         await db.collection("users").doc(userId).update(updateData);
         return res.status(200).json({
