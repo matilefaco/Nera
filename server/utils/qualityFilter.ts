@@ -12,15 +12,18 @@ export interface UserProfileData {
   indexable?: boolean;
   specialty?: string;
   isTestAccount?: boolean;
+  internalAccount?: boolean;
 }
 
 /**
  * Checks if a profile matches any test, fake, QA, audit, or draft criteria.
- * Returns true if the profile is classified as non-public/test/fake.
+ * Returns true if the profile is classified as non-public/test/fake or internal.
  * This is used for Directory indexing or situations where we require explicit publication.
  */
 export function isNonPublicProfile(userData: UserProfileData | null | undefined): boolean {
   if (!userData) return true;
+
+  if (userData.internalAccount === true) return true;
 
   // 1. Minimum structural validation
   const slug = (userData.slug || "").toLowerCase().trim();

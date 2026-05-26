@@ -4,6 +4,7 @@ import { X, Lock, Settings, ChevronRight, Sun, Zap, Moon, Calendar, Clock } from
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { notify } from '../lib/notify';
+import { useAuth } from '../AuthContext';
 import PremiumButton from './PremiumButton';
 import { cn, formatDateKey, getTodayLocale } from '../lib/utils';
 
@@ -44,6 +45,7 @@ export default function QuickBlockModal({
   const [selectedOption, setSelectedOption] = useState<string | null>(time ? 'specific' : 'today_full');
   const [selectedReason, setSelectedReason] = useState(REASONS[0]);
   const [customRange, setCustomRange] = useState({ start: '09:00', end: '18:00' });
+  const { profile } = useAuth();
 
   const handleBlock = async () => {
     setLoading(true);
@@ -85,13 +87,15 @@ export default function QuickBlockModal({
 
       notify.success(`Agenda bloqueada com sucesso!`);
       // Update analytics
-      addDoc(collection(db, 'analytics_events'), {
-        professionalId,
-        type: 'quick_block_created',
-        payload: { option: selectedOption, reason: selectedReason },
-        timestamp: serverTimestamp(),
-        origin: 'dashboard'
-      }).catch(() => {});
+      if (!profile?.internalAccount && !profile?.excludeFromAnalytics) {
+        addDoc(collection(db, 'analytics_events'), {
+          professionalId,
+          type: 'quick_block_created',
+          payload: { option: selectedOption, reason: selectedReason },
+          timestamp: serverTimestamp(),
+          origin: 'dashboard'
+        }).catch(() => {});
+      }
 
       onClose();
     } catch (e) {

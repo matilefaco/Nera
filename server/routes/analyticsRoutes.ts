@@ -36,6 +36,14 @@ router.post("/public/track", async (req, res) => {
     const db = getDb();
     if (!db) throw new Error("Database not connected");
 
+    const proDoc = await db.collection("users").doc(professionalId).get();
+    if (proDoc.exists) {
+      const proData = proDoc.data();
+      if (proData?.internalAccount === true || proData?.excludeFromAnalytics === true) {
+        return res.status(200).json({ ok: true });
+      }
+    }
+
     // Add document to Firestore (write)
     await db.collection("analytics_events").add({
       professionalId,

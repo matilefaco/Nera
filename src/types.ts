@@ -192,6 +192,10 @@ export interface UserProfile {
   updatedAt: string;
   role?: string;
 
+  internalAccount?: boolean;
+  internalType?: 'qa' | 'audit' | 'regression';
+  excludeFromAnalytics?: boolean;
+
   // --- LEGACY FIELDS FOR COMPATIBILITY ---
   /** @deprecated Use workingHours.startTime */
   startTime?: string;

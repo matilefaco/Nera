@@ -322,9 +322,11 @@ function PublicProfileContent() {
         }
 
         // Growth Analytics: Log Visit
-        logAnalyticsEvent(professionalId, "visit").catch((err) => {
-          devLog("[PublicProfile] Analytics error:", err);
-        });
+        if (!userData.internalAccount && !userData.excludeFromAnalytics) {
+          logAnalyticsEvent(professionalId, "visit").catch((err) => {
+            devLog("[PublicProfile] Analytics error:", err);
+          });
+        }
 
         devLog(`[PublicProfile] Starting secondary background tasks`);
         // Parallel fetches for portfolio (since it's not and shouldn't be in the main payload for size reasons)
@@ -677,7 +679,9 @@ function PublicProfileContent() {
               <button
                 onClick={() => {
                   const profId = profile?.professionalId || profile?.uid;
-                  logAnalyticsEvent(profId || '', "click_book_sticky");
+                  if (!profile?.internalAccount && !profile?.excludeFromAnalytics) {
+                    logAnalyticsEvent(profId || '', "click_book_sticky");
+                  }
                   if (urgencyInfo?.isAgendaFull && features?.waitlist) {
                     setIsWaitlistOpen(true);
                   } else {
@@ -757,7 +761,9 @@ function PublicProfileContent() {
         availability={weeklyAvailability}
         onSelectDate={(date) => {
           const profId = profile?.professionalId || profile?.uid;
-          logAnalyticsEvent(profId || '', "week_calendar_click");
+          if (!profile?.internalAccount && !profile?.excludeFromAnalytics) {
+            logAnalyticsEvent(profId || '', "week_calendar_click");
+          }
           const day = weeklyAvailability.find((d) => d.date === date);
           if (day?.status === "full" && features?.waitlist) {
             setIsWaitlistOpen(true);
@@ -777,7 +783,9 @@ function PublicProfileContent() {
             profile={profile}
             onBookingClick={() => {
               const profId = profile?.professionalId || profile?.uid;
-              logAnalyticsEvent(profId || '', "click_book_final");
+              if (!profile?.internalAccount && !profile?.excludeFromAnalytics) {
+                logAnalyticsEvent(profId || '', "click_book_final");
+              }
               setIsBookingModalOpen(true);
             }}
             completedBookings={stats?.totalCompletedBookings}
