@@ -101,24 +101,6 @@ export default function ProfilePage() {
 
 
 
-  const profileCompleteness = useMemo(() => {
-    if (!profile) return 0;
-    const fields = [
-      !!profile.avatar,           // 15 pts — foto
-      !!profile.bio,              // 15 pts — bio
-      !!profile.headline,         // 10 pts — headline
-      !!profile.instagram,        // 10 pts — instagram
-      (profile.portfolio?.length || 0) >= 3,  // 20 pts — portfolio com 3+ fotos
-      (profile.professionalIdentity?.differentials?.length || 0) >= 2, // 10 pts
-      !!profile.professionalIdentity?.yearsExperience, // 10 pts
-      !!profile.studioAddress?.street || (profile.serviceAreas?.length || 0) > 0, // 10 pts
-    ];
-    const pts = [15,15,10,10,20,10,10,10];
-    let total = 0;
-    fields.forEach((f, i) => { if (f) total += pts[i]; });
-    return total;
-  }, [profile]);
-  
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const portfolioInputRef = useRef<HTMLInputElement>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>('');
@@ -197,6 +179,35 @@ export default function ProfilePage() {
   
   const [showCalendarDisconnectModal, setShowCalendarDisconnectModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const profileCompleteness = useMemo(() => {
+    let score = 0;
+    
+    // Essenciais (75 pontos)
+    if (name?.trim().length >= 3) score += 10;
+    if (specialty?.trim().length > 0) score += 10;
+    if (whatsapp?.replace(/\D/g, '').length >= 10) score += 10;
+    if (slug?.trim().length >= 3) score += 10;
+    if (city?.trim().length > 0 || neighborhood?.trim().length > 0) score += 5;
+    if (serviceMode) score += 5;
+    if (workingDays?.length > 0 && startTime && endTime) score += 5;
+    if (avatar || avatarPreview) score += 10;
+    if (headline?.trim().length > 0 || bio?.trim().length > 0) score += 10;
+
+    // Bônus (25 pontos)
+    if (portfolio?.length > 0) score += 5;
+    if (differentials?.length > 0) score += 5;
+    if (instagram?.trim().length > 0) score += 5;
+    if (paymentMethods?.length > 0) score += 5;
+    if (googleCalendarConnected || (studioAddress && studioAddress.street)) score += 5;
+
+    return Math.min(100, score);
+  }, [
+    name, specialty, whatsapp, slug, city, neighborhood, serviceMode, 
+    workingDays, startTime, endTime, avatar, avatarPreview, 
+    headline, bio, portfolio, differentials, instagram, paymentMethods, 
+    googleCalendarConnected, studioAddress
+  ]);
 
   const buildSnapshot = (data: any) => {
     return JSON.stringify({
@@ -945,7 +956,7 @@ export default function ProfilePage() {
         </header>
 
         {profileCompleteness < 100 ? (
-          <div className="mb-10 px-5 py-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="mb-6 px-5 py-4 bg-brand-parchment/30 rounded-2xl border border-brand-mist/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-brand-ink">
@@ -965,11 +976,39 @@ export default function ProfilePage() {
             </p>
           </div>
         ) : (
-          <div className="mb-10 flex items-center gap-2 px-3 py-1.5 bg-brand-linen/50 text-brand-ink rounded-lg w-fit border border-brand-mist/50">
+          <div className="mb-6 flex items-center gap-2 px-3 py-1.5 bg-brand-linen/50 text-brand-ink rounded-lg w-fit border border-brand-mist/50">
             <CheckCircle2 size={14} className="text-brand-terracotta" />
             <span className="text-[9px] font-bold uppercase tracking-[0.2em]">Perfil completo</span>
           </div>
         )}
+
+        <nav className="mb-10 w-full overflow-x-auto no-scrollbar -mx-5 px-5 md:mx-0 md:px-0">
+          <ul className="flex items-center gap-2 pb-2 min-w-max md:flex-wrap md:pb-0">
+            {[
+              { id: 'profile-identidade', label: '1. Identidade' },
+              { id: 'profile-vitrine', label: '2. Vitrine' },
+              { id: 'profile-atendimento', label: '3. Atendimento' },
+              { id: 'profile-localizacao', label: '4. Localização' },
+              { id: 'profile-protecao', label: '5. Proteção' },
+              { id: 'profile-integracoes', label: '6. Integrações' },
+            ].map((item) => (
+              <li key={item.id}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById(item.id);
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                  className="px-4 py-2 bg-brand-linen/50 border border-brand-mist/50 rounded-xl text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta/30 transition-all whitespace-nowrap"
+                >
+                  {item.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
         <form 
           onSubmit={handleSave} 
@@ -977,7 +1016,7 @@ export default function ProfilePage() {
         >
           
           {/* 1. IDENTIDADE */}
-          <section className="space-y-6 pt-2">
+          <section id="profile-identidade" className="space-y-6 pt-2 scroll-mt-24">
             <div className="flex items-center gap-3 pb-2 px-2">
               <User size={20} className="text-brand-terracotta" />
               <h2 className="text-xl font-serif text-brand-ink">1. Identidade</h2>
@@ -1008,7 +1047,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 2. VITRINE */}
-          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+          <section id="profile-vitrine" className="space-y-6 pt-10 border-t border-brand-mist/50 scroll-mt-24">
             <div className="flex items-center gap-3 pb-2 px-2">
               <Sparkles size={20} className="text-brand-terracotta" />
               <h2 className="text-xl font-serif text-brand-ink">2. Vitrine</h2>
@@ -1419,7 +1458,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 3. ATENDIMENTO */}
-          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+          <section id="profile-atendimento" className="space-y-6 pt-10 border-t border-brand-mist/50 scroll-mt-24">
             <div className="flex items-center gap-3 pb-2 px-2">
               <Briefcase size={20} className="text-brand-terracotta" />
               <h2 className="text-xl font-serif text-brand-ink">3. Atendimento</h2>
@@ -1548,7 +1587,7 @@ export default function ProfilePage() {
             <hr className="border-brand-mist/50 my-6" />
 
             {/* Location Section */}
-            <div className="mb-2">
+            <div id="profile-localizacao" className="mb-2 scroll-mt-24">
               <FormLocation
                 title="Sua Localização"
                 subtitle="Configure como e onde você atende."
@@ -1640,7 +1679,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 4. PROTEÇÃO */}
-          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+          <section id="profile-protecao" className="space-y-6 pt-10 border-t border-brand-mist/50 scroll-mt-24">
             <div className="flex items-center gap-3 pb-2 px-2">
               <ShieldCheck size={20} className="text-brand-terracotta" />
               <h2 className="text-xl font-serif text-brand-ink">4. Proteção</h2>
@@ -1738,7 +1777,7 @@ export default function ProfilePage() {
           </section>
 
           {/* 5. INTEGRAÇÕES */}
-          <section className="space-y-6 pt-10 border-t border-brand-mist/50">
+          <section id="profile-integracoes" className="space-y-6 pt-10 border-t border-brand-mist/50 scroll-mt-24">
             <div className="flex items-center gap-3 pb-2 px-2">
               <LinkIcon size={20} className="text-brand-terracotta" />
               <h2 className="text-xl font-serif text-brand-ink">5. Integrações</h2>
