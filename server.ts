@@ -140,7 +140,8 @@ export async function createServerApp() {
       import("./server/routes/calendarRoutes.js"),
       import("./server/routes/bookingRoutes.js"),
       import("./server/routes/notificationRoutes.js"),
-      import("./server/routes/analyticsRoutes.js")
+      import("./server/routes/analyticsRoutes.js"),
+      import("./server/routes/adminRoutes.js")
     ]);
   } catch (routeErr: any) {
     logger.error("SERVER", "Failed to import one or more routes", { error: routeErr.message, stack: routeErr.stack });
@@ -157,10 +158,12 @@ export async function createServerApp() {
     calendarRoutes,
     bookingRoutes,
     notificationRoutes,
-    analyticsRoutes
+    analyticsRoutes,
+    adminRoutes
   ] = routes;
 
   apiRouter.use("/auth", authRoutes.default);
+  apiRouter.use("/admin", adminRoutes.default);
   apiRouter.use("/ai", aiRoutes.default);
   apiRouter.use("/slug", publicLookupLimiter, slugRoutes.default);
   apiRouter.use("/health", healthRoutes.default);
