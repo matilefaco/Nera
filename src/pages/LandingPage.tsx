@@ -77,7 +77,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="hero-sub fade-in d2">
-              Sua agenda inteligente que elimina o caos do WhatsApp e profissionaliza seu negócio — com reservas automáticas, lembretes e visão financeira clara.
+              Uma presença que trabalha enquanto você atende. Sua vitrine, sua agenda e seu histórico — num único link com a sua cara.
             </p>
 
             <div className="hero-ctas fade-in d3">

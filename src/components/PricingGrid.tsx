@@ -43,8 +43,11 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <div className="plan-tier">Essencial</div>
           <div className="plan-price">R$&nbsp;49</div>
           <div className="plan-period">por mês · cancele quando quiser</div>
-          <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)' }}>
-            15 dias de teste grátis com cartão
+          <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)', paddingBottom: '16px', marginBottom: '16px' }}>
+            Para quem já atende com frequência e quer parar de improvisar.
+            <span style={{ display: 'block', marginTop: '6px', fontSize: '13px', opacity: 0.8, fontWeight: 400 }}>
+              15 dias de teste grátis com cartão
+            </span>
           </p>
           <ul className="plan-features">
             <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos ilimitados</li>
@@ -69,10 +72,10 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
 
         {/* PRO */}
         <div className="plan-card pro">
-          <div className="plan-badge">{currentPlan === 'pro' ? 'Seu plano atual' : 'Recomendado para quem quer crescer'}</div>
+          <div className="plan-badge">{currentPlan === 'pro' ? 'Seu plano atual' : 'Para quem já está no ritmo e quer o melhor'}</div>
           <div className="plan-tier">Plano Pro</div>
           <div className="plan-price">R$&nbsp;89</div>
-          <div className="plan-period">por mês · ferramentas completas para crescer mais rápido</div>
+          <div className="plan-period">por mês · agenda, relacionamento e presença num só lugar</div>
           <p className="plan-tagline">&nbsp;</p>
           <ul className="plan-features">
             <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial + Notificações WhatsApp</li>
