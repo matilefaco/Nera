@@ -827,8 +827,8 @@ export default function OnboardingPage() {
         attendsAt: serviceMode as any
       } as ProfessionalIdentity,
       published: true, // Explicitly marked as published
-      onboardingCompleted: true,
-      onboardingStep: 3, // Changed from 6 to 3
+      onboardingCompleted: false, // We delay this so they can see step 4
+      onboardingStep: 4,
       indexable: true,
       planRank: profile?.planRank || 0,
       avatarSkipped: avatar ? false : true, // If no avatar, consider skipped
@@ -898,7 +898,8 @@ export default function OnboardingPage() {
       }
       
       await saveProfilePartial(user.uid, { 
-        onboardingStep: 3
+        onboardingCompleted: true,
+        onboardingStep: 4
       });
       navigate('/dashboard?tab=hoje');
     } catch (error) {
@@ -1579,15 +1580,15 @@ export default function OnboardingPage() {
               </div>
 
               <div className="space-y-4">
-                <h1 className="text-5xl font-serif font-normal text-brand-ink">Sua vitrine está no ar.</h1>
-                <p className="text-brand-stone text-lg max-w-sm mx-auto font-light">
-                  Seu perfil profissional está pronto para ser visto. Compartilhe seu link para começar a receber clientes.
+                <h1 className="text-5xl font-serif font-normal text-brand-ink">✨ Sua página profissional está pronta</h1>
+                <p className="text-brand-stone text-lg max-w-md mx-auto font-light">
+                  Agora suas clientes já podem conhecer seu trabalho, consultar seus horários e solicitar agendamentos.
                 </p>
               </div>
 
               <div className="bg-brand-white p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-8">
                 <div className="p-8 bg-brand-parchment rounded-[32px] border border-brand-mist">
-                  <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-2">Seu link profissional</p>
+                  <p className="text-[10px] font-medium text-brand-stone uppercase tracking-widest mb-2">{name}</p>
                   <p className="text-2xl font-serif italic text-brand-terracotta break-all">{getPublicProfileUrl(slug).replace(/^https?:\/\//, '')}</p>
                 </div>
 
@@ -1614,14 +1615,14 @@ export default function OnboardingPage() {
                   className="w-full bg-brand-ink text-brand-white py-7 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 shadow-xl disabled:opacity-50"
                   disabled={isFinalizing}
                 >
-                  {isFinalizing ? 'Preparando...' : 'Acessar meu painel'} <ArrowRight size={20} />
+                  {isFinalizing ? 'Preparando...' : 'Ir para painel'} <ArrowRight size={20} />
                 </button>
                 <Link 
                   to={`/p/${slug}`} 
                   target="_blank"
                   className="text-[11px] font-medium text-brand-terracotta uppercase tracking-widest hover:text-brand-sienna transition-colors text-center"
                 >
-                  Ver minha página pública
+                  Ver minha página
                 </Link>
               </div>
             </motion.div>
