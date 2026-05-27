@@ -2,8 +2,8 @@ import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 
 const CONFIG = {
-  dryRun: true,
-  confirm: "", // MUST be "MARK_INTERNAL_ACCOUNTS" for real execution
+  dryRun: false,
+  confirm: "MARK_INTERNAL_ACCOUNTS", // MUST be "MARK_INTERNAL_ACCOUNTS" for real execution
   
   qa: [
     "qa.nera.essencial.20260519113423@example.com",
