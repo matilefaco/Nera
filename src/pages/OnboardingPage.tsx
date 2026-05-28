@@ -1410,7 +1410,7 @@ export default function OnboardingPage() {
                   <Clock size={32} />
                 </div>
                 <h1 className="text-4xl font-serif font-normal text-brand-ink">Dias e Horários</h1>
-                <p className="text-brand-stone font-light text-center">Sua agenda começa a funcionar a partir desses horários. Depois você poderá ajustar tudo quando quiser.</p>
+                <p className="text-brand-stone font-light text-center">Estes serão seus horários padrão de atendimento. Você poderá ajustar dias específicos depois.</p>
               </div>
 
               <div className="bg-brand-white p-6 md:p-10 rounded-[40px] border border-brand-mist shadow-xl space-y-10">

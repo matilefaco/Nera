@@ -328,8 +328,9 @@ export const FormIdentity = ({
                   {showLabels && <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Sua bio profissional (Opcional)</label>}
                   {setSelectedBioStyle && (
                     <details className="mt-1 group">
-                      <summary className="text-[9px] cursor-pointer text-brand-stone/80 hover:text-brand-ink italic list-none flex items-center gap-1 ml-1 mb-2 outline-none">
-                        <span>Ajustar tom da bio</span>
+                      <summary className="text-[10px] sm:text-[11px] cursor-pointer font-bold text-brand-terracotta hover:text-brand-sienna uppercase tracking-widest list-none flex items-center gap-1.5 ml-1 mb-2 outline-none">
+                        <Sparkles size={12} className="text-brand-terracotta" />
+                        <span>Ajustar tom da bio com IA</span>
                         <span className="text-[8px] group-open:rotate-180 transition-transform">▼</span>
                       </summary>
                       <div className="flex flex-wrap gap-1.5 mt-2 mb-2">
@@ -385,7 +386,7 @@ export const FormIdentity = ({
           {(differentials !== undefined && setDifferentials) && (
             <div className="space-y-4">
               <div className="flex flex-col gap-1">
-                {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">Seus Diferenciais</label>}
+                {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">O que suas clientes costumam elogiar no seu atendimento?</label>}
                 <p className="text-[10px] text-brand-stone/60 font-light ml-1 mb-2">
                   Selecione os pontos que tornam seu atendimento único. Eles aparecerão em uma seção especial na sua vitrine.
                 </p>
@@ -438,36 +439,41 @@ export const FormIdentity = ({
               )}
 
               {/* Adicionar Personalizado */}
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder={getDifferentialPlaceholder(specialty)}
-                  className="flex-1 px-4 py-2.5 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-xs placeholder:text-brand-stone/50"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const val = (e.target as HTMLInputElement).value.trim();
+              <div className="space-y-1.5">
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Ex: Café especial..."
+                    className="flex-1 px-4 py-2.5 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-xs placeholder:text-brand-stone/50"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const val = (e.target as HTMLInputElement).value.trim();
+                        if (val && !differentials.includes(val)) {
+                          setDifferentials([...differentials, val]);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement;
+                      const val = input.value.trim();
                       if (val && !differentials.includes(val)) {
                         setDifferentials([...differentials, val]);
-                        (e.target as HTMLInputElement).value = '';
+                        input.value = '';
                       }
-                    }
-                  }}
-                />
-                <button 
-                  type="button"
-                  onClick={(e) => {
-                    const input = e.currentTarget.previousElementSibling as HTMLInputElement;
-                    const val = input.value.trim();
-                    if (val && !differentials.includes(val)) {
-                      setDifferentials([...differentials, val]);
-                      input.value = '';
-                    }
-                  }}
-                  className="px-4 py-2.5 bg-brand-linen text-brand-ink border border-brand-mist/50 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
-                >
-                  Ok
-                </button>
+                    }}
+                    className="px-4 py-2.5 bg-brand-linen text-brand-ink border border-brand-mist/50 rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
+                  >
+                    Ok
+                  </button>
+                </div>
+                <p className="text-[10px] text-brand-stone/60 font-light ml-1">
+                  Digite e pressione <span className="font-medium">Enter</span> para adicionar outros diferenciais.
+                </p>
               </div>
             </div>
           )}

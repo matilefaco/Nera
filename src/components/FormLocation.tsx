@@ -221,7 +221,7 @@ export const FormLocation = ({
             </div>
             <FormError message={errors.city} />
             <p className="text-[9px] text-brand-stone/70 font-light italic ml-1 mt-1">
-              Ajuda suas clientes a encontrarem você por região.
+              Sua cidade aparece na sua vitrine e ajuda clientes próximas a encontrarem você.
             </p>
           </div>
           <div className="space-y-1">

@@ -99,73 +99,73 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   
   if (lowerSpec.includes('maqui')) {
     exampleHeadline = '- Maquiadora: "Make para noivas, formandas e madrinhas"';
-    exampleBio = 'Exemplo de TOM: "Maquiadora para eventos sociais e fotos, priorizando durabilidade e um acabamento adaptado ao seu estilo. Recebo você no meu espaço apenas com horário marcado."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Maquiagem que valoriza seus traços com leveza. Atendimento tranquilo e atencioso, pensado para que você se sinta você mesma."';
     repertoire = "maquiagem social, noivas, madrinhas, formandas, maquiagem fotográfica, pele blindada, colorimetria, visagismo, maquiagem artística, airbrush, delineado esfumado, cut crease";
   } else if (lowerSpec.includes('estetic') || lowerSpec.includes('pele') || lowerSpec.includes('facial')) {
     exampleHeadline = '- Esteticista: "Limpeza de pele e protocolos faciais avançados"';
-    exampleBio = 'Exemplo de TOM: "Esteticista especializada na saúde da pele. Monto protocolos individualizados para cada necessidade, respeitando o seu tipo de pele em todas as etapas."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Cuidados faciais pensados para uma pele limpa, saudável e bem tratada. A ideia é criar uma rotina leve de cuidados que se encaixe no seu dia a dia."';
     repertoire = "limpeza de pele, peeling, microagulhamento, radiofrequência, LED terapia, protocolos faciais, hidratação facial, tratamento para acne, rejuvenescimento, revitalização, massagem facial, drenagem facial";
   } else if (lowerSpec.includes('lash') || lowerSpec.includes('cílios') || lowerSpec.includes('cilios')) {
     exampleHeadline = '- Lash Designer: "Fio a fio, volume russo e lifting"';
-    exampleBio = 'Exemplo de TOM: "Lash designer focada em entregar extensões de cílios com alta durabilidade, do clássico ao volume brasileiro, sempre em um ambiente confortável."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Cílios leves e confortáveis para quem gosta de um olhar mais desenhado sem exagero. O trabalho é feito preservando a saúde dos seus fios naturais."';
     repertoire = "fio a fio, volume brasileiro, volume russo, volume híbrido, mega volume, wet effect, cat eye, fox eye, lash lifting, lash botox, mapping, manutenção";
   } else if (lowerSpec.includes('sobrancelha')) {
     exampleHeadline = '- Sobrancelhas: "Design, henna e laminação"';
-    exampleBio = 'Exemplo de TOM: "Designer de sobrancelhas com foco em alinhar a assimetria do seu rosto. Utilizo técnicas modernas de aplicação de henna e fio a fio."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Design feito respeitando o desenho natural das suas sobrancelhas. Um cuidado pensado para deixar o olhar harmônico e muito natural."';
     repertoire = "henna, brow lamination, design estratégico, visagismo, alinhamento facial, correção de assimetria, fio a fio, coloração, tintura de sobrancelhas, epilação egípcia, mapeamento facial";
   } else if (lowerSpec.includes('cabel') || lowerSpec.includes('hair')) {
     exampleHeadline = '- Cabeleireira: "Corte, cor e tratamentos capilares"';
-    exampleBio = 'Exemplo de TOM: "Cabeleireira especializada em corte e coloração para cabelos cacheados. Todos os procedimentos são iniciados a partir da avaliação de saúde dos fios."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Um espaço para cuidar bem do cabelo. Um trabalho atencioso focado em manter o fio saudável e um corte que faça sentido na sua rotina."';
     repertoire = "corte feminino, corte bordado, cronograma capilar, reconstrução, nutrição, hidratação, balayage, morena iluminada, platinado, colorimetria, finalização de cachos, progressiva, botox capilar, mechas";
   } else if (lowerSpec.includes('bronze')) {
     exampleHeadline = '- Bronzeamento: "Bronze natural e marquinha perfeita"';
-    exampleBio = 'Exemplo de TOM: "Profissional focada em entregar um bronzeamento natural aliado à hidratação da pele. Utilizo um equipamento seguro, sem exposição nociva."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Um bronze tranquilo e bem cuidado, que valoriza a hidratação da pele e garante um tom bonito de forma bastante natural."';
     repertoire = "bronzeamento em fita, marquinha personalizada, hidratação pré sessão, hidratação pós sessão, bronze natural, uniformização, bronze gelado, banho de lua, esfoliação";
   } else if (lowerSpec.includes('trancista') || lowerSpec.includes('trança') || lowerSpec.includes('tranca')) {
     exampleHeadline = '- Trancista: "Especialista em tranças afro e penteados protetores"';
-    exampleBio = 'Exemplo de TOM: "Trancista com foco em tranças afro e estilos de trança protetores. Realizo um atendimento com tempo adequado para respeitar a saúde do seu cabelo natural."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Tranças feitas com carinho, técnica e paciência. Trabalho sempre pautado pelo cuidado com a textura e a saúde do seu cabelo natural."';
     repertoireSafe = "tranças afro, penteados protetores, estilos de trança, cuidados com cabelo natural";
     repertoireSpecific = "box braids, twist, fulani, crochet braids, nagô";
   } else if (lowerSpec.includes('micropigmentadora') || lowerSpec.includes('micropigmentação') || lowerSpec.includes('micro')) {
     exampleHeadline = '- Micropigmentação: "Micropigmentação labial e de sobrancelhas"';
-    exampleBio = 'Exemplo de TOM: "Micropigmentadora focada em resultados naturais e duradouros. Esclareço de antemão todas as dúvidas do procedimento e priorizo seu conforto."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "A micropigmentação aqui é para trazer praticidade. O resultado é sempre sutil, apenas realçando os traços originais da cliente."';
     repertoire = "fio a fio, shadow, ombré brows, nano brows, micropigmentação labial, neutralização labial, despigmentação, revitalização, delineado definitivo, microblanding";
   } else if (lowerSpec.includes('podolog') || lowerSpec.includes('podólog')) {
     exampleHeadline = '- Podologia: "Tratamento especializado e saúde dos pés"';
-    exampleBio = 'Exemplo de TOM: "Especialista em podologia, focada em cuidados preventivos e bem-estar. Atendimento voltado para a saúde integral dos seus pés."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Saúde e alívio para os pés através de um atendimento cuidadoso, limpo e sem pressa. Tratamentos para tratar incômodos e recuperar o bem-estar."';
     repertoireSafe = "saúde dos pés, cuidados preventivos, atendimento especializado, bem-estar dos pés";
     repertoireSpecific = "órteses, unhas encravadas, fissuras, micoses, corte técnico";
   } else if (lowerSpec.includes('masso') || lowerSpec.includes('massagem')) {
     exampleHeadline = '- Massoterapeuta: "Massagem relaxante, drenagem e liberação miofascial"';
-    exampleBio = 'Exemplo de TOM: "Massoterapeuta focada no relaxamento muscular e alívio de tensões, com infraestrutura montada para proporcionar um ambiente silencioso e tranquilo."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Massagem voltada a soltar a musculatura e trazer conforto para o corpo. Um espaço tranquilo, ideal para relaxar e fugir um pouco da rotina agitada."';
     repertoire = "drenagem linfática, relaxante, modeladora, miofascial, pedras quentes, shiatsu, reflexologia, ventosaterapia, massagem terapêutica, alívio de dor";
   } else if (lowerSpec.includes('terapeuta capilar') || lowerSpec.includes('terapia capilar')) {
     exampleHeadline = '- Terapeuta Capilar: "Tratamento de queda, caspa e saúde do couro cabeludo"';
-    exampleBio = 'Exemplo de TOM: "Terapeuta capilar dedicada à recuperação de fios. Organizo os protocolos de tratamento de acordo com sua avaliação para devolver a saúde do estroma capilar."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Terapia capilar levada a sério. Atendimentos focados em devolver a saúde do couro cabeludo e construir um fio mais forte ao longo do tempo."';
     repertoire = "análise capilar, queda, oleosidade, couro cabeludo, fototerapia, recuperação capilar, detox capilar, argiloterapia, alta frequência, alopecia, dermatite seborreica, tricologia";
   } else if (lowerSpec.includes('nail') || lowerSpec.includes('fibra')) {
     exampleHeadline = '- Nail Designer: "Especialista em fibra de vidro e nail art"';
-    exampleBio = 'Exemplo de TOM: "Nail designer atuando do alongamento em fibra de vidro clássico à nail art mais detalhada. Crio unhas resistentes e elegantes."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Unhas com acabamento delicado e visual natural para a rotina do dia a dia. Alongamentos bem feitos, resistentes e que não parecem artificiais."';
     repertoire = "fibra de vidro, gel, molde f1, encapsulamento, nail art, blindagem, manutenção, banho de gel, esmaltação em gel, francesinha reversa, baby boomer";
   } else if (lowerSpec.includes('manicure') || lowerSpec.includes('unha') || lowerSpec.includes('esmaltação')) {
     exampleHeadline = '- Manicure: "Esmaltação em gel e unhas naturais"';
-    exampleBio = 'Exemplo de TOM: "Manicure especializada em técnicas clássicas, esmaltação em gel e spa dos pés. Todo o meu material é 100% descartável ou esterilizado."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Cuidado clássico com as unhas. Foco em uma cutilagem limpa, esmaltação cuidadosa e materiais que garantem a assepsia durante todo o atendimento."';
     repertoire = "esmaltação em gel, banho de gel, blindagem, encapsulada, fibra de vidro, cutilagem russa, nail art, spa dos pés, manutenção, cutilagem contínua, unhas naturais";
   } else if (lowerSpec.includes('labial') || lowerSpec.includes('lábio') || lowerSpec.includes('labio')) {
     exampleHeadline = '- Designer Labial: "Revitalização e design de lábios"';
-    exampleBio = 'Exemplo de TOM: "Especializada em revitalização labial com técnicas modernas para realçar a coloração de forma gradual, garantindo um resultado natural."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Um cuidado leve para os lábios. Os procedimentos ajudam na textura e devolvem uma cor saudável sem aspecto pesado ou marcado demais."';
     repertoire = "revitalização labial, neutralização labial, micropigmentação labial, efeito batom, aquarela lips, hidra gloss, design de lábios";
   } else if (lowerSpec.includes('depiladora') || lowerSpec.includes('depilação')) {
     exampleHeadline = '- Depiladora: "Depilação a laser, cera e método egípcio"';
-    exampleBio = 'Exemplo de TOM: "Depiladora profissional utilizando cera quente ou método a laser. A prioridade é manter um procedimento ágil e seguro para peles sensíveis."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Depilação feita da forma mais ágil e indolor possível, respeitando a pele de cada pessoa e trabalhando de forma cautelosa."';
     repertoire = "cera quente, cera fria, método egípcio (linha), depilação facial, depilação corporal, pele sensível, depilação a laser, luz pulsada, epilação";
   } else if (lowerSpec.includes('piercing') || lowerSpec.includes('body piercer')) {
     exampleHeadline = '- Body Piercer: "Perfurações seguras e joias em titânio"';
-    exampleBio = 'Exemplo de TOM: "Body piercer focada em perfurações precisas com joias biocompatíveis. Acompanho todas as etapas de rotina para garantir uma boa cicatrização."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Perfurações corporais executadas com material adequado e técnica segura. Eu acompanho a evolução da pele de cada cliente para ajudar numa cicatrização tranquila."';
     repertoire = "perfurações seguras, joias em titânio, aço cirúrgico, biossegurança, perfuração auricular, perfuração corporal, microdermal, surface, downsize, anodização";
   } else {
     exampleHeadline = '- Profissional: "Atendimento especializado em beleza e bem-estar"';
-    exampleBio = 'Exemplo de TOM: "Profissional do setor de beleza e bem-estar, focada em técnicas precisas e atendimento acolhedor. Minha prioridade é realizar o serviço adequado para a sua necessidade."';
+    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Atendimento cuidadoso e transparente. Faço o possível para entregar um bom serviço, em um ambiente agradável e com o resultado que você procura."';
   }
 
   let repertoireSection = '';
@@ -210,29 +210,41 @@ INSTRUÇÕES EDITORIAIS CRÍTICAS (LEIA COM MÁXIMA ATENÇÃO):
 O tom exigido é "Conversa humana e profissional": transmita confiança através da clareza e naturalidade. Diga o que você faz de forma concreta, sem exageros.
 
 PALAVRAS E EXPRESSÕES ESTRITAMENTE PROIBIDAS (NÃO USE NUNCA):
+- Estruturas de Currículo / LinkedIn (PROIBIDAS): "profissional", "especializada", "especialista em", "alta durabilidade", "segura", "duradoura", "atendimento personalizado", "com qualidade", "alta qualidade", "com amor e dedicação", "com técnicas modernas", "experiência em", "sucesso em", "seguro e duradouro"
 - Marketing/coach/luxo: "premium", "luxo", "exclusiva", "excelência", "experiência única", "autoestima", "transformar vidas", "realçar sua beleza", "revelar sua melhor versão", "soberana", "atendimento diferenciado", "resultados extraordinários", "alto padrão", "alta performance", "incrível", "maravilhosa"
 - Cafonas/Artificiais: "cuido das suas unhas como cuido das minhas", "quando você sair, vai querer voltar", "arte em cada milímetro", "olhar que hipnotiza", "beleza que transforma", "unhas dos sonhos", "cílios que falam por você"
 - Clínico/acadêmico: "biologia da pele", "anatomia", "avaliação criteriosa", "protocolos de biossegurança", "metodologia", "estrutura anatômica", "processos rigorosos", "procedimentos avançados", "excelência técnica", "fisiologia"
-- GENÉRICOS (EVITE FORTEMENTE): "Trabalho com cuidado", "Faço com carinho", "Atenção aos detalhes", "Resultados duradouros", "Atendimento personalizado", "Qualidade em cada detalhe", "Carinho e dedicação"
+- GENÉRICOS (EVITE FORTEMENTE): "Trabalho com cuidado", "Faço com carinho", "Atenção aos detalhes", "Resultados duradouros", "Atendimento personalizado", "Qualidade em cada detalhe", "Carinho e dedicação", "Focado em", "priorizando", "buscando", "meu objetivo é"
 
-DIRETRIZES DE ESTILO PARA HEADLINE (FOCO EM CONCRETUDE):
-1. A headline NÃO precisa ser inspiradora, emocional ou publicitária. Priorize clareza.
-2. Prefira citar TÉCNICA, SERVIÇO, ESPECIALIDADE, FORMATO DE ATENDIMENTO do que adjetivos genéricos.
-3. SEMPRE cite pelo menos um elemento concreto ou técnica da sua profissão na headline. 
-4. Pergunte-se: "Essa frase serviria para qualquer profissional da plataforma?". Se SIM, crie outra mais específica.
-Exemplos de direção correta, focados em concretude (para entender estilo):
-${exampleHeadline}
+DIRETRIZES DE ESTILO PARA HEADLINE (FOCO EM CONCRETUDE E NATURALIDADE):
+1. A headline deve ser CURTA, RESPIRÁVEL e DIRETA. Ela ficará na área principal da sua vitrine.
+2. A headline NUNCA deve soar como um currículo, perfil de LinkedIn ou marketplace genérico (EXATAMENTE PROIBIDO: "Profissional especializada em X", "Designer profissional", "Especialista em beleza").
+3. Prefira combinar uma MATERIALIDADE/TÉCNICA com o RESULTADO VISUAL REAL. (ex: "[Nome da Técnica] com [Aspecto Natural]").
+4. A headline DEVE ter MUITA naturalidade. Sem excesso de adjetivos. É PROIBIDO usar palavras como "sofisticado", "refinado", "impecável", "excelência", "premium".
+Exemplos de direção correta (INSPIRAÇÃO ESTRUTURAL APENAS - É ESTRITAMENTE PROIBIDO COPIAR ESSAS FRASES):
+- Alongamentos naturais e leves para o dia a dia
+- Tranças bem cuidadas e alinhadas
+- Design cuidadoso respeitando seu formato natural
+- Cílios com volume sob medida
+- Cuidados faciais básicos e eficientes
+- Estética com foco em naturalidade
+- Esmaltação em gel fina e resistente
+Exemplos RUINS (PROIBIDOS NESSA IA: currículo, robótico, LinkedIn, genérico):
+- "Manicure segura e duradoura"
+- "Lash designer profissional"
+- "Micropigmentadora especializada"
+- "Atendimento personalizado de qualidade"
+- "Especialista em beleza"
+- "Técnica moderna e alta durabilidade"
 
-DIRETRIZES DE ESTILO PARA BIO (MUITO IMPORTANTE: FATOS CONCRETOS E VARIEDADE):
-Crie um texto de 1 a 3 frases curtas, escrito na 1ª pessoa.
-Sua bio deve parecer escrita por uma pessoa real descrevendo seu ofício, sem invenções.
-EVITE FORTEMENTE o padrão robótico de iniciar sempre com: "Trabalho com", "Faço", "Meu foco é" ou "Atendo por agendamento".
-Varie a estrutura das frases. Use formatos diferentes baseados em FATOS, como:
-- "Sou [Especialidade] há X anos..."
-- "Aqui você encontra..."
-- "Atendo principalmente com foco em..."
-- "Especializei-me em..."
-- "[Sua Especialidade] focada em..."
+DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PARECER ESCRITA POR IA OU COPYWRITER):
+1. Crie um texto de 1 a 2 frases curtas. 
+2. A bio deve ter ritmo humano, leitura ágil e natural. Escrita na 1ª pessoa.
+3. NUNCA tente provar competência, justificar experiência, ou adicionar um polimento artificial. Cuidado com o tom "premium/copywriter" enlatado.
+4. NUNCA soe como um currículo corporativo. PROIBIDO: "Com experiência de...", "Trabalho com técnicas avançadas...", "Sempre atualizada...", "Atendimento personalizado".
+5. NUNCA soe como manifesto luxuoso de branding. ESTRITAMENTE PROIBIDO usar excesso de intenção ou abstrações: "o objetivo é trazer", "focado em", "priorizando", "buscando", "acabamento sofisticado", "beleza duradoura", "respeito absoluto", "estrutura fina", "resultado impecável", "design refinado", "toque sofisticado", "experiência premium".
+6. Priorize a SIMPLICIDADE ELEGANTE: descreva a parte física, os atributos concretos do trabalho sem adornos publicitários. A naturalidade e o silêncio também são formas de elegância. Não preencha com adjetivos performáticos.
+7. ${exampleBio}
 
 REGRA DE PRECISÃO ABSOLUTA (PROIBIDO INVENTAR):
 - O repertório NÃO representa serviços confirmados. Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa qualquer técnica presente no repertório se ela não estiver nos DADOS DA PROFISSIONAL.
@@ -241,11 +253,10 @@ REGRA DE PRECISÃO ABSOLUTA (PROIBIDO INVENTAR):
 - NÃO invente motivações ou histórias ("Escolhi essa área porque...").
 - NÃO invente missões emocionais ("Quero ajudar você a se sentir...").
 Mencione apenas as suas técnicas, seus serviços, seu tempo de experiência e sua forma de trabalhar reais baseados nos DADOS DA PROFISSIONAL. Seja concreta. Fale de fatos reais, não de intenções românticas.
-${exampleBio}
 
 REGRAS ANTI-CÓPIA E CONTAMINAÇÃO:
 - A saída final deve usar somente termos compatíveis com a especialidade recebida em \`specialty\`. Nunca use técnicas, serviços ou palavras de outra profissão.
-- Os exemplos e diretrizes servem apenas para entender estilo. Nunca copie literalmente exemplos para a saída final.
+- Os exemplos e diretrizes servem APENAS para entender o estilo e a forma (curta, respirável). NUNCA copie literalmente as frases de exemplo para a saída final. Crie uma headline ORIGINAL para a usuária focada na especialidade dela.
 
 REGRAS ESTRITAS POR ESPECIALIDADE (BLOQUEIOS):
 - Se specialty for Maquiadora ou Maquiagem: proibir esmaltação, unha, gel, banho de gel, cutícula, sobrancelha, limpeza de pele, bronze.

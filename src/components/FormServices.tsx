@@ -338,7 +338,7 @@ export const FormServices = ({
                   <div className="mb-3">
                     <p className="text-[10px] font-medium text-brand-ink ml-1 mb-0.5">Sugestões para começar</p>
                     <p className="text-[9px] text-brand-stone font-light italic ml-1 mb-2">
-                      Você pode ajustar nome, duração e preço depois.
+                      Comece pelos serviços que você mais atende. Você pode editar tudo depois.
                     </p>
                     <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none -mx-2 px-2 md:mx-0 md:px-0">
                       {suggestions.map((sug, idx) => {
@@ -462,7 +462,7 @@ export const FormServices = ({
 
                   <div className="bg-brand-linen/40 p-5 rounded-3xl border border-dashed border-brand-mist/50 mt-4">
                     <p className="text-[10px] text-brand-stone font-medium leading-relaxed uppercase tracking-widest mb-2">
-                       A duração define os horários disponíveis para suas clientes.
+                       Esse é o tempo que você normalmente leva para realizar esse serviço.
                     </p>
                     {durationVal > 0 && slots > 0 && (
                       <p className="text-[10px] text-brand-stone font-light italic leading-relaxed">
