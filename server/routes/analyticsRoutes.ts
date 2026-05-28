@@ -93,59 +93,84 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   const lowerSpec = (specialty || '').toLowerCase();
   let exampleHeadline = '';
   let exampleBio = '';
+  let repertoire = '';
   
   if (lowerSpec.includes('maqui')) {
     exampleHeadline = '- Maquiadora: "Make para noivas, formandas e madrinhas"';
     exampleBio = 'Exemplo de TOM: "Maquiadora para eventos sociais e fotos, priorizando durabilidade e um acabamento adaptado ao seu estilo. Recebo você no meu espaço apenas com horário marcado."';
+    repertoire = "maquiagem social, noivas, madrinhas, formandas, maquiagem fotográfica, pele blindada, colorimetria, visagismo, maquiagem artística, airbrush, delineado esfumado, cut crease";
   } else if (lowerSpec.includes('estetic') || lowerSpec.includes('pele') || lowerSpec.includes('facial')) {
     exampleHeadline = '- Esteticista: "Limpeza de pele e protocolos faciais avançados"';
     exampleBio = 'Exemplo de TOM: "Esteticista especializada na saúde da pele. Monto protocolos individualizados para cada necessidade, respeitando o seu tipo de pele em todas as etapas."';
+    repertoire = "limpeza de pele, peeling, microagulhamento, radiofrequência, LED terapia, protocolos faciais, hidratação facial, tratamento para acne, rejuvenescimento, revitalização, massagem facial, drenagem facial";
   } else if (lowerSpec.includes('lash') || lowerSpec.includes('cílios') || lowerSpec.includes('cilios')) {
     exampleHeadline = '- Lash Designer: "Fio a fio, volume russo e lifting"';
     exampleBio = 'Exemplo de TOM: "Lash designer focada em entregar extensões de cílios com alta durabilidade, do clássico ao volume brasileiro, sempre em um ambiente confortável."';
+    repertoire = "fio a fio, volume brasileiro, volume russo, volume híbrido, mega volume, wet effect, cat eye, fox eye, lash lifting, lash botox, mapping, manutenção";
   } else if (lowerSpec.includes('sobrancelha')) {
     exampleHeadline = '- Sobrancelhas: "Design, henna e laminação"';
     exampleBio = 'Exemplo de TOM: "Designer de sobrancelhas com foco em alinhar a assimetria do seu rosto. Utilizo técnicas modernas de aplicação de henna e fio a fio."';
+    repertoire = "henna, brow lamination, design estratégico, visagismo, alinhamento facial, correção de assimetria, fio a fio, coloração, tintura de sobrancelhas, epilação egípcia, mapeamento facial";
   } else if (lowerSpec.includes('cabel') || lowerSpec.includes('hair')) {
     exampleHeadline = '- Cabeleireira: "Corte, cor e tratamentos capilares"';
     exampleBio = 'Exemplo de TOM: "Cabeleireira especializada em corte e coloração para cabelos cacheados. Todos os procedimentos são iniciados a partir da avaliação de saúde dos fios."';
+    repertoire = "corte feminino, corte bordado, cronograma capilar, reconstrução, nutrição, hidratação, balayage, morena iluminada, platinado, colorimetria, finalização de cachos, progressiva, botox capilar, mechas";
   } else if (lowerSpec.includes('bronze')) {
     exampleHeadline = '- Bronzeamento: "Bronze natural e marquinha perfeita"';
     exampleBio = 'Exemplo de TOM: "Profissional focada em entregar um bronzeamento natural aliado à hidratação da pele. Utilizo um equipamento seguro, sem exposição nociva."';
+    repertoire = "bronzeamento em fita, marquinha personalizada, hidratação pré sessão, hidratação pós sessão, bronze natural, uniformização, bronze gelado, banho de lua, esfoliação";
   } else if (lowerSpec.includes('trancista') || lowerSpec.includes('trança') || lowerSpec.includes('tranca')) {
     exampleHeadline = '- Trancista: "Tranças nagô, box braids e twist"';
     exampleBio = 'Exemplo de TOM: "Trancista com foco em tranças afro, box braids e penteados protetores. Realizo um atendimento com tempo adequado para respeitar a saúde do seu cabelo natural."';
+    repertoire = "box braids, nagô, twist, fulani, tranças afro, penteados protetores, entrelace, crochet braids, goddess braids, jumbo, manutenção de tranças";
   } else if (lowerSpec.includes('micropigmentadora') || lowerSpec.includes('micropigmentação') || lowerSpec.includes('micro')) {
     exampleHeadline = '- Micropigmentação: "Micropigmentação labial e de sobrancelhas"';
     exampleBio = 'Exemplo de TOM: "Micropigmentadora focada em resultados naturais e duradouros. Esclareço de antemão todas as dúvidas do procedimento e priorizo seu conforto."';
+    repertoire = "fio a fio, shadow, ombré brows, nano brows, micropigmentação labial, neutralização labial, despigmentação, revitalização, delineado definitivo, microblanding";
   } else if (lowerSpec.includes('podolog') || lowerSpec.includes('podólog')) {
     exampleHeadline = '- Podologia: "Tratamento especializado para saúde dos pés"';
     exampleBio = 'Exemplo de TOM: "Especialista em podologia preventiva e corretiva, desde o simples tratamento de calosidades até unhas encravadas. Atendimento voltado à saúde dos seus pés."';
+    repertoire = "podologia preventiva, calosidades, unhas encravadas, órteses, reflexologia podal, hidratação profunda, rissuras, tratamento de micoses, assepsia, corte técnico";
   } else if (lowerSpec.includes('masso') || lowerSpec.includes('massagem')) {
     exampleHeadline = '- Massoterapeuta: "Massagem relaxante, drenagem e liberação miofascial"';
     exampleBio = 'Exemplo de TOM: "Massoterapeuta focada no relaxamento muscular e alívio de tensões, com infraestrutura montada para proporcionar um ambiente silencioso e tranquilo."';
+    repertoire = "drenagem linfática, relaxante, modeladora, miofascial, pedras quentes, shiatsu, reflexologia, ventosaterapia, massagem terapêutica, alívio de dor";
   } else if (lowerSpec.includes('terapeuta capilar') || lowerSpec.includes('terapia capilar')) {
     exampleHeadline = '- Terapeuta Capilar: "Tratamento de queda, caspa e saúde do couro cabeludo"';
     exampleBio = 'Exemplo de TOM: "Terapeuta capilar dedicada à recuperação de fios. Organizo os protocolos de tratamento de acordo com sua avaliação para devolver a saúde do estroma capilar."';
+    repertoire = "análise capilar, queda, oleosidade, couro cabeludo, fototerapia, recuperação capilar, detox capilar, argiloterapia, alta frequência, alopecia, dermatite seborreica, tricologia";
   } else if (lowerSpec.includes('nail') || lowerSpec.includes('fibra')) {
     exampleHeadline = '- Nail Designer: "Especialista em fibra de vidro e nail art"';
     exampleBio = 'Exemplo de TOM: "Nail designer atuando do alongamento em fibra de vidro clássico à nail art mais detalhada. Crio unhas resistentes e elegantes."';
+    repertoire = "fibra de vidro, gel, molde f1, encapsulamento, nail art, blindagem, manutenção, banho de gel, esmaltação em gel, francesinha reversa, baby boomer";
   } else if (lowerSpec.includes('manicure') || lowerSpec.includes('unha') || lowerSpec.includes('esmaltação')) {
     exampleHeadline = '- Manicure: "Esmaltação em gel e unhas naturais"';
     exampleBio = 'Exemplo de TOM: "Manicure especializada em técnicas clássicas, esmaltação em gel e spa dos pés. Todo o meu material é 100% descartável ou esterilizado."';
+    repertoire = "esmaltação em gel, banho de gel, blindagem, encapsulada, fibra de vidro, cutilagem russa, nail art, spa dos pés, manutenção, cutilagem contínua, unhas naturais";
   } else if (lowerSpec.includes('labial') || lowerSpec.includes('lábio') || lowerSpec.includes('labio')) {
     exampleHeadline = '- Designer Labial: "Revitalização e design de lábios"';
     exampleBio = 'Exemplo de TOM: "Especializada em revitalização labial com técnicas modernas para realçar a coloração de forma gradual, garantindo um resultado natural."';
+    repertoire = "revitalização labial, neutralização labial, micropigmentação labial, efeito batom, aquarela lips, hidra gloss, design de lábios";
   } else if (lowerSpec.includes('depiladora') || lowerSpec.includes('depilação')) {
     exampleHeadline = '- Depiladora: "Depilação a laser, cera e método egípcio"';
     exampleBio = 'Exemplo de TOM: "Depiladora profissional utilizando cera quente ou método a laser. A prioridade é manter um procedimento ágil e seguro para peles sensíveis."';
+    repertoire = "cera quente, cera fria, método egípcio (linha), depilação facial, depilação corporal, pele sensível, depilação a laser, luz pulsada, epilação";
   } else if (lowerSpec.includes('piercing') || lowerSpec.includes('body piercer')) {
     exampleHeadline = '- Body Piercer: "Perfurações seguras e joias em titânio"';
     exampleBio = 'Exemplo de TOM: "Body piercer focada em perfurações precisas com joias biocompatíveis. Acompanho todas as etapas de rotina para garantir uma boa cicatrização."';
+    repertoire = "perfurações seguras, joias em titânio, aço cirúrgico, biossegurança, perfuração auricular, perfuração corporal, microdermal, surface, downsize, anodização";
   } else {
     exampleHeadline = '- Profissional: "Atendimento especializado em beleza e bem-estar"';
     exampleBio = 'Exemplo de TOM: "Profissional do setor de beleza e bem-estar, focada em técnicas precisas e atendimento acolhedor. Minha prioridade é realizar o serviço adequado para a sua necessidade."';
   }
+
+  const repertoireSection = repertoire 
+    ? `\nREPERTÓRIO TÉCNICO OPCIONAL (USO LIVRE):
+Para variar suas respostas e deixá-las menos repetitivas, você pode usar os termos técnicos abaixo. 
+Eles servem APENAS para enriquecer sua escolha de vocabulário, desde que se encaixem perfeitamente no estilo da profissional.
+Técnicas desta área: ${repertoire}
+ATENÇÃO: Não liste todas. Escolha 1, 2 ou no máximo 3 para dar concretude sem ficar artificial.\n` 
+    : '';
 
   try {
     const prompt = `Você é uma profissional real da área de beleza e bem-estar no Brasil, descrevendo seu próprio trabalho para clientes no seu perfil ou Instagram.
@@ -160,7 +185,7 @@ DADOS DA PROFISSIONAL:
 - Tempo na área: ${yearsExperience ? yearsExperience : 'Profissional com experiência'}
 - Estilo: ${Array.isArray(serviceStyle) ? serviceStyle.join(', ') : (serviceStyle || 'Cuidadoso')}
 - Diferenciais focais: ${Array.isArray(differentials) ? differentials.join(', ') : (differentials || 'Bom atendimento')}
-
+${repertoireSection}
 INSTRUÇÕES EDITORIAIS CRÍTICAS (LEIA COM MÁXIMA ATENÇÃO):
 O tom exigido é "Conversa humana e profissional": transmita confiança através da clareza e naturalidade. Diga o que você faz de forma concreta, sem exageros.
 

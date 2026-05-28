@@ -378,7 +378,7 @@ export const FormServices = ({
                     type="text" 
                     value={service.name} 
                     onChange={(e) => updateService(index, 'name', e.target.value)} 
-                    placeholder="Ex: Consultoria de Imagem" 
+                    placeholder="Ex: Manicure completa" 
                     className={cn(
                       "w-full px-6 py-4 bg-brand-parchment border rounded-2xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                       errors[index]?.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20 font-medium" : "border-brand-mist"
@@ -473,7 +473,7 @@ export const FormServices = ({
                 </div>
 
                 <div className="md:col-span-1 space-y-2">
-                  <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Valor do serviço (Obrigatório) <span className="text-brand-terracotta">*</span></label>
+                  <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Valor do serviço <span className="text-brand-terracotta">*</span></label>
                   <div className="relative">
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-brand-mist/40" size={14} />
                     <input 

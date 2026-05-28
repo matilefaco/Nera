@@ -227,7 +227,7 @@ export const FormLocation = ({
           <div className="space-y-1">
             {showLabels && (
               <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-0.5 block">
-                Bairro base
+                Bairro base <span className="text-brand-terracotta">*</span>
               </label>
             )}
             <input 

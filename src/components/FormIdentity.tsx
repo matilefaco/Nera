@@ -476,11 +476,11 @@ export const FormIdentity = ({
             <div className="space-y-2">
               {showLabels && (
                 <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
-                  Telefone para Notificações <span className="text-brand-terracotta">*</span>
+                  Seu WhatsApp <span className="text-brand-terracotta">*</span>
                 </label>
               )}
               <p className="text-[10px] text-brand-stone font-light mt-1 ml-1 mb-2">
-                Usado para avisos importantes sobre os agendamentos da sua agenda.
+                Suas clientes vão te chamar por aqui. Também usamos esse número para avisos de agendamento.
               </p>
               <input 
                 type="tel" 
@@ -583,7 +583,7 @@ export const FormIdentity = ({
                   <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
                     Crie seu link profissional <span className="text-brand-terracotta">*</span>
                   </label>
-                  <p className="text-[9px] text-brand-stone/60 font-light mt-0 mb-3 ml-1">Esse será o endereço público da sua vitrine na Nera.</p>
+                  <p className="text-[9px] text-brand-stone/60 font-light mt-0 mb-3 ml-1">É o link que você compartilha com suas clientes.</p>
                 </>
               )}
               <div className={cn(

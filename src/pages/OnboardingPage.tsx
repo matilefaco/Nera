@@ -1551,7 +1551,7 @@ export default function OnboardingPage() {
                       <span>Publicando...</span>
                     </>
                   ) : (
-                    <>Publicar minha agenda <CheckCircle2 size={18} /></>
+                    <>Publicar minha vitrine <CheckCircle2 size={18} /></>
                   )}
                 </button>
               </div>
@@ -1582,7 +1582,7 @@ export default function OnboardingPage() {
               <div className="space-y-4">
                 <h1 className="text-5xl font-serif font-normal text-brand-ink">✨ Sua página profissional está pronta</h1>
                 <p className="text-brand-stone text-lg max-w-md mx-auto font-light">
-                  Agora suas clientes já podem conhecer seu trabalho, consultar seus horários e solicitar agendamentos.
+                  Compartilhe seu link. Suas clientes já podem te encontrar e agendar.
                 </p>
               </div>
 
