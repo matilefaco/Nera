@@ -94,6 +94,8 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   let exampleHeadline = '';
   let exampleBio = '';
   let repertoire = '';
+  let repertoireSafe = '';
+  let repertoireSpecific = '';
   
   if (lowerSpec.includes('maqui')) {
     exampleHeadline = '- Maquiadora: "Make para noivas, formandas e madrinhas"';
@@ -120,17 +122,19 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
     exampleBio = 'Exemplo de TOM: "Profissional focada em entregar um bronzeamento natural aliado à hidratação da pele. Utilizo um equipamento seguro, sem exposição nociva."';
     repertoire = "bronzeamento em fita, marquinha personalizada, hidratação pré sessão, hidratação pós sessão, bronze natural, uniformização, bronze gelado, banho de lua, esfoliação";
   } else if (lowerSpec.includes('trancista') || lowerSpec.includes('trança') || lowerSpec.includes('tranca')) {
-    exampleHeadline = '- Trancista: "Tranças nagô, box braids e twist"';
-    exampleBio = 'Exemplo de TOM: "Trancista com foco em tranças afro, box braids e penteados protetores. Realizo um atendimento com tempo adequado para respeitar a saúde do seu cabelo natural."';
-    repertoire = "box braids, nagô, twist, fulani, tranças afro, penteados protetores, entrelace, crochet braids, goddess braids, jumbo, manutenção de tranças";
+    exampleHeadline = '- Trancista: "Especialista em tranças afro e penteados protetores"';
+    exampleBio = 'Exemplo de TOM: "Trancista com foco em tranças afro e estilos de trança protetores. Realizo um atendimento com tempo adequado para respeitar a saúde do seu cabelo natural."';
+    repertoireSafe = "tranças afro, penteados protetores, estilos de trança, cuidados com cabelo natural";
+    repertoireSpecific = "box braids, twist, fulani, crochet braids, nagô";
   } else if (lowerSpec.includes('micropigmentadora') || lowerSpec.includes('micropigmentação') || lowerSpec.includes('micro')) {
     exampleHeadline = '- Micropigmentação: "Micropigmentação labial e de sobrancelhas"';
     exampleBio = 'Exemplo de TOM: "Micropigmentadora focada em resultados naturais e duradouros. Esclareço de antemão todas as dúvidas do procedimento e priorizo seu conforto."';
     repertoire = "fio a fio, shadow, ombré brows, nano brows, micropigmentação labial, neutralização labial, despigmentação, revitalização, delineado definitivo, microblanding";
   } else if (lowerSpec.includes('podolog') || lowerSpec.includes('podólog')) {
-    exampleHeadline = '- Podologia: "Tratamento especializado para saúde dos pés"';
-    exampleBio = 'Exemplo de TOM: "Especialista em podologia preventiva e corretiva, desde o simples tratamento de calosidades até unhas encravadas. Atendimento voltado à saúde dos seus pés."';
-    repertoire = "podologia preventiva, calosidades, unhas encravadas, órteses, reflexologia podal, hidratação profunda, rissuras, tratamento de micoses, assepsia, corte técnico";
+    exampleHeadline = '- Podologia: "Tratamento especializado e saúde dos pés"';
+    exampleBio = 'Exemplo de TOM: "Especialista em podologia, focada em cuidados preventivos e bem-estar. Atendimento voltado para a saúde integral dos seus pés."';
+    repertoireSafe = "saúde dos pés, cuidados preventivos, atendimento especializado, bem-estar dos pés";
+    repertoireSpecific = "órteses, unhas encravadas, fissuras, micoses, corte técnico";
   } else if (lowerSpec.includes('masso') || lowerSpec.includes('massagem')) {
     exampleHeadline = '- Massoterapeuta: "Massagem relaxante, drenagem e liberação miofascial"';
     exampleBio = 'Exemplo de TOM: "Massoterapeuta focada no relaxamento muscular e alívio de tensões, com infraestrutura montada para proporcionar um ambiente silencioso e tranquilo."';
@@ -164,16 +168,29 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
     exampleBio = 'Exemplo de TOM: "Profissional do setor de beleza e bem-estar, focada em técnicas precisas e atendimento acolhedor. Minha prioridade é realizar o serviço adequado para a sua necessidade."';
   }
 
-  const repertoireSection = repertoire 
-    ? `\nREPERTÓRIO TÉCNICO DA PROFISSÃO (CONTEXTO GERAL):
+  let repertoireSection = '';
+  
+  if (repertoireSafe && repertoireSpecific) {
+    repertoireSection = `\nREPERTÓRIO TÉCNICO DA PROFISSÃO (DIVIDIDO EM 2 NÍVEIS):
+
+1. REPERTÓRIO SEGURO (USO LIVRE):
+Pode ser usado livremente para descrever a profissão, pois são descrições amplas da área.
+Termos seguros: ${repertoireSafe}
+
+2. REPERTÓRIO ESPECÍFICO (USO RESTRITO E BLOQUEADO):
+SÃO TÉCNICAS E PROCEDIMENTOS ESPECÍFICOS. Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa qualquer técnica abaixo se não houver confirmação explícita nos DADOS DA PROFISSIONAL.
+Apenas cite essas técnicas se a usuária as forneceu.
+Técnicas estritas (proibido inventar): ${repertoireSpecific}\n`;
+  } else if (repertoire) {
+    repertoireSection = `\nREPERTÓRIO TÉCNICO DA PROFISSÃO (CONTEXTO GERAL):
 O repertório técnico serve apenas para compreender o universo daquela profissão.
 O repertório NÃO representa serviços confirmados.
 Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa uma técnica específica apenas porque ela existe no repertório.
 Uma técnica só pode ser apresentada como serviço realizado quando ela tiver sido explicitamente informada pela profissional nos DADOS DA PROFISSIONAL.
 Quando não houver informação suficiente, utilize descrições amplas da área de atuação.
 
-Técnicas da área para contexto: ${repertoire}\n` 
-    : '';
+Técnicas da área para contexto: ${repertoire}\n`;
+  }
 
   try {
     const prompt = `Você é uma profissional real da área de beleza e bem-estar no Brasil, descrevendo seu próprio trabalho para clientes no seu perfil ou Instagram.
