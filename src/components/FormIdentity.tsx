@@ -277,7 +277,7 @@ export const FormIdentity = ({
             <div className="space-y-1.5 flex flex-col pt-2">
               {showLabels && (
                 <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
-                  Tempo de Experiência
+                  Há quanto tempo você atende?
                 </label>
               )}
               <div className="flex flex-wrap gap-2">

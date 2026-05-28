@@ -59,9 +59,9 @@ export const OnboardingLivePreview = ({
             
             <p className={cn(
               "text-[11px] font-light mt-3 line-clamp-2",
-              headline ? "text-brand-stone" : "text-brand-stone/30 italic"
+              headline ? "text-brand-stone" : "text-brand-stone/40"
             )}>
-              {headline || 'Sua headline aparecerá aqui...'}
+              {headline || 'Atendimento exclusivo com foco em resultados naturais.'}
             </p>
           </div>
         </div>

@@ -30,15 +30,15 @@ import SilentConfirmModal from '../components/SilentConfirmModal';
 
 const IDENTITY_DIFFERENTIALS = [
   'Pontualidade',
-  'Biossegurança',
-  'Atendimento personalizado',
-  'Produtos premium',
+  'Biossegurança rigorosa',
+  'Atendimento focado',
+  'Ativos de alta performance',
   'Ambiente confortável',
-  'Técnica avançada',
+  'Técnica baseada em fundamentos',
   'Resultado duradouro',
-  'Atendimento exclusivo',
-  'Naturalidade',
-  'Experiência comprovada'
+  'Acompanhamento contínuo',
+  'Estrutura natural',
+  'Experiência técnica'
 ];
 
 const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));

@@ -33,7 +33,7 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
                 transition={{ delay: 0.1 }}
                 className="text-[clamp(28px,8vw,36px)] md:text-5xl font-serif text-brand-ink leading-tight"
               >
-                Excelência e <em className="italic">Precisão</em>
+                Técnica e <em className="italic">Precisão</em>
               </motion.h2>
               <motion.p 
                 initial={{ opacity: 0, y: 20 }}
@@ -44,7 +44,7 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
               >
                 {((customBio || profile.bio) && isSanitizedContent(customBio || profile.bio)) 
                   ? (customBio || profile.bio) 
-                  : 'Dedicada a realçar sua melhor versão com naturalidade.'}
+                  : 'Protocolos focados em resultados duradouros e respeito à estrutura natural.'}
               </motion.p>
             </div>
 

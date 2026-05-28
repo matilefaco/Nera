@@ -64,59 +64,199 @@ export const FormServices = ({
       return [
         { name: 'Atendimento personalizado', duration: 60 },
         { name: 'Consulta inicial', duration: 30 },
-        { name: 'Serviço principal', duration: 60 }
+        { name: 'Avaliação', duration: 30 },
+        { name: 'Serviço principal', duration: 60 },
+        { name: 'Manutenção', duration: 45 },
+        { name: 'Retorno', duration: 30 }
       ];
     }
     
     // Normalize string: lowercase, remove accents
     const s = spec.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
-    if (s.includes('lash') || s.includes('cilio')) {
+    if (s.includes('bronzeamento') || s.includes('bronze')) {
       return [
-        { name: 'Extensão fio a fio', duration: 120 },
-        { name: 'Volume brasileiro', duration: 120 },
-        { name: 'Manutenção de cílios', duration: 60 }
+        { name: 'Bronzeamento Natural', duration: 90 },
+        { name: 'Bronzeamento a Jato', duration: 45 },
+        { name: 'Bronzeamento Gelado', duration: 60 },
+        { name: 'Banho de Lua', duration: 45 },
+        { name: 'Esfoliação Corporal', duration: 45 },
+        { name: 'Bronzeamento com Fita', duration: 90 },
+        { name: 'Sessão de Retoque', duration: 30 },
+        { name: 'Hidratação Pós-Bronze', duration: 30 }
       ];
     }
-    if (s.includes('sobrancelha') || s.includes('micropigmentadora')) {
+
+    if (s.includes('masso') || s.includes('massagem')) {
       return [
-        { name: 'Design de sobrancelhas', duration: 60 },
-        { name: 'Design com henna', duration: 60 },
-        { name: 'Brow lamination', duration: 90 }
+        { name: 'Massagem Relaxante', duration: 60 },
+        { name: 'Drenagem Linfática', duration: 60 },
+        { name: 'Massagem Modeladora', duration: 60 },
+        { name: 'Massagem Terapêutica', duration: 60 },
+        { name: 'Ventosaterapia', duration: 45 },
+        { name: 'Pedras Quentes', duration: 90 },
+        { name: 'Reflexologia Podal', duration: 45 },
+        { name: 'Massagem Desportiva', duration: 60 },
+        { name: 'Drenagem Pós-Operatória', duration: 60 }
       ];
     }
+
+    if (s.includes('terapeuta capilar') || s.includes('terapia capilar')) {
+      return [
+        { name: 'Avaliação Capilar', duration: 60 },
+        { name: 'Detox Capilar', duration: 60 },
+        { name: 'Tratamento de Queda', duration: 60 },
+        { name: 'Laserterapia Capilar', duration: 45 },
+        { name: 'Microagulhamento Capilar', duration: 60 },
+        { name: 'Ozonioterapia Capilar', duration: 45 },
+        { name: 'Alta Frequência Capilar', duration: 30 },
+        { name: 'Argiloterapia Capilar', duration: 60 }
+      ];
+    }
+
+    if (s.includes('micropigmentadora') || s.includes('micropigmentacao')) {
+      return [
+        { name: 'Micropigmentação Fio a Fio', duration: 120 },
+        { name: 'Micropigmentação Shadow', duration: 120 },
+        { name: 'Micropigmentação Labial', duration: 150 },
+        { name: 'Revitalização Labial', duration: 120 },
+        { name: 'Retoque de Micropigmentação', duration: 60 },
+        { name: 'Neutralização de Lábios', duration: 120 },
+        { name: 'Delineado de Olhos', duration: 120 },
+        { name: 'Despigmentação a Laser', duration: 60 },
+        { name: 'Camuflagem de Olheiras', duration: 90 }
+      ];
+    }
+
+    if (s.includes('trancista') || s.includes('tranca')) {
+      return [
+        { name: 'Tranças Box Braids', duration: 240 },
+        { name: 'Tranças Nagô', duration: 120 },
+        { name: 'Knotless Braids', duration: 240 },
+        { name: 'Tranças Fulani', duration: 180 },
+        { name: 'Goddess Braids', duration: 180 },
+        { name: 'Twist', duration: 180 },
+        { name: 'Entrelace', duration: 150 },
+        { name: 'Manutenção de Tranças', duration: 90 },
+        { name: 'Remoção de Tranças', duration: 60 }
+      ];
+    }
+
+    if (s.includes('depila')) {
+      return [
+        { name: 'Depilação Íntima (Virilha)', duration: 30 },
+        { name: 'Depilação Meia Perna', duration: 30 },
+        { name: 'Depilação Perna Inteira', duration: 45 },
+        { name: 'Depilação Axilas', duration: 15 },
+        { name: 'Depilação Buço', duration: 15 },
+        { name: 'Sobrancelha na Cera', duration: 15 },
+        { name: 'Depilação Braços', duration: 30 },
+        { name: 'Sessão Laser (Área Pequena)', duration: 30 },
+        { name: 'Depilação Costas', duration: 30 }
+      ];
+    }
+
     if (s.includes('maqui')) {
       return [
-        { name: 'Maquiagem social', duration: 60 },
-        { name: 'Maquiagem para noiva', duration: 120 },
-        { name: 'Produção para formanda', duration: 90 }
+        { name: 'Maquiagem Social', duration: 60 },
+        { name: 'Maquiagem para Noiva', duration: 120 },
+        { name: 'Maquiagem para Madrinha', duration: 60 },
+        { name: 'Maquiagem para Formanda', duration: 90 },
+        { name: 'Maquiagem Fotográfica', duration: 90 },
+        { name: 'Teste de Maquiagem', duration: 90 },
+        { name: 'Maquiagem com Penteado', duration: 150 },
+        { name: 'Curso de Automaquiagem', duration: 180 }
       ];
     }
-    if (s.includes('nail') || s.includes('unha') || s.includes('manicure')) {
+
+    if (s.includes('estetic') || s.includes('tto')) {
       return [
-        { name: 'Manicure', duration: 60 },
-        { name: 'Banho de gel', duration: 90 },
-        { name: 'Alongamento de unhas', duration: 120 }
+        { name: 'Limpeza de Pele Profunda', duration: 90 },
+        { name: 'Limpeza de Pele Simples', duration: 60 },
+        { name: 'Peeling Químico', duration: 60 },
+        { name: 'Peeling de Diamante', duration: 45 },
+        { name: 'Microagulhamento Facial', duration: 60 },
+        { name: 'Drenagem Linfática Facial', duration: 45 },
+        { name: 'Hidratação Facial Profunda', duration: 60 },
+        { name: 'Radiofrequência Facial', duration: 45 },
+        { name: 'Tratamento para Acne', duration: 60 }
       ];
     }
-    if (s.includes('estetic') || s.includes('masso') || s.includes('depila') || s.includes('tto')) {
+
+    if (s.includes('cabel') || s.includes('hair')) {
       return [
-        { name: 'Limpeza de pele', duration: 60 },
-        { name: 'Drenagem linfática', duration: 60 },
-        { name: 'Peeling facial', duration: 60 }
+        { name: 'Corte Feminino', duration: 60 },
+        { name: 'Corte Masculino', duration: 45 },
+        { name: 'Escova Modeladora', duration: 60 },
+        { name: 'Coloração Raiz', duration: 90 },
+        { name: 'Coloração Global', duration: 120 },
+        { name: 'Mechas / Luzes', duration: 240 },
+        { name: 'Morena Iluminada', duration: 180 },
+        { name: 'Progressiva / Selagem', duration: 180 },
+        { name: 'Cronograma Capilar', duration: 60 },
+        { name: 'Penteado', duration: 90 }
       ];
     }
-    if (s.includes('cabel') || s.includes('trancista') || s.includes('terapeuta capilar') || s.includes('hair')) {
+
+    if (s.includes('sobrancelha')) {
       return [
-        { name: 'Corte feminino', duration: 60 },
-        { name: 'Escova', duration: 60 },
-        { name: 'Coloração', duration: 120 }
+        { name: 'Design de Sobrancelhas', duration: 30 },
+        { name: 'Design com Henna', duration: 60 },
+        { name: 'Brow Lamination', duration: 60 },
+        { name: 'Retoque de Design', duration: 30 },
+        { name: 'Micropigmentação Fio a Fio', duration: 120 },
+        { name: 'Micropigmentação Shadow', duration: 120 },
+        { name: 'Retoque de Micropigmentação', duration: 60 },
+        { name: 'Depilação Facial (Linha)', duration: 30 }
       ];
     }
+
+    if (s.includes('lash') || s.includes('cilio')) {
+      return [
+        { name: 'Extensão Fio a Fio', duration: 120 },
+        { name: 'Volume Brasileiro', duration: 120 },
+        { name: 'Volume Russo', duration: 150 },
+        { name: 'Mega Volume', duration: 180 },
+        { name: 'Lash Lifting', duration: 60 },
+        { name: 'Manutenção de Extensão', duration: 90 },
+        { name: 'Remoção de Extensão', duration: 30 },
+        { name: 'Coloração de Cílios', duration: 30 }
+      ];
+    }
+
+    if (s.includes('nail')) {
+      return [
+        { name: 'Alongamento em Gel', duration: 120 },
+        { name: 'Alongamento em Fibra', duration: 120 },
+        { name: 'Manutenção de Alongamento', duration: 90 },
+        { name: 'Banho de Gel', duration: 90 },
+        { name: 'Esmaltação em Gel', duration: 60 },
+        { name: 'Blindagem', duration: 60 },
+        { name: 'Nail Art', duration: 30 },
+        { name: 'Remoção de Alongamento', duration: 45 }
+      ];
+    }
+
+    if (s.includes('manicure') || s.includes('unha')) {
+      return [
+        { name: 'Manicure e Pedicure', duration: 120 },
+        { name: 'Manicure Simples', duration: 60 },
+        { name: 'Pedicure Simples', duration: 60 },
+        { name: 'Esmaltação em Gel', duration: 60 },
+        { name: 'Banho de Gel', duration: 90 },
+        { name: 'Spa dos Pés', duration: 45 },
+        { name: 'Cutilagem Express', duration: 30 },
+        { name: 'Plástica dos Pés', duration: 60 }
+      ];
+    }
+
     return [
       { name: 'Atendimento personalizado', duration: 60 },
       { name: 'Consulta inicial', duration: 30 },
-      { name: 'Serviço principal', duration: 60 }
+      { name: 'Avaliação', duration: 30 },
+      { name: 'Serviço principal', duration: 60 },
+      { name: 'Manutenção', duration: 45 },
+      { name: 'Retorno', duration: 30 }
     ];
   };
 

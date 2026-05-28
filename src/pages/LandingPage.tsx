@@ -349,7 +349,7 @@ export default function LandingPage() {
         </div>
         <div className="footer-bottom">
           <span className="footer-copy">© 2026 Nera · Feita com intenção no Brasil 🇧🇷</span>
-          <span className="footer-copy">Para profissionais que valorizam excelência</span>
+          <span className="footer-copy">Para profissionais que valorizam técnica</span>
         </div>
       </footer>
     </div>

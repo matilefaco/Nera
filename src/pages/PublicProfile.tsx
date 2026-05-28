@@ -200,15 +200,15 @@ function PublicProfileContent() {
           city: 'São Paulo',
           neighborhood: 'Jardins',
           serviceMode: 'hybrid',
-          headline: 'Especialista em Design de Sobrancelhas Naturais',
-          bio: 'Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica sem transformações artificiais. Cada traço é pensado para valorizar o seu olhar de forma única e elegante.',
+          headline: 'Design anatômico de sobrancelhas e harmonização',
+          bio: 'Trabalho com técnicas avançadas de design de sobrancelhas, focando em anatomia e biossegurança. Realizo avaliações cuidadosas antes de qualquer procedimento para garantir resultados naturais e duradouros.',
           avatar: 'https://i.imgur.com/gBdf3tO.png',
           coverImage: 'https://images.unsplash.com/photo-1600125867375-9c5ae5cf61ac?q=80&w=1200&auto=format&fit=crop',
           professionalIdentity: {
             yearsExperience: '8',
             mainSpecialty: 'Design de Sobrancelhas',
             subSpecialties: ['Brow Lamination', 'Micropigmentação Natural', 'Design com Henna'],
-            serviceStyle: ['Minimalista e Natural', 'Premium e Personalizado'],
+            serviceStyle: ['Minimalista e Natural', 'Técnico e Personalizado'],
             differentials: ['Biossegurança rigorosa', 'Atendimento pontual', 'Produtos de alta performance']
           },
           profileTheme: {
@@ -245,12 +245,12 @@ function PublicProfileContent() {
         
         const HELENA_SERVICES = [
           { id: '1', name: 'Sobrancelhas Harmonizadas', price: 150, duration: 45, description: 'Sobrancelhas alinhadas ao seu rosto, com resultado natural e harmonioso que valoriza seu olhar.' },
-          { id: '2', name: 'Brow Lamination Premium', price: 280, duration: 60, description: 'Efeito de sobrancelhas cheias e disciplinadas, ideal para quem busca volume com elegância.' },
-          { id: '3', name: 'Micropigmentação Soft', price: 950, duration: 150, description: 'Preenchimento fio a fio ultra-realista para quem deseja acordar pronta todos os dias.' }
+          { id: '2', name: 'Brow Lamination Estrutural', price: 280, duration: 60, description: 'Efeito de sobrancelhas cheias e disciplinadas, focado em estrutura e alinhamento duradouro.' },
+          { id: '3', name: 'Micropigmentação Soft', price: 950, duration: 150, description: 'Preenchimento fio a fio ultra-realista para quem deseja praticidade e correção de falhas.' }
         ];
 
         const HELENA_REVIEWS = [
-          { id: '1', comment: 'Trabalho impecável! A Helena conseguiu manter a naturalidade que eu tanto queria.', firstName: 'Mariana', neighborhood: 'Pinheiros', rating: 5, createdAt: new Date().toISOString() },
+          { id: '1', comment: 'Técnica muito segura! A Helena conseguiu manter a naturalidade que eu tanto queria.', firstName: 'Mariana', neighborhood: 'Pinheiros', rating: 5, createdAt: new Date().toISOString() },
           { id: '2', comment: 'Profissional super atenciosa, o estúdio é lindo e o resultado superou minhas expectativas.', firstName: 'Beatriz', neighborhood: 'Vila Madalena', rating: 5, createdAt: new Date().toISOString() },
           { id: '3', comment: 'Já fiz com várias outras pessoas, mas ninguém faz a harmonização como ela.', firstName: 'Carolina', neighborhood: 'Jardins', rating: 5, createdAt: new Date().toISOString() }
         ];

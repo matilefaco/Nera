@@ -19,7 +19,7 @@ export const DifferentialsSection = ({ differentials }: DifferentialsSectionProp
             viewport={{ once: true }}
             className="text-[10px] font-bold uppercase tracking-[0.3em] text-[var(--theme-accent,var(--color-brand-terracotta))]"
           >
-            Excelência em cada detalhe
+            Método em cada detalhe
           </motion.span>
           <motion.h2 
             initial={{ opacity: 0, y: 10 }}

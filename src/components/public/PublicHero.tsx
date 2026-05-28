@@ -277,7 +277,7 @@ export const PublicHero = ({
           <p className="body-text text-brand-stone max-w-sm">
             {((heroBio || profile.bio) && isSanitizedContent(heroBio || profile.bio))
               ? (heroBio || profile.bio)
-              : (profile.specialty ? `${formatSpecialtyLabel(profile.specialty)} com foco em excelência e bem-estar.` : 'Atendimento personalizado com foco em resultados de alta qualidade.')}
+              : (profile.specialty ? `Técnicas de ${formatSpecialtyLabel(profile.specialty)} focadas em resultados e bem-estar.` : 'Atendimento focado em técnica limpa e resultados seguros.')}
           </p>
 
           <div className="flex flex-col gap-3">

@@ -33,17 +33,17 @@ type ServiceMode = 'home' | 'studio' | 'hybrid';
 const IDENTITY_STYLES = [
   'Delicada e detalhista',
   'Rápida e eficiente',
-  'Técnica e precisa',
-  'Premium e sofisticada',
+  'Técnica e rigorosa',
+  'Segura e estruturada',
   'Natural e leve'
 ];
 
 const IDENTITY_DIFFERENTIALS = [
   'Pontualidade',
-  'Biossegurança',
-  'Produtos premium',
-  'Atendimento exclusivo',
-  'Técnica avançada'
+  'Biossegurança rigorosa',
+  'Ativos de alta performance',
+  'Acompanhamento contínuo',
+  'Técnica baseada em fundamentos'
 ];
 
 const CopyLinkButton = ({ slug }: { slug: string }) => {

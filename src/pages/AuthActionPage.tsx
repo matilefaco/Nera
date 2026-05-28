@@ -129,7 +129,7 @@ export default function AuthActionPage() {
       </motion.div>
 
       <p className="mt-12 text-[10px] text-brand-stone font-light uppercase tracking-widest">
-        Nera · Excelência Profissional
+        Nera · Gestão Profissional
       </p>
     </div>
   );
