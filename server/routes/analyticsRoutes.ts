@@ -165,11 +165,14 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   }
 
   const repertoireSection = repertoire 
-    ? `\nREPERTÓRIO TÉCNICO OPCIONAL (USO LIVRE):
-Para variar suas respostas e deixá-las menos repetitivas, você pode usar os termos técnicos abaixo. 
-Eles servem APENAS para enriquecer sua escolha de vocabulário, desde que se encaixem perfeitamente no estilo da profissional.
-Técnicas desta área: ${repertoire}
-ATENÇÃO: Não liste todas. Escolha 1, 2 ou no máximo 3 para dar concretude sem ficar artificial.\n` 
+    ? `\nREPERTÓRIO TÉCNICO DA PROFISSÃO (CONTEXTO GERAL):
+O repertório técnico serve apenas para compreender o universo daquela profissão.
+O repertório NÃO representa serviços confirmados.
+Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa uma técnica específica apenas porque ela existe no repertório.
+Uma técnica só pode ser apresentada como serviço realizado quando ela tiver sido explicitamente informada pela profissional nos DADOS DA PROFISSIONAL.
+Quando não houver informação suficiente, utilize descrições amplas da área de atuação.
+
+Técnicas da área para contexto: ${repertoire}\n` 
     : '';
 
   try {
@@ -215,6 +218,8 @@ Varie a estrutura das frases. Use formatos diferentes baseados em FATOS, como:
 - "[Sua Especialidade] focada em..."
 
 REGRA DE PRECISÃO ABSOLUTA (PROIBIDO INVENTAR):
+- O repertório NÃO representa serviços confirmados. Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa qualquer técnica presente no repertório se ela não estiver nos DADOS DA PROFISSIONAL.
+- NÃO invente especialidades nem serviços não informados.
 - NÃO invente paixões ("Minha paixão é...", "Amo o que faço").
 - NÃO invente motivações ou histórias ("Escolhi essa área porque...").
 - NÃO invente missões emocionais ("Quero ajudar você a se sentir...").
@@ -235,7 +240,12 @@ REGRAS ESTRITAS POR ESPECIALIDADE (BLOQUEIOS):
 - Se specialty for Podologia ou Massagista: proibir médica, clínica, fisioterapeuta, diagnósticos clínicos.
 
 AUTO-CHECK FINAL ANTES DE RESPONDER: 
-Antes de retornar o JSON, confira mentalmente: a headline e a bio poderiam pertencer a outra especialidade? Elas citam algum serviço fora da especialidade recebida? A bio contém emoções inventadas não enviadas nos dados da profissional? Se sim, reescreva focando nos fatos concretos e frios.
+Antes de retornar o JSON:
+1. Verifique se alguma técnica específica foi afirmada.
+2. Pergunte-se: "Essa técnica foi realmente fornecida pela profissional?"
+3. Se NÃO foi fornecida: substituir por descrição amplas e factuais da área de atuação.
+4. Só então gerar a headline e bio finais.
+5. Confira mentalmente: a headline e a bio poderiam pertencer a outra especialidade? Elas citam algum serviço fora da especialidade recebida? A bio contém emoções inventadas não enviadas nos dados da profissional? Se sim, reescreva focando nos fatos concretos e frios.
 
 Retorne APENAS um JSON válido, puro, sem marcações markdown, estruturado exatamente assim:
 {"headline": "Headline gerada", "bio": "Bio gerada"}
