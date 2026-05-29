@@ -291,6 +291,45 @@ export default function LandingPage() {
         <PricingGrid isLanding={true} />
       </section>
 
+      {/* FAQ */}
+      <section id="faq">
+        <div className="wrap">
+          <span className="label faq-eyebrow reveal">Ainda com dúvidas?</span>
+          <h2 className="faq-h2 reveal">
+            Pequenas respostas antes de começar.
+          </h2>
+          <p className="faq-intro reveal">
+            As perguntas que costumam aparecer antes do primeiro agendamento.
+          </p>
+          <div className="faq-list reveal">
+            <div className="faq-item">
+              <h3 className="faq-q">Preciso baixar aplicativo?</h3>
+              <p className="faq-a">Não. A Nera funciona diretamente pelo navegador.</p>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-q">Minhas clientes precisam criar conta?</h3>
+              <p className="faq-a">Não. Elas podem solicitar horários sem criar cadastro.</p>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-q">Funciona pelo celular?</h3>
+              <p className="faq-a">Sim. A Nera foi pensada para funcionar na rotina da profissional.</p>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-q">Posso cancelar quando quiser?</h3>
+              <p className="faq-a">Sim. Sem fidelidade e sem burocracia.</p>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-q">A Nera cobra taxa por agendamento?</h3>
+              <p className="faq-a">Não. Você paga apenas o plano escolhido.</p>
+            </div>
+            <div className="faq-item">
+              <h3 className="faq-q">Serve para quem atende sozinha?</h3>
+              <p className="faq-a">Sim. A Nera foi criada justamente para profissionais autônomas da beleza.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FINAL CTA */}
       <section id="cta">
         <div className="cta-bg-n"><span>n</span></div>
@@ -334,7 +373,6 @@ export default function LandingPage() {
               <a href="#how" className="footer-link">Como funciona</a>
               <a href="#features" className="footer-link">Funcionalidades</a>
               <a href="#pricing" className="footer-link">Planos e preços</a>
-              <Link to="/profissionais" className="footer-link">Diretório</Link>
             </div>
           </div>
           <div>
