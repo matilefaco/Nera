@@ -92,80 +92,62 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   // Dynamic examples to prevent cross-contamination
   const lowerSpec = (specialty || '').toLowerCase();
   let exampleHeadline = '';
-  let exampleBio = '';
   let repertoire = '';
   let repertoireSafe = '';
   let repertoireSpecific = '';
   
   if (lowerSpec.includes('maqui')) {
     exampleHeadline = '- Maquiadora: "Make para noivas, formandas e madrinhas"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Maquiagem que valoriza seus traços com leveza. Atendimento tranquilo e atencioso, pensado para que você se sinta você mesma."';
     repertoire = "maquiagem social, noivas, madrinhas, formandas, maquiagem fotográfica, pele blindada, colorimetria, visagismo, maquiagem artística, airbrush, delineado esfumado, cut crease";
   } else if (lowerSpec.includes('estetic') || lowerSpec.includes('pele') || lowerSpec.includes('facial')) {
     exampleHeadline = '- Esteticista: "Limpeza de pele e protocolos faciais avançados"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Cuidados faciais pensados para uma pele limpa, saudável e bem tratada. A ideia é criar uma rotina leve de cuidados que se encaixe no seu dia a dia."';
     repertoire = "limpeza de pele, peeling, microagulhamento, radiofrequência, LED terapia, protocolos faciais, hidratação facial, tratamento para acne, rejuvenescimento, revitalização, massagem facial, drenagem facial";
   } else if (lowerSpec.includes('lash') || lowerSpec.includes('cílios') || lowerSpec.includes('cilios')) {
     exampleHeadline = '- Lash Designer: "Fio a fio, volume russo e lifting"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Cílios leves e confortáveis para quem gosta de um olhar mais desenhado sem exagero. O trabalho é feito preservando a saúde dos seus fios naturais."';
     repertoire = "fio a fio, volume brasileiro, volume russo, volume híbrido, mega volume, wet effect, cat eye, fox eye, lash lifting, lash botox, mapping, manutenção";
   } else if (lowerSpec.includes('sobrancelha')) {
     exampleHeadline = '- Sobrancelhas: "Design, henna e laminação"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Design feito respeitando o desenho natural das suas sobrancelhas. Um cuidado pensado para deixar o olhar harmônico e muito natural."';
     repertoire = "henna, brow lamination, design estratégico, visagismo, alinhamento facial, correção de assimetria, fio a fio, coloração, tintura de sobrancelhas, epilação egípcia, mapeamento facial";
   } else if (lowerSpec.includes('cabel') || lowerSpec.includes('hair')) {
     exampleHeadline = '- Cabeleireira: "Corte, cor e tratamentos capilares"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Um espaço para cuidar bem do cabelo. Um trabalho atencioso focado em manter o fio saudável e um corte que faça sentido na sua rotina."';
     repertoire = "corte feminino, corte bordado, cronograma capilar, reconstrução, nutrição, hidratação, balayage, morena iluminada, platinado, colorimetria, finalização de cachos, progressiva, botox capilar, mechas";
   } else if (lowerSpec.includes('bronze')) {
     exampleHeadline = '- Bronzeamento: "Bronze natural e marquinha perfeita"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Um bronze tranquilo e bem cuidado, que valoriza a hidratação da pele e garante um tom bonito de forma bastante natural."';
     repertoire = "bronzeamento em fita, marquinha personalizada, hidratação pré sessão, hidratação pós sessão, bronze natural, uniformização, bronze gelado, banho de lua, esfoliação";
   } else if (lowerSpec.includes('trancista') || lowerSpec.includes('trança') || lowerSpec.includes('tranca')) {
     exampleHeadline = '- Trancista: "Especialista em tranças afro e penteados protetores"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Tranças feitas com carinho, técnica e paciência. Trabalho sempre pautado pelo cuidado com a textura e a saúde do seu cabelo natural."';
     repertoireSafe = "tranças afro, penteados protetores, estilos de trança, cuidados com cabelo natural";
     repertoireSpecific = "box braids, twist, fulani, crochet braids, nagô";
   } else if (lowerSpec.includes('micropigmentadora') || lowerSpec.includes('micropigmentação') || lowerSpec.includes('micro')) {
     exampleHeadline = '- Micropigmentação: "Micropigmentação labial e de sobrancelhas"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "A micropigmentação aqui é para trazer praticidade. O resultado é sempre sutil, apenas realçando os traços originais da cliente."';
     repertoire = "fio a fio, shadow, ombré brows, nano brows, micropigmentação labial, neutralização labial, despigmentação, revitalização, delineado definitivo, microblanding";
   } else if (lowerSpec.includes('podolog') || lowerSpec.includes('podólog')) {
     exampleHeadline = '- Podologia: "Tratamento especializado e saúde dos pés"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Saúde e alívio para os pés através de um atendimento cuidadoso, limpo e sem pressa. Tratamentos para tratar incômodos e recuperar o bem-estar."';
     repertoireSafe = "saúde dos pés, cuidados preventivos, atendimento especializado, bem-estar dos pés";
     repertoireSpecific = "órteses, unhas encravadas, fissuras, micoses, corte técnico";
   } else if (lowerSpec.includes('masso') || lowerSpec.includes('massagem')) {
     exampleHeadline = '- Massoterapeuta: "Massagem relaxante, drenagem e liberação miofascial"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Massagem voltada a soltar a musculatura e trazer conforto para o corpo. Um espaço tranquilo, ideal para relaxar e fugir um pouco da rotina agitada."';
     repertoire = "drenagem linfática, relaxante, modeladora, miofascial, pedras quentes, shiatsu, reflexologia, ventosaterapia, massagem terapêutica, alívio de dor";
   } else if (lowerSpec.includes('terapeuta capilar') || lowerSpec.includes('terapia capilar')) {
     exampleHeadline = '- Terapeuta Capilar: "Tratamento de queda, caspa e saúde do couro cabeludo"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Terapia capilar levada a sério. Atendimentos focados em devolver a saúde do couro cabeludo e construir um fio mais forte ao longo do tempo."';
     repertoire = "análise capilar, queda, oleosidade, couro cabeludo, fototerapia, recuperação capilar, detox capilar, argiloterapia, alta frequência, alopecia, dermatite seborreica, tricologia";
   } else if (lowerSpec.includes('nail') || lowerSpec.includes('fibra')) {
     exampleHeadline = '- Nail Designer: "Especialista em fibra de vidro e nail art"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Unhas com acabamento delicado e visual natural para a rotina do dia a dia. Alongamentos bem feitos, resistentes e que não parecem artificiais."';
     repertoire = "fibra de vidro, gel, molde f1, encapsulamento, nail art, blindagem, manutenção, banho de gel, esmaltação em gel, francesinha reversa, baby boomer";
   } else if (lowerSpec.includes('manicure') || lowerSpec.includes('unha') || lowerSpec.includes('esmaltação')) {
     exampleHeadline = '- Manicure: "Esmaltação em gel e unhas naturais"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Cuidado clássico com as unhas. Foco em uma cutilagem limpa, esmaltação cuidadosa e materiais que garantem a assepsia durante todo o atendimento."';
     repertoire = "esmaltação em gel, banho de gel, blindagem, encapsulada, fibra de vidro, cutilagem russa, nail art, spa dos pés, manutenção, cutilagem contínua, unhas naturais";
   } else if (lowerSpec.includes('labial') || lowerSpec.includes('lábio') || lowerSpec.includes('labio')) {
     exampleHeadline = '- Designer Labial: "Revitalização e design de lábios"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Um cuidado leve para os lábios. Os procedimentos ajudam na textura e devolvem uma cor saudável sem aspecto pesado ou marcado demais."';
     repertoire = "revitalização labial, neutralização labial, micropigmentação labial, efeito batom, aquarela lips, hidra gloss, design de lábios";
   } else if (lowerSpec.includes('depiladora') || lowerSpec.includes('depilação')) {
     exampleHeadline = '- Depiladora: "Depilação a laser, cera e método egípcio"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Depilação feita da forma mais ágil e indolor possível, respeitando a pele de cada pessoa e trabalhando de forma cautelosa."';
     repertoire = "cera quente, cera fria, método egípcio (linha), depilação facial, depilação corporal, pele sensível, depilação a laser, luz pulsada, epilação";
   } else if (lowerSpec.includes('piercing') || lowerSpec.includes('body piercer')) {
     exampleHeadline = '- Body Piercer: "Perfurações seguras e joias em titânio"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Perfurações corporais executadas com material adequado e técnica segura. Eu acompanho a evolução da pele de cada cliente para ajudar numa cicatrização tranquila."';
     repertoire = "perfurações seguras, joias em titânio, aço cirúrgico, biossegurança, perfuração auricular, perfuração corporal, microdermal, surface, downsize, anodização";
   } else {
     exampleHeadline = '- Profissional: "Atendimento especializado em beleza e bem-estar"';
-    exampleBio = 'Exemplo (Direção de tom para sua profissão): "Atendimento cuidadoso e transparente. Faço o possível para entregar um bom serviço, em um ambiente agradável e com o resultado que você procura."';
   }
 
   let repertoireSection = '';
@@ -237,6 +219,18 @@ Exemplos RUINS (PROIBIDOS NESSA IA: currículo, robótico, LinkedIn, genérico):
 - "Especialista em beleza"
 - "Técnica moderna e alta durabilidade"
 
+DIRETRIZES DE DIVERSIDADE EDITORIAL (MUITO IMPORTANTE PARA EVITAR REPETIÇÃO):
+Evite os padrões que causam homogeneização. A IA tende a sempre usar "cuidado", "delicado", "naturalidade", "leveza" em todas as bios. Para gerar verdadeira diversidade, adote MENTALMENTE APENAS UMA das perspectivas (famílias) abaixo, dependendo da área, e escreva a headline e a bio exclusivamente sob essa lente:
+
+- Se NAIL DESIGNER: escolha (A) praticidade, (B) criatividade, (C) minimalismo, (D) durabilidade, OU (E) detalhes.
+- Se LASH DESIGNER: escolha (A) olhar, (B) harmonia, (C) conforto, (D) simetria vascular, OU (E) moldura.
+- Se TRANCISTA: escolha (A) expressão, (B) identidade, (C) saúde do fio, (D) cultura, OU (E) alinhamento protetor.
+- Se PODÓLOGA: escolha (A) conforto silencioso, (B) prevenção, (C) pisada livre, (D) mobilidade cotidiana, OU (E) saúde estrutural.
+- Se MICROPIGMENTADORA: escolha (A) simetria natural, (B) precisão técnica, (C) contraste suave, (D) desenho anatômico, OU (E) observação de traços.
+- Se ESTETICISTA E OUTROS: escolha (A) rotina, (B) textura saudável, (C) barreira cutânea, (D) bem-estar diário, OU (E) vitalidade.
+
+PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO use adjetivos ou substantivos literais da perspectiva escolhida (ex: não escreva a palavra "praticidade", apenas descreva algo prático).
+
 DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PARECER ESCRITA POR IA OU COPYWRITER):
 1. Crie um texto de 1 a 2 frases curtas. 
 2. A bio deve ter ritmo humano, leitura ágil e natural. Escrita na 1ª pessoa.
@@ -244,7 +238,6 @@ DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PA
 4. NUNCA soe como um currículo corporativo. PROIBIDO: "Com experiência de...", "Trabalho com técnicas avançadas...", "Sempre atualizada...", "Atendimento personalizado".
 5. NUNCA soe como manifesto luxuoso de branding. ESTRITAMENTE PROIBIDO usar excesso de intenção ou abstrações: "o objetivo é trazer", "focado em", "priorizando", "buscando", "acabamento sofisticado", "beleza duradoura", "respeito absoluto", "estrutura fina", "resultado impecável", "design refinado", "toque sofisticado", "experiência premium".
 6. Priorize a SIMPLICIDADE ELEGANTE: descreva a parte física, os atributos concretos do trabalho sem adornos publicitários. A naturalidade e o silêncio também são formas de elegância. Não preencha com adjetivos performáticos.
-7. ${exampleBio}
 
 REGRA DE PRECISÃO ABSOLUTA (PROIBIDO INVENTAR):
 - O repertório NÃO representa serviços confirmados. Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa qualquer técnica presente no repertório se ela não estiver nos DADOS DA PROFISSIONAL.
