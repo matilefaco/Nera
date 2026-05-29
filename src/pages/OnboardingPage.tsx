@@ -123,6 +123,7 @@ export default function OnboardingPage() {
     avatarSkipped, setAvatarSkipped,
     profileTheme, setProfileTheme
   } = useProfileForm(profile);
+  const [bioContext, setBioContext] = useState('');
 
   const [instagramConfirmed, setInstagramConfirmed] = useState(false);
   const instagramStatus = useMemo(() => {
@@ -443,7 +444,8 @@ export default function OnboardingPage() {
           yearsExperience,
           serviceStyle: selectedStyles,
           differentials: selectedDifferentials,
-          bioStyle: selectedBioStyle
+          bioStyle: selectedBioStyle,
+          bioContext
         })
       });
 
@@ -1293,6 +1295,8 @@ export default function OnboardingPage() {
                 setWhatsapp={setWhatsapp}
                 showLabels={true}
                 errors={formErrors}
+                bioContext={bioContext}
+                setBioContext={setBioContext}
               />
 
               <button 

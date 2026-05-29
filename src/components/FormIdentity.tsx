@@ -49,6 +49,8 @@ export interface FormIdentityProps {
   subtitle?: string;
   showLabels?: boolean;
   onGenerateBio?: () => void;
+  bioContext?: string;
+  setBioContext?: (val: string) => void;
   isGeneratingBio?: boolean;
   selectedBioStyle?: string;
   setSelectedBioStyle?: (val: string) => void;
@@ -111,6 +113,8 @@ export const FormIdentity = ({
   subtitle,
   showLabels = true,
   onGenerateBio,
+  bioContext,
+  setBioContext,
   isGeneratingBio,
   selectedBioStyle = 'elegante',
   setSelectedBioStyle
@@ -207,7 +211,7 @@ export const FormIdentity = ({
                 type="text" 
                 value={name} 
                 onChange={(e) => setName(e.target.value)} 
-                placeholder="Ex: Bruna Designer" 
+                placeholder="Ex: Letícia Lima" 
                 className={cn(
                   "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
                   errors.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
@@ -225,7 +229,7 @@ export const FormIdentity = ({
                 type="text" 
                 value={specialty} 
                 onChange={(e) => setSpecialty(e.target.value)} 
-                placeholder="Ex: Nail Designer" 
+                placeholder="Ex: Trancista" 
                 className={cn(
                   "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
                   errors.specialty ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
@@ -315,7 +319,7 @@ export const FormIdentity = ({
                 type="text" 
                 value={headline} 
                 onChange={(e) => setHeadline(e.target.value)} 
-                placeholder="Ex: Design de sobrancelhas natural, preciso e elegante."
+                placeholder="Ex: Sobrancelhas desenhadas para valorizar o seu formato natural"
                 className="w-full px-4 py-2.5 bg-brand-parchment/60 border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50"
               />
             </div>
@@ -353,20 +357,39 @@ export const FormIdentity = ({
                     </details>
                   )}
                 </div>
-                <div className="mt-4 sm:mt-0 max-w-sm">
+                <div className="flex-1 w-full max-w-sm sm:max-w-xs mt-4 sm:mt-0">
                   {onGenerateBio && (
                     <div className="flex flex-col gap-2">
-                      <button 
-                        type="button"
-                        onClick={onGenerateBio}
-                        disabled={isGeneratingBio}
-                        className="flex items-center gap-2 text-[10px] font-bold text-brand-white bg-brand-ink px-4 py-2 rounded-full uppercase tracking-[0.1em] shadow-md hover:shadow-lg hover:-translate-y-0.5 hover:bg-brand-espresso disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-md transition-all h-fit w-fit"
-                      >
-                        <Sparkles size={14} className="text-brand-terracotta" /> {isGeneratingBio ? 'Gerando...' : 'Sugerir bio com IA'}
-                      </button>
-                      <p className="text-[9px] text-brand-stone/60 font-light italic leading-relaxed md:max-w-xs pl-2 border-l border-brand-mist/50">
-                        Descrevemos seu trabalho no tom ideal para atrair as clientes certas e transmitir autoridade.
-                      </p>
+                       {setBioContext && (
+                         <div className="flex flex-col gap-1.5 mb-2 border border-brand-mist/50 p-2.5 rounded-xl bg-brand-white shadow-sm">
+                           <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
+                             Conte um pouco sobre o seu trabalho (opcional)
+                           </label>
+                           <p className="text-[9px] text-brand-stone/60 font-light leading-tight">
+                             Algumas linhas já ajudam a IA a criar uma bio mais parecida com você.
+                           </p>
+                           <textarea
+                             value={bioContext || ''}
+                             onChange={(e) => setBioContext(e.target.value)}
+                             placeholder="Ex:&#10;Minhas clientes costumam gostar dos meus alongamentos mais discretos.&#10;Atendo muitas noivas.&#10;Gosto de um resultado mais natural para o dia a dia."
+                             className="w-full text-[11px] font-light italic bg-brand-parchment/30 outline-none resize-none h-[60px] placeholder:text-brand-stone/40 border-t border-brand-mist/30 pt-2 mt-1"
+                           />
+                         </div>
+                       )}
+
+                       <p className="text-[9px] text-brand-stone font-light italic leading-relaxed md:max-w-xs pl-2 border-l border-brand-terracotta/30 mb-1">
+                         Não sabe o que escrever?<br/>
+                         A IA da Nera cria sua bio profissional em segundos.
+                       </p>
+                       <button 
+                         type="button"
+                         onClick={onGenerateBio}
+                         disabled={isGeneratingBio}
+                         className="flex items-center gap-2 text-[10px] font-bold text-brand-white bg-brand-ink px-4 py-2 rounded-full uppercase tracking-[0.1em] shadow-md hover:shadow-lg hover:-translate-y-0.5 hover:bg-brand-espresso disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-md transition-all h-fit w-fit group"
+                       >
+                         <Sparkles size={14} className="text-brand-terracotta group-hover:scale-110 transition-transform" /> 
+                         {isGeneratingBio ? 'Gerando...' : 'Sugerir bio com IA'}
+                       </button>
                     </div>
                   )}
                 </div>
@@ -386,7 +409,7 @@ export const FormIdentity = ({
           {(differentials !== undefined && setDifferentials) && (
             <div className="space-y-4">
               <div className="flex flex-col gap-1">
-                {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">O que suas clientes costumam elogiar no seu atendimento?</label>}
+                {showLabels && <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">O que mais representa a sua forma de atender?</label>}
                 <p className="text-[10px] text-brand-stone/60 font-light ml-1 mb-2">
                   Selecione os pontos que tornam seu atendimento único. Eles aparecerão em uma seção especial na sua vitrine.
                 </p>

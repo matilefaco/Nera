@@ -51,17 +51,19 @@ export const OnboardingLivePreview = ({
           
           <div className="flex-1 min-w-0">
             <h4 className="font-serif text-lg text-brand-ink truncate leading-tight">
-              {name || 'Sua Identidade'}
+              {name || 'Letícia Lima'}
             </h4>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta mt-1">
-              {specialty || 'Sua Especialidade'}
-            </p>
+            {specialty || name ? (
+              <p className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta mt-1">
+                {specialty || 'Sua Especialidade'}
+              </p>
+            ) : null}
             
             <p className={cn(
               "text-[11px] font-light mt-3 line-clamp-2",
               headline ? "text-brand-stone" : "text-brand-stone/40"
             )}>
-              {headline || 'Atendimento exclusivo com foco em resultados naturais.'}
+              {headline || (specialty ? '' : 'As linhas principais da sua vitrine aparecerão aqui.')}
             </p>
           </div>
         </div>

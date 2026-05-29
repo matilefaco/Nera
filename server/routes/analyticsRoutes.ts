@@ -62,7 +62,7 @@ router.post("/public/track", async (req, res) => {
 });
 
 router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
-  const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle } = req.body;
+  const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle, bioContext } = req.body;
   logger.info("AI", "[BioAI] Entry /generate-content", { meta: { name, specialty } });
   
   // Simple rate limit check
@@ -248,6 +248,9 @@ DADOS DA PROFISSIONAL:
 - Tempo na área: ${yearsExperience ? yearsExperience : 'Profissional com experiência'}
 - Estilo: ${Array.isArray(serviceStyle) ? serviceStyle.join(', ') : (serviceStyle || 'Cuidadoso')}
 - Diferenciais focais: ${Array.isArray(differentials) ? differentials.join(', ') : (differentials || 'Bom atendimento')}
+
+CONTEXTO ADICIONAL INFORMADO PELA PROFISSIONAL:
+${bioContext || 'Não informado'}
 ${repertoireSection}
 INSTRUÇÕES EDITORIAIS CRÍTICAS (LEIA COM MÁXIMA ATENÇÃO):
 O tom exigido é "Conversa humana e profissional": transmita confiança através da clareza e naturalidade. Diga o que você faz de forma concreta, sem exageros.
