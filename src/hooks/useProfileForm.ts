@@ -25,7 +25,7 @@ export function useProfileForm(profile: UserProfile | null) {
     neighborhood: '',
     city: '',
     reference: '',
-    privacyMode: 'reveal_after_booking',
+    privacyMode: 'neighborhood_only',
     hasParking: false,
     parkingInfo: '',
     hasAccessibility: false,

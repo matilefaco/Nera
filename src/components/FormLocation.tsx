@@ -389,8 +389,8 @@ export const FormLocation = ({
                       </div>
                     </div>
                     <div className="space-y-0.5">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-brand-ink group-hover:text-brand-terracotta transition-colors">Sim, mostrar endereço completo</span>
-                      <p className="text-[10px] text-brand-stone font-light leading-tight">O endereço da rua e número ficarão visíveis para todos que visitarem sua vitrine.</p>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-brand-ink group-hover:text-brand-terracotta transition-colors">Mostrar endereço completo</span>
+                      <p className="text-[10px] text-brand-stone font-light leading-tight">Rua, número, bairro e cidade ficam visíveis na sua vitrine. Ideal para estúdios em endereços comerciais.</p>
                     </div>
                   </label>
                   
@@ -399,7 +399,28 @@ export const FormLocation = ({
                       <input
                         type="radio"
                         name="address_privacy"
-                        checked={studioAddress.privacyMode !== 'public_full'}
+                        checked={studioAddress.privacyMode === 'neighborhood_only'}
+                        onChange={() => setStudioAddress({...studioAddress, privacyMode: 'neighborhood_only'})}
+                        className="peer appearance-none w-4 h-4 rounded-full border border-brand-mist checked:border-brand-terracotta transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
+                      />
+                      <div className="absolute text-brand-terracotta opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none left-1 top-1 w-2 h-2 rounded-full bg-brand-terracotta">
+                      </div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-brand-ink group-hover:text-brand-terracotta transition-colors">Mostrar apenas bairro e cidade</span>
+                        <span className="bg-brand-mist/50 text-brand-stone px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider">Recomendado</span>
+                      </div>
+                      <p className="text-[10px] text-brand-stone font-light leading-tight">A cliente sabe a região onde você atende, sem ver sua rua e número. Um equilíbrio entre confiança e privacidade.</p>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <div className="relative flex items-center h-4 mt-0.5">
+                      <input
+                        type="radio"
+                        name="address_privacy"
+                        checked={studioAddress.privacyMode === 'reveal_after_booking'}
                         onChange={() => setStudioAddress({...studioAddress, privacyMode: 'reveal_after_booking'})}
                         className="peer appearance-none w-4 h-4 rounded-full border border-brand-mist checked:border-brand-terracotta transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
                       />
@@ -407,8 +428,8 @@ export const FormLocation = ({
                       </div>
                     </div>
                     <div className="space-y-0.5">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-brand-ink group-hover:text-brand-terracotta transition-colors">Não, mostrar apenas bairro e cidade</span>
-                      <p className="text-[10px] text-brand-stone font-light leading-tight">Esconde rua e número. O endereço completo só será revelado para clientes após finalizarem a reserva.</p>
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-brand-ink group-hover:text-brand-terracotta transition-colors">Revelar endereço só após a reserva confirmada</span>
+                      <p className="text-[10px] text-brand-stone font-light leading-tight">O endereço completo é enviado apenas após a confirmação. Use se você atende em casa ou prefere máxima privacidade.</p>
                     </div>
                   </label>
                 </div>

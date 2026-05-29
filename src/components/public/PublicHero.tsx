@@ -462,17 +462,21 @@ export const PublicHero = ({
                             {profile.studioAddress.complement && <span className="block">{profile.studioAddress.complement}</span>}
                             <span className="block opacity-60">{profile.studioAddress.neighborhood}, {profile.studioAddress.city}</span>
                           </>
+                        ) : profile.studioAddress?.privacyMode === 'neighborhood_only' ? (
+                          <>
+                            <span className="block">{profile.neighborhood ? `${profile.neighborhood}, ${profile.city || ''}` : profile.city}</span>
+                          </>
                         ) : (
                           <>
                             <span className="block">{profile.neighborhood ? `${profile.neighborhood}, ${profile.city || ''}` : profile.city}</span>
-                            <span className="block text-[11px] font-light italic text-brand-stone mt-2">Endereço detalhado disponível após a reserva</span>
+                            <span className="block text-[11px] font-light italic text-brand-stone mt-2">Estúdio particular. O endereço completo é compartilhado após a confirmação.</span>
                           </>
                         )}
                       </p>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                      {profile.studioAddress?.privacyMode === 'public_full' && profile.studioAddress?.street ? (
+                      {profile.studioAddress?.privacyMode === 'public_full' && profile.studioAddress?.street && (
                         <>
                           <button 
                             onClick={() => {
@@ -495,12 +499,6 @@ export const PublicHero = ({
                             <Copy size={14} className="text-brand-stone" /> Copiar endereço
                           </button>
                         </>
-                      ) : (
-                        <div className="p-4 bg-brand-linen/30 border border-dotted border-brand-mist rounded-xl">
-                          <p className="text-[10px] text-brand-stone font-light italic leading-snug">
-                            Para sua segurança e privacidade, a profissional optou por revelar o endereço exato apenas para clientes com reserva confirmada.
-                          </p>
-                        </div>
                       )}
                     </div>
                   </div>
