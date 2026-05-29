@@ -96,6 +96,24 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   let repertoireSafe = '';
   let repertoireSpecific = '';
   
+  let families = [];
+  if (lowerSpec.includes('nail') || lowerSpec.includes('fibra') || lowerSpec.includes('manicure') || lowerSpec.includes('unha')) {
+    families = ['praticidade', 'criatividade', 'minimalismo', 'durabilidade', 'detalhes'];
+  } else if (lowerSpec.includes('lash') || lowerSpec.includes('cílios') || lowerSpec.includes('cilios')) {
+    families = ['olhar', 'harmonia', 'conforto', 'simetria vascular', 'moldura'];
+  } else if (lowerSpec.includes('trancista') || lowerSpec.includes('trança') || lowerSpec.includes('tranca')) {
+    families = ['expressão', 'identidade', 'saúde do fio', 'cultura', 'alinhamento protetor'];
+  } else if (lowerSpec.includes('podolog') || lowerSpec.includes('podólog')) {
+    families = ['conforto silencioso', 'prevenção', 'pisada livre', 'mobilidade cotidiana', 'saúde estrutural'];
+  } else if (lowerSpec.includes('micro') || lowerSpec.includes('micropigmentadora')) {
+    families = ['simetria natural', 'precisão técnica', 'contraste suave', 'desenho anatômico', 'observação de traços'];
+  } else if (lowerSpec.includes('estetic') || lowerSpec.includes('pele') || lowerSpec.includes('facial')) {
+    families = ['rotina', 'textura saudável', 'barreira cutânea', 'bem-estar diário', 'vitalidade'];
+  } else {
+    families = ['bem-estar diário', 'auto-cuidado natural', 'tranquilidade', 'rotina', 'conforto'];
+  }
+  const chosenFamily = families[Math.floor(Math.random() * families.length)];
+  
   if (lowerSpec.includes('maqui')) {
     exampleHeadline = '- Maquiadora: "Make para noivas, formandas e madrinhas"';
     repertoire = "maquiagem social, noivas, madrinhas, formandas, maquiagem fotográfica, pele blindada, colorimetria, visagismo, maquiagem artística, airbrush, delineado esfumado, cut crease";
@@ -219,17 +237,13 @@ Exemplos RUINS (PROIBIDOS NESSA IA: currículo, robótico, LinkedIn, genérico):
 - "Especialista em beleza"
 - "Técnica moderna e alta durabilidade"
 
+FAMÍLIA EDITORIAL SELECIONADA: ${chosenFamily}
+
 DIRETRIZES DE DIVERSIDADE EDITORIAL (MUITO IMPORTANTE PARA EVITAR REPETIÇÃO):
-Evite os padrões que causam homogeneização. A IA tende a sempre usar "cuidado", "delicado", "naturalidade", "leveza" em todas as bios. Para gerar verdadeira diversidade, adote MENTALMENTE APENAS UMA das perspectivas (famílias) abaixo, dependendo da área, e escreva a headline e a bio exclusivamente sob essa lente:
+Evite os padrões que causam homogeneização. A IA tende a sempre usar "cuidado", "delicado", "naturalidade", "leveza" em todas as bios.
+Para gerar verdadeira diversidade, adote EXCLUSIVAMENTE a MENTALIDADE DA FAMÍLIA EDITORIAL selecionada acima ("${chosenFamily}") e escreva a headline e a bio puramente sob essa lente.
 
-- Se NAIL DESIGNER: escolha (A) praticidade, (B) criatividade, (C) minimalismo, (D) durabilidade, OU (E) detalhes.
-- Se LASH DESIGNER: escolha (A) olhar, (B) harmonia, (C) conforto, (D) simetria vascular, OU (E) moldura.
-- Se TRANCISTA: escolha (A) expressão, (B) identidade, (C) saúde do fio, (D) cultura, OU (E) alinhamento protetor.
-- Se PODÓLOGA: escolha (A) conforto silencioso, (B) prevenção, (C) pisada livre, (D) mobilidade cotidiana, OU (E) saúde estrutural.
-- Se MICROPIGMENTADORA: escolha (A) simetria natural, (B) precisão técnica, (C) contraste suave, (D) desenho anatômico, OU (E) observação de traços.
-- Se ESTETICISTA E OUTROS: escolha (A) rotina, (B) textura saudável, (C) barreira cutânea, (D) bem-estar diário, OU (E) vitalidade.
-
-PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO use adjetivos ou substantivos literais da perspectiva escolhida (ex: não escreva a palavra "praticidade", apenas descreva algo prático).
+PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO use adjetivos ou substantivos literais da perspectiva escolhida (ex: se for "praticidade", não escreva a palavra "praticidade", apenas descreva algo prático ou que demonstre isso). A perspectiva deve influenciar o texto de forma IMPLÍCITA, baseando a Headline e a Bio nisso.
 
 DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PARECER ESCRITA POR IA OU COPYWRITER):
 1. Crie um texto de 1 a 2 frases curtas. 
