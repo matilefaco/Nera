@@ -249,8 +249,14 @@ DADOS DA PROFISSIONAL:
 - Estilo: ${Array.isArray(serviceStyle) ? serviceStyle.join(', ') : (serviceStyle || 'Cuidadoso')}
 - Diferenciais focais: ${Array.isArray(differentials) ? differentials.join(', ') : (differentials || 'Bom atendimento')}
 
-CONTEXTO ADICIONAL INFORMADO PELA PROFISSIONAL:
-${bioContext || 'Não informado'}
+CONTEXTO ADICIONAL INFORMADO PELA PROFISSIONAL (FONTE PRINCIPAL DE DIFERENCIAÇÃO):
+${bioContext ? `"${bioContext}"
+
+MÁXIMA PRIORIDADE - ESTE CONTEXTO É SOBERANO:
+1. Ele é a principal fonte de diferenciação e contexto humano desta profissional.
+2. Extraia temas centrais, perfil de cliente, preferências técnicas ou foco de atendimento.
+3. Você DEVE garantir que a HEADLINE e a BIO reflitam claramente esse contexto. Não copie literalmente, mas adapte-o para uma narrativa profissional. Se a profissional citar um problema comum das clientes (ex: unhas roídas, pele sensível, queda capilar), aborde o CUIDADO, FORTALECIMENTO ou RESOLUÇÃO desse problema na Bio de forma humana.
+4. Em caso de conflito, as informações acima sobrescrevem a Família Editorial listada abaixo. A Família servirá apenas como guia secundário de tom.` : 'Não informado'}
 ${repertoireSection}
 INSTRUÇÕES EDITORIAIS CRÍTICAS (LEIA COM MÁXIMA ATENÇÃO):
 O tom exigido é "Conversa humana e profissional": transmita confiança através da clareza e naturalidade. Diga o que você faz de forma concreta, sem exageros.
