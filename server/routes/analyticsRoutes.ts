@@ -96,21 +96,64 @@ router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedR
   let repertoireSafe = '';
   let repertoireSpecific = '';
   
-  let families = [];
+  type EditorialFamily = { name: string, favored: string, avoid: string };
+  let families: Array<EditorialFamily> = [];
   if (lowerSpec.includes('nail') || lowerSpec.includes('fibra') || lowerSpec.includes('manicure') || lowerSpec.includes('unha')) {
-    families = ['praticidade', 'criatividade', 'minimalismo', 'durabilidade', 'detalhes'];
+    families = [
+      { name: 'praticidade', favored: 'rotina, praticidade, manutenção, dia a dia, funcional', avoid: 'criatividade, nail art, precisão, detalhes' },
+      { name: 'criatividade', favored: 'expressão, personalidade, combinações, estilo, visual', avoid: 'rotina, manutenção, praticidade' },
+      { name: 'minimalismo', favored: 'leveza, discrição, simplicidade, visual limpo', avoid: 'nail art, criatividade, detalhes, precisão' },
+      { name: 'durabilidade', favored: 'resistência, estrutura, longa duração, manutenção reduzida', avoid: 'criatividade, minimalismo' },
+      { name: 'detalhes', favored: 'acabamento, desenho, observação, simetria', avoid: 'praticidade, rotina, durabilidade' }
+    ];
   } else if (lowerSpec.includes('lash') || lowerSpec.includes('cílios') || lowerSpec.includes('cilios')) {
-    families = ['olhar', 'harmonia', 'conforto', 'simetria vascular', 'moldura'];
+    families = [
+      { name: 'olhar', favored: 'expressão, magnetismo, destaque, despertar, olhar marcante', avoid: 'harmonia, conforto, simetria, leveza excessiva' },
+      { name: 'harmonia', favored: 'equilíbrio, naturalidade, formato do rosto, visagismo', avoid: 'olhar exagerado, conforto extremo, simetria rígida' },
+      { name: 'conforto', favored: 'leveza, bem-estar, peso zero, rotina, conforto no uso', avoid: 'olhar denso, harmonia complexa, simetria, volume extremo' },
+      { name: 'simetria vascular', favored: 'precisão, alinhamento, exatidão, técnica impecável', avoid: 'olhar abstrato, harmonia livre, conforto descompromissado' },
+      { name: 'moldura', favored: 'realce, contorno, estrutura, definição do olhar', avoid: 'olhar isolado, conforto puro, simetria matemática' }
+    ];
   } else if (lowerSpec.includes('trancista') || lowerSpec.includes('trança') || lowerSpec.includes('tranca')) {
-    families = ['expressão', 'identidade', 'saúde do fio', 'cultura', 'alinhamento protetor'];
+    families = [
+      { name: 'expressão', favored: 'arte, estilo, personalidade, criatividade, visual único', avoid: 'saúde do fio, alinhamento, prevenção, discrição' },
+      { name: 'identidade', favored: 'raízes, pertencimento, essência, força, autoria', avoid: 'expressão livre, alinhamento técnico, cultura acadêmica' },
+      { name: 'saúde do fio', favored: 'cuidado, preservação, couro cabeludo, proteção capilar', avoid: 'expressão artística, identidade, cultura, volume extremo' },
+      { name: 'cultura', favored: 'tradição, história, legado, ancestralidade', avoid: 'saúde do fio, alinhamento milimétrico' },
+      { name: 'alinhamento protetor', favored: 'técnica, precisão, durabilidade, estrutura, trança firme', avoid: 'expressão solta, identidade, cultura abstrata' }
+    ];
   } else if (lowerSpec.includes('podolog') || lowerSpec.includes('podólog')) {
-    families = ['conforto silencioso', 'prevenção', 'pisada livre', 'mobilidade cotidiana', 'saúde estrutural'];
+    families = [
+      { name: 'conforto silencioso', favored: 'alívio, bem-estar, descanso, leveza para os pés', avoid: 'prevenção, pisada, estrutura vascular' },
+      { name: 'prevenção', favored: 'cuidado contínuo, atenção, antecipação, acompanhamento', avoid: 'conforto imediato, pisada, mobilidade' },
+      { name: 'pisada livre', favored: 'caminhada, uso diário, sem dor, soltura, passos leves', avoid: 'prevenção médica, saúde estrutural' },
+      { name: 'mobilidade cotidiana', favored: 'rotina, trabalho, movimento, dia a dia confortável', avoid: 'conforto de spa, prevenção técnica' },
+      { name: 'saúde estrutural', favored: 'anatomia, técnica apurada, recuperação, cuidado profundo', avoid: 'conforto superficial, pisada estética' }
+    ];
   } else if (lowerSpec.includes('micro') || lowerSpec.includes('micropigmentadora')) {
-    families = ['simetria natural', 'precisão técnica', 'contraste suave', 'desenho anatômico', 'observação de traços'];
+    families = [
+      { name: 'simetria natural', favored: 'equilíbrio, naturalidade, formato, harmonia, rosto', avoid: 'precisão matemática, contraste, desenho marcante' },
+      { name: 'precisão técnica', favored: 'exatidão, técnica, durabilidade, fio a fio exato', avoid: 'simetria natural solta, contraste suave' },
+      { name: 'contraste suave', favored: 'leveza, sombra, degradê, aspecto maquiado leve', avoid: 'precisão extrema, observação rigorosa, desenho rígido' },
+      { name: 'desenho anatômico', favored: 'estrutura, visagismo, medidas, formato ideal, mapeamento', avoid: 'contraste suave, simetria natural intuitiva' },
+      { name: 'observação de traços', favored: 'individualidade, personalização, leitura do rosto', avoid: 'precisão técnica padrão, contraste suave genérico' }
+    ];
   } else if (lowerSpec.includes('estetic') || lowerSpec.includes('pele') || lowerSpec.includes('facial')) {
-    families = ['rotina', 'textura saudável', 'barreira cutânea', 'bem-estar diário', 'vitalidade'];
+    families = [
+      { name: 'rotina', favored: 'dia a dia, skincare, constância, praticidade, hábitos', avoid: 'textura, barreira, vitalidade milagrosa' },
+      { name: 'textura saudável', favored: 'toque, uniformidade, viço, maciez, pele suave', avoid: 'rotina complexa, barreira profunda, bem-estar' },
+      { name: 'barreira cutânea', favored: 'proteção, equilíbrio, saúde da pele, hidratação avançada', avoid: 'rotina simples, textura focada, vitalidade instantânea' },
+      { name: 'bem-estar diário', favored: 'relaxamento, autocuidado, momento seu, pausa', avoid: 'textura focada, barreira cutânea rígida' },
+      { name: 'vitalidade', favored: 'luminosidade, renovação, energia, rosto descansado', avoid: 'rotina rígida, barreira protetora, relaxamento passivo' }
+    ];
   } else {
-    families = ['bem-estar diário', 'auto-cuidado natural', 'tranquilidade', 'rotina', 'conforto'];
+    families = [
+      { name: 'bem-estar diário', favored: 'conforto, rotina, alívio, leveza, momentos tranquilos', avoid: 'técnica avançada, precisão extrema, foco estético' },
+      { name: 'auto-cuidado natural', favored: 'essência, naturalidade, calma, tempo de qualidade', avoid: 'resultados imediatos, performance, detalhes exatos' },
+      { name: 'tranquilidade', favored: 'paz, pausa, relaxamento do corpo, silêncio interior', avoid: 'rotina dinâmica, correção estética' },
+      { name: 'rotina', favored: 'dia a dia, hábitos consistentes, manutenção, constância', avoid: 'tranquilidade de spa, naturalidade extrema' },
+      { name: 'conforto', favored: 'acolhimento absoluto, cuidado sem dor, alívio diário', avoid: 'performance intensa, técnica avançada, simetria' }
+    ];
   }
   const chosenFamily = families[Math.floor(Math.random() * families.length)];
   
@@ -237,13 +280,16 @@ Exemplos RUINS (PROIBIDOS NESSA IA: currículo, robótico, LinkedIn, genérico):
 - "Especialista em beleza"
 - "Técnica moderna e alta durabilidade"
 
-FAMÍLIA EDITORIAL SELECIONADA: ${chosenFamily}
+FAMÍLIA EDITORIAL SELECIONADA: ${chosenFamily.name.toUpperCase()}
+- VOCABULÁRIO E TEMAS FAVORECIDOS: ${chosenFamily.favored}
+- VOCABULÁRIO E TEMAS ESTRITAMENTE PROIBIDOS: ${chosenFamily.avoid}
 
 DIRETRIZES DE DIVERSIDADE EDITORIAL (MUITO IMPORTANTE PARA EVITAR REPETIÇÃO):
 Evite os padrões que causam homogeneização. A IA tende a sempre usar "cuidado", "delicado", "naturalidade", "leveza" em todas as bios.
-Para gerar verdadeira diversidade, adote EXCLUSIVAMENTE a MENTALIDADE DA FAMÍLIA EDITORIAL selecionada acima ("${chosenFamily}") e escreva a headline e a bio puramente sob essa lente.
+Para gerar verdadeira diversidade, adote EXCLUSIVAMENTE a MENTALIDADE DA FAMÍLIA EDITORIAL selecionada acima ("${chosenFamily.name}").
+Você DEVE adotar os TEMAS FAVORECIDOS e é ESTRITAMENTE PROIBIDA de usar os TEMAS PROIBIDOS indicados acima para garantir que sua geração tenha identidade própria e nenhuma contaminação cruzada.
 
-PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO use adjetivos ou substantivos literais da perspectiva escolhida (ex: se for "praticidade", não escreva a palavra "praticidade", apenas descreva algo prático ou que demonstre isso). A perspectiva deve influenciar o texto de forma IMPLÍCITA, baseando a Headline e a Bio nisso.
+PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO use adjetivos ou substantivos literais da perspectiva escolhida (ex: se for "praticidade", não escreva a palavra "praticidade", apenas descreva algo prático ou que demonstre isso). A perspectiva deve influenciar o texto de forma puramente IMPLÍCITA, baseando a Headline e a Bio exclusivamente nessa lente.
 
 DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PARECER ESCRITA POR IA OU COPYWRITER):
 1. Crie um texto de 1 a 2 frases curtas. 
