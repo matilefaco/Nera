@@ -1,0 +1,502 @@
+[
+  {
+    "specialty": "Manicure",
+    "headline": "Manicure natural e eficiente",
+    "bio": "Trabalho com rapidez e eficiência para fornecer um acabamento natural e atraente. Com 5 anos de experiência, sou especialista em atender às necessidades de cada cliente."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Design de Cílios com Foco em Eficiência",
+    "bio": "Atendo clientes exigentes com atenção pontual. Com 5 anos de experiência em design de cílios, trabalho rápido e eficiente para alcançar resultados visuais naturais e duradouros."
+  },
+  {
+    "specialty": "Designer de Cílios",
+    "headline": "Design de Cílios com Contorno Preciso",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em design de cílios. Trabalho rápido e eficiente para alcançar resultados naturais e definidos."
+  },
+  {
+    "specialty": "Designer de Sobrancelhas",
+    "headline": "Design de Sobrancelhas com Naturalidade",
+    "bio": "Trabalho com rapidez e eficiência para criar uma forma natural de sobrancelha que se encaixa perfeitamente em seu rosto. Com 5 anos de experiência, sou especialista em atender às necessidades de cada cliente."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de Unhas Rápido e Eficiente",
+    "bio": "Trabalho com foco em naturalidade, oferecendo soluções práticas para unhas saudáveis e bonitas. Com 5 anos de experiência, sou especialista em atendimento pontual e cuidado com cada detalhe."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Cabeleireira eficiente para clientes exigentes",
+    "bio": "Trabalho com rapidez e eficiência para atender às necessidades de clientes exigentes. Com 5 anos de experiência, sou especialista em atendimento pontual e cuidado com as necessidades individuais de cada cliente."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Depilação rápida e eficiente",
+    "bio": "Trabalho com clientes exigentes, atendendo com atenção e eficiência para garantir resultados visuais naturais e duradoures."
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Atendimento pontual para pele saudável",
+    "bio": "Esteticista com 5 anos de experiência, focada em atender clientes exigentes com cuidado e eficiência."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem rápida e eficiente",
+    "bio": "Sou uma maquiadora com 5 anos de experiência. Meu foco é oferecer atendimento pontual e especializado, garantindo que minhas clientes se sintam confortáveis e naturalmente belas."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Design de Sobrancelha com Foco em Naturalidade",
+    "bio": "Trabalho com técnicas rápidas e eficientes para criar sobrancelhas naturais e definidas. Minhas clientes procuram algo natural e eu atendo às suas necessidades com atenção aos detalhes."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Alongamentos naturais e eficientes para o dia a dia",
+    "bio": "Sou uma massoterapeuta com 5 anos de experiência, focada em atendimentos pontuais e eficientes. Minhas clientes buscam soluções naturais para seus problemas de saúde, e eu estou aqui para ajudá-las a encontrar alívio e conforto com minhas técnicas de massagem personalizadas."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Tranças rápidas e eficientes",
+    "bio": "Trancista com 5 anos de experiência, atendendo clientes exigentes com atenção pontual e especialização em tranças rápidas e eficientes."
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Bronzeamento rápido e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. 5 anos de experiência me permitiram desenvolver um estilo rápido e eficiente para atender às necessidades de cada cliente."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de unhas natural e eficiente",
+    "bio": "Sou uma Nail Designer com 5 anos de experiência, focada em criar designs de unhas naturais e eficientes que atendam às necessidades das minhas clientes."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Alongamentos naturais para cabelos saudáveis",
+    "bio": "Sou uma terapeuta capilar com 5 anos de experiência, especializada em atendimentos pontuais. Minhas clientes procuram soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudá-las a encontrar a solução certa para cada um deles."
+  },
+  {
+    "specialty": "Designer de Cílios",
+    "headline": "Cílios com volume sob medida",
+    "bio": "Com 5 anos de experiência em design de cílios, atendo clientes exigentes com atendimento pontual e especialista. Meu foco é garantir que você se sinta confiante e forte com seus cílios."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Cílios com volume sob medida",
+    "bio": "Atendo clientes exigentes com atendimento pontual e eficiente. Com 5 anos de experiência em Lash Design, trabalho para criar um olhar definido e natural."
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Esmaltação natural e resistente",
+    "bio": "Sou uma manicure com 5 anos de experiência, especializada em esmaltação rápida e eficiente. Minhas clientes procuram algo natural e eu sou capaz de entregar isso para elas."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Tranças rápidas e eficientes",
+    "bio": "Sou uma cabeleireira experiente com 5 anos de atuação, especializada em atendimentos pontuais e eficientes. Trabalho com clientes exigentes e atento aos detalhes para garantir um resultado natural e desejado."
+  },
+  {
+    "specialty": "Designer de Sobrancelhas",
+    "headline": "Design de Sobrancelhas com Naturalidade",
+    "bio": "Designer de Sobrancelhas há 5 anos, eu trabalho rápido e eficientemente para criar um design que respeite seu formato natural. Meu foco é atender pontualmente às necessidades de cada cliente, oferecendo um atendimento especializado e personalizado."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Micropigmentação com resultados naturais",
+    "bio": "Atendo com especialização em micropigmentação, oferecendo soluções eficientes e rápidas para suas necessidades. Com 5 anos de experiência, priorizo a naturalidade e o conforto ao trabalhar com minhas clientes."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem natural e eficiente",
+    "bio": "Sou uma maquiadora experiente, com 5 anos de carreira, focada em resultados naturais e rápidos. Meu objetivo é ajudar minhas clientes a se sentirem confortáveis e relaxadas com seus próprios traços, sem precisar de muito tempo ou esforço."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Depilação rápida e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em depilação. Com 5 anos de experiência, priorizo a eficiência e a satisfação das minhas clientes."
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Alongamentos faciais eficientes",
+    "bio": "Trabalho com atenção pontual, atendendo às necessidades de clientes exigentes. Com 5 anos de experiência em estética, priorizo a eficiência e a naturalidade em cada procedimento."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Alongamentos naturais e eficientes para o dia a dia",
+    "bio": "Sou Massoterapeuta há 5 anos, focada em atendimentos pontuais e eficientes. Meus clientes procuram algo natural e prático, e eu sou especialista em atender a essas necessidades."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Design de Sobrancelhas com Precisão",
+    "bio": "Lash Designer com 5 anos de experiência, focada em atender clientes exigentes com design de sobrancelhas precisos e eficientes."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de Unhas com Naturalidade",
+    "bio": "Profissional de design de unhas com 5 anos de experiência, focada em criar desenhos naturais e eficientes que respeitam o formato das unhas."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Cuidados capilares naturais",
+    "bio": "Sou uma terapeuta capilar com 5 anos de experiência, especializada em atendimentos pontuais e eficientes. Meus clientes buscam soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudar a encontrar a solução certa para você."
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Bronzeamento rápido e eficiente",
+    "bio": "Atendo clientes exigentes com atendimento pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a precisão e a eficiência em cada sessão."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Tranças rápidas e eficientes",
+    "bio": "Trancista há 5 anos, atendo clientes exigentes com atenção pontual e especialização em tranças rápidas e eficientes."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem natural e eficiente",
+    "bio": "Sou uma maquiadora com 5 anos de experiência, focada em atender de forma pontual e eficiente. Minhas clientes buscam algo natural e eu atuo para que elas se sintam confortáveis e relaxadas com a minha maquiagem."
+  },
+  {
+    "specialty": "Designer de Sobrancelhas",
+    "headline": "Design de Sobrancelhas com Naturalidade",
+    "bio": "Trabalho com sobrancelhas para que você se sinta confortável e natural em sua própria pele. Com 5 anos de experiência em design de sobrancelhas, priorizo a simplicidade e a elegância para criar uma forma que respeite seu formato natural."
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Manicure natural e eficiente",
+    "bio": "Sou uma manicure com 5 anos de experiência, especializada em atendimentos pontuais e técnicas eficientes. Meus clientes buscam algo natural e prático para o seu dia a dia."
+  },
+  {
+    "specialty": "Designer de Cílios",
+    "headline": "Design de Cílios Rápido e Eficiente",
+    "bio": "Atendo clientes exigentes com cuidado e atenção aos detalhes. Com 5 anos de experiência em design de cílios, trabalho para criar resultados naturais e duradouros."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Cabeleireira eficiente com atenção pontual",
+    "bio": "Trabalho com rapidez e eficiência para atender às necessidades das clientes exigentes, oferecendo um atendimento personalizado e cuidadoso. Com 5 anos de experiência, sou especialista em criar soluções de beleza que atendam às demandas das mulheres modernas."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Depilação rápida e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual. 5 anos de experiência em depilação rápida e eficiente."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Massagens naturais para o seu bem-estar",
+    "bio": "Massoterapeuta há 5 anos, trabalho com atendimento pontual e especialização em técnicas rápidas e eficientes para aliviar o estresse e promover a relaxação."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Micropigmentação natural e eficaz",
+    "bio": "Trabalho com foco em resultados naturais, atendendo às necessidades individuais de cada cliente. Com 5 anos de experiência, priorizo a eficiência e a precisão em cada procedimento."
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Atendimento pontual e eficiente",
+    "bio": "Sou uma esteticista experiente, atendendo clientes exigentes há 5 anos. Meu foco é oferecer cuidados faciais básicos e eficientes para ajudar você a se sentir mais confortável e confiante em sua própria pele."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Tranças rápidas e eficientes para clientes exigentes",
+    "bio": "Trancista há 5 anos, atendo a clientes que buscam soluções rápidas e eficientes para seus problemas de cabelo. Meu foco é oferecer atendimento pontual e especializado para atender às necessidades únicas de cada cliente."
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Bronzeamento rápido e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a eficiência e a qualidade em cada procedimento."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Design de Cílios com Foco em Naturalidade",
+    "bio": "Trabalho com rapidez e eficiência para criar design de cílios que respeitem seu formato natural. Atendo clientes exigentes com atendimento pontual e especialista."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Tratamentos capilares naturais para cabelos saudáveis",
+    "bio": "Sou Terapeuta Capilar com 5 anos de experiência em tratamentos capilares naturais. Meu foco é oferecer atendimentos pontuais e eficientes para ajudar minhas clientes a alcançar cabelos saudáveis e naturais."
+  },
+  {
+    "specialty": "Designer de Sobrancelhas",
+    "headline": "Design de Sobrancelhas com Foco em Naturalidade",
+    "bio": "Trabalho com clientes exigentes, oferecendo design de sobrancelhas eficiente e rápido. Com 5 anos de experiência, priorizo a naturalidade e a sutileza em cada detalhe."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de Unha Rápido e Eficiente",
+    "bio": "Trabalho com cuidado e eficiência para criar designs de unha naturais e duradouros. Com 5 anos de experiência, atendo às necessidades das minhas clientes com atenção pontual e especialização em design de unha."
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Manicure rápida e eficiente",
+    "bio": "Sou uma manicure com 5 anos de experiência, focada em atender minhas clientes de forma pontual e eficiente. Meu objetivo é garantir que você saia com um sorriso no rosto e suas unhas sejam o foco de atenção."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Alongamentos naturais para cabeleira",
+    "bio": "Trabalho com rapidez e eficiência, atendendo às necessidades de clientes exigentes. Com 5 anos de experiência, sou especializada em cuidar do seu cabelo com atenção pontual."
+  },
+  {
+    "specialty": "Designer de Cílios",
+    "headline": "Design de Cílios com Contorno Preciso",
+    "bio": "Trabalho com foco em atendimento pontual, atendendo clientes exigentes. Com 5 anos de experiência em design de cílios, priorizo a precisão e a eficiência em cada aplicação."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem natural e eficiente",
+    "bio": "Sou uma maquiadora com 5 anos de experiência, especializada em atendimentos pontuais e eficientes. Minhas clientes procuram algo natural e eu entendo isso. Trabalho com cuidado e atenção aos detalhes para que você se sinta confortável e confiante com sua aparência."
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Tratamentos eficientes para pele saudável",
+    "bio": "Esteticista com 5 anos de experiência, atendendo clientes exigentes com atenção pontual e especialização em tratamentos rápidos e eficazes."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Desenhando com precisão",
+    "bio": "Trabalho com micropigmentação para resultados naturais e duradouros. 5 anos de experiência em oferecer atendimento pontual e eficiente para cada cliente."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Depilação rápida e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização. Com 5 anos de experiência, priorizo a eficiência e a qualidade em cada depilação."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Alongamentos naturais e leves para o dia a dia",
+    "bio": "Sou uma terapeuta capilar com 5 anos de experiência. Meu foco é oferecer atendimentos pontuais e eficientes, respeitando a naturalidade do cabelo. Trabalho com cuidado e sutileza para alcançar resultados visuais naturais."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Tranças rápidas e eficientes",
+    "bio": "Trancista há 5 anos, atendo clientes exigentes com atendimento pontual e especializado. Minha prioridade é garantir que você tenha um cabelo trançado perfeito e rápido, sem comprometer a qualidade."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Alongamentos naturais e eficientes para o dia a dia",
+    "bio": "Sou Massoterapeuta há 5 anos, trabalhando com atendimento pontual e focado em resultados naturais. Minhas clientes procuram algo natural e eficaz, e eu estou aqui para ajudá-las a encontrar alívio e bem-estar."
+  },
+  {
+    "specialty": "Designer de Cílios",
+    "headline": "Cílios com volume sob medida",
+    "bio": "Atendendo clientes exigentes com atenção pontual, sou uma Designer de Cílios experiente há 5 anos. Meu foco é oferecer soluções eficientes e rápidas para as necessidades de cada cliente."
+  },
+  {
+    "specialty": "Designer de Sobrancelhas",
+    "headline": "Design de Sobrancelhas com Naturalidade",
+    "bio": "Trabalho com técnicas rápidas e eficientes para criar sobrancelhas naturais e definidas. Com 5 anos de experiência, priorizo a observação e a sutileza para atender às preferências de cada cliente."
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Bronzeamento rápido e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a eficiência e a naturalidade em cada aplicação."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de Unhas com Naturalidade",
+    "bio": "Trabalho com unhas para resultados naturais e duradouros. Com 5 anos de experiência, atendo com especialização e eficiência para que você tenha as unhas que você sempre quis."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Design de Sobrancelhas com Precisão",
+    "bio": "Atuo como Lash Designer há 5 anos, oferecendo design de sobrancelhas com foco na precisão e eficiência. Meu estilo é rápido e eficaz, atendendo às necessidades das clientes exigentes que buscam resultados naturais e precisos."
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Tranças bem cuidadas e alinhadas",
+    "bio": "Sou uma esteticista com 5 anos de experiência, focada em atender com rapidez e eficiência. Meus clientes procuram algo natural e eu trabalho para oferecer cuidados faciais básicos e eficientes, respeitando seu formato natural."
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Manicure eficiente e pontual",
+    "bio": "Trabalho com foco em atender clientes exigentes, oferecendo soluções rápidas e eficazes para as necessidades de unhas e cuidados com as mãos. Com 5 anos de experiência, priorizo a simetria e o acabamento para resultados naturais e duráveis."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Micropigmentação natural e eficiente",
+    "bio": "Trabalho com micropigmentação há 5 anos, oferecendo soluções naturais e eficientes para as necessidades das minhas clientes. Meu estilo é rápido e eficaz, garantindo resultados naturais e duradouros."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem eficiente para clientes exigentes",
+    "bio": "Trabalho rapidamente e eficientemente para atender às necessidades das clientes exigentes. Com 5 anos de experiência em maquiagem, sou especialista em atender às demandas das clientes que buscam resultados rápidos e precisos."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Alongamentos naturais para cabelos",
+    "bio": "Sou uma cabeleireira experiente com 5 anos de atuação. Meu estilo é rápido e eficiente, e eu me especializo em atendimentos pontuais. Meus clientes buscam soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudá-los a encontrar a solução certa para cada um deles."
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Bronzeamento rápido e eficiente",
+    "bio": "Atendi clientes exigentes há 5 anos, oferecendo bronzeamento rápido e eficiente. Meu estilo é rápido e eficiente, com atendimento pontual e especialização em bronzeamento."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Depilação rápida e eficiente",
+    "bio": "Trabalho com atenção aos detalhes, focando em resultados naturais. Com 5 anos de experiência, atendo com especialização e cuidado."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Massagens rápidas e eficientes para o seu bem-estar",
+    "bio": "Sou uma massoterapeuta com 5 anos de experiência, atendendo clientes exigentes com atenção pontual e foco em resultados eficientes. Meu objetivo é ajudar você a encontrar alívio e conforto em seu corpo e mente."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Cuidados capilares naturais e eficientes",
+    "bio": "Sou uma terapeuta capilar com 5 anos de experiência. Meu foco é oferecer atendimentos pontuais e eficientes, respeitando a naturalidade dos cabelos. Trabalho com clientes que buscam soluções naturais para seus problemas capilares."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Tranças firmes e eficientes",
+    "bio": "Sou uma trancista com 5 anos de experiência. Atendo clientes exigentes e me especializo em tranças rápidas e eficientes. Meu foco é garantir que as tranças sejam firmes e duradouras, sem comprometer a estética e a comodidade da cliente."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de Unhas com Foco em Naturalidade",
+    "bio": "Trabalho como Nail Designer há 5 anos, focado em criar designs de unhas que sejam naturais e duráveis. Meu objetivo é oferecer atendimento pontual e eficiente para que minhas clientes possam ter unhas que sejam ao mesmo tempo bonitas e resistentes."
+  },
+  {
+    "specialty": "Designer de Sobrancelhas",
+    "headline": "Design de Sobrancelhas com atenção ao detalhe",
+    "bio": "Atendo clientes exigentes com precisão e eficiência, oferecendo soluções personalizadas para suas sobrancelhas. Com 5 anos de experiência, trabalho com rapidez e eficácia para alcançar resultados naturais e duradouros."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Cílios com volume sob medida",
+    "bio": "Sou uma Lash Designer com 5 anos de experiência, focada em criar cílios naturais e eficientes. Meu estilo é rápido e eficiente, garantindo que você se sinta confortável e atendida."
+  },
+  {
+    "specialty": "Designer de Cílios",
+    "headline": "Design de Cílios com volume sob medida",
+    "bio": "Trabalho com atenção aos detalhes para criar cílios que sejam naturais e atraentes. Com 5 anos de experiência, atendo clientes exigentes e oferecendo um atendimento pontual e eficiente."
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Manicure com acabamento natural",
+    "bio": "Trabalho rápido e eficiente para deixar as unhas com um acabamento natural e duradouro. Com 5 anos de experiência, priorizo a simetria e a observação para criar designs personalizados para cada cliente."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Cabeleireira eficiente para clientes exigentes",
+    "bio": "Trabalho com rapidez e eficiência para atender às necessidades de clientes exigentes. Com 5 anos de experiência, priorizo a qualidade e a atenção aos detalhes em cada corte e estilização."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Micropigmentação natural e eficiente",
+    "bio": "Trabalho com precisão e rapidez para criar resultados naturais e duradouros. Com 5 anos de experiência, sou especialista em atender às necessidades individuais de cada cliente."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Depilação rápida e eficiente",
+    "bio": "Atendo clientes exigentes com cuidado e atenção pontual. 5 anos de experiência em depilação."
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Alongamentos faciais eficientes",
+    "bio": "Trabalho com foco em naturalidade, oferecendo alongamentos faciais eficientes para ajudar a manter a pele saudável e equilibrada."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem rápida e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em maquiagem. Com 5 anos de experiência, priorizo a simplicidade e a eficiência em meus serviços de maquiagem."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de unha natural e resistente",
+    "bio": "Trabalho com unhas desde 2018, sempre priorizando a naturalidade e a durabilidade. Meu objetivo é criar designs que sejam fáceis de manter e duradouros."
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Bronzeamento rápido e eficiente",
+    "bio": "Atendo clientes exigentes com bronzeamento personalizado e atenção ao detalhe. 5 anos de experiência e foco em resultados naturais."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Alongamentos naturais para cabelos saudáveis",
+    "bio": "Sou uma terapeuta capilar com 5 anos de experiência, especializada em atendimentos pontuais e eficientes. Minhas clientes procuram soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudá-las a encontrar a solução certa para você."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Tranças rápidas e eficientes",
+    "bio": "Trancista há 5 anos, atendo clientes exigentes com atendimento pontual e especialização em tranças rápidas e eficientes."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Alongamentos naturais e eficientes para o seu bem-estar",
+    "bio": "Sou Massoterapeuta há 5 anos, especializada em atendimentos pontuais e eficientes. Meu foco é ajudar as pessoas a encontrar conforto e relaxamento em suas vidas cotidianas."
+  },
+  {
+    "specialty": "Designer de Cílios",
+    "headline": "Design de Cílios com Atenção Pontual",
+    "bio": "Trabalho com rapidez e eficiência para criar cílios que destaquem sua expressão. Com 5 anos de experiência em design de cílios, atendo clientes exigentes com especialização em atendimento pontual."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Design de Cílios Rápido e Eficiente",
+    "bio": "Trabalho com técnicas rápidas e eficientes para criar um design de cílios natural e atraente. Com 5 anos de experiência, priorizo a atenção aos detalhes para garantir um resultado de alta qualidade."
+  },
+  {
+    "specialty": "Designer de Sobrancelhas",
+    "headline": "Design de Sobrancelhas com atenção pontual",
+    "bio": "Atendo clientes exigentes com design de sobrancelhas eficiente e rápido. 5 anos de experiência em criar formas naturais e agradáveis para você."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Tranças bem cuidadas e alinhadas",
+    "bio": "Sou uma cabeleireira com 5 anos de experiência, focada em atender minhas clientes com rapidez e eficiência. Meu estilo é natural e respeita o formato original do cabelo. Trabalho para que minhas clientes se sintam confortáveis e atendidas."
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Manicure rápida e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e habilidade para resultados duráveis. Com 5 anos de experiência em manicure, priorizo a eficiência e a durabilidade das minhas técnicas para que você possa se sentir confiante com suas unhas."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Alongamentos naturais e eficientes para o dia a dia",
+    "bio": "Massoterapeuta com 5 anos de experiência, focada em atendimentos pontuais e especialista em técnicas rápidas e eficientes. Meu objetivo é ajudar as pessoas a se sentir mais relaxadas e fortalecidas."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem rápida e eficiente para clientes exigentes",
+    "bio": "Atendo clientes exigentes com maquiagem rápida e eficiente, garantindo um resultado natural e duradouro. Com 5 anos de experiência na área, priorizo a atenção aos detalhes e a satisfação do cliente."
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Alongamentos faciais naturais e eficientes",
+    "bio": "Sou uma esteticista com 5 anos de experiência, focada em atender minhas clientes de forma pontual e eficiente. Minhas clientes procuram algo natural e eu entendo isso. Eu ajudo a resolver problemas de pele sensível e fortaleço a pele com técnicas naturais e eficazes."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Depilação rápida e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em depilação. 5 anos de experiência em proporcionar resultados rápidos e eficientes."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Pigmentação natural e eficiente",
+    "bio": "Sou uma micropigmentadora com 5 anos de experiência, focada em resultados naturais e eficientes. Meu objetivo é ajudar minhas clientes a encontrar um estilo de beleza que seja único e autêntico."
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Design de Sobrancelhas com Precisão",
+    "bio": "Sou uma Lash Designer com 5 anos de experiência, atendo clientes exigentes com atendimento pontual e especialização em design de sobrancelhas. Trabalho com rapidez e eficiência para alcançar resultados naturais e duradouros."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Design de Unhas com Foco em Naturalidade",
+    "bio": "Trabalho com cuidado e eficiência para criar designs de unhas que sejam naturais e duráveis. Com 5 anos de experiência, priorizo a atenção aos detalhes para garantir que você se sinta confortável e feliz com seu look."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Cuidados capilares eficientes",
+    "bio": "Atendo clientes exigentes com atenção pontual. Com 5 anos de experiência em cuidados capilares, trabalho rapidamente e eficientemente para atender às suas necessidades."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Alongamentos naturais e eficientes para o dia a dia",
+    "bio": "Trancista com 5 anos de experiência, focada em atendimentos pontuais e especializada em técnicas rápidas e eficientes para cuidar do couro cabeludo de forma natural."
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Bronzeamento rápido e eficiente",
+    "bio": "Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a eficiência e a rapidez no processo, garantindo resultados naturais e duradoures."
+  }
+]

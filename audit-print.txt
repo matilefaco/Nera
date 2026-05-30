@@ -1,0 +1,400 @@
+--- Perfil 1 (Manicure) ---
+Headline: Manicure natural e eficiente
+Bio: Trabalho com rapidez e eficiência para fornecer um acabamento natural e atraente. Com 5 anos de experiência, sou especialista em atender às necessidades de cada cliente.
+
+--- Perfil 2 (Lash Designer) ---
+Headline: Design de Cílios com Foco em Eficiência
+Bio: Atendo clientes exigentes com atenção pontual. Com 5 anos de experiência em design de cílios, trabalho rápido e eficiente para alcançar resultados visuais naturais e duradouros.
+
+--- Perfil 3 (Designer de Cílios) ---
+Headline: Design de Cílios com Contorno Preciso
+Bio: Atendo clientes exigentes com atenção pontual e especialização em design de cílios. Trabalho rápido e eficiente para alcançar resultados naturais e definidos.
+
+--- Perfil 4 (Designer de Sobrancelhas) ---
+Headline: Design de Sobrancelhas com Naturalidade
+Bio: Trabalho com rapidez e eficiência para criar uma forma natural de sobrancelha que se encaixa perfeitamente em seu rosto. Com 5 anos de experiência, sou especialista em atender às necessidades de cada cliente.
+
+--- Perfil 5 (Nail Designer) ---
+Headline: Design de Unhas Rápido e Eficiente
+Bio: Trabalho com foco em naturalidade, oferecendo soluções práticas para unhas saudáveis e bonitas. Com 5 anos de experiência, sou especialista em atendimento pontual e cuidado com cada detalhe.
+
+--- Perfil 6 (Cabeleireira) ---
+Headline: Cabeleireira eficiente para clientes exigentes
+Bio: Trabalho com rapidez e eficiência para atender às necessidades de clientes exigentes. Com 5 anos de experiência, sou especialista em atendimento pontual e cuidado com as necessidades individuais de cada cliente.
+
+--- Perfil 7 (Depiladora) ---
+Headline: Depilação rápida e eficiente
+Bio: Trabalho com clientes exigentes, atendendo com atenção e eficiência para garantir resultados visuais naturais e duradoures.
+
+--- Perfil 8 (Esteticista) ---
+Headline: Atendimento pontual para pele saudável
+Bio: Esteticista com 5 anos de experiência, focada em atender clientes exigentes com cuidado e eficiência.
+
+--- Perfil 9 (Maquiadora) ---
+Headline: Maquiagem rápida e eficiente
+Bio: Sou uma maquiadora com 5 anos de experiência. Meu foco é oferecer atendimento pontual e especializado, garantindo que minhas clientes se sintam confortáveis e naturalmente belas.
+
+--- Perfil 10 (Micropigmentadora) ---
+Headline: Design de Sobrancelha com Foco em Naturalidade
+Bio: Trabalho com técnicas rápidas e eficientes para criar sobrancelhas naturais e definidas. Minhas clientes procuram algo natural e eu atendo às suas necessidades com atenção aos detalhes.
+
+--- Perfil 11 (Massoterapeuta) ---
+Headline: Alongamentos naturais e eficientes para o dia a dia
+Bio: Sou uma massoterapeuta com 5 anos de experiência, focada em atendimentos pontuais e eficientes. Minhas clientes buscam soluções naturais para seus problemas de saúde, e eu estou aqui para ajudá-las a encontrar alívio e conforto com minhas técnicas de massagem personalizadas.
+
+--- Perfil 12 (Trancista) ---
+Headline: Tranças rápidas e eficientes
+Bio: Trancista com 5 anos de experiência, atendendo clientes exigentes com atenção pontual e especialização em tranças rápidas e eficientes.
+
+--- Perfil 13 (Bronzeamento) ---
+Headline: Bronzeamento rápido e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. 5 anos de experiência me permitiram desenvolver um estilo rápido e eficiente para atender às necessidades de cada cliente.
+
+--- Perfil 14 (Nail Designer) ---
+Headline: Design de unhas natural e eficiente
+Bio: Sou uma Nail Designer com 5 anos de experiência, focada em criar designs de unhas naturais e eficientes que atendam às necessidades das minhas clientes.
+
+--- Perfil 15 (Terapeuta Capilar) ---
+Headline: Alongamentos naturais para cabelos saudáveis
+Bio: Sou uma terapeuta capilar com 5 anos de experiência, especializada em atendimentos pontuais. Minhas clientes procuram soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudá-las a encontrar a solução certa para cada um deles.
+
+--- Perfil 16 (Designer de Cílios) ---
+Headline: Cílios com volume sob medida
+Bio: Com 5 anos de experiência em design de cílios, atendo clientes exigentes com atendimento pontual e especialista. Meu foco é garantir que você se sinta confiante e forte com seus cílios.
+
+--- Perfil 17 (Lash Designer) ---
+Headline: Cílios com volume sob medida
+Bio: Atendo clientes exigentes com atendimento pontual e eficiente. Com 5 anos de experiência em Lash Design, trabalho para criar um olhar definido e natural.
+
+--- Perfil 18 (Manicure) ---
+Headline: Esmaltação natural e resistente
+Bio: Sou uma manicure com 5 anos de experiência, especializada em esmaltação rápida e eficiente. Minhas clientes procuram algo natural e eu sou capaz de entregar isso para elas.
+
+--- Perfil 19 (Cabeleireira) ---
+Headline: Tranças rápidas e eficientes
+Bio: Sou uma cabeleireira experiente com 5 anos de atuação, especializada em atendimentos pontuais e eficientes. Trabalho com clientes exigentes e atento aos detalhes para garantir um resultado natural e desejado.
+
+--- Perfil 20 (Designer de Sobrancelhas) ---
+Headline: Design de Sobrancelhas com Naturalidade
+Bio: Designer de Sobrancelhas há 5 anos, eu trabalho rápido e eficientemente para criar um design que respeite seu formato natural. Meu foco é atender pontualmente às necessidades de cada cliente, oferecendo um atendimento especializado e personalizado.
+
+--- Perfil 21 (Micropigmentadora) ---
+Headline: Micropigmentação com resultados naturais
+Bio: Atendo com especialização em micropigmentação, oferecendo soluções eficientes e rápidas para suas necessidades. Com 5 anos de experiência, priorizo a naturalidade e o conforto ao trabalhar com minhas clientes.
+
+--- Perfil 22 (Maquiadora) ---
+Headline: Maquiagem natural e eficiente
+Bio: Sou uma maquiadora experiente, com 5 anos de carreira, focada em resultados naturais e rápidos. Meu objetivo é ajudar minhas clientes a se sentirem confortáveis e relaxadas com seus próprios traços, sem precisar de muito tempo ou esforço.
+
+--- Perfil 23 (Depiladora) ---
+Headline: Depilação rápida e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização em depilação. Com 5 anos de experiência, priorizo a eficiência e a satisfação das minhas clientes.
+
+--- Perfil 24 (Esteticista) ---
+Headline: Alongamentos faciais eficientes
+Bio: Trabalho com atenção pontual, atendendo às necessidades de clientes exigentes. Com 5 anos de experiência em estética, priorizo a eficiência e a naturalidade em cada procedimento.
+
+--- Perfil 25 (Massoterapeuta) ---
+Headline: Alongamentos naturais e eficientes para o dia a dia
+Bio: Sou Massoterapeuta há 5 anos, focada em atendimentos pontuais e eficientes. Meus clientes procuram algo natural e prático, e eu sou especialista em atender a essas necessidades.
+
+--- Perfil 26 (Lash Designer) ---
+Headline: Design de Sobrancelhas com Precisão
+Bio: Lash Designer com 5 anos de experiência, focada em atender clientes exigentes com design de sobrancelhas precisos e eficientes.
+
+--- Perfil 27 (Nail Designer) ---
+Headline: Design de Unhas com Naturalidade
+Bio: Profissional de design de unhas com 5 anos de experiência, focada em criar desenhos naturais e eficientes que respeitam o formato das unhas.
+
+--- Perfil 28 (Terapeuta Capilar) ---
+Headline: Cuidados capilares naturais
+Bio: Sou uma terapeuta capilar com 5 anos de experiência, especializada em atendimentos pontuais e eficientes. Meus clientes buscam soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudar a encontrar a solução certa para você.
+
+--- Perfil 29 (Bronzeamento) ---
+Headline: Bronzeamento rápido e eficiente
+Bio: Atendo clientes exigentes com atendimento pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a precisão e a eficiência em cada sessão.
+
+--- Perfil 30 (Trancista) ---
+Headline: Tranças rápidas e eficientes
+Bio: Trancista há 5 anos, atendo clientes exigentes com atenção pontual e especialização em tranças rápidas e eficientes.
+
+--- Perfil 31 (Maquiadora) ---
+Headline: Maquiagem natural e eficiente
+Bio: Sou uma maquiadora com 5 anos de experiência, focada em atender de forma pontual e eficiente. Minhas clientes buscam algo natural e eu atuo para que elas se sintam confortáveis e relaxadas com a minha maquiagem.
+
+--- Perfil 32 (Designer de Sobrancelhas) ---
+Headline: Design de Sobrancelhas com Naturalidade
+Bio: Trabalho com sobrancelhas para que você se sinta confortável e natural em sua própria pele. Com 5 anos de experiência em design de sobrancelhas, priorizo a simplicidade e a elegância para criar uma forma que respeite seu formato natural.
+
+--- Perfil 33 (Manicure) ---
+Headline: Manicure natural e eficiente
+Bio: Sou uma manicure com 5 anos de experiência, especializada em atendimentos pontuais e técnicas eficientes. Meus clientes buscam algo natural e prático para o seu dia a dia.
+
+--- Perfil 34 (Designer de Cílios) ---
+Headline: Design de Cílios Rápido e Eficiente
+Bio: Atendo clientes exigentes com cuidado e atenção aos detalhes. Com 5 anos de experiência em design de cílios, trabalho para criar resultados naturais e duradouros.
+
+--- Perfil 35 (Cabeleireira) ---
+Headline: Cabeleireira eficiente com atenção pontual
+Bio: Trabalho com rapidez e eficiência para atender às necessidades das clientes exigentes, oferecendo um atendimento personalizado e cuidadoso. Com 5 anos de experiência, sou especialista em criar soluções de beleza que atendam às demandas das mulheres modernas.
+
+--- Perfil 36 (Depiladora) ---
+Headline: Depilação rápida e eficiente
+Bio: Atendo clientes exigentes com atenção pontual. 5 anos de experiência em depilação rápida e eficiente.
+
+--- Perfil 37 (Massoterapeuta) ---
+Headline: Massagens naturais para o seu bem-estar
+Bio: Massoterapeuta há 5 anos, trabalho com atendimento pontual e especialização em técnicas rápidas e eficientes para aliviar o estresse e promover a relaxação.
+
+--- Perfil 38 (Micropigmentadora) ---
+Headline: Micropigmentação natural e eficaz
+Bio: Trabalho com foco em resultados naturais, atendendo às necessidades individuais de cada cliente. Com 5 anos de experiência, priorizo a eficiência e a precisão em cada procedimento.
+
+--- Perfil 39 (Esteticista) ---
+Headline: Atendimento pontual e eficiente
+Bio: Sou uma esteticista experiente, atendendo clientes exigentes há 5 anos. Meu foco é oferecer cuidados faciais básicos e eficientes para ajudar você a se sentir mais confortável e confiante em sua própria pele.
+
+--- Perfil 40 (Trancista) ---
+Headline: Tranças rápidas e eficientes para clientes exigentes
+Bio: Trancista há 5 anos, atendo a clientes que buscam soluções rápidas e eficientes para seus problemas de cabelo. Meu foco é oferecer atendimento pontual e especializado para atender às necessidades únicas de cada cliente.
+
+--- Perfil 41 (Bronzeamento) ---
+Headline: Bronzeamento rápido e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a eficiência e a qualidade em cada procedimento.
+
+--- Perfil 42 (Lash Designer) ---
+Headline: Design de Cílios com Foco em Naturalidade
+Bio: Trabalho com rapidez e eficiência para criar design de cílios que respeitem seu formato natural. Atendo clientes exigentes com atendimento pontual e especialista.
+
+--- Perfil 43 (Terapeuta Capilar) ---
+Headline: Tratamentos capilares naturais para cabelos saudáveis
+Bio: Sou Terapeuta Capilar com 5 anos de experiência em tratamentos capilares naturais. Meu foco é oferecer atendimentos pontuais e eficientes para ajudar minhas clientes a alcançar cabelos saudáveis e naturais.
+
+--- Perfil 44 (Designer de Sobrancelhas) ---
+Headline: Design de Sobrancelhas com Foco em Naturalidade
+Bio: Trabalho com clientes exigentes, oferecendo design de sobrancelhas eficiente e rápido. Com 5 anos de experiência, priorizo a naturalidade e a sutileza em cada detalhe.
+
+--- Perfil 45 (Nail Designer) ---
+Headline: Design de Unha Rápido e Eficiente
+Bio: Trabalho com cuidado e eficiência para criar designs de unha naturais e duradouros. Com 5 anos de experiência, atendo às necessidades das minhas clientes com atenção pontual e especialização em design de unha.
+
+--- Perfil 46 (Manicure) ---
+Headline: Manicure rápida e eficiente
+Bio: Sou uma manicure com 5 anos de experiência, focada em atender minhas clientes de forma pontual e eficiente. Meu objetivo é garantir que você saia com um sorriso no rosto e suas unhas sejam o foco de atenção.
+
+--- Perfil 47 (Cabeleireira) ---
+Headline: Alongamentos naturais para cabeleira
+Bio: Trabalho com rapidez e eficiência, atendendo às necessidades de clientes exigentes. Com 5 anos de experiência, sou especializada em cuidar do seu cabelo com atenção pontual.
+
+--- Perfil 48 (Designer de Cílios) ---
+Headline: Design de Cílios com Contorno Preciso
+Bio: Trabalho com foco em atendimento pontual, atendendo clientes exigentes. Com 5 anos de experiência em design de cílios, priorizo a precisão e a eficiência em cada aplicação.
+
+--- Perfil 49 (Maquiadora) ---
+Headline: Maquiagem natural e eficiente
+Bio: Sou uma maquiadora com 5 anos de experiência, especializada em atendimentos pontuais e eficientes. Minhas clientes procuram algo natural e eu entendo isso. Trabalho com cuidado e atenção aos detalhes para que você se sinta confortável e confiante com sua aparência.
+
+--- Perfil 50 (Esteticista) ---
+Headline: Tratamentos eficientes para pele saudável
+Bio: Esteticista com 5 anos de experiência, atendendo clientes exigentes com atenção pontual e especialização em tratamentos rápidos e eficazes.
+
+--- Perfil 51 (Micropigmentadora) ---
+Headline: Desenhando com precisão
+Bio: Trabalho com micropigmentação para resultados naturais e duradouros. 5 anos de experiência em oferecer atendimento pontual e eficiente para cada cliente.
+
+--- Perfil 52 (Depiladora) ---
+Headline: Depilação rápida e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização. Com 5 anos de experiência, priorizo a eficiência e a qualidade em cada depilação.
+
+--- Perfil 53 (Terapeuta Capilar) ---
+Headline: Alongamentos naturais e leves para o dia a dia
+Bio: Sou uma terapeuta capilar com 5 anos de experiência. Meu foco é oferecer atendimentos pontuais e eficientes, respeitando a naturalidade do cabelo. Trabalho com cuidado e sutileza para alcançar resultados visuais naturais.
+
+--- Perfil 54 (Trancista) ---
+Headline: Tranças rápidas e eficientes
+Bio: Trancista há 5 anos, atendo clientes exigentes com atendimento pontual e especializado. Minha prioridade é garantir que você tenha um cabelo trançado perfeito e rápido, sem comprometer a qualidade.
+
+--- Perfil 55 (Massoterapeuta) ---
+Headline: Alongamentos naturais e eficientes para o dia a dia
+Bio: Sou Massoterapeuta há 5 anos, trabalhando com atendimento pontual e focado em resultados naturais. Minhas clientes procuram algo natural e eficaz, e eu estou aqui para ajudá-las a encontrar alívio e bem-estar.
+
+--- Perfil 56 (Designer de Cílios) ---
+Headline: Cílios com volume sob medida
+Bio: Atendendo clientes exigentes com atenção pontual, sou uma Designer de Cílios experiente há 5 anos. Meu foco é oferecer soluções eficientes e rápidas para as necessidades de cada cliente.
+
+--- Perfil 57 (Designer de Sobrancelhas) ---
+Headline: Design de Sobrancelhas com Naturalidade
+Bio: Trabalho com técnicas rápidas e eficientes para criar sobrancelhas naturais e definidas. Com 5 anos de experiência, priorizo a observação e a sutileza para atender às preferências de cada cliente.
+
+--- Perfil 58 (Bronzeamento) ---
+Headline: Bronzeamento rápido e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a eficiência e a naturalidade em cada aplicação.
+
+--- Perfil 59 (Nail Designer) ---
+Headline: Design de Unhas com Naturalidade
+Bio: Trabalho com unhas para resultados naturais e duradouros. Com 5 anos de experiência, atendo com especialização e eficiência para que você tenha as unhas que você sempre quis.
+
+--- Perfil 60 (Lash Designer) ---
+Headline: Design de Sobrancelhas com Precisão
+Bio: Atuo como Lash Designer há 5 anos, oferecendo design de sobrancelhas com foco na precisão e eficiência. Meu estilo é rápido e eficaz, atendendo às necessidades das clientes exigentes que buscam resultados naturais e precisos.
+
+--- Perfil 61 (Esteticista) ---
+Headline: Tranças bem cuidadas e alinhadas
+Bio: Sou uma esteticista com 5 anos de experiência, focada em atender com rapidez e eficiência. Meus clientes procuram algo natural e eu trabalho para oferecer cuidados faciais básicos e eficientes, respeitando seu formato natural.
+
+--- Perfil 62 (Manicure) ---
+Headline: Manicure eficiente e pontual
+Bio: Trabalho com foco em atender clientes exigentes, oferecendo soluções rápidas e eficazes para as necessidades de unhas e cuidados com as mãos. Com 5 anos de experiência, priorizo a simetria e o acabamento para resultados naturais e duráveis.
+
+--- Perfil 63 (Micropigmentadora) ---
+Headline: Micropigmentação natural e eficiente
+Bio: Trabalho com micropigmentação há 5 anos, oferecendo soluções naturais e eficientes para as necessidades das minhas clientes. Meu estilo é rápido e eficaz, garantindo resultados naturais e duradouros.
+
+--- Perfil 64 (Maquiadora) ---
+Headline: Maquiagem eficiente para clientes exigentes
+Bio: Trabalho rapidamente e eficientemente para atender às necessidades das clientes exigentes. Com 5 anos de experiência em maquiagem, sou especialista em atender às demandas das clientes que buscam resultados rápidos e precisos.
+
+--- Perfil 65 (Cabeleireira) ---
+Headline: Alongamentos naturais para cabelos
+Bio: Sou uma cabeleireira experiente com 5 anos de atuação. Meu estilo é rápido e eficiente, e eu me especializo em atendimentos pontuais. Meus clientes buscam soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudá-los a encontrar a solução certa para cada um deles.
+
+--- Perfil 66 (Bronzeamento) ---
+Headline: Bronzeamento rápido e eficiente
+Bio: Atendi clientes exigentes há 5 anos, oferecendo bronzeamento rápido e eficiente. Meu estilo é rápido e eficiente, com atendimento pontual e especialização em bronzeamento.
+
+--- Perfil 67 (Depiladora) ---
+Headline: Depilação rápida e eficiente
+Bio: Trabalho com atenção aos detalhes, focando em resultados naturais. Com 5 anos de experiência, atendo com especialização e cuidado.
+
+--- Perfil 68 (Massoterapeuta) ---
+Headline: Massagens rápidas e eficientes para o seu bem-estar
+Bio: Sou uma massoterapeuta com 5 anos de experiência, atendendo clientes exigentes com atenção pontual e foco em resultados eficientes. Meu objetivo é ajudar você a encontrar alívio e conforto em seu corpo e mente.
+
+--- Perfil 69 (Terapeuta Capilar) ---
+Headline: Cuidados capilares naturais e eficientes
+Bio: Sou uma terapeuta capilar com 5 anos de experiência. Meu foco é oferecer atendimentos pontuais e eficientes, respeitando a naturalidade dos cabelos. Trabalho com clientes que buscam soluções naturais para seus problemas capilares.
+
+--- Perfil 70 (Trancista) ---
+Headline: Tranças firmes e eficientes
+Bio: Sou uma trancista com 5 anos de experiência. Atendo clientes exigentes e me especializo em tranças rápidas e eficientes. Meu foco é garantir que as tranças sejam firmes e duradouras, sem comprometer a estética e a comodidade da cliente.
+
+--- Perfil 71 (Nail Designer) ---
+Headline: Design de Unhas com Foco em Naturalidade
+Bio: Trabalho como Nail Designer há 5 anos, focado em criar designs de unhas que sejam naturais e duráveis. Meu objetivo é oferecer atendimento pontual e eficiente para que minhas clientes possam ter unhas que sejam ao mesmo tempo bonitas e resistentes.
+
+--- Perfil 72 (Designer de Sobrancelhas) ---
+Headline: Design de Sobrancelhas com atenção ao detalhe
+Bio: Atendo clientes exigentes com precisão e eficiência, oferecendo soluções personalizadas para suas sobrancelhas. Com 5 anos de experiência, trabalho com rapidez e eficácia para alcançar resultados naturais e duradouros.
+
+--- Perfil 73 (Lash Designer) ---
+Headline: Cílios com volume sob medida
+Bio: Sou uma Lash Designer com 5 anos de experiência, focada em criar cílios naturais e eficientes. Meu estilo é rápido e eficiente, garantindo que você se sinta confortável e atendida.
+
+--- Perfil 74 (Designer de Cílios) ---
+Headline: Design de Cílios com volume sob medida
+Bio: Trabalho com atenção aos detalhes para criar cílios que sejam naturais e atraentes. Com 5 anos de experiência, atendo clientes exigentes e oferecendo um atendimento pontual e eficiente.
+
+--- Perfil 75 (Manicure) ---
+Headline: Manicure com acabamento natural
+Bio: Trabalho rápido e eficiente para deixar as unhas com um acabamento natural e duradouro. Com 5 anos de experiência, priorizo a simetria e a observação para criar designs personalizados para cada cliente.
+
+--- Perfil 76 (Cabeleireira) ---
+Headline: Cabeleireira eficiente para clientes exigentes
+Bio: Trabalho com rapidez e eficiência para atender às necessidades de clientes exigentes. Com 5 anos de experiência, priorizo a qualidade e a atenção aos detalhes em cada corte e estilização.
+
+--- Perfil 77 (Micropigmentadora) ---
+Headline: Micropigmentação natural e eficiente
+Bio: Trabalho com precisão e rapidez para criar resultados naturais e duradouros. Com 5 anos de experiência, sou especialista em atender às necessidades individuais de cada cliente.
+
+--- Perfil 78 (Depiladora) ---
+Headline: Depilação rápida e eficiente
+Bio: Atendo clientes exigentes com cuidado e atenção pontual. 5 anos de experiência em depilação.
+
+--- Perfil 79 (Esteticista) ---
+Headline: Alongamentos faciais eficientes
+Bio: Trabalho com foco em naturalidade, oferecendo alongamentos faciais eficientes para ajudar a manter a pele saudável e equilibrada.
+
+--- Perfil 80 (Maquiadora) ---
+Headline: Maquiagem rápida e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização em maquiagem. Com 5 anos de experiência, priorizo a simplicidade e a eficiência em meus serviços de maquiagem.
+
+--- Perfil 81 (Nail Designer) ---
+Headline: Design de unha natural e resistente
+Bio: Trabalho com unhas desde 2018, sempre priorizando a naturalidade e a durabilidade. Meu objetivo é criar designs que sejam fáceis de manter e duradouros.
+
+--- Perfil 82 (Bronzeamento) ---
+Headline: Bronzeamento rápido e eficiente
+Bio: Atendo clientes exigentes com bronzeamento personalizado e atenção ao detalhe. 5 anos de experiência e foco em resultados naturais.
+
+--- Perfil 83 (Terapeuta Capilar) ---
+Headline: Alongamentos naturais para cabelos saudáveis
+Bio: Sou uma terapeuta capilar com 5 anos de experiência, especializada em atendimentos pontuais e eficientes. Minhas clientes procuram soluções naturais para seus problemas de cabelo, e eu estou aqui para ajudá-las a encontrar a solução certa para você.
+
+--- Perfil 84 (Trancista) ---
+Headline: Tranças rápidas e eficientes
+Bio: Trancista há 5 anos, atendo clientes exigentes com atendimento pontual e especialização em tranças rápidas e eficientes.
+
+--- Perfil 85 (Massoterapeuta) ---
+Headline: Alongamentos naturais e eficientes para o seu bem-estar
+Bio: Sou Massoterapeuta há 5 anos, especializada em atendimentos pontuais e eficientes. Meu foco é ajudar as pessoas a encontrar conforto e relaxamento em suas vidas cotidianas.
+
+--- Perfil 86 (Designer de Cílios) ---
+Headline: Design de Cílios com Atenção Pontual
+Bio: Trabalho com rapidez e eficiência para criar cílios que destaquem sua expressão. Com 5 anos de experiência em design de cílios, atendo clientes exigentes com especialização em atendimento pontual.
+
+--- Perfil 87 (Lash Designer) ---
+Headline: Design de Cílios Rápido e Eficiente
+Bio: Trabalho com técnicas rápidas e eficientes para criar um design de cílios natural e atraente. Com 5 anos de experiência, priorizo a atenção aos detalhes para garantir um resultado de alta qualidade.
+
+--- Perfil 88 (Designer de Sobrancelhas) ---
+Headline: Design de Sobrancelhas com atenção pontual
+Bio: Atendo clientes exigentes com design de sobrancelhas eficiente e rápido. 5 anos de experiência em criar formas naturais e agradáveis para você.
+
+--- Perfil 89 (Cabeleireira) ---
+Headline: Tranças bem cuidadas e alinhadas
+Bio: Sou uma cabeleireira com 5 anos de experiência, focada em atender minhas clientes com rapidez e eficiência. Meu estilo é natural e respeita o formato original do cabelo. Trabalho para que minhas clientes se sintam confortáveis e atendidas.
+
+--- Perfil 90 (Manicure) ---
+Headline: Manicure rápida e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e habilidade para resultados duráveis. Com 5 anos de experiência em manicure, priorizo a eficiência e a durabilidade das minhas técnicas para que você possa se sentir confiante com suas unhas.
+
+--- Perfil 91 (Massoterapeuta) ---
+Headline: Alongamentos naturais e eficientes para o dia a dia
+Bio: Massoterapeuta com 5 anos de experiência, focada em atendimentos pontuais e especialista em técnicas rápidas e eficientes. Meu objetivo é ajudar as pessoas a se sentir mais relaxadas e fortalecidas.
+
+--- Perfil 92 (Maquiadora) ---
+Headline: Maquiagem rápida e eficiente para clientes exigentes
+Bio: Atendo clientes exigentes com maquiagem rápida e eficiente, garantindo um resultado natural e duradouro. Com 5 anos de experiência na área, priorizo a atenção aos detalhes e a satisfação do cliente.
+
+--- Perfil 93 (Esteticista) ---
+Headline: Alongamentos faciais naturais e eficientes
+Bio: Sou uma esteticista com 5 anos de experiência, focada em atender minhas clientes de forma pontual e eficiente. Minhas clientes procuram algo natural e eu entendo isso. Eu ajudo a resolver problemas de pele sensível e fortaleço a pele com técnicas naturais e eficazes.
+
+--- Perfil 94 (Depiladora) ---
+Headline: Depilação rápida e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização em depilação. 5 anos de experiência em proporcionar resultados rápidos e eficientes.
+
+--- Perfil 95 (Micropigmentadora) ---
+Headline: Pigmentação natural e eficiente
+Bio: Sou uma micropigmentadora com 5 anos de experiência, focada em resultados naturais e eficientes. Meu objetivo é ajudar minhas clientes a encontrar um estilo de beleza que seja único e autêntico.
+
+--- Perfil 96 (Lash Designer) ---
+Headline: Design de Sobrancelhas com Precisão
+Bio: Sou uma Lash Designer com 5 anos de experiência, atendo clientes exigentes com atendimento pontual e especialização em design de sobrancelhas. Trabalho com rapidez e eficiência para alcançar resultados naturais e duradouros.
+
+--- Perfil 97 (Nail Designer) ---
+Headline: Design de Unhas com Foco em Naturalidade
+Bio: Trabalho com cuidado e eficiência para criar designs de unhas que sejam naturais e duráveis. Com 5 anos de experiência, priorizo a atenção aos detalhes para garantir que você se sinta confortável e feliz com seu look.
+
+--- Perfil 98 (Terapeuta Capilar) ---
+Headline: Cuidados capilares eficientes
+Bio: Atendo clientes exigentes com atenção pontual. Com 5 anos de experiência em cuidados capilares, trabalho rapidamente e eficientemente para atender às suas necessidades.
+
+--- Perfil 99 (Trancista) ---
+Headline: Alongamentos naturais e eficientes para o dia a dia
+Bio: Trancista com 5 anos de experiência, focada em atendimentos pontuais e especializada em técnicas rápidas e eficientes para cuidar do couro cabeludo de forma natural.
+
+--- Perfil 100 (Bronzeamento) ---
+Headline: Bronzeamento rápido e eficiente
+Bio: Atendo clientes exigentes com atenção pontual e especialização em bronzeamento. Com 5 anos de experiência, priorizo a eficiência e a rapidez no processo, garantindo resultados naturais e duradoures.
+
