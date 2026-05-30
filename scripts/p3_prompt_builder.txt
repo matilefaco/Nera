@@ -1,31 +1,3 @@
-import express from "express";
-import { getDb } from "../firebaseAdmin.js";
-import { 
-  callNvidiaAI, 
-  aiRateLimit, 
-  RATE_LIMIT_WINDOW, 
-  MAX_REQUESTS, 
-  getServiceDescriptionWithFallback 
-} from "../utils.js";
-import { checkPlanFeature } from "../middleware/planMiddleware.js";
-import { generateMonthlyReportPDF } from "../reports/monthlyReport.js";
-import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
-import { logger } from "../utils/logger.js";
-
-const router = express.Router();
-
-const debugOnly = (req: any, res: any, next: any) => {
-  if (process.env.NODE_ENV === "production") {
-    return res.status(404).send("Not Found");
-  }
-  return next();
-};
-
-/**
- * PUBLIC: Track Analytics Event
- * Protected by analyticsLimiter in server.ts
- */
-router.post("/public/track", async (req, res) => {
   try {
     const { professionalId, type, referrer, origin } = req.body;
 
@@ -227,14 +199,7 @@ Técnicas estritas (proibido inventar): ${repertoireSpecific}\n`;
   } else if (repertoire) {
     repertoireSection = `\nREPERTÓRIO TÉCNICO DA PROFISSÃO (CONTEXTO GERAL):
 O repertório técnico serve apenas para compreender o universo daquela profissão.
-O repertório NÃO representa serviços confirmados.
-Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa uma técnica específica apenas porque ela existe no repertório.
-Uma técnica só pode ser apresentada como serviço realizado quando ela tiver sido explicitamente informada pela profissional nos DADOS DA PROFISSIONAL.
-Quando não houver informação suficiente, utilize descrições amplas da área de atuação.
-
-Técnicas da área para contexto: ${repertoire}\n`;
-  }
-
+--
   try {
     const prompt = `Você é uma profissional real da área de beleza e bem-estar no Brasil, descrevendo seu próprio trabalho para clientes no seu perfil ou Instagram.
 Seu objetivo é gerar uma Frase Principal (headline) curta e uma Mini Bio (bio) baseada EXCLUSIVAMENTE nos dados abaixo.
@@ -265,9 +230,10 @@ Evite completamente linguagem de promessa, "autoestima genérica", "soberania", 
 
 A REGRA DOS DIFERENCIAIS (ATENÇÃO!):
 É ESTRITAMENTE PROIBIDO colar literalmente as expressões contidas nos "Diferenciais focais" e "Estilo". 
-A IA deve usar os diferenciais para INFLUENCIAR O TOM indiretamente. Exemplo: se o diferencial for "Pontualidade", sugira consistência de agenda ou respeito ao tempo da cliente de forma orgânica, MAS É ESTRITAMENTE PROIBIDO usar palavras como "pontualidade" ou "pontual" literalmente, ou colar atributos de forma mecânica.
+A IA deve usar os diferenciais para INFLUENCIAR O TOM indiretamente. Exemplo: se o diferencial for "Pontualidade", sugira organização referenciando implicitamente (ex: "Atendo com horário organizado", "Sem espera desnecessária"), MAS É ESTRITAMENTE PROIBIDO usar palavras como "pontualidade" ou "pontual" literalmente, ou colar atributos de forma mecânica.
 
 PALAVRAS E EXPRESSÕES ESTRITAMENTE PROIBIDAS (NÃO USE NUNCA):
+- Inícios de frase proibidos (NÃO ARRANQUE ASSIM): "Eu trabalho", "Trabalho com", "Eu sou", "Sou", "Eu, Ana", "Meu foco é", "Minha prioridade é", "A minha prioridade"
 - Muletas afetivas e genéricas (PROIBIDAS): "cuidado e atenção", "atenção e cuidado", "cuidado e dedicação", "dedicação e cuidado", "atendimento cuidadoso", "com carinho", "prioridade é", "meu foco é", "valorizo a pontualidade", "priorizo a pontualidade"
 - Estruturas de Currículo / LinkedIn (PROIBIDAS): "profissional", "especializada", "especialista em", "alta durabilidade", "segura", "duradoura", "com qualidade", "alta qualidade", "com amor e dedicação", "com técnicas modernas", "experiência em", "sucesso em"
 - Marketing/coach/luxo: "premium", "luxo", "exclusiva", "excelência", "experiência única", "autoestima", "transformar vidas", "realçar sua beleza", "revelar sua melhor versão", "soberana", "atendimento diferenciado", "resultados extraordinários"
@@ -278,12 +244,12 @@ DIRETRIZES DE ESTILO PARA HEADLINE (FOCO EM SITUAÇÃO REAL, MENOS RÓTULO):
 1. A headline deve ser CURTA e DIRETA. A headline pode ser uma frase curta de benefício, uma situação real da cliente, uma promessa prática, um contraste ou uma descrição simples do resultado. Não use sempre a estrutura 'X para Y'.
 2. A headline NÃO DEVE parecer uma categoria de marketplace (PROIBIDO: "Design de X com Y", "Especialista em X").
 3. Headline curta, concreta, que mostra o seu verdadeiro foco. 
-Exemplos de direção (NÃO COPIE E NÃO TENTE IMITAR A ESTRUTURA):
-- Cílios com leveza absoluta
+Exemplos de direção (NÃO COPIE):
+- Cílios tão leves que você esquece que está usando
 - Sobrancelhas sem efeito marcado
-- Unhas discretas e rotina descomplicada
-- Tranças e raízes protegidas
-- Massagem e descompressão muscular
+- Unhas mais discretas no seu dia a dia
+- Trancista focada na durabilidade e raízes protegidas
+- Massagem profunda focada na tensão muscular
 Exemplos RUINS (PROIBIDOS: rótulos, robótica, currículo):
 - "Manicure rápida e eficiente"
 - "Design de cílios com volume"
@@ -303,9 +269,9 @@ PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO us
 
 DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PARECER ESCRITA POR IA OU COPYWRITER):
 1. Crie um texto de MÁXIMO 25 PALAVRAS. O texto deve ser extremamente curto, no máximo 2 frases.
-2. A bio deve ter variedade de abertura. Para soar natural e fugir do lugar-comum, PULE a auto-apresentação com verbos triviais (NÃO inicie com "Trabalho", "Atendo", "Sou", "Preparo", "Faço", "Meu objetivo"). Comece diretamente pelo sujeito (a cliente), pelo ambiente do estúdio, pela sensação do serviço, pelo resultado direto ou por um detalhe prático, sem usar muletas introdutórias.
-3. NUNCA tente provar competência ou elencar cursos (PROIBIDO iniciar com "Atuo na área há...", "Tenho X anos de experiência...", "Ao longo dos últimos anos...", "Sou profissional", ou "Com expertise"). Vá direto ao espaço do cliente, situação do dia a dia ou forma prática de conduzir o horário, sem usar verbos desgastados de auto-apresentação.
-4. Quando for relevante para a especialidade, use pequenos detalhes da forma de executar o serviço. Não torne todas as bios clínicas, e não foque sempre em etapas como higienização ou preparação.
+2. A bio deve soar natural e variar a abertura. Ela pode começar pela cliente, pela situação, pela rotina, por um detalhe do atendimento, pelo resultado desejado ou por um processo técnico leve. Evite repetir sempre a mesma estrutura. Evite início nominal com a profissão.
+3. NUNCA tente provar competência ou elencar cursos (PROIBIDO iniciar com "Atuo na área há...", "Tenho X anos de experiência...", "Ao longo dos últimos anos...", "Sou profissional", ou "Com expertise"). É ESTRITAMENTE PROIBIDO arrancar a bio com "Eu trabalho", "Eu sou", "Trabalho com" ou "Sou". Vá direto à ação ou ao contexto.
+4. Quando for relevante para a especialidade, use pequenos detalhes práticos do atendimento, preparo ou orientação. Não torne todas as bios clínicas, técnicas ou parecidas com protocolo.
 5. Priorize a SIMPLICIDADE ELEGANTE: palavras diretas e concretas. Não faça mosaico ou listinha juntando as palavras do prompt soltas. Componha as frases de forma inteligente.
 
 A REGRA DE EXPERIÊNCIA (MUITO IMPORTANTE):

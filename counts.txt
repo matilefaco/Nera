@@ -1,0 +1,7 @@
+      1 Avalio seu
+      2 Avalio suas
+      9 Avalio cada
+     13 Avalio as
+     13 Avalio o
+     17 Avalio e
+     97 Avalio a

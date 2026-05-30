@@ -1,0 +1,177 @@
+[
+  {
+    "specialty": "Manicure",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Sobrancelhas",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Podóloga",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Sobrancelhas",
+    "headline": "API Error",
+    "bio": "NVIDIA Status 429: {\"status\":429,\"title\":\"Too Many Requests\"}"
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Sem pressa, cuidando de cada unha",
+    "bio": "Unhas naturais, rotina descomplicada, sem pressa"
+  },
+  {
+    "specialty": "Lash Designer",
+    "headline": "Cílios naturais, sem desperdício",
+    "bio": "Peles maduras precisam de cuidado, não de desperdício de materiais descartáveis. Meu trabalho é criar cílios naturais que duram."
+  },
+  {
+    "specialty": "Micropigmentadora",
+    "headline": "Peles maduras merecem cuidado",
+    "bio": "Atendo peles maduras com micropigmentação, oferecendo uma solução discreta e eficiente para a beleza"
+  },
+  {
+    "specialty": "Esteticista",
+    "headline": "Recuperando danos anteriores com cuidado e eficiência",
+    "bio": "Peles maduras precisam de atenção constante. Eu uso materiais descartáveis para criar um ambiente limpo e higiênico, garantindo um tratamento personalizado para cada cliente."
+  },
+  {
+    "specialty": "Maquiadora",
+    "headline": "Maquiagem para momentos de tranquilidade",
+    "bio": "Peles maduras merecem descansar em silêncio, sem maquiagem pesada. Eu trabalho com materiais descartáveis para que você se sinta relaxada e natural."
+  },
+  {
+    "specialty": "Sobrancelhas",
+    "headline": "Sobrancelhas delicadas, sem efeito marcado",
+    "bio": "Peles maduras precisam cuidado e atenção, então trabalho com materiais descartáveis para garantir conforto e segurança."
+  },
+  {
+    "specialty": "Cabeleireira",
+    "headline": "Tranquilidade em cada corte",
+    "bio": "Peles maduras, um corte cuidadoso e materiais descartáveis. Em silêncio, você se senta para um momento de calma."
+  },
+  {
+    "specialty": "Trancista",
+    "headline": "Cuidando de cada trança, para que você possa ser você",
+    "bio": "Peles maduras e cabelos naturais, em um ambiente de confiança e respeito"
+  },
+  {
+    "specialty": "Podóloga",
+    "headline": "Cuidados sem dor para peles maduras",
+    "bio": "Atendo peles com problemas de saúde, oferecendo técnicas sem dor e materiais descartáveis para um atendimento eficiente e seguro."
+  },
+  {
+    "specialty": "Terapeuta Capilar",
+    "headline": "Cuidados rápidos, mas bem feitos",
+    "bio": "Peles maduras e rotinas descomplicadas são minhas especialidades. Trabalho com materiais descartáveis para garantir a limpeza e a higiene."
+  },
+  {
+    "specialty": "Depiladora",
+    "headline": "Atendimento sem pressa",
+    "bio": "Peles maduras e cuidados com materiais descartáveis. Em silêncio, sem pressa, para um atendimento tranquilo e eficiente."
+  },
+  {
+    "specialty": "Nail Designer",
+    "headline": "Unhas duráveis, sem comprometer a rotina",
+    "bio": "Peles maduras e cuidadosa, sem estresse na rotina"
+  },
+  {
+    "specialty": "Bronzeamento",
+    "headline": "Cuidando das peles maduras com carinho e eficiência",
+    "bio": "Peles maduras, cuidadas com materiais descartáveis e atenção individualizada. Em um ambiente tranquilo, oferecendo soluções naturais para peles maduras."
+  },
+  {
+    "specialty": "Massoterapeuta",
+    "headline": "Alívio para peles danificadas",
+    "bio": "Peles maduras precisam de cuidado e atenção. Trabalho com materiais descartáveis para oferecer a você a tranquilidade que você merece."
+  },
+  {
+    "specialty": "Manicure",
+    "headline": "Unhas cuidadas em silêncio",
+    "bio": "Trabalho em silêncio para que você possa relaxar e se sentir confortável."
+  }
+]

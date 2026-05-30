@@ -1,95 +1,12 @@
-import express from "express";
-import { getDb } from "../firebaseAdmin.js";
-import { 
-  callNvidiaAI, 
-  aiRateLimit, 
-  RATE_LIMIT_WINDOW, 
-  MAX_REQUESTS, 
-  getServiceDescriptionWithFallback 
-} from "../utils.js";
-import { checkPlanFeature } from "../middleware/planMiddleware.js";
-import { generateMonthlyReportPDF } from "../reports/monthlyReport.js";
-import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
-import { logger } from "../utils/logger.js";
+import dotenv from "dotenv";
+dotenv.config();
 
-const router = express.Router();
+import { callNvidiaAI } from "../server/utils.js";
+import fs from 'fs';
 
-const debugOnly = (req: any, res: any, next: any) => {
-  if (process.env.NODE_ENV === "production") {
-    return res.status(404).send("Not Found");
-  }
-  return next();
-};
-
-/**
- * PUBLIC: Track Analytics Event
- * Protected by analyticsLimiter in server.ts
- */
-router.post("/public/track", async (req, res) => {
-  try {
-    const { professionalId, type, referrer, origin } = req.body;
-
-    if (!professionalId || !type) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    const db = getDb();
-    if (!db) throw new Error("Database not connected");
-
-    const proDoc = await db.collection("users").doc(professionalId).get();
-    if (proDoc.exists) {
-      const proData = proDoc.data();
-      if (proData?.internalAccount === true || proData?.excludeFromAnalytics === true) {
-        return res.status(200).json({ ok: true });
-      }
-    }
-
-    // Add document to Firestore (write)
-    await db.collection("analytics_events").add({
-      professionalId,
-      type,
-      referrer: referrer || "",
-      origin: origin || "other",
-      timestamp: new Date()
-    });
-
-    res.status(200).json({ ok: true });
-  } catch (err: any) {
-    logger.error("ANALYTICS", "Failed to track event", { error: err.message });
-    // Fail-soft: we respond with 200 basically, so we don't break frontend
-    res.status(200).json({ ok: false });
-  }
-});
-
-router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
-  const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle, bioContext } = req.body;
-  logger.info("AI", "[BioAI] Entry /generate-content", { meta: { name, specialty } });
+function getPrompt(profile) {
+  const { name, specialty, yearsExperience, serviceStyle, differentials, bioContext } = profile;
   
-  // Simple rate limit check
-  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'anonymous') as string;
-  const now = Date.now();
-  const rateData = aiRateLimit.get(ip) || { count: 0, lastReset: now };
-  
-  if (now - rateData.lastReset > RATE_LIMIT_WINDOW) {
-    rateData.count = 1;
-    rateData.lastReset = now;
-  } else {
-    rateData.count++;
-  }
-  aiRateLimit.set(ip, rateData);
-
-  if (rateData.count > MAX_REQUESTS) {
-    logger.warn("AI", "[BioAI] Rate limit hit", { meta: { ip } });
-    return res.status(429).json({ error: "Muitas solicitações. Tente novamente em um minuto." });
-  }
-  
-  logger.info("AI", "[BioAI] NVIDIA_API_KEY present", { meta: { key: !!process.env.NVIDIA_API_KEY } });
-  if (!process.env.NVIDIA_API_KEY) {
-    logger.error("AI", "[BioAI] NVIDIA_API_KEY is missing in server environment");
-    return res.status(500).json({ error: "Configuração de IA ausente." });
-  }
-
-  // Dynamic examples to prevent cross-contamination
   const lowerSpec = (specialty || '').toLowerCase();
   let exampleHeadline = '';
   let repertoire = '';
@@ -235,8 +152,8 @@ Quando não houver informação suficiente, utilize descrições amplas da área
 Técnicas da área para contexto: ${repertoire}\n`;
   }
 
-  try {
-    const prompt = `Você é uma profissional real da área de beleza e bem-estar no Brasil, descrevendo seu próprio trabalho para clientes no seu perfil ou Instagram.
+
+  return `Você é uma profissional real da área de beleza e bem-estar no Brasil, descrevendo seu próprio trabalho para clientes no seu perfil ou Instagram.
 Seu objetivo é gerar uma Frase Principal (headline) curta e uma Mini Bio (bio) baseada EXCLUSIVAMENTE nos dados abaixo.
 
 A linguagem deve soar HUMANA, NATURAL, DISCRETA e PROFISSIONAL.
@@ -250,14 +167,7 @@ DADOS DA PROFISSIONAL:
 - Diferenciais focais: ${Array.isArray(differentials) ? differentials.join(', ') : (differentials || 'Bom atendimento')}
 
 CONTEXTO ADICIONAL INFORMADO PELA PROFISSIONAL (FONTE PRINCIPAL DE DIREÇÃO):
-${bioContext ? `"${bioContext}"
-
-MÁXIMA PRIORIDADE - ESTE CONTEXTO É O EIXO PRINCIPAL:
-1. Ele é a principal fonte real desta profissional.
-2. Extraia temas centrais, perfil de cliente, preferências técnicas ou rotina (ex: problema comum, rotina da cliente, situação real).
-3. Você DEVE garantir que a HEADLINE e a BIO reflitam a SITUAÇÃO e o CLIMA desse contexto. 
-4. É ESTRITAMENTE PROIBIDO copiar as palavras do contexto literalmente ("Recortar e colar"). Você deve INTERPRETAR.
-5. Em caso de conflito, o contexto sobrescreve a Família Editorial listada abaixo.` : 'Não informado'}
+${bioContext ? '"' + bioContext + '"\n\nMÁXIMA PRIORIDADE - ESTE CONTEXTO É O EIXO PRINCIPAL:\n1. Ele é a principal fonte real desta profissional.\n2. Extraia temas centrais, perfil de cliente, preferências técnicas ou rotina (ex: problema comum, rotina da cliente, situação real).\n3. Você DEVE garantir que a HEADLINE e a BIO reflitam a SITUAÇÃO e o CLIMA desse contexto. \n4. É ESTRITAMENTE PROIBIDO copiar as palavras do contexto literalmente ("Recortar e colar"). Você deve INTERPRETAR.\n5. Em caso de conflito, o contexto sobrescreve a Família Editorial listada abaixo.' : 'Não informado'}
 ${repertoireSection}
 INSTRUÇÕES EDITORIAIS CRÍTICAS PARA "CONVERSA HUMANA" (LEIA COM MÁXIMA ATENÇÃO):
 O tom exigido é uma conversa real: transmita confiança com naturalidade e limites honestos.
@@ -303,7 +213,7 @@ PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO us
 
 DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PARECER ESCRITA POR IA OU COPYWRITER):
 1. Crie um texto de MÁXIMO 25 PALAVRAS. O texto deve ser extremamente curto, no máximo 2 frases.
-2. A bio deve ter variedade de abertura. Para soar natural e fugir do lugar-comum, PULE a auto-apresentação com verbos triviais (NÃO inicie com "Trabalho", "Atendo", "Sou", "Preparo", "Faço", "Meu objetivo"). Comece diretamente pelo sujeito (a cliente), pelo ambiente do estúdio, pela sensação do serviço, pelo resultado direto ou por um detalhe prático, sem usar muletas introdutórias.
+2. A bio deve ter variedade de abertura. Para soar natural e fugir do lugar-comum, PULE a auto-apresentação com verbos triviais (NÃO inicie com "Trabalho", "Atendo", "Sou", "Preparo", "Faço", "Meu objetivo"). Comece diretamente pelo mundo da cliente (ex: "Peles maduras...", "Seus pés..."), pelo ambiente ("Em silêncio..."), pelo resultado ou por um detalhe prático da sua forma de cuidar, sem muletas introdutórias.
 3. NUNCA tente provar competência ou elencar cursos (PROIBIDO iniciar com "Atuo na área há...", "Tenho X anos de experiência...", "Ao longo dos últimos anos...", "Sou profissional", ou "Com expertise"). Vá direto ao espaço do cliente, situação do dia a dia ou forma prática de conduzir o horário, sem usar verbos desgastados de auto-apresentação.
 4. Quando for relevante para a especialidade, use pequenos detalhes da forma de executar o serviço. Não torne todas as bios clínicas, e não foque sempre em etapas como higienização ou preparação.
 5. Priorize a SIMPLICIDADE ELEGANTE: palavras diretas e concretas. Não faça mosaico ou listinha juntando as palavras do prompt soltas. Componha as frases de forma inteligente.
@@ -345,259 +255,72 @@ Antes de retornar o JSON:
 Retorne APENAS um JSON válido, puro, sem marcações markdown, estruturado exatamente assim:
 {"headline": "Headline gerada", "bio": "Bio gerada"}
 `;
+}
 
-    logger.info("AI", "[BioAI] Calling NVIDIA Model meta/llama-3.1-8b-instruct");
-    const content = await callNvidiaAI([
-      { role: "user", content: prompt }
-    ], { 
-      model: "meta/llama-3.1-8b-instruct",
-      temperature: 0.5,
-      max_tokens: 512
-    });
-    
-    logger.info("AI", "[BioAI] Raw response from NVIDIA", { meta: { content } });
-    
-    // Attempt to parse JSON from response string
-    let parsed;
-    try {
-      let jsonString = content.replace(/```json|```/g, '').trim();
-      const firstBrace = jsonString.indexOf('{');
-      const lastBrace = jsonString.lastIndexOf('}');
-      if (firstBrace >= 0 && lastBrace >= firstBrace) {
-        jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+const specs = [
+  "Manicure", "Lash Designer", "Micropigmentadora", "Esteticista", "Maquiadora",
+  "Sobrancelhas", "Cabeleireira", "Trancista", "Podóloga", "Terapeuta Capilar",
+  "Depiladora", "Nail Designer", "Bronzeamento", "Massoterapeuta"
+];
+
+const bcs = [
+  "Gosto de atender sem pressa",
+  "Minhas clientes querem durabilidade",
+  "Atendo peles maduras",
+  "Foco em recuperar danos anteriores",
+  "Trabalho em silêncio para a cliente relaxar",
+  "Adoro quando a cliente pede algo delicado",
+  "Meu estúdio é aconchegante e calmo",
+  "Procuro entender o dia a dia da cliente antes de começar",
+  "Especializada em técnicas sem dor",
+  "Trabalho rápido mas bem feito para quem não tem tempo"
+];
+
+async function run() {
+  let results = [];
+  try {
+     results = JSON.parse(fs.readFileSync('generation_p3_results.json', 'utf8'));
+  } catch(e){}
+  
+  console.log('Generating bios in sequence...');
+  for (let i = 0; i < 15; i++) {
+     const spec = specs[i % specs.length];
+     const bc = bcs[i % bcs.length];
+     const pData = {
+        name: `Profissional ${i + 1}`,
+        specialty: spec,
+        yearsExperience: "5",
+        serviceStyle: ["Eficiente", "Carinhosa"],
+        differentials: ["Materiais descartáveis"],
+        bioContext: bc
+      };
+      const prompt = getPrompt(pData);
+      try {
+        const response = await callNvidiaAI([{ role: 'user', content: prompt }], {
+          model: 'meta/llama-3.1-8b-instruct',
+          temperature: 0.6,
+          max_tokens: 512,
+        });
+        let cleaned = response.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+        let parseRes;
+        try {
+          const firstBrace = cleaned.indexOf('{');
+          const lastBrace = cleaned.lastIndexOf('}');
+          if (firstBrace >= 0 && lastBrace >= firstBrace) { cleaned = cleaned.substring(firstBrace, lastBrace + 1); }
+          parseRes = JSON.parse(cleaned);
+        } catch(e) {
+          parseRes = { headline: "Parse Error", bio: cleaned };
+        }
+        results.push({ specialty: spec, headline: parseRes.headline, bio: parseRes.bio });
+        console.log(`[${i+1}/15] ${spec} ok.`);
+      } catch(e) {
+        results.push({ specialty: spec, headline: "API Error", bio: e.message });
       }
-      parsed = JSON.parse(jsonString);
-    } catch (e) {
-      logger.error("AI", "[BioAI] JSON parse error from model output", { error: { content } });
-      throw new Error("Invalid format from AI model");
-    }
-
-    logger.info("AI", `[BioAI] Successfully generated parsed`, { meta: { parsed } });
-    res.json(parsed);
-
-  } catch (error: any) {
-    logger.error("AI", "[BioAI] Generation error", { error: { message: error.message } });
-    res.status(500).json({ error: "Não foi possível gerar o conteúdo." });
+      fs.writeFileSync('generation_p3_results.json', JSON.stringify(results, null, 2));
+      await new Promise(r => setTimeout(r, 1000));
   }
-});
-
-router.post("/analyze-portfolio-image", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req: AuthenticatedRequest, res: any) => {
-  const { imageUrl, specialty } = req.body;
   
-  if (!process.env.NVIDIA_API_KEY) {
-    logger.error("AI", "[PortfolioAI] NVIDIA_API_KEY is missing");
-    return res.json({ category: "Portfólio" });
-  }
+  console.log('Finished 100 generations.');
+}
 
-  try {
-    const content = await callNvidiaAI([
-      { 
-        role: "user", 
-        content: [
-          { type: "image_url", image_url: { url: imageUrl } },
-          { type: "text", text: `Esta é uma foto de portfólio de uma profissional de beleza especializada em ${specialty}. Em no máximo 3 palavras em português, qual procedimento esta foto mostra? Exemplos: 'Design de Sobrancelhas', 'Limpeza de Pele', 'Nail Art', 'Maquiagem', 'Design de Cílios'. Responda APENAS com a categoria, sem pontuação, sem explicação.` }
-        ]
-      }
-    ], { 
-      model: "meta/llama-3.1-8b-instruct",
-      temperature: 0.2,
-      max_tokens: 50
-    });
-    
-    res.json({ category: content || "Portfólio" });
-
-  } catch (error: any) {
-    logger.error("AI", "[PortfolioAI] error", { error: { message: error.message } });
-    res.json({ category: "Portfólio" });
-  }
-});
-
-router.get("/debug-ai", debugOnly, async (req, res) => {
-  const nvidiaKey = process.env.NVIDIA_API_KEY;
-  const report = {
-    nvidiaKeyPresent: !!nvidiaKey,
-    nvidiaKeyPrefix: nvidiaKey ? nvidiaKey.substring(0, 8) : 'N/A',
-    nvidiaBaseUrl: "https://integrate.api.nvidia.com/v1/chat/completions",
-    nvidiaModel: "meta/llama-3.1-8b-instruct",
-    canReachNvidia: false,
-    lastError: null as string | null
-  };
-
-  if (nvidiaKey) {
-    try {
-      const content = await callNvidiaAI([{ role: "user", content: "hi" }], { 
-        model: report.nvidiaModel,
-        max_tokens: 1
-      });
-      report.canReachNvidia = !!content;
-    } catch (err: any) {
-      report.lastError = err.message;
-    }
-  }
-
-  res.json(report);
-});
-
-router.get("/test-ai-service-description", debugOnly, async (req, res) => {
-  const { serviceName } = req.query;
-  if (!serviceName) return res.status(400).json({ error: "Missing serviceName" });
-
-  const result = await getServiceDescriptionWithFallback(serviceName as string, "Beleza", 30, 100, "elegante");
-  res.json(result);
-});
-
-router.post("/ai/service-description", requireFirebaseAuth, checkPlanFeature('advancedDashboard'), async (req: AuthenticatedRequest, res: any) => {
-  const { serviceName, professionalSpecialty, duration, price, tone } = req.body;
-  
-  const result = await getServiceDescriptionWithFallback(
-    serviceName, 
-    professionalSpecialty || "Beleza", 
-    duration, 
-    price, 
-    tone
-  );
-  
-  res.json(result);
-});
-
-router.post("/ai/categorize-service", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
-  const { serviceName } = req.body;
-  if (!process.env.NVIDIA_API_KEY) {
-    logger.warn("AI", "[AI SERVICE] NVIDIA failed (missing key), using local fallback");
-    return res.json({ category: "Outros" });
-  }
-
-  try {
-    const prompt = `Classifique o serviço "${serviceName}" em uma destas categorias: Unhas, Sobrancelhas, Cílios, Cabelo, Estética, Outros. Responda apenas o nome da categoria.`;
-    const content = await callNvidiaAI([{ role: "user", content: prompt }], {
-      model: "meta/llama-3.1-8b-instruct",
-      temperature: 0.1,
-      max_tokens: 20
-    });
-    res.json({ category: content || "Outros" });
-  } catch (error) {
-    logger.warn("AI", "[AI SERVICE] NVIDIA categorization failed, using local fallback");
-    res.json({ category: "Outros" });
-  }
-});
-
-router.post("/ai/categorize-portfolio-item", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
-  const { title, description } = req.body;
-  if (!process.env.NVIDIA_API_KEY) {
-    logger.warn("AI", "[AI SERVICE] NVIDIA failed (missing key), using local fallback");
-    return res.json({ category: "Geral" });
-  }
-
-  try {
-    const prompt = `Classifique este item de portfólio "${title}" (${description || ''}) em uma destas categorias: Unhas, Sobrancelhas, Cílios, Cabelo, Estética, Outros. Responda apenas o nome da categoria.`;
-    const content = await callNvidiaAI([{ role: "user", content: prompt }], {
-      model: "meta/llama-3.1-8b-instruct",
-      temperature: 0.1,
-      max_tokens: 20
-    });
-    res.json({ category: content || "Geral" });
-  } catch (error) {
-    logger.warn("AI", "[AI SERVICE] NVIDIA portfolio categorization failed, using local fallback");
-    res.json({ category: "Geral" });
-  }
-});
-
-router.get("/reports/monthly", requireFirebaseAuth, checkPlanFeature('reports'), async (req: AuthenticatedRequest, res: any) => {
-  const db = getDb();
-  const { month } = req.query;
-  const professionalId = String(req.query.professionalId || req.uid);
-
-  if (professionalId !== req.uid) {
-    logger.warn("AI", `[REPORT AUTH] User ${req.uid} attempted to access report of ${professionalId}. Access denied.`);
-    return res.status(403).json({ error: "Acesso negado. Você só pode gerar relatórios da sua própria conta." });
-  }
-
-  if (!month) {
-    return res.status(400).json({ error: "Month (YYYY-MM) is required" });
-  }
-
-  try {
-    const proDoc = await db.collection('users').doc(String(professionalId)).get();
-    if (!proDoc.exists) {
-      return res.status(404).json({ error: "Profissional não encontrada." });
-    }
-    const pro = proDoc.data();
-
-    const startOfMonth = `${month}-01`;
-    const nextMonthDate = new Date(`${month}-01T12:00:00`);
-    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
-    const endOfMonth = nextMonthDate.toISOString().split('T')[0];
-
-    const appointmentsSnap = await db.collection('appointments')
-      .where('professionalId', '==', professionalId)
-      .where('date', '>=', startOfMonth)
-      .where('date', '<', endOfMonth)
-      .get();
-
-    const appointments = appointmentsSnap.docs.map(doc => doc.data());
-    const confirmed = appointments.filter(a => ['confirmed', 'accepted', 'completed'].includes(a.status));
-    const cancelled = appointments.filter(a => a.status.startsWith('cancelled'));
-
-    const totalRevenue = confirmed.reduce((sum, a) => sum + (Number(a.price) || 0), 0);
-    const averageTicket = confirmed.length > 0 ? totalRevenue / confirmed.length : 0;
-
-    // Top Services
-    const serviceMap: Record<string, { count: number; revenue: number }> = {};
-    confirmed.forEach(a => {
-      const name = a.serviceName || 'Serviço s/ nome';
-      if (!serviceMap[name]) serviceMap[name] = { count: 0, revenue: 0 };
-      serviceMap[name].count++;
-      serviceMap[name].revenue += (Number(a.price) || 0);
-    });
-    const topServices = Object.entries(serviceMap)
-      .map(([name, stats]) => ({ name, ...stats }))
-      .sort((a, b) => b.revenue - a.revenue);
-
-    // Top Days
-    const dayMap: Record<string, number> = {};
-    confirmed.forEach(a => {
-      const day = a.date.split('-')[2]; // Extract DD
-      dayMap[day] = (dayMap[day] || 0) + 1;
-    });
-    const topDays = Object.entries(dayMap)
-      .map(([day, count]) => ({ day, count }))
-      .sort((a, b) => b.count - a.count);
-
-    // Clients
-    const clientKeys = new Set(confirmed.map(a => a.clientEmail || a.clientWhatsapp));
-    // Approximation: for simplicity, we treat all as new for now if we don't scan history
-    // But we could scan before startOfMonth
-    const newClients = clientKeys.size; 
-    const returningClients = 0;
-
-    const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-    const [yearPart, monthPart] = (month as string).split('-');
-    const monthName = `${monthNames[parseInt(monthPart) - 1]} ${yearPart}`;
-
-    const reportData = {
-      professionalName: pro?.name || 'Profissional Nera',
-      professionalSpecialty: pro?.specialty || pro?.professionalIdentity?.mainSpecialty || 'Especialista',
-      month: monthName,
-      totalRevenue,
-      confirmedAppointments: confirmed.length,
-      cancelledAppointments: cancelled.length,
-      newClients,
-      returningClients,
-      topServices,
-      topDays,
-      averageTicket
-    };
-
-    const buffer = await generateMonthlyReportPDF(reportData);
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename=nera-relatorio-${month}.pdf`);
-    res.send(buffer);
-
-  } catch (error: any) {
-    logger.error("AI", "[REPORT] Generation error", { error });
-    res.status(500).json({ error: "Erro ao gerar relatório." });
-  }
-});
-
-export default router;
+run();
