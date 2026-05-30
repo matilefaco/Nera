@@ -245,49 +245,49 @@ NUNCA escreva como um copywriter publicitário. Fale com naturalidade, seguranç
 DADOS DA PROFISSIONAL:
 - Nome: ${name || 'A profissional'}
 - Profissão real/Especialidade: ${specialty || 'Beleza e Bem-estar'}
-- Tempo na área: ${yearsExperience ? yearsExperience : 'Profissional com experiência'}
+- Perfil de Maturidade: ${yearsExperience ? (parseInt(yearsExperience as string) >= 4 ? 'Profissional experiente, madura e segura' : 'Profissional dedicada e atualizada') : 'Profissional dedicada'}
 - Estilo: ${Array.isArray(serviceStyle) ? serviceStyle.join(', ') : (serviceStyle || 'Cuidadoso')}
 - Diferenciais focais: ${Array.isArray(differentials) ? differentials.join(', ') : (differentials || 'Bom atendimento')}
 
-CONTEXTO ADICIONAL INFORMADO PELA PROFISSIONAL (FONTE PRINCIPAL DE DIFERENCIAÇÃO):
+CONTEXTO ADICIONAL INFORMADO PELA PROFISSIONAL (FONTE PRINCIPAL DE DIREÇÃO):
 ${bioContext ? `"${bioContext}"
 
-MÁXIMA PRIORIDADE - ESTE CONTEXTO É SOBERANO:
-1. Ele é a principal fonte de diferenciação e contexto humano desta profissional.
-2. Extraia temas centrais, perfil de cliente, preferências técnicas ou foco de atendimento.
-3. Você DEVE garantir que a HEADLINE e a BIO reflitam claramente esse contexto. Não copie literalmente, mas adapte-o para uma narrativa profissional. Se a profissional citar um problema comum das clientes (ex: unhas roídas, pele sensível, queda capilar), aborde o CUIDADO, FORTALECIMENTO ou RESOLUÇÃO desse problema na Bio de forma humana.
-4. Em caso de conflito, as informações acima sobrescrevem a Família Editorial listada abaixo. A Família servirá apenas como guia secundário de tom.` : 'Não informado'}
+MÁXIMA PRIORIDADE - ESTE CONTEXTO É O EIXO PRINCIPAL:
+1. Ele é a principal fonte real desta profissional.
+2. Extraia temas centrais, perfil de cliente, preferências técnicas ou rotina (ex: problema comum, rotina da cliente, situação real).
+3. Você DEVE garantir que a HEADLINE e a BIO reflitam a SITUAÇÃO e o CLIMA desse contexto. 
+4. É ESTRITAMENTE PROIBIDO copiar as palavras do contexto literalmente ("Recortar e colar"). Você deve INTERPRETAR.
+5. Em caso de conflito, o contexto sobrescreve a Família Editorial listada abaixo.` : 'Não informado'}
 ${repertoireSection}
-INSTRUÇÕES EDITORIAIS CRÍTICAS (LEIA COM MÁXIMA ATENÇÃO):
-O tom exigido é "Conversa humana e profissional": transmita confiança através da clareza e naturalidade. Diga o que você faz de forma concreta, sem exageros.
+INSTRUÇÕES EDITORIAIS CRÍTICAS PARA "CONVERSA HUMANA" (LEIA COM MÁXIMA ATENÇÃO):
+O tom exigido é "Processo e realidade": transmita confiança falando de processo, avaliação, preparo, cuidado técnico, limites honestos e orientações para a cliente. 
+Evite completamente linguagem de promessa, "autoestima genérica", "soberania", "experiência única", "beleza dos sonhos". A comunicação deve ser muito normal, sóbria e modesta.
+
+A REGRA DOS DIFERENCIAIS (ATENÇÃO!):
+É ESTRITAMENTE PROIBIDO colar literalmente as expressões contidas nos "Diferenciais focais" e "Estilo" (ex: não escreva "ofereço atenção pontual e natural" se os diferenciais forem "atenção pontual" e "natural"). 
+A IA deve usar os diferenciais para INFLUENCIAR O TOM E ATITUDE, mas nunca deve transformar a string literal numa frase mecânica.
 
 PALAVRAS E EXPRESSÕES ESTRITAMENTE PROIBIDAS (NÃO USE NUNCA):
-- Estruturas de Currículo / LinkedIn (PROIBIDAS): "profissional", "especializada", "especialista em", "alta durabilidade", "segura", "duradoura", "atendimento personalizado", "com qualidade", "alta qualidade", "com amor e dedicação", "com técnicas modernas", "experiência em", "sucesso em", "seguro e duradouro"
-- Marketing/coach/luxo: "premium", "luxo", "exclusiva", "excelência", "experiência única", "autoestima", "transformar vidas", "realçar sua beleza", "revelar sua melhor versão", "soberana", "atendimento diferenciado", "resultados extraordinários", "alto padrão", "alta performance", "incrível", "maravilhosa"
-- Cafonas/Artificiais: "cuido das suas unhas como cuido das minhas", "quando você sair, vai querer voltar", "arte em cada milímetro", "olhar que hipnotiza", "beleza que transforma", "unhas dos sonhos", "cílios que falam por você"
-- Clínico/acadêmico: "biologia da pele", "anatomia", "avaliação criteriosa", "protocolos de biossegurança", "metodologia", "estrutura anatômica", "processos rigorosos", "procedimentos avançados", "excelência técnica", "fisiologia"
-- GENÉRICOS (EVITE FORTEMENTE): "Trabalho com cuidado", "Faço com carinho", "Atenção aos detalhes", "Resultados duradouros", "Atendimento personalizado", "Qualidade em cada detalhe", "Carinho e dedicação", "Focado em", "priorizando", "buscando", "meu objetivo é"
+- Estruturas de Currículo / LinkedIn (PROIBIDAS): "profissional", "especializada", "especialista em", "alta durabilidade", "segura", "duradoura", "com qualidade", "alta qualidade", "com amor e dedicação", "com técnicas modernas", "experiência em", "sucesso em"
+- Marketing/coach/luxo: "premium", "luxo", "exclusiva", "excelência", "experiência única", "autoestima", "transformar vidas", "realçar sua beleza", "revelar sua melhor versão", "soberana", "atendimento diferenciado", "resultados extraordinários"
+- Cafonas/Artificiais/Emocionais demais: "cuido das suas unhas como cuido das minhas", "quando você sair, vai querer voltar", "arte em cada milímetro", "olhar que hipnotiza", "beleza que transforma"
+- Genéricos colados: "Trabalho com cuidado e dedicação", "Meu foco é", "Rápida e eficiente" (PROIBIDO: Não repita "rápida e eficiente" ou "rápido e")
 
-DIRETRIZES DE ESTILO PARA HEADLINE (FOCO EM CONCRETUDE E NATURALIDADE):
-1. A headline deve ser CURTA, RESPIRÁVEL e DIRETA. Ela ficará na área principal da sua vitrine.
-2. A headline NUNCA deve soar como um currículo, perfil de LinkedIn ou marketplace genérico (EXATAMENTE PROIBIDO: "Profissional especializada em X", "Designer profissional", "Especialista em beleza").
-3. Prefira combinar uma MATERIALIDADE/TÉCNICA com o RESULTADO VISUAL REAL. (ex: "[Nome da Técnica] com [Aspecto Natural]").
-4. A headline DEVE ter MUITA naturalidade. Sem excesso de adjetivos. É PROIBIDO usar palavras como "sofisticado", "refinado", "impecável", "excelência", "premium".
-Exemplos de direção correta (INSPIRAÇÃO ESTRUTURAL APENAS - É ESTRITAMENTE PROIBIDO COPIAR ESSAS FRASES):
-- Alongamentos naturais e leves para o dia a dia
-- Tranças bem cuidadas e alinhadas
-- Design cuidadoso respeitando seu formato natural
-- Cílios com volume sob medida
-- Cuidados faciais básicos e eficientes
-- Estética com foco em naturalidade
-- Esmaltação em gel fina e resistente
-Exemplos RUINS (PROIBIDOS NESSA IA: currículo, robótico, LinkedIn, genérico):
-- "Manicure segura e duradoura"
-- "Lash designer profissional"
-- "Micropigmentadora especializada"
-- "Atendimento personalizado de qualidade"
-- "Especialista em beleza"
-- "Técnica moderna e alta durabilidade"
+DIRETRIZES DE ESTILO PARA HEADLINE (FOCO EM SITUAÇÃO REAL, MENOS RÓTULO):
+1. A headline deve ser CURTA e DIRETA.
+2. A headline NÃO DEVE parecer uma categoria de marketplace (PROIBIDO: "Design de X com Y", "X para Y", "Especialista em X").
+3. Headline curta, concreta, que mostra o seu verdadeiro foco. 
+Exemplos de direção (NÃO COPIE):
+- Cílios leves para quem nunca usou extensão
+- Sobrancelhas sem efeito marcado
+- Unhas discretas para trabalhar sem pensar nelas
+- Corte que respeita a textura natural do seu fio
+- Massagem para quem vive tenso no dia a dia
+Exemplos RUINS (PROIBIDOS: rótulos, robótica, currículo):
+- "Manicure rápida e eficiente"
+- "Design de cílios com volume"
+- "Massoterapeuta especializada"
+- "Lash designer com naturalidade"
 
 FAMÍLIA EDITORIAL SELECIONADA: ${chosenFamily.name.toUpperCase()}
 - VOCABULÁRIO E TEMAS FAVORECIDOS: ${chosenFamily.favored}
@@ -301,20 +301,24 @@ Você DEVE adotar os TEMAS FAVORECIDOS e é ESTRITAMENTE PROIBIDA de usar os TEM
 PROIBIDO EXPLICAR A PERSPECTIVA. Apenas aplique-a na essência da frase. NÃO use adjetivos ou substantivos literais da perspectiva escolhida (ex: se for "praticidade", não escreva a palavra "praticidade", apenas descreva algo prático ou que demonstre isso). A perspectiva deve influenciar o texto de forma puramente IMPLÍCITA, baseando a Headline e a Bio exclusivamente nessa lente.
 
 DIRETRIZES DE ESTILO PARA BIO (ATENÇÃO: LEVEZA, NATURALIDADE E VERDADE, SEM PARECER ESCRITA POR IA OU COPYWRITER):
-1. Crie um texto de 1 a 2 frases curtas. 
-2. A bio deve ter ritmo humano, leitura ágil e natural. Escrita na 1ª pessoa.
-3. NUNCA tente provar competência, justificar experiência, ou adicionar um polimento artificial. Cuidado com o tom "premium/copywriter" enlatado.
-4. NUNCA soe como um currículo corporativo. PROIBIDO: "Com experiência de...", "Trabalho com técnicas avançadas...", "Sempre atualizada...", "Atendimento personalizado".
-5. NUNCA soe como manifesto luxuoso de branding. ESTRITAMENTE PROIBIDO usar excesso de intenção ou abstrações: "o objetivo é trazer", "focado em", "priorizando", "buscando", "acabamento sofisticado", "beleza duradoura", "respeito absoluto", "estrutura fina", "resultado impecável", "design refinado", "toque sofisticado", "experiência premium".
-6. Priorize a SIMPLICIDADE ELEGANTE: descreva a parte física, os atributos concretos do trabalho sem adornos publicitários. A naturalidade e o silêncio também são formas de elegância. Não preencha com adjetivos performáticos.
+1. Crie um texto de MÁXIMO 25 PALAVRAS. O texto deve ser extremamente curto, no máximo 2 frases.
+2. A bio deve ter ritmo natural de uma fala. Escrita na 1ª pessoa ("eu").
+3. NUNCA tente provar competência ou elencar cursos (PROIBIDO iniciar com "Atuo na área há...", "Tenho X anos de experiência...", "Ao longo dos últimos anos...", "Sou profissional", ou "Com expertise").
+4. Fale do seu processo de trabalho real. Valorize higiene, avaliação, preparo físico da técnica, ferramentas limpas e limite técnico honesto que se aplique À SUA ESPECIALIDADE ESPECÍFICA (não invente etapas de pele para quem cuida de cabelo, ou musculatura para quem faz unha).
+5. Priorize a SIMPLICIDADE ELEGANTE: palavras diretas e concretas. Não faça mosaico ou listinha juntando as palavras do prompt soltas. Componha as frases de forma inteligente.
 
-REGRA DE PRECISÃO ABSOLUTA (PROIBIDO INVENTAR):
+A REGRA DE EXPERIÊNCIA (MUITO IMPORTANTE):
+É ESTRITAMENTE PROIBIDO MENCIONAR O NÚMERO DE ANOS DE EXPERIÊNCIA NA BIO. NÃO digite números como "5 anos", "10 anos", etc. Em vez disso, simplesmente demonstre maturidade dizendo como você trabalha hoje de forma sólida e segura. NÃO ESCREVA "Sou profissional com experiência". Fale como uma pessoa normal.
+
+REGRA DE PRECISÃO ABSOLUTA E SEPARAÇÃO SEMÂNTICA (CRÍTICA!):
 - O repertório NÃO representa serviços confirmados. Você é ESTRITAMENTE PROIBIDA de afirmar que a profissional executa qualquer técnica presente no repertório se ela não estiver nos DADOS DA PROFISSIONAL.
-- NÃO invente especialidades nem serviços não informados.
-- NÃO invente paixões ("Minha paixão é...", "Amo o que faço").
-- NÃO invente motivações ou histórias ("Escolhi essa área porque...").
-- NÃO invente missões emocionais ("Quero ajudar você a se sentir...").
-Mencione apenas as suas técnicas, seus serviços, seu tempo de experiência e sua forma de trabalhar reais baseados nos DADOS DA PROFISSIONAL. Seja concreta. Fale de fatos reais, não de intenções românticas.
+- É ESTRITAMENTE PROIBIDO fundir palavras, técnicas, metáforas ou dores de uma especialidade em outra. 
+  * Massoterapeutas e Esteticistas corporais NÃO cuidam de unhas ou cutículas, NÃO fazem alongamentos ou fios. Trabalham tensão, musculatura, relaxamento.
+  * Podólogas NÃO fazem skincare, limpeza de pele facial ou alongamentos com cola, apenas pés, pisada, pele do pé.
+  * Trancistas NÃO fazem massagem profunda nem alongamento de unhas ou cutículas. Lidam com raiz, fios, tração, couros cabeludos.
+  * Nail design e Manicure NÃO lidam com dores musculares nem derme facial. Lidam com unhas, resistência, esmaltação, formato, saúde da lâmina.
+  * Lash (Cílios) NÃO faz sobrancelha a não ser que informado (lidam com pálpebra, fios soltos, isolamento).
+- NÃO invente missões emocionais ("Quero ajudar você a se sentir..."). Mencione apenas fidedignamente o que está nos DADOS DA PROFISSIONAL.
 
 REGRAS ANTI-CÓPIA E CONTAMINAÇÃO:
 - A saída final deve usar somente termos compatíveis com a especialidade recebida em \`specialty\`. Nunca use técnicas, serviços ou palavras de outra profissão.
