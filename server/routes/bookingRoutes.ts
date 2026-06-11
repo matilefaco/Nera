@@ -225,7 +225,10 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
                   isExpired = lockData.expiresAt.getTime() <= nowMs;
                 }
               }
-              if (isExpired) return null; // Ignore pending appointment whose lock expired
+              // Only ignore if the lock belongs to this specific appointment
+              if (isExpired && lockData.appointmentId === doc.id) {
+                return null; // Ignore pending appointment whose lock expired
+              }
             }
           }
 
@@ -913,8 +916,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           serviceId: finalData.serviceId || 'unknown',
           status: 'pending',
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + 15 * 60 * 1000)
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
       }
 
