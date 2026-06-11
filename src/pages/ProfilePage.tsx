@@ -288,7 +288,7 @@ export default function ProfilePage() {
   }, [
     name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
     studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
-    advancePaymentRequired, delayTolerance, profileTheme.variant,
+    advancePaymentRequired, delayTolerance, profileTheme?.variant,
     differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
     acceptsInstallments
   ]);
@@ -1494,7 +1494,7 @@ export default function ProfilePage() {
                   {Object.entries(THEMES).map(([variant, theme]) => {
                     const locked = isThemeLocked(variant);
                     const mood = THEME_MOODS[variant] || { label: theme.name, subtitle: 'Tema visual para a vitrine.' };
-                    const isSelected = profileTheme.variant === variant;
+                    const isSelected = profileTheme?.variant === variant;
                     
                     return (
                       <button

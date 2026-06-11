@@ -195,23 +195,23 @@ export const getBookingNotificationCopy = (plan: string = 'free', hasWhatsApp: b
   const isEssencial = plan === 'essencial';
   
   const data = {
-    notification: "Você receberá atualizações por e-mail.",
-    professional: "A profissional será avisada sobre sua solicitação."
+    notification: "Você receberá a confirmação em breve por e-mail.",
+    professional: "Seu horário foi protegido e está aguardando confirmação da profissional."
   };
 
   if (isPro) {
     if (hasWhatsApp) {
-      data.notification = "Você receberá atualizações por e-mail e WhatsApp.";
+      data.notification = "Você receberá a confirmação em breve por e-mail e WhatsApp.";
     } else {
-      data.notification = "Você receberá atualizações por e-mail.";
+      data.notification = "Você receberá a confirmação em breve por e-mail.";
     }
-    data.professional = "A profissional acompanha sua solicitação em tempo real.";
+    data.professional = "Seu horário permanece protegido enquanto a profissional confirma os detalhes.";
     return data;
   }
 
   if (isEssencial) {
-    data.notification = "Você receberá confirmação e atualizações por e-mail.";
-    data.professional = "A profissional acompanha sua solicitação pela Nera.";
+    data.notification = "Você receberá a confirmação da sua reserva por e-mail.";
+    data.professional = "Sua reserva foi registrada e a profissional acompanha pela Nera.";
     return data;
   }
 

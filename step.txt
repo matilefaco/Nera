@@ -1,0 +1,32 @@
+1:import React from 'react';
+2:import { cn } from '../lib/utils';
+3:
+4:interface BookingStepProps {
+5:  step: number;
+6:  total: number;
+7:  title: string;
+8:}
+9:
+10:export default function BookingStep({ step, total, title }: BookingStepProps) {
+11:  return (
+12:    <div className="mb-8">
+13:      <div className="flex gap-2 mb-4">
+14:        {Array.from({ length: total }).map((_, i) => (
+15:          <div 
+16:            key={i} 
+17:            className={cn(
+18:              "h-1 flex-1 rounded-full transition-all duration-500", 
+19:              step > i ? "bg-brand-terracotta" : "bg-brand-mist"
+20:            )} 
+21:          />
+22:        ))}
+23:      </div>
+24:      <div>
+25:        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-terracotta block mb-1">
+26:          Etapa {step} de {total}
+27:        </span>
+28:        <h3 className="text-[clamp(18px,6vw,24px)] font-serif text-brand-ink leading-tight">{title}</h3>
+29:      </div>
+30:    </div>
+31:  );
+32:}

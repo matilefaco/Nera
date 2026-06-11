@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Link } from 'react-router-dom';
 import { 
@@ -433,9 +433,21 @@ export default function BookingModal({ profile, services, onClose, open, initial
     return null;
   }, [selectedDate, availableSlots]);
 
+  const fullSlotsFetchedRef = useRef(false);
+
   useEffect(() => {
     const profId = profile?.professionalId || profile?.uid;
-    if (!selectedDate || !profId || !open) return;
+    
+    if (!open) {
+      fullSlotsFetchedRef.current = false;
+      return;
+    }
+    
+    if (!selectedDate || !profId) return;
+
+    if (fullSlotsFetchedRef.current && !slotsLoadError) {
+      return; // Already loaded full 15-day window
+    }
 
     let isMounted = true;
     setIsLoadingSlots(true);
@@ -471,8 +483,14 @@ export default function BookingModal({ profile, services, onClose, open, initial
           });
           fetchTimeoutPromise.catch(() => {});
 
+          const today = new Date();
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() + 15);
+          const startStr = formatDateKey(today);
+          const endStr = formatDateKey(endDate);
+
           const res = await Promise.race([
-            fetch(`/api/public/occupied-slots/${profId}?start=${selectedDate}&end=${selectedDate}`),
+            fetch(`/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}`),
             fetchTimeoutPromise
           ]);
           clearTimeout(fetchTimeoutId);
@@ -499,6 +517,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
         setBlockedSchedules(currentBlocked);
         setDayAppointments(currentAppts);
+        fullSlotsFetchedRef.current = true;
         if (isDev) console.log(`[Slots] arrays set. currentAppts: ${currentAppts.length}, currentBlocked: ${currentBlocked.length}`);
       } catch (error) {
         if (isDev) console.error(`[Slots] error actual= general fetch error:`, error);
@@ -786,13 +805,18 @@ export default function BookingModal({ profile, services, onClose, open, initial
                               </button>
                             </div>
                           ) : isLoadingSlots ? (
-                            <>
-                              {[1, 2, 3, 4, 5, 6].map(i => (
-                                <div key={i} className="py-3.5 rounded-xl border border-brand-mist bg-brand-mist/10 animate-pulse h-[42px] flex items-center justify-center">
-                                  <div className="h-3 w-12 bg-brand-mist/40 rounded-full"></div>
-                                </div>
-                              ))}
-                            </>
+                            <div className="col-span-3 space-y-4 py-2">
+                              <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest text-center animate-pulse">
+                                Buscando horários disponíveis...
+                              </p>
+                              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                  <div key={i} className="py-3.5 rounded-xl border border-brand-mist bg-brand-mist/10 animate-pulse h-[42px] flex items-center justify-center">
+                                    <div className="h-3 w-12 bg-brand-mist/40 rounded-full"></div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           ) : availableSlots.length > 0 ? (
                             availableSlots.map(time => (
                               <button key={time} onClick={() => setSelectedTime(time)} className={cn("py-3.5 rounded-xl border transition-all text-[11px] font-bold flex items-center justify-center gap-1.5", selectedTime === time ? "bg-brand-ink text-brand-white border-brand-ink" : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-stone")}>
@@ -1073,7 +1097,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
 
                   <div className="bg-brand-linen/30 border border-brand-mist rounded-3xl p-6 mb-10">
                     <p className="text-[10px] text-brand-stone font-light text-center leading-relaxed">
-                      Ao confirmar, seu pedido será enviado para aprovação da profissional.
+                      Ao confirmar, seu horário fica reservado aguardando confirmação da profissional.
                       {getBookingNotificationCopy(profile.plan, !!profile.whatsapp).notification}
                     </p>
                   </div>
@@ -1157,7 +1181,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
             className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center p-6 sm:p-8 text-center overflow-y-auto no-scrollbar pt-16 pb-32 md:justify-center md:pt-8 md:pb-8"
           >
             <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", damping: 15 }} className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"><Check size={48} /></motion.div>
-            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">{profile?.name.split(' ')[0]} recebeu seu pedido</h2>
+            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">Sua reserva foi registrada</h2>
             <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
               {getBookingNotificationCopy(profile.plan, !!profile.whatsapp).notification}
               <span className="block mt-2 text-[10px] text-brand-stone italic">
@@ -1167,7 +1191,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
             {selectedService && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-brand-parchment rounded-3xl border border-brand-mist p-8 w-full max-w-md mb-12 text-left shadow-sm">
                 <div className="flex justify-between items-center mb-6 border-b border-brand-mist/50 pb-4">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block">Resumo da solicitação</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block">Resumo da reserva</span>
                   {reservationCode && (
                     <div className="text-right">
                       <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-0.5">Código</span>
