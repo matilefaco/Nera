@@ -5,7 +5,8 @@ import {
   X, Clock, Calendar as CalendarIcon, Check, 
   ArrowLeft, ArrowRight, ShieldCheck, Zap, 
   MapPin, Home, Building2, MessageCircle, 
-  Share2, Heart, Sparkles, LogOut, Settings, Tag, CircleSlash
+  Share2, Heart, Sparkles, LogOut, Settings, Tag, CircleSlash,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
 import { db, createBookingRequest, handleBookingError, markWaitlistAsBooked } from '../firebase';
@@ -42,6 +43,25 @@ export default function BookingModal({ profile, services, onClose, open, initial
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  
+  const dateScrollRef = useRef<HTMLDivElement>(null);
+  const [showLeftScroll, setShowLeftScroll] = useState(false);
+  const [showRightScroll, setShowRightScroll] = useState(true);
+
+  const handleDateScroll = () => {
+    if (dateScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = dateScrollRef.current;
+      setShowLeftScroll(scrollLeft > 10);
+      setShowRightScroll(scrollLeft < scrollWidth - clientWidth - 10);
+    }
+  };
+
+  const scrollDates = (dir: 'left' | 'right') => {
+    if (dateScrollRef.current) {
+      const amount = dir === 'left' ? -200 : 200;
+      dateScrollRef.current.scrollBy({ left: amount, behavior: 'smooth' });
+    }
+  };
   const [selectedArea, setSelectedArea] = useState<ServiceArea | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
@@ -774,8 +794,37 @@ export default function BookingModal({ profile, services, onClose, open, initial
                     </div>
 
                     <div className="pt-8 border-t border-brand-mist/30">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1 mb-4 block">Selecione o melhor momento</label>
-                      <div className="flex overflow-x-auto gap-3 pb-4 mb-6 no-scrollbar -mx-2 px-2">
+                      <div className="flex items-center justify-between mb-4">
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1 block">Selecione o melhor momento</label>
+                        <div className="hidden md:flex items-center gap-1">
+                          <button 
+                            onClick={() => scrollDates('left')} 
+                            className={cn("w-7 h-7 rounded-full flex items-center justify-center transition-colors", showLeftScroll ? "bg-brand-linen text-brand-ink hover:bg-brand-mist" : "bg-transparent text-brand-stone/30 cursor-default")}
+                            disabled={!showLeftScroll}
+                            aria-label="Rolar para a esquerda"
+                          >
+                            <ChevronLeft size={16} />
+                          </button>
+                          <button 
+                            onClick={() => scrollDates('right')} 
+                            className={cn("w-7 h-7 rounded-full flex items-center justify-center transition-colors", showRightScroll ? "bg-brand-linen text-brand-ink hover:bg-brand-mist" : "bg-transparent text-brand-stone/30 cursor-default")}
+                            disabled={!showRightScroll}
+                            aria-label="Rolar para a direita"
+                          >
+                            <ChevronRight size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="relative">
+                        <div className={cn("hidden md:block absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-brand-white to-transparent z-10 pointer-events-none transition-opacity duration-300", showLeftScroll ? "opacity-100" : "opacity-0")} />
+                        <div className={cn("hidden md:block absolute right-0 top-0 bottom-4 w-6 bg-gradient-to-l from-brand-white to-transparent z-10 pointer-events-none transition-opacity duration-300", showRightScroll ? "opacity-100" : "opacity-0")} />
+                        
+                        <div 
+                          ref={dateScrollRef}
+                          onScroll={handleDateScroll}
+                          className="flex overflow-x-auto gap-3 pb-4 mb-6 no-scrollbar -mx-2 px-2"
+                        >
                         {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(offset => {
                           const date = new Date();
                           date.setDate(date.getDate() + offset);
@@ -790,6 +839,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
                             </button>
                           );
                         })}
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 sm:gap-3">

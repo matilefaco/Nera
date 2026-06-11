@@ -1252,7 +1252,7 @@ export default function Dashboard() {
                 rel="noopener noreferrer"
                 className="flex flex-1 md:flex-none justify-center items-center gap-2 px-4 py-2 border border-brand-mist/80 bg-brand-white text-brand-ink rounded-[12px] text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors shadow-none whitespace-nowrap"
               >
-                <Eye size={12} className="text-brand-stone/80" /> Ver vitrine
+                <Eye size={12} className="text-brand-stone/80" /> Ver minha página
               </a>
             )}
             <button 
@@ -1627,16 +1627,29 @@ export default function Dashboard() {
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-brand-linen/40 px-5 py-4 rounded-[20px] border border-brand-mist/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 group hover:border-brand-mist transition-colors"
+                className="bg-brand-white p-5 sm:p-6 rounded-[24px] border border-brand-terracotta/20 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-5 shrink-0 relative overflow-hidden hover:border-brand-terracotta/30 hover:shadow-md transition-all duration-300 group"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-brand-terracotta/80 shrink-0" />
-                  <p className="text-[13px] font-serif text-brand-ink">
-                    <span className="font-medium text-brand-terracotta">{pendingCount} {pendingCount === 1 ? 'novo pedido' : 'pedidos pendentes'}</span> na fila de confirmação
-                  </p>
+                <div className="absolute top-0 left-0 bottom-0 w-1.5 bg-gradient-to-b from-brand-terracotta/40 to-brand-terracotta/80" />
+                
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-brand-linen flex items-center justify-center text-brand-terracotta shrink-0">
+                    <Inbox size={20} className="stroke-[1.5] sm:w-[22px] sm:h-[22px]" />
+                  </div>
+                  <div className="flex flex-col">
+                    <h4 className="text-[16px] sm:text-[17px] font-serif text-brand-ink tracking-tight mb-1">
+                      <strong className="font-medium text-brand-terracotta">{pendingCount} {pendingCount === 1 ? 'cliente aguardando' : 'clientes aguardando'}</strong> confirmação
+                    </h4>
+                    <p className="text-[13px] text-brand-stone font-light leading-snug max-w-sm">
+                      Revise os detalhes e confirme o agendamento.
+                    </p>
+                  </div>
                 </div>
-                <Link to="/pedidos" className="w-fit ml-5 sm:ml-0 flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-widest text-brand-terracotta hover:text-brand-sienna transition-colors py-1">
-                  Avaliar <ChevronRight size={12} className="text-brand-terracotta/50 group-hover:translate-x-0.5 transition-transform" />
+
+                <Link 
+                  to="/pedidos" 
+                  className="w-full sm:w-auto mt-2 sm:mt-0 flex justify-center items-center gap-2 px-6 py-3 sm:py-2.5 bg-brand-ink text-brand-white rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-brand-ink/90 transition-colors shrink-0 shadow-sm"
+                >
+                  Revisar {pendingCount === 1 ? 'pedido' : 'pedidos'} <ChevronRight size={14} className="text-white/60" />
                 </Link>
               </motion.div>
             )}
