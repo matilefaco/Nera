@@ -47,7 +47,8 @@ const getClientKey = (phone?: string, email?: string, name?: string): string => 
 router.get("/public/occupied-slots/:professionalId", async (req, res) => {
   const db = getDb();
   const { professionalId } = req.params;
-  const { start, end } = req.query;
+  const start = req.query?.start;
+  const end = req.query?.end;
 
   // 1. Strict Validation of Inputs
   if (!professionalId || typeof professionalId !== 'string' || professionalId === 'undefined' || professionalId === 'null') {

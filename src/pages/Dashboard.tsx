@@ -12,7 +12,7 @@ import {
   Settings, List, MessageCircle, CheckCircle2, 
   Share2, Plus, MapPin, Check, TrendingUp, Heart,
   ChevronRight, Sparkles, Home, X, Instagram, Copy, Inbox,
-  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info, Ticket, Gift, Loader2
+  AlertCircle, ShieldCheck, Lock, Sun, Moon, Zap, Star, Camera, Smartphone, DollarSign, Info, Ticket, Gift, Loader2, Eye
 } from 'lucide-react';
 import { notify } from '../lib/notify';
 import { 
@@ -1245,11 +1245,21 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar pt-4 md:pt-0">
+            {profile?.slug && (
+              <a 
+                href={getPublicProfileUrl(profile.slug)} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex flex-1 md:flex-none justify-center items-center gap-2 px-4 py-2 border border-brand-mist/80 bg-brand-white text-brand-ink rounded-[12px] text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors shadow-none whitespace-nowrap"
+              >
+                <Eye size={12} className="text-brand-stone/80" /> Ver vitrine
+              </a>
+            )}
             <button 
               onClick={() => setIsQuickBlockOpen(true)}
               className="flex flex-1 md:flex-none justify-center items-center gap-2 px-4 py-2 border border-brand-mist/80 bg-brand-white text-brand-ink rounded-[12px] text-[9px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-colors shadow-none whitespace-nowrap"
             >
-              <Lock size={12} className="text-brand-stone/80" /> Bloquear
+              <Lock size={12} className="text-brand-stone/80" /> Bloquear horário
             </button>
             <button 
               onClick={() => setIsShareModalOpen(true)}
