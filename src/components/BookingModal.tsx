@@ -479,7 +479,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
           
           let fetchTimeoutId: any;
           const fetchTimeoutPromise = new Promise<never>((_, reject) => {
-            fetchTimeoutId = setTimeout(() => reject(new Error("FETCH_TIMEOUT")), 8000);
+            fetchTimeoutId = setTimeout(() => reject(new Error("FETCH_TIMEOUT")), 20000);
           });
           fetchTimeoutPromise.catch(() => {});
 

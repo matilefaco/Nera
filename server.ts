@@ -60,7 +60,7 @@ export async function createServerApp() {
   const app = express();
 
   // Trust proxy for rate limiting
-  app.set("trust proxy", 1);
+  app.set("trust proxy", true);
   
   app.use(requestIdMiddleware);
   app.use(performanceLogger);
