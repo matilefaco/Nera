@@ -443,7 +443,10 @@ export default function BookingModal({ profile, services, onClose, open, initial
       return;
     }
     
-    if (!selectedDate || !profId) return;
+    if (!selectedDate || !profId || profId === 'undefined' || profId === 'null') {
+      if (isDev) console.log(`[Slots] Aborting fetch: Invalid professional ID (${profId})`);
+      return;
+    }
 
     if (fullSlotsFetchedRef.current && !slotsLoadError) {
       return; // Already loaded full 15-day window
@@ -557,7 +560,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
     setBookingAttempted(true);
     
     const profId = profile?.professionalId || profile?.uid;
-    if (!profId || !selectedService?.id || (selectedService?.price ?? 0) < 0) {
+    if (!profId || profId === 'undefined' || profId === 'null' || !selectedService?.id || (selectedService?.price ?? 0) < 0) {
       if (isDev) {
         console.error('[BOOKING_ERROR] Invalid service or profile data', { 
           service: selectedService, 
