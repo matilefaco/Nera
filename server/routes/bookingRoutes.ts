@@ -45,10 +45,35 @@ const getClientKey = (phone?: string, email?: string, name?: string): string => 
 
 // --- NEW: SECURE SLOT LOOKUP (Blindagem) ---
 router.get("/public/occupied-slots/:professionalId", async (req, res) => {
+  console.log("[DEBUG_OCCUPIED_SLOTS] Routing info:", {
+    params: req.params,
+    professionalId: req.params.professionalId,
+    query: req.query,
+    url: req.url,
+    originalUrl: req.originalUrl
+  });
+  
   const db = getDb();
   const { professionalId } = req.params;
   const start = req.query?.start;
   const end = req.query?.end;
+
+  let startVal = start;
+  let endVal = end;
+
+  // Fallback for Firebase / Proxies dropping query strings from req.query
+  if (!startVal || !endVal) {
+    try {
+      const urlStr = req.originalUrl || req.url || '';
+      if (urlStr.includes('?')) {
+        const searchParams = new URLSearchParams(urlStr.substring(urlStr.indexOf('?')));
+        if (!startVal) startVal = searchParams.get('start');
+        if (!endVal) endVal = searchParams.get('end');
+      }
+    } catch (e) {
+      console.error('Error parsing fallback query params:', e);
+    }
+  }
 
   // 1. Strict Validation of Inputs
   if (!professionalId || typeof professionalId !== 'string' || professionalId === 'undefined' || professionalId === 'null') {
@@ -57,11 +82,19 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
   }
 
   // Ensure start and end are valid strings (Express can return string | string[] | ParsedQs | ParsedQs[])
-  const startStr = typeof start === 'string' ? start.trim() : (Array.isArray(start) ? String(start[0]).trim() : '');
-  const endStr = typeof end === 'string' ? end.trim() : (Array.isArray(end) ? String(end[0]).trim() : '');
+  const startStr = typeof startVal === 'string' ? startVal.trim() : (Array.isArray(startVal) ? String(startVal[0]).trim() : '');
+  const endStr = typeof endVal === 'string' ? endVal.trim() : (Array.isArray(endVal) ? String(endVal[0]).trim() : '');
 
   if (!startStr || !endStr) {
-    logger.warn("BOOKING", "occupied-slots blocked: missing or malformed ranges", { meta: { start, end } });
+    logger.warn("BOOKING", "occupied-slots blocked: missing or malformed ranges", { 
+      meta: { 
+        start: startVal, 
+        end: endVal, 
+        url: req.url,
+        originalUrl: req.originalUrl,
+        query: req.query
+      } 
+    });
     return res.status(400).json({ error: "Datas de início e fim são obrigatórias", slots: [] });
   }
 
