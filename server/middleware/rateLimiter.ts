@@ -10,11 +10,11 @@ const skipHandler = (req: any) => {
 /**
  * Public Lookup Limiter
  * Used for /api/slug, public profile/showcase routes
- * 30 requests per minute
+ * 120 requests per minute
  */
 export const publicLookupLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 30,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   skip: skipHandler,
@@ -26,11 +26,11 @@ export const publicLookupLimiter = rateLimit({
 /**
  * Booking Limiter
  * Used for public booking creation and interaction
- * 10 requests per minute
+ * 120 requests per minute
  */
 export const bookingLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 10,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   skip: skipHandler,
