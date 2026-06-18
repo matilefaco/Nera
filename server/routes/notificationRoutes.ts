@@ -893,6 +893,49 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
           }
         }
       }
+
+      const plan = pro?.plan || 'free';
+      const expiresAt = pro?.planExpiresAt;
+      const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+      const activePlan = isExpired ? 'free' : plan;
+
+      if (activePlan === 'pro' && appt.clientWhatsapp && !appt.reminder24hWhatsappSentAt) {
+        const [y, m, d] = appt.date.split('-');
+        const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+        const weekdays = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        const diaSemana = weekdays[dateObj.getDay()];
+
+        const msg = buildReminderMessage24h({
+          clienteNome: appt.clientName,
+          diaSemana,
+          data: `${d}/${m}/${y}`,
+          horario: appt.time,
+          servicoNome: appt.serviceName,
+          profissionalNome: pro?.name || 'Profissional',
+          local: pro?.location || 'Stúdio',
+          linkConfirmar: `${appUrl}/manage/${apptId}?action=confirm-presence`,
+          linkManage: `${appUrl}/manage/${apptId}`
+        });
+
+        const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {
+          appointmentId: apptId,
+          userId: appt.professionalId,
+          type: 'reminder_24h',
+          clientName: appt.clientName,
+          clientWhatsapp: appt.clientWhatsapp
+        });
+
+        if (result.success) {
+          const updates: any = {
+            reminder24hWhatsappSentAt: admin.firestore.FieldValue.serverTimestamp()
+          };
+          if (docSnap.data().status !== 'pending_confirmation') {
+            updates.status = 'pending_confirmation';
+          }
+          await docSnap.ref.update(updates);
+          sentCount++;
+        }
+      }
     }
 
     const durationMs = Date.now() - startTime;
