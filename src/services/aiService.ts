@@ -9,6 +9,7 @@ const devLog = (...args: any[]) => isDev && console.log(...args);
  */
 export async function generateServiceDescription(params: {
   serviceName: string;
+  serviceCategory?: string;
   professionalSpecialty?: string;
   duration?: string;
   price?: string | number;
@@ -76,7 +77,27 @@ export async function generateServiceDescription(params: {
 
   if (isDev) console.error('[AI SERVICE] generateServiceDescription failed completely:', lastError.message, lastError.stack, lastError);
   
-  return { description: 'Realça os cílios com leveza, mantendo um acabamento delicado e natural.', source: 'fallback', error: `${lastError.name}: ${lastError.message}` }; 
+  let fallbackText = "Serviço realizado com cuidado, atenção aos detalhes e foco em uma experiência confortável para a cliente.";
+  
+  if (params.serviceCategory === 'Depilação') {
+    fallbackText = `Atendimento cuidadoso em ${params.serviceName}, com foco em conforto, higiene e acabamento bem feito.`;
+  } else if (params.serviceCategory === 'Cílios') {
+    fallbackText = `Realce do olhar com ${params.serviceName}, valorizando leveza, simetria e acabamento natural.`;
+  } else if (params.serviceCategory === 'Estética Facial') {
+    fallbackText = `Cuidado facial personalizado com ${params.serviceName}, pensado para valorizar a pele com atenção e segurança.`;
+  } else if (params.serviceCategory === 'Sobrancelhas') {
+    fallbackText = `Design impecável em ${params.serviceName}, pensado para harmonizar seu rosto com naturalidade e elegância.`;
+  } else if (params.serviceCategory === 'Unhas') {
+    fallbackText = `Cuidado técnico em ${params.serviceName}, com foco em saúde, durabilidade e acabamento perfeito.`;
+  } else if (params.serviceCategory === 'Cabelos') {
+    fallbackText = `Atendimento profissional em ${params.serviceName}, respeitando seu estilo e a saúde dos fios.`;
+  } else if (params.serviceCategory === 'Maquiagem') {
+    fallbackText = `Produção elegante e duradoura com ${params.serviceName}, realçando sua beleza natural.`;
+  } else if (params.serviceCategory === 'Massagens e Terapias' || params.serviceCategory === 'Estética Corporal') {
+    fallbackText = `Experiência focada no seu bem-estar e relaxamento através de ${params.serviceName}.`;
+  }
+
+  return { description: fallbackText, source: 'fallback', error: `${lastError.name}: ${lastError.message}` }; 
 }
 
 export async function categorizeService(serviceName: string): Promise<string> {

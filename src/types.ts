@@ -1,4 +1,5 @@
 import { Timestamp, FieldValue } from 'firebase/firestore';
+import type { ServiceCategory } from './data/serviceCategoryTaxonomy';
 
 export interface AddressData {
   street: string;
@@ -16,7 +17,10 @@ export interface Service {
   price: number;
   duration: number;
   description?: string;
+  /** category = coleção livre atual */
   category?: string;
+  /** serviceCategory = categoria oficial da taxonomia Nera */
+  serviceCategory?: ServiceCategory | string;
   categoryData?: {
     slug: string;
     label: string;

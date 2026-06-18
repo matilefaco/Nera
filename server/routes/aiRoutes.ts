@@ -68,7 +68,7 @@ Crie a descrição seguindo rigorosamente as regras.`;
 
 router.post('/service-description', requireFirebaseAuth as any, async (req, res) => {
   try {
-    const { serviceName, professionalSpecialty, duration, price, tone } = req.body;
+    const { serviceName, serviceCategory, professionalSpecialty, duration, price, tone } = req.body;
 
     if (!serviceName) {
       return res.status(400).json({ success: false, error: 'serviceName is required' });
@@ -81,6 +81,7 @@ router.post('/service-description', requireFirebaseAuth as any, async (req, res)
 
     logger.info('AI', 'Service description request', { 
       serviceName, 
+      serviceCategory,
       duration, 
       price, 
       tone,
@@ -104,11 +105,12 @@ Regras OBRIGATÓRIAS:
 - Foco: benefício real percebido pela cliente, com clareza, leveza e naturalidade.`;
 
     const userPrompt = `Serviço: ${serviceName}
+${serviceCategory ? `Categoria do Serviço: ${serviceCategory}` : ''}
 ${professionalSpecialty ? `Especialidade: ${professionalSpecialty}` : ''}
 ${price ? `Preço: R$${price}` : ''}
 ${tone ? `Tom: ${tone}` : ''}
 
-Crie a descrição seguindo rigorosamente as regras.`;
+Crie a descrição seguindo rigorosamente as regras. A descrição deve estar alinhada de forma clara e inquestionável à Categoria do Serviço quando aplicável (não misture depilação com sobrancelhas/cílios, por exemplo).`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 9000);
@@ -172,12 +174,9 @@ Crie a descrição seguindo rigorosamente as regras.`;
 
       // Proibidos fallback
       const lowerContent = description.toLowerCase();
-      if (lowerContent.includes("nosso serviço") || lowerContent.includes("criado especialmente")) {
-         description = "Realça os cílios com leveza, mantendo um acabamento delicado e natural.";
-      }
-
-      if (!description.trim() || description.length < 10) {
-        description = "Realça os cílios com leveza, mantendo um acabamento delicado e natural.";
+      if (lowerContent.includes("nosso serviço") || lowerContent.includes("criado especialmente") || !description.trim() || description.length < 10) {
+        // Usa um fallback seguro e genérico que será manipulado no frontend e aiService
+        return res.status(500).json({ success: false, error: 'AI output rejected by custom filters', source: 'fallback' });
       }
 
       // Ensure ending punctuation

@@ -15,6 +15,7 @@ import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
 import { UserProfile, Service } from '../types';
 import { generateServiceDescription } from '../services/aiService';
+import { getServiceCategoryNames } from '../data/serviceCategoryTaxonomy';
 import { FirstVisitTip } from '../components/FirstVisitTip';
 import { PageErrorBoundary } from '../components/PageErrorBoundary';
 import { Skeleton } from '../components/ui/Skeleton';
@@ -36,6 +37,7 @@ export default function ServicesPage() {
   const [duration, setDuration] = useState('');
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
+  const [serviceCategory, setServiceCategory] = useState<string>('');
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const [badge, setBadge] = useState<string>('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -194,6 +196,7 @@ export default function ServicesPage() {
       
       const result = await generateServiceDescription({
         serviceName: name,
+        serviceCategory: serviceCategory,
         professionalSpecialty: specialty,
         duration: duration,
         price: price,
@@ -202,9 +205,17 @@ export default function ServicesPage() {
 
       let finalDescription = result.description?.trim() || '';
       
-      // Se falhou completamente na rede ou retry, usar o fallback elegante local
+      // Se falhou completamente na rede ou retry, e por algum motivo não voltou nada
       if (!finalDescription) {
-        finalDescription = "Realça os cílios com leveza, mantendo um acabamento delicado e natural.";
+        if (serviceCategory === 'Depilação') {
+          finalDescription = `Atendimento cuidadoso em ${name}, com foco em conforto, higiene e acabamento bem feito.`;
+        } else if (serviceCategory === 'Cílios') {
+          finalDescription = `Realce do olhar com ${name}, valorizando leveza, simetria e acabamento natural.`;
+        } else if (serviceCategory === 'Estética Facial') {
+          finalDescription = `Cuidado facial personalizado com ${name}, pensado para valorizar a pele com atenção e segurança.`;
+        } else {
+          finalDescription = `Serviço realizado com cuidado, atenção aos detalhes e foco em uma experiência confortável para a cliente.`;
+        }
       }
 
       // Sanitize: remove quotes at start/end and trim
@@ -246,6 +257,11 @@ export default function ServicesPage() {
       return;
     }
 
+    if (!serviceCategory) {
+      notify.error('Selecione uma categoria para o serviço.');
+      return;
+    }
+
     setLoading(true);
 
     const professionalId = user?.uid;
@@ -283,6 +299,7 @@ export default function ServicesPage() {
         description: description.trim(),
         duration: Number(duration) || 0,
         price: Number(price) || 0,
+        serviceCategory,
         category: finalCatLabel, // Keep for compat
         categoryData: {
            label: finalCatLabel,
@@ -373,6 +390,7 @@ export default function ServicesPage() {
     setDescription(service.description);
     setDuration(service.duration.toString());
     setPrice(service.price.toString());
+    setServiceCategory(service.serviceCategory || 'Outros');
     
     // Extrapolate category
     const catLabel = service.categoryData?.label || service.category || '';
@@ -394,6 +412,7 @@ export default function ServicesPage() {
     setDuration('');
     setPrice('');
     setCategory('');
+    setServiceCategory('');
     setBadge('');
     setShowCustomDuration(false);
   };
@@ -550,7 +569,7 @@ export default function ServicesPage() {
                 initial={{ opacity: 0, scale: 0.98, y: 20 }} 
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98, y: 20 }}
-                className="bg-brand-white w-full h-[100dvh] sm:h-auto max-w-[min(100vw,560px)] sm:rounded-[40px] p-8 sm:p-12 shadow-2xl relative border-x sm:border-y border-brand-mist overflow-y-auto no-scrollbar box-border mx-auto flex flex-col"
+                className="bg-brand-white w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] max-w-[560px] sm:rounded-[40px] p-8 sm:p-12 shadow-2xl relative border-x sm:border-y border-brand-mist overflow-y-auto no-scrollbar box-border mx-auto flex flex-col"
               >
                 <div className="absolute top-0 left-0 w-full h-2 bg-brand-terracotta shrink-0" />
                 <button onClick={closeModal} className="absolute right-6 top-8 sm:right-10 sm:top-10 text-brand-stone hover:text-brand-ink transition-colors z-10"><X size={24} /></button>
@@ -564,6 +583,29 @@ export default function ServicesPage() {
                   <div className="space-y-2">
                     <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Nome do Serviço</label>
                     <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Design de Sobrancelhas" className="w-full px-5 sm:px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-base font-light min-w-0 box-border" required />
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="flex flex-col gap-1.5 ml-1">
+                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest flex items-center gap-1">
+                        Categoria do serviço <span className="text-brand-terracotta">*</span>
+                      </label>
+                      <span className="text-[10px] text-brand-stone/70">Ajuda a organizar sua vitrine por área de atendimento.</span>
+                    </div>
+                    <div className="relative">
+                      <select 
+                        value={serviceCategory} 
+                        onChange={(e) => setServiceCategory(e.target.value)} 
+                        className="w-full px-5 sm:px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-base font-light min-w-0 box-border appearance-none cursor-pointer" 
+                        required
+                      >
+                        <option value="" disabled>Selecione uma categoria...</option>
+                        {getServiceCategoryNames().map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                      <ChevronRight size={16} className="absolute right-6 top-1/2 -translate-y-1/2 text-brand-stone pointer-events-none rotate-90" />
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
@@ -596,8 +638,8 @@ export default function ServicesPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div className="space-y-4">
                       <div className="flex flex-col gap-1.5 ml-1">
-                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Coleção</label>
-                        <span className="text-[10px] text-brand-stone/70">Organize experiências parecidas em um mesmo grupo.</span>
+                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Coleção (grupo opcional)</label>
+                        <span className="text-[10px] text-brand-stone/70">Use para juntar serviços parecidos, como Facial, Pacotes ou Promoções.</span>
                       </div>
                       <div className="relative">
                         <input 
@@ -631,8 +673,11 @@ export default function ServicesPage() {
                         )}
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">Destaque Editorial (Opcional)</label>
+                    <div className="space-y-4">
+                      <div className="flex flex-col gap-1.5 ml-1">
+                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Selo opcional</label>
+                        <span className="text-[10px] text-brand-stone/70">Marque serviços que merecem destaque na vitrine.</span>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {['Nenhum', 'Mais procurado'].map(b => (
                           <button
