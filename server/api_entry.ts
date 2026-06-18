@@ -58,7 +58,8 @@ export const api = onRequest(
       "STRIPE_WEBHOOK_SECRET",
       "STRIPE_PRICE_ESSENCIAL",
       "STRIPE_PRICE_PRO",
-      "STRIPE_PORTAL_CONFIGURATION_ID"
+      "STRIPE_PORTAL_CONFIGURATION_ID",
+      "CRON_SECRET"
     ],
   },
   async (req: any, res: any) => {
