@@ -43,6 +43,32 @@ export default function ServicesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCustomDuration, setShowCustomDuration] = useState(false);
   const [durationError, setDurationError] = useState(false);
+  
+  const [activeFilter, setActiveFilter] = useState('Todos');
+
+  const availableFilters = React.useMemo(() => {
+    const filters = new Set<string>();
+    services.forEach(s => {
+      if (s.serviceCategory) {
+        filters.add(s.serviceCategory);
+      } else {
+        filters.add('Outros');
+      }
+    });
+    return ['Todos', ...Array.from(filters).sort((a, b) => {
+      if (a === 'Outros') return 1;
+      if (b === 'Outros') return -1;
+      return a.localeCompare(b);
+    })];
+  }, [services]);
+
+  const displayedServices = React.useMemo(() => {
+    if (activeFilter === 'Todos') return services;
+    return services.filter(s => {
+      if (activeFilter === 'Outros') return !s.serviceCategory;
+      return s.serviceCategory === activeFilter;
+    });
+  }, [services, activeFilter]);
 
   useEffect(() => {
     if (isDev) console.log(`[P0] ServicesPage: mount at ${Date.now()}`);
@@ -398,7 +424,8 @@ export default function ServicesPage() {
     
     // Normalize badge
     const currentBadge = service.badge;
-    setBadge(currentBadge === 'Mais procurado' ? 'Mais procurado' : '');
+    const allowedBadges = ['Mais procurado', 'Novo', 'Promoção', 'Exclusivo', 'Pacote'];
+    setBadge(allowedBadges.includes(currentBadge || '') ? currentBadge : '');
     
     setShowCustomDuration(![30, 45, 60, 90, 120, 150, 180].includes(Number(service.duration)));
     setIsModalOpen(true);
@@ -441,6 +468,25 @@ export default function ServicesPage() {
           </button>
         </header>
 
+        {services.length > 0 && availableFilters.length > 1 && (
+          <div className="flex overflow-x-auto no-scrollbar gap-2 mb-8 pb-2">
+            {availableFilters.map(filter => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={cn(
+                  "whitespace-nowrap px-4 py-2 rounded-full text-[11px] uppercase tracking-widest font-bold transition-all",
+                  activeFilter === filter
+                    ? "bg-brand-ink text-brand-white shadow-md"
+                    : "bg-brand-white text-brand-stone hover:bg-brand-parchment border border-brand-mist/50"
+                )}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {isInitialLoading ? (
             <>
@@ -466,8 +512,12 @@ export default function ServicesPage() {
                 </div>
               ))}
             </>
-          ) : services.length > 0 ? (
-            services.map((service, index) => (
+          ) : displayedServices.length > 0 ? (
+            displayedServices.map((service, index) => {
+              const realIndex = services.findIndex(s => s.id === service.id);
+              const isFiltered = activeFilter !== 'Todos';
+
+              return (
               <motion.div 
                 key={service.id} 
                 layout 
@@ -479,14 +529,19 @@ export default function ServicesPage() {
                 
                 <div className="flex justify-between items-start mb-6 sm:mb-8 relative z-10 gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0 pr-2">
+                    {service.serviceCategory && (
+                      <span className="text-[9px] uppercase tracking-widest font-bold text-brand-ink bg-brand-parchment/60 border border-brand-mist/50 px-2.5 py-1 rounded-[6px] inline-block mb-3 shadow-sm">
+                        {service.serviceCategory}
+                      </span>
+                    )}
                     <h3 className="text-lg sm:text-xl font-serif text-brand-ink mb-1.5 sm:mb-2 group-hover:text-brand-terracotta transition-colors leading-snug">{service.name}</h3>
                     <p className="text-brand-stone text-xs sm:text-sm font-light leading-relaxed line-clamp-2">{service.description || 'Consulte detalhes no dia do atendimento.'}</p>
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-1 shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-2xl border border-brand-mist/30">
-                    <button onClick={() => handleReorder(index, 'up')} disabled={index === 0} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all disabled:opacity-30">
+                  <div className="flex flex-col sm:flex-row gap-1 shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-2xl border border-brand-mist/30" title={isFiltered ? "Para reorganizar, volte para Todos." : undefined}>
+                    <button onClick={() => handleReorder(realIndex, 'up')} disabled={isFiltered || realIndex === 0} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all disabled:opacity-30">
                       <ArrowUp size={16} className="sm:w-[18px] sm:h-[18px]" />
                     </button>
-                    <button onClick={() => handleReorder(index, 'down')} disabled={index === services.length - 1} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all disabled:opacity-30">
+                    <button onClick={() => handleReorder(realIndex, 'down')} disabled={isFiltered || realIndex === services.length - 1} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all disabled:opacity-30">
                       <ArrowDown size={16} className="sm:w-[18px] sm:h-[18px]" />
                     </button>
                     <div className="w-px h-6 bg-brand-mist mx-1 self-center hidden sm:block" />
@@ -508,7 +563,7 @@ export default function ServicesPage() {
                   </div>
                 </div>
               </motion.div>
-            ))
+            )})
           ) : (
             <div className="lg:col-span-2 py-32 text-center bg-brand-white/50 rounded-[40px] border border-dashed border-brand-mist/60">
               <div className="w-24 h-24 bg-[#FAF9F8] rounded-full flex items-center justify-center text-brand-stone/40 mx-auto mb-8 border border-brand-mist/40">
@@ -600,7 +655,11 @@ export default function ServicesPage() {
                         required
                       >
                         <option value="" disabled>Selecione uma categoria...</option>
-                        {getServiceCategoryNames().map(cat => (
+                        {getServiceCategoryNames().sort((a, b) => {
+                          if (a === 'Outros') return 1;
+                          if (b === 'Outros') return -1;
+                          return a.localeCompare(b);
+                        }).map(cat => (
                           <option key={cat} value={cat}>{cat}</option>
                         ))}
                       </select>
@@ -635,51 +694,14 @@ export default function ServicesPage() {
                     <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que torna este serviço especial?" className="w-full px-5 sm:px-6 py-3.5 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink h-24 sm:h-28 resize-none transition-all font-light text-sm min-w-0 box-border" />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-6">
                     <div className="space-y-4">
                       <div className="flex flex-col gap-1.5 ml-1">
-                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Coleção (grupo opcional)</label>
-                        <span className="text-[10px] text-brand-stone/70">Use para juntar serviços parecidos, como Facial, Pacotes ou Promoções.</span>
-                      </div>
-                      <div className="relative">
-                        <input 
-                          type="text" 
-                          value={category} 
-                          onChange={(e) => {
-                            setCategory(e.target.value);
-                            setShowCategorySuggestions(true);
-                          }} 
-                          onFocus={() => setShowCategorySuggestions(true)}
-                          onBlur={() => setTimeout(() => setShowCategorySuggestions(false), 200)}
-                          placeholder="Ex: Facial" 
-                          className="w-full px-5 py-3 bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm"
-                        />
-                        {showCategorySuggestions && filteredCategories.length > 0 && (
-                          <div className="absolute top-full left-0 right-0 mt-2 p-2 bg-brand-white border border-brand-mist rounded-[16px] shadow-lg z-50 flex flex-col max-h-48 overflow-y-auto">
-                            {filteredCategories.map(cat => (
-                              <button
-                                key={cat}
-                                type="button"
-                                onClick={() => {
-                                  setCategory(cat);
-                                  setShowCategorySuggestions(false);
-                                }}
-                                className="px-4 py-2.5 text-left text-sm font-light text-brand-stone hover:text-brand-ink hover:bg-brand-parchment rounded-xl transition-colors"
-                              >
-                                {cat}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex flex-col gap-1.5 ml-1">
-                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Selo opcional</label>
-                        <span className="text-[10px] text-brand-stone/70">Marque serviços que merecem destaque na vitrine.</span>
+                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Destaque do serviço</label>
+                        <span className="text-[10px] text-brand-stone/70">Ajuda a destacar serviços importantes na sua vitrine.</span>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {['Nenhum', 'Mais procurado'].map(b => (
+                        {['Nenhum', 'Mais procurado', 'Novo', 'Promoção', 'Exclusivo', 'Pacote'].map(b => (
                           <button
                             key={b}
                             type="button"
@@ -688,7 +710,7 @@ export default function ServicesPage() {
                               "px-3 py-2 rounded-xl border text-[9px] font-bold uppercase tracking-wider transition-all",
                               (badge === b) || (b === 'Nenhum' && !badge)
                                 ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
-                                : "border-brand-mist text-brand-stone hover:border-brand-ink"
+                                : "bg-brand-white text-brand-stone border-brand-mist/50 hover:bg-brand-parchment"
                             )}
                           >
                             {b}

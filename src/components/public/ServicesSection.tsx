@@ -16,10 +16,7 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   const getServiceCategoryLabel = (service: Service): string => {
-    if (service.categoryData?.label) return service.categoryData.label;
-    if (service.category && typeof service.category === 'string' && service.category !== 'Geral') return service.category;
-    // Fallback if needed, but we don't want to break if there is no category
-    return 'Outros'; 
+    return service.serviceCategory || 'Outros';
   };
 
   const categories = useMemo(() => {
@@ -39,7 +36,7 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
     }
     
     const finalCats = ['Todos', ...arr];
-    return finalCats.length > 2 || (finalCats.length === 2 && finalCats[1] !== 'Outros') ? finalCats : [];
+    return finalCats.length > 2 ? finalCats : [];
   }, [services]);
 
   const filteredServices = useMemo(() => {
@@ -52,8 +49,9 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
 
   const isValidBadge = (badge: string | undefined): badge is string => {
     if (!badge) return false;
-    // Only 'Mais procurado' is permitted to show visually
-    return badge === 'Mais procurado';
+    // Allow known badge values to display
+    const allowedBadges = ['Mais procurado', 'Novo', 'Promoção', 'Exclusivo', 'Pacote'];
+    return allowedBadges.includes(badge);
   };
 
   const isCompact = services.length > 4;
@@ -138,14 +136,6 @@ export const ServicesSection = ({ services, profile, onSelectService }: Services
                     isCompact ? "px-2.5 py-1 text-[7px] mb-2" : "px-3.5 py-1.5 text-[8px] mb-4"
                   )}>
                     {service.badge}
-                  </span>
-                )}
-                {!isValidBadge(service.badge) && i === 0 && selectedCategory === 'Todos' && (
-                  <span className={cn(
-                    "inline-block border border-[var(--theme-accent,var(--color-brand-terracotta))]/20 text-[var(--theme-accent,var(--color-brand-terracotta))] font-bold uppercase tracking-[0.25em] rounded-full max-w-fit shadow-sm bg-brand-white/50 backdrop-blur-sm",
-                    isCompact ? "px-2.5 py-1 text-[7px] mb-2" : "px-3.5 py-1.5 text-[8px] mb-4"
-                  )}>
-                    Mais procurado
                   </span>
                 )}
 

@@ -677,7 +677,9 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
         price: d.price,
         duration: d.duration,
         category: d.category,
-        order: d.order
+        order: d.order,
+        serviceCategory: d.serviceCategory, // P0 CRITICAL: Return correct category
+        badge: d.badge
       };
     });
 
