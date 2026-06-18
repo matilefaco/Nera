@@ -419,7 +419,13 @@ function PublicProfileContent() {
 
       try {
         const now = new Date();
-        const duration = Number(services[0]?.duration) || 60;
+        let duration = 60;
+        if (preSelectedService) {
+          duration = Number(preSelectedService.duration) || 60;
+        } else if (services.length > 0) {
+          const minDuration = Math.min(...services.map(s => Number(s.duration) || 60));
+          duration = minDuration > 0 ? minDuration : 60;
+        }
 
         // Fetch all blocked schedules for the week once
         const blockedQ = query(
@@ -540,7 +546,7 @@ function PublicProfileContent() {
     if (profile && services.length > 0) {
       findAvailabilityData();
     }
-  }, [profile, services]);
+  }, [profile, services, preSelectedService]);
 
   const urgencyInfo = React.useMemo(() => {
     if (!profile || services.length === 0 || totalWeeklySlots === null)
