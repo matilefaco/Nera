@@ -18,6 +18,7 @@ import { THEMES, getTheme } from '../lib/themes';
 import Logo from '../components/Logo';
 import AppLayout from '../components/AppLayout';
 import AppLoadingScreen from '../components/AppLoadingScreen';
+import { OFFICIAL_CATEGORIES } from '../constants/categories';
 import { FormIdentity } from '../components/FormIdentity';
 import { FormLocation } from '../components/FormLocation';
 import { analyzePortfolio } from '../services/aiService';
@@ -183,9 +184,12 @@ export default function ProfilePage() {
   const [portfolioStatus, setPortfolioStatus] = useState<'idle' | 'loading' | 'loaded' | 'stalled' | 'error'>(() => {
     return user && profilePortfolioCache.has(user.uid) ? 'loaded' : 'loading';
   });
-  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category: string, isUploading?: boolean}[]>(() => {
+  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category?: string, categoryId?: string, categoryLabel?: string, isFeatured?: boolean, isUploading?: boolean}[]>(() => {
     return user ? (profilePortfolioCache.get(user.uid) || []) : [];
   });
+  const [pendingPortfolioFile, setPendingPortfolioFile] = useState<File | null>(null);
+  const [pendingPortfolioCategory, setPendingPortfolioCategory] = useState<string>('');
+  const [pendingPortfolioFeatured, setPendingPortfolioFeatured] = useState<boolean>(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -827,54 +831,77 @@ export default function ProfilePage() {
     const files = e.target.files;
 
     if (files && files.length > 0 && user) {
-      if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
-        notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.');
-        return;
-      }
-      
-      try {
-         await auth.currentUser.getIdToken(true);
-      } catch (err) {
-         notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.');
-         return;
-      }
-
-      setUploadingImage(true);
       const file = files[0];
-      const tempId = 'temp-' + Date.now();
+      setPendingPortfolioFile(file);
+      setPendingPortfolioCategory(specialty || 'Bem-estar e Bronzeamento');
+      setPendingPortfolioFeatured(false);
       
-      // Basic aesthetic / quality heuristics
-      if (file.size < 60 * 1024) {
-        const hasShownSizeWarning = sessionStorage.getItem('has_shown_portfolio_size_warning');
-        if (!hasShownSizeWarning) {
-          toast('Imagens com um pouco mais de resolução costumam transmitir mais confiança.', {
-            icon: '✨',
-            style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
-          });
-          sessionStorage.setItem('has_shown_portfolio_size_warning', 'true');
-        }
-      }
-      
-      const lastUploadName = sessionStorage.getItem('last_portfolio_upload');
-      if (lastUploadName === file.name) {
-        const hasShownDuplicateWarning = sessionStorage.getItem('has_shown_portfolio_duplicate_warning');
-        if (!hasShownDuplicateWarning) {
-          toast('Essa imagem parece muito semelhante a uma que você já adicionou.', {
-            icon: '💡',
-            style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
-          });
-          sessionStorage.setItem('has_shown_portfolio_duplicate_warning', 'true');
-        }
-      }
-      sessionStorage.setItem('last_portfolio_upload', file.name);
+      // Cleanup the input
+      if (portfolioInputRef.current) portfolioInputRef.current.value = '';
+    }
+  };
 
-      // 1. Immediate Local Preview
-      try {
-        const localUrl = URL.createObjectURL(file);
-        setPortfolio(prev => [{ id: tempId, url: localUrl, category: specialty || 'Geral', isUploading: true }, ...prev]);
-      } catch (previewErr) {
-        if (isDev) console.error('[Portfolio] error creating preview:', previewErr);
+  const confirmPortfolioUpload = async () => {
+    if (!pendingPortfolioFile || !user) return;
+    const file = pendingPortfolioFile;
+    setPendingPortfolioFile(null); // Close modal
+    
+    // Auth check
+    if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+      notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.');
+      return;
+    }
+    
+    try {
+       await auth.currentUser.getIdToken(true);
+    } catch (err) {
+       notify.warning('Sua sessão expirou. Entre novamente para enviar imagens.');
+       return;
+    }
+
+    setUploadingImage(true);
+    const tempId = 'temp-' + Date.now();
+    
+    // Basic aesthetic / quality heuristics
+    if (file.size < 60 * 1024) {
+      const hasShownSizeWarning = sessionStorage.getItem('has_shown_portfolio_size_warning');
+      if (!hasShownSizeWarning) {
+        toast('Imagens com um pouco mais de resolução costumam transmitir mais confiança.', {
+          icon: '✨',
+          style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
+        });
+        sessionStorage.setItem('has_shown_portfolio_size_warning', 'true');
       }
+    }
+    
+    const lastUploadName = sessionStorage.getItem('last_portfolio_upload');
+    if (lastUploadName === file.name) {
+      const hasShownDuplicateWarning = sessionStorage.getItem('has_shown_portfolio_duplicate_warning');
+      if (!hasShownDuplicateWarning) {
+        toast('Essa imagem parece muito semelhante a uma que você já adicionou.', {
+          icon: '💡',
+          style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
+        });
+        sessionStorage.setItem('has_shown_portfolio_duplicate_warning', 'true');
+      }
+    }
+    sessionStorage.setItem('last_portfolio_upload', file.name);
+
+    // 1. Immediate Local Preview
+    try {
+      const localUrl = URL.createObjectURL(file);
+      setPortfolio(prev => [{ 
+        id: tempId, 
+        url: localUrl, 
+        category: pendingPortfolioCategory, 
+        categoryId: pendingPortfolioCategory.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        categoryLabel: pendingPortfolioCategory,
+        isFeatured: pendingPortfolioFeatured,
+        isUploading: true 
+      }, ...prev]);
+    } catch (previewErr) {
+      if (isDev) console.error('[Portfolio] error creating preview:', previewErr);
+    }
 
       let uniqueFilename = '';
       try {
@@ -889,30 +916,39 @@ export default function ProfilePage() {
         const url = await uploadImageToStorage(compressed, `portfolio/${user.uid}/${uniqueFilename}`);
         if (isDev) console.log('[Portfolio] upload finished:', url);
 
-        // 3b. AI Categorization
-        let autoCategory = '';
-        try {
-          autoCategory = await analyzePortfolio({ imageUrl: url, specialty });
-        } catch (catErr) {
-          if (isDev) console.log('[Portfolio] AI Categorization failed:', catErr);
-          // silencioso — categoria fica vazia se falhar
-        }
-        
         // 4. Persistence
         if (isDev) console.log('[Portfolio] saving to Firestore');
-        const docId = await savePortfolioItem(user.uid, url, autoCategory || specialty || 'Geral');
+        
+        const categoryLabelToSave = pendingPortfolioCategory;
+        const categoryIdToSave = pendingPortfolioCategory.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        
+        const docId = await savePortfolioItem(user.uid, {
+          url, 
+          category: categoryLabelToSave, 
+          categoryId: categoryIdToSave,
+          categoryLabel: categoryLabelToSave,
+          isFeatured: pendingPortfolioFeatured
+        });
+        
         if (isDev) console.log('[Portfolio] saved successfully with ID:', docId);
         
         // Replace temp item with final item
         setPortfolio(prev => {
           const newPortfolio = prev.map(item => 
-            item.id === tempId ? { id: docId, url: url, category: autoCategory || specialty || 'Geral' } : item
+            item.id === tempId ? { 
+              id: docId, 
+              url: url, 
+              category: categoryLabelToSave,
+              categoryId: categoryIdToSave,
+              categoryLabel: categoryLabelToSave,
+              isFeatured: pendingPortfolioFeatured 
+            } : item
           );
           if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
           return newPortfolio;
         });
 
-        notify.success(`Foto adicionada${autoCategory ? ` · ${autoCategory}` : ''}`);
+        notify.success(`Foto adicionada · ${categoryLabelToSave}`);
         setDiagnosticInfo(null);
       } catch (err: any) {
         console.error('[Portfolio] upload failed:', err);
@@ -960,7 +996,6 @@ export default function ProfilePage() {
         setUploadingImage(false);
         if (portfolioInputRef.current) portfolioInputRef.current.value = '';
       }
-    }
   };
 
   const removePortfolioImage = async (id: string) => {
@@ -1323,6 +1358,60 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+
+            {/* PORTFOLIO UPLOAD MODAL */}
+            {pendingPortfolioFile && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-ink/40 backdrop-blur-sm">
+                <div className="bg-brand-white w-full max-w-sm rounded-[24px] p-6 shadow-2xl relative">
+                  <button 
+                    onClick={() => {
+                      setPendingPortfolioFile(null);
+                      if (portfolioInputRef.current) portfolioInputRef.current.value = '';
+                    }}
+                    className="absolute top-4 right-4 text-brand-stone hover:text-brand-ink transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                  <h3 className="text-xl font-serif text-brand-ink mb-2">Detalhes da Foto</h3>
+                  <p className="text-[11px] text-brand-stone mb-6">Esta foto aparecerá de forma organizada na sua vitrine inteligente.</p>
+
+                  <div className="space-y-5">
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-2">Categoria Oficial</label>
+                      <select
+                        value={pendingPortfolioCategory}
+                        onChange={(e) => setPendingPortfolioCategory(e.target.value)}
+                        className="w-full h-12 bg-white border border-brand-mist rounded-xl px-4 text-sm text-brand-ink focus:outline-none focus:border-brand-terracotta focus:ring-1 focus:ring-brand-terracotta transition-colors"
+                      >
+                        {OFFICIAL_CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 bg-brand-parchment border border-brand-mist rounded-xl cursor-pointer" onClick={() => setPendingPortfolioFeatured(!pendingPortfolioFeatured)}>
+                      <div className={cn(
+                        "w-5 h-5 rounded flex-shrink-0 flex items-center justify-center border transition-colors mt-0.5",
+                        pendingPortfolioFeatured ? "bg-brand-terracotta border-brand-terracotta text-white" : "border-brand-stone/40 text-transparent"
+                      )}>
+                        <Check size={14} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-brand-ink">Destaque na Vitrine</p>
+                        <p className="text-[10px] text-brand-stone mt-0.5">Fotos destacadas aparecem primeiro para as clientes (máx recomendado: 6).</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={confirmPortfolioUpload}
+                    className="mt-6 w-full h-12 bg-brand-ink text-white rounded-xl text-xs font-bold uppercase tracking-widest flex items-center justify-center hover:bg-brand-espresso transition-colors active:scale-[0.98]"
+                  >
+                    Confirmar e Enviar
+                  </button>
+                </div>
+              </div>
+            )}
             
             {/* DIAGNÓSTICO OBRIGATÓRIO (TELA) */}
             {diagnosticInfo && (

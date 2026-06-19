@@ -36,7 +36,11 @@ export interface Service {
 export interface PortfolioItem {
   id: string;
   url: string;
-  category?: string;
+  category?: string; // Legacy
+  categoryId?: string;
+  categoryLabel?: string;
+  isFeatured?: boolean;
+  orderIdx?: number;
   createdAt: string;
 }
 
@@ -237,6 +241,7 @@ export interface Appointment {
   
   serviceId: string;
   serviceName: string;
+  additionalServices?: any[];
   duration: number;
   price: number;
   travelFee?: number;
@@ -318,6 +323,7 @@ export interface WaitlistEntry {
   requestedDate: string; // YYYY-MM-DD
   serviceId: string;
   serviceName: string;
+  additionalServices?: any[];
   period: 'morning' | 'afternoon' | 'night' | 'any';
   preferredTime?: string; // HH:mm
   assignedTime?: string; // HH:mm assigned by system or pro

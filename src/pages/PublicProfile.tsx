@@ -346,6 +346,10 @@ function PublicProfileContent() {
                     id: doc.id,
                     url: doc.data().url || doc.data().imageUrl,
                     category: doc.data().category,
+                    categoryId: doc.data().categoryId,
+                    categoryLabel: doc.data().categoryLabel,
+                    isFeatured: doc.data().isFeatured,
+                    orderIdx: doc.data().orderIdx,
                     createdAt: doc.data().createdAt || new Date().toISOString(),
                   }));
                   setProfile((prev) => prev ? { ...prev, portfolio: portfolioItems } : null);

@@ -51,21 +51,7 @@ const DURATION_OPTIONS = [
   { label: '3h', value: 180 },
 ];
 
-const CATEGORIES = [
-  'Bem-estar e Bronzeamento',
-  'Cabelos',
-  'Cílios',
-  'Depilação',
-  'Estética Corporal',
-  'Estética Facial',
-  'Maquiagem',
-  'Massagens e Terapias',
-  'Micropigmentação',
-  'Podologia',
-  'Sobrancelhas',
-  'Unhas',
-  'Outros'
-];
+import { OFFICIAL_CATEGORIES as CATEGORIES } from '../constants/categories';
 
 export const FormServices = ({
   services,

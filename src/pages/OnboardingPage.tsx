@@ -58,6 +58,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { notify } from "../lib/notify";
+import { OFFICIAL_CATEGORIES } from "../constants/categories";
 import imageCompression from "browser-image-compression";
 import {
   generateSlug,
@@ -381,8 +382,11 @@ export default function OnboardingPage() {
   const [newAreaName, setNewAreaName] = useState("");
   const [newAreaFee, setNewAreaFee] = useState("");
   const [portfolio, setPortfolio] = useState<
-    { id?: string; url: string; category: string; isUploading?: boolean }[]
+    { id?: string; url: string; category?: string; categoryId?: string; categoryLabel?: string; isFeatured?: boolean; isUploading?: boolean }[]
   >([]);
+  const [pendingPortfolioFile, setPendingPortfolioFile] = useState<File | null>(null);
+  const [pendingPortfolioCategory, setPendingPortfolioCategory] = useState<string>('');
+  const [pendingPortfolioFeatured, setPendingPortfolioFeatured] = useState<boolean>(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
@@ -1280,103 +1284,117 @@ export default function OnboardingPage() {
     const files = e.target.files;
 
     if (files && files.length > 0 && user) {
-      if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
-        notify.warning(
-          "Sua sessão expirou. Entre novamente para enviar imagens.",
-          { id: "auth_expire_portfolio" },
-        );
-        return;
-      }
-
-      try {
-        await auth.currentUser.getIdToken(true);
-      } catch (err) {
-        notify.warning(
-          "Sua sessão expirou. Entre novamente para enviar imagens.",
-          { id: "auth_expire_portfolio" },
-        );
-        return;
-      }
-
-      setUploadingImage(true);
       const file = files[0];
-      const tempId = "temp-" + Date.now();
+      setPendingPortfolioFile(file);
+      setPendingPortfolioCategory(specialty || "Bem-estar e Bronzeamento");
+      setPendingPortfolioFeatured(false);
 
-      // 1. Immediate Local Preview
-      try {
-        const localUrl = URL.createObjectURL(file);
-        setPortfolio((prev) => [
-          {
-            id: tempId,
-            url: localUrl,
-            category: specialty || "Geral",
-            isUploading: true,
-          },
-          ...prev,
-        ]);
-      } catch (previewErr) {
-        console.error("[Portfolio] error creating preview:", previewErr);
-      }
+      if (portfolioInputRef.current) portfolioInputRef.current.value = "";
+    }
+  };
 
-      let uniqueFilename = "";
+  const confirmPortfolioUpload = async () => {
+    if (!pendingPortfolioFile || !user) return;
+    const file = pendingPortfolioFile;
+    setPendingPortfolioFile(null);
+    
+    if (!auth.currentUser || auth.currentUser.uid !== user.uid) {
+      notify.warning(
+        "Sua sessão expirou. Entre novamente para enviar imagens.",
+        { id: "auth_expire_portfolio" },
+      );
+      return;
+    }
+
+    try {
+      await auth.currentUser.getIdToken(true);
+    } catch (err) {
+      notify.warning(
+        "Sua sessão expirou. Entre novamente para enviar imagens.",
+        { id: "auth_expire_portfolio" },
+      );
+      return;
+    }
+
+    setUploadingImage(true);
+    const tempId = "temp-" + Date.now();
+
+    const categoryLabelToSave = pendingPortfolioCategory;
+    const categoryIdToSave = pendingPortfolioCategory.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+    // 1. Immediate Local Preview
+    try {
+      const localUrl = URL.createObjectURL(file);
+      setPortfolio((prev) => [
+        {
+          id: tempId,
+          url: localUrl,
+          category: categoryLabelToSave,
+          categoryId: categoryIdToSave,
+          categoryLabel: categoryLabelToSave,
+          isFeatured: pendingPortfolioFeatured,
+          isUploading: true,
+        },
+        ...prev,
+      ]);
+    } catch (previewErr) {
+      console.error("[Portfolio] error creating preview:", previewErr);
+    }
+
+    let uniqueFilename = "";
+    // 3. Upload
+    try {
+      // 2. Compression
+      const options = {
+        maxSizeMB: 0.2,
+        maxWidthOrHeight: 1200,
+        useWebWorker: false,
+      };
+      const compressedFile = await imageCompression(file, options);
+      devLog(
+        `[Portfolio Onboarding] Compression done. Original: ${file.size}, Compressed: ${compressedFile.size}`,
+      );
+
       // 3. Upload
-      try {
-        // 2. Compression
-        const options = {
-          maxSizeMB: 0.2,
-          maxWidthOrHeight: 1200,
-          useWebWorker: false,
-        };
-        const compressedFile = await imageCompression(file, options);
-        devLog(
-          `[Portfolio Onboarding] Compression done. Original: ${file.size}, Compressed: ${compressedFile.size}`,
-        );
+      uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "")}`;
+      const downloadUrl = await uploadImageToStorage(
+        compressedFile,
+        `portfolio/${user.uid}/${uniqueFilename}`,
+      );
+      devLog("[Portfolio Onboarding] upload finished:", downloadUrl);
 
-        // 3. Upload
-        uniqueFilename = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, "")}`;
-        const downloadUrl = await uploadImageToStorage(
-          compressedFile,
-          `portfolio/${user.uid}/${uniqueFilename}`,
-        );
-        devLog("[Portfolio Onboarding] upload finished:", downloadUrl);
-
-        // 3b. AI Categorization
-        let autoCategory = "";
-        try {
-          autoCategory = await analyzePortfolio({
-            imageUrl: downloadUrl,
-            specialty,
-          });
-        } catch (catErr) {
-          // silently fail
+      // 4. Persistence
+      const docId = await savePortfolioItem(
+        user.uid,
+        {
+          url: downloadUrl,
+          category: categoryLabelToSave,
+          categoryId: categoryIdToSave,
+          categoryLabel: categoryLabelToSave,
+          isFeatured: pendingPortfolioFeatured,
         }
+      );
+      devLog("[Portfolio Onboarding] saved successfully with ID:", docId);
 
-        // 4. Persistence
-        const docId = await savePortfolioItem(
-          user.uid,
-          downloadUrl,
-          autoCategory || specialty || "Geral",
-        );
-        devLog("[Portfolio Onboarding] saved successfully with ID:", docId);
+      // Update local state with real ID
+      setPortfolio((prev) =>
+        prev.map((item) =>
+          item.id === tempId
+            ? {
+                id: docId,
+                url: downloadUrl,
+                category: categoryLabelToSave,
+                categoryId: categoryIdToSave,
+                categoryLabel: categoryLabelToSave,
+                isFeatured: pendingPortfolioFeatured,
+              }
+            : item,
+        ),
+      );
 
-        // Update local state with real ID
-        setPortfolio((prev) =>
-          prev.map((item) =>
-            item.id === tempId
-              ? {
-                  id: docId,
-                  url: downloadUrl,
-                  category: autoCategory || specialty || "Geral",
-                }
-              : item,
-          ),
-        );
-
-        notify.success(
-          `Foto adicionada${autoCategory ? ` · ${autoCategory}` : ""}`,
-        );
-        setDiagnosticInfo(null);
-      } catch (error: any) {
+      notify.success(`Foto adicionada · ${categoryLabelToSave}`);
+      setDiagnosticInfo(null);
+    } catch (error: any) {
         console.error("[Portfolio] upload failed:", error);
 
         // Fetch diagnostic info
@@ -1430,7 +1448,6 @@ export default function OnboardingPage() {
         setUploadingImage(false);
         if (portfolioInputRef.current) portfolioInputRef.current.value = "";
       }
-    }
   };
 
   const removePortfolioImage = async (id: string) => {

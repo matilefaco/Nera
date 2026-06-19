@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { PortfolioItem } from '../../types';
 import PremiumButton from '../PremiumButton';
-import { getProfileHeroCopy } from '../../lib/copy';
 import { cn } from '../../lib/utils';
 
 interface PortfolioSectionProps {
@@ -14,8 +13,9 @@ interface PortfolioSectionProps {
 }
 
 export const PortfolioSection = ({ portfolio, onBookingClick, specialty, professionalName }: PortfolioSectionProps) => {
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [activeCategory, setActiveCategory] = useState<string>('');
   const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (selectedImageIndex !== null) {
@@ -26,16 +26,72 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty, profess
     return () => { document.body.style.overflow = 'unset'; }
   }, [selectedImageIndex]);
 
+  const normalizedPortfolio = useMemo(() => portfolio.map((item, index) => ({
+    ...item,
+    displayCategory: item.categoryLabel || item.category || 'Portfólio',
+    originalIndex: index
+  })), [portfolio]);
+
+  const uniqueCategories = useMemo(() => 
+    Array.from(new Set(normalizedPortfolio.map(item => item.displayCategory))),
+  [normalizedPortfolio]);
+
+  const hasFeatured = useMemo(() => 
+    normalizedPortfolio.some(i => i.isFeatured), 
+  [normalizedPortfolio]);
+
+  const hasMultipleCategories = uniqueCategories.length > 1;
+
+  useEffect(() => {
+    if (!activeCategory) {
+      if (hasFeatured && hasMultipleCategories) {
+        setActiveCategory('Destaques');
+      } else if (hasMultipleCategories) {
+        setActiveCategory('Todos');
+      } else {
+        setActiveCategory('all'); // fallback single category
+      }
+    }
+  }, [hasFeatured, hasMultipleCategories, activeCategory]);
+
+  const currentCategory = activeCategory || (hasFeatured && hasMultipleCategories ? 'Destaques' : (hasMultipleCategories ? 'Todos' : 'all'));
+
+  const handleCategoryChange = (cat: string) => {
+    setActiveCategory(cat);
+    setIsExpanded(false);
+  };
+
+  const filteredItems = useMemo(() => {
+    if (currentCategory === 'Destaques') {
+      return normalizedPortfolio
+        .filter(item => item.isFeatured)
+        .sort((a, b) => {
+          if (a.orderIdx !== b.orderIdx) return (a.orderIdx || 0) - (b.orderIdx || 0);
+          return a.originalIndex - b.originalIndex;
+        })
+        .slice(0, 5);
+    }
+    
+    let baseItems = currentCategory === 'Todos' || currentCategory === 'all'
+      ? normalizedPortfolio
+      : normalizedPortfolio.filter(item => item.displayCategory === currentCategory);
+      
+    // Sort so featured come first
+    return [...baseItems].sort((a, b) => {
+      if (a.isFeatured && !b.isFeatured) return -1;
+      if (!a.isFeatured && b.isFeatured) return 1;
+      if (a.isFeatured && b.isFeatured) {
+         if (a.orderIdx !== b.orderIdx) return (a.orderIdx || 0) - (b.orderIdx || 0);
+      }
+      return a.originalIndex - b.originalIndex;
+    });
+  }, [normalizedPortfolio, currentCategory]);
+
   if (portfolio.length === 0) return null;
 
-  const categories = ['all', ...Array.from(new Set(portfolio.map(item => item.category).filter(Boolean)))];
-  const filteredItems = activeCategory === 'all' 
-    ? portfolio 
-    : portfolio.filter(item => item.category === activeCategory);
-
   const displayLimit = 5;
-  const showMoreCTA = filteredItems.length > displayLimit;
-  const displayItems = showMoreCTA ? filteredItems.slice(0, displayLimit) : filteredItems;
+  const showMoreCTA = !isExpanded && filteredItems.length > displayLimit && currentCategory !== 'Destaques';
+  const displayItems = isExpanded ? filteredItems : filteredItems.slice(0, displayLimit);
 
   const openModal = (index: number) => setSelectedImageIndex(index);
   const closeModal = () => setSelectedImageIndex(null);
@@ -78,26 +134,50 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty, profess
         </div>
 
         {/* Categories */}
-        {categories.length > 2 && (
+        {hasMultipleCategories && (
           <div className="flex flex-wrap gap-2 mb-12">
-            {categories.map(cat => (
+            {hasFeatured && (
               <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
+                onClick={() => handleCategoryChange('Destaques')}
                 className={cn(
                   "px-6 py-2.5 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] transition-all border",
-                  activeCategory === cat 
+                  currentCategory === 'Destaques'
                     ? "bg-brand-ink text-brand-white border-brand-ink shadow-lg" 
                     : "bg-brand-white text-brand-stone border-brand-mist hover:border-[var(--theme-accent,var(--color-brand-terracotta))] hover:text-[var(--theme-accent,var(--color-brand-terracotta))]"
                 )}
               >
-                {cat === 'all' ? 'Todos' : cat}
+                Destaques
+              </button>
+            )}
+            <button
+              onClick={() => handleCategoryChange('Todos')}
+              className={cn(
+                "px-6 py-2.5 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] transition-all border",
+                currentCategory === 'Todos'
+                  ? "bg-brand-ink text-brand-white border-brand-ink shadow-lg" 
+                  : "bg-brand-white text-brand-stone border-brand-mist hover:border-[var(--theme-accent,var(--color-brand-terracotta))] hover:text-[var(--theme-accent,var(--color-brand-terracotta))]"
+              )}
+            >
+              Todos
+            </button>
+            {uniqueCategories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => handleCategoryChange(cat)}
+                className={cn(
+                  "px-6 py-2.5 rounded-full text-[9px] font-bold uppercase tracking-[0.2em] transition-all border",
+                  currentCategory === cat 
+                    ? "bg-brand-ink text-brand-white border-brand-ink shadow-lg" 
+                    : "bg-brand-white text-brand-stone border-brand-mist hover:border-[var(--theme-accent,var(--color-brand-terracotta))] hover:text-[var(--theme-accent,var(--color-brand-terracotta))]"
+                )}
+              >
+                {cat}
               </button>
             ))}
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8 auto-rows-[280px] md:auto-rows-[320px]">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 auto-rows-[160px] sm:auto-rows-[240px] lg:auto-rows-[320px]">
           <AnimatePresence mode="popLayout">
             {displayItems.map((item, i) => (
               <motion.div
@@ -109,41 +189,45 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty, profess
                 transition={{ duration: 0.5, delay: i * 0.05 }}
                 onClick={() => openModal(i)}
                 className={cn(
-                  "relative rounded-3xl overflow-hidden group cursor-pointer bg-brand-stone/5",
-                  i === 0 && displayItems.length >= 4 ? "md:col-span-2 md:row-span-2" : ""
+                  "relative rounded-[1.25rem] sm:rounded-3xl overflow-hidden group cursor-pointer bg-brand-stone/5",
+                  i === 0 && displayItems.length >= 4 ? "col-span-2 row-span-2" : "col-span-1 row-span-1"
                 )}
               >
                  <img
                   src={item.url}
-                  alt={item.category || `Trabalho de ${professionalName || 'Beleza'}`}
+                  alt={item.displayCategory || `Trabalho de ${professionalName || 'Beleza'}`}
                   className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                   referrerPolicy="no-referrer"
                   loading="lazy"
                 />
                 
                 {/* Visual Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-brand-ink/70 via-brand-ink/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-8">
-                  <span className="font-serif italic text-white text-xl">{item.category}</span>
+                <div className="absolute inset-0 bg-gradient-to-t from-brand-ink/70 via-brand-ink/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex flex-col justify-end p-4 sm:p-8">
+                  <span className="font-serif italic text-white text-lg sm:text-xl">{item.displayCategory}</span>
                 </div>
 
-                {/* Always visible category chip */}
-                {item.category && (
-                  <div className="absolute top-5 left-5 z-10 px-4 py-1.5 bg-brand-ink/40 backdrop-blur-md border border-white/20 rounded-full text-[8px] font-bold uppercase tracking-widest text-white shadow-sm transition-all group-hover:bg-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:border-transparent">
-                    {item.category}
-                  </div>
-                )}
-
-                {/* Ver mais CTA if last item */}
-                {showMoreCTA && i === displayItems.length - 1 && (
-                  <div className="absolute inset-0 bg-brand-ink/40 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center transition-colors group-hover:bg-brand-ink/60">
-                    <span className="text-white font-serif text-3xl mb-2">+{filteredItems.length - displayLimit}</span>
-                    <span className="text-white/90 text-[10px] font-bold uppercase tracking-widest">Ver portfólio completo</span>
+                {/* Always visible category chip - only if it's 'Todos' view and we have multiple categories, otherwise it's redundant */}
+                {(currentCategory === 'Todos' || currentCategory === 'Destaques') && hasMultipleCategories && item.displayCategory !== 'Portfólio' && (
+                  <div className="absolute top-3 sm:top-5 left-3 sm:left-5 z-10 px-3 sm:px-4 py-1 sm:py-1.5 bg-brand-ink/40 backdrop-blur-md border border-white/20 rounded-full text-[7px] sm:text-[8px] font-bold uppercase tracking-widest text-white shadow-sm transition-all group-hover:bg-[var(--theme-accent,var(--color-brand-terracotta))] group-hover:border-transparent">
+                    {item.displayCategory}
                   </div>
                 )}
               </motion.div>
             ))}
           </AnimatePresence>
         </div>
+
+        {/* Ver Mais Button */}
+        {showMoreCTA && (
+          <div className="mt-8 md:mt-12 flex justify-center">
+             <button 
+               onClick={() => setIsExpanded(true)}
+               className="px-8 py-3 rounded-full border border-brand-mist bg-transparent text-brand-ink text-[10px] uppercase tracking-widest font-bold hover:bg-brand-linen hover:border-[var(--theme-accent,var(--color-brand-terracotta))] hover:text-[var(--theme-accent,var(--color-brand-terracotta))] transition-colors"
+             >
+               Ver mais {currentCategory !== 'Todos' && currentCategory !== 'Destaques' && currentCategory !== 'all' ? `em ${currentCategory}` : 'fotos'}
+             </button>
+          </div>
+        )}
       </div>
 
       {/* Modal Gallery */}
@@ -205,10 +289,10 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty, profess
               )}
             </div>
             
-            {filteredItems[selectedImageIndex].category && (
+            {(filteredItems[selectedImageIndex] as any).displayCategory && (filteredItems[selectedImageIndex] as any).displayCategory !== 'Portfólio' && (
               <div className="absolute bottom-8 left-0 right-0 flex justify-center z-50 pointer-events-none">
                 <div className="px-6 py-2.5 bg-brand-ink/50 backdrop-blur-xl border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest text-white shadow-xl">
-                  {filteredItems[selectedImageIndex].category}
+                  {(filteredItems[selectedImageIndex] as any).displayCategory}
                 </div>
               </div>
             )}
@@ -218,3 +302,4 @@ export const PortfolioSection = ({ portfolio, onBookingClick, specialty, profess
     </section>
   );
 };
+

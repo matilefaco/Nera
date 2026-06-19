@@ -178,11 +178,10 @@ export async function saveProfilePartial(uid: string, data: Partial<UserProfile>
   });
 }
 
-export async function savePortfolioItem(uid: string, url: string, category: string): Promise<string> {
+export async function savePortfolioItem(uid: string, itemData: { url: string, category?: string, categoryId?: string, categoryLabel?: string, isFeatured?: boolean, orderIdx?: number }): Promise<string> {
   const colRef = collection(db, `users/${uid}/portfolio`);
   const docRef = await addDoc(colRef, {
-    url,
-    category,
+    ...itemData,
     createdAt: serverTimestamp()
   });
   return docRef.id;
