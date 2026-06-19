@@ -559,10 +559,18 @@ export default function BookingModal({ profile, services, onClose, open, initial
     };
   }, [selectedDate, profile?.professionalId, profile?.uid, open, retrySlotsCount]);
 
+  const getTravelFee = () => {
+    if (bookingMode !== 'home') return 0;
+    if (profile?.travelFeeMode === 'fixed') {
+      return Number(profile.fixedTravelFee) || 0;
+    }
+    return selectedArea?.fee || 0;
+  };
+
   const calculateTotalPrice = () => {
     if (!selectedService) return 0;
     const basePrice = Number(selectedService.price) || 0;
-    const total = basePrice + (selectedArea?.fee || 0);
+    const total = basePrice + getTravelFee();
     
     if (appliedCoupon) {
       if (appliedCoupon.type === 'percentage') {
@@ -673,7 +681,7 @@ export default function BookingModal({ profile, services, onClose, open, initial
           serviceName: selectedService.name,
           duration: Number(selectedService.duration) || 60,
           price: selectedService.price,
-          travelFee: selectedArea?.fee || 0,
+          travelFee: getTravelFee(),
           totalPrice: totalPrice,
           locationType: isHomeService ? 'home' : 'studio',
           neighborhood: (isHomeService ? (addressNeighborhood.trim() || selectedArea?.name) : profile.neighborhood) || '',

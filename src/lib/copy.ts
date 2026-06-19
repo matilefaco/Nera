@@ -1,20 +1,20 @@
 export const SERVICE_MODES = {
   studio: {
-    label: "Atende no estúdio",
-    shortLabel: "Estúdio",
-    description: "Clientes vão até você no seu espaço.",
+    label: "Atendo no meu espaço",
+    shortLabel: "Meu espaço",
+    description: "A cliente vai até o seu espaço.",
     icon: "Building2"
   },
   home: {
-    label: "Atende em domicílio",
-    shortLabel: "Domicílio",
-    description: "Você vai até o endereço das suas clientes.",
+    label: "Atendo no endereço da cliente",
+    shortLabel: "Endereço da cliente",
+    description: "Você vai até o local informado pela cliente.",
     icon: "Home"
   },
   hybrid: {
-    label: "Estúdio e domicílio",
-    shortLabel: "Híbrido",
-    description: "Você atende no seu espaço e também vai até as clientes.",
+    label: "Atendo das duas formas",
+    shortLabel: "Ambos",
+    description: "Você atende no seu espaço e também em domicílio.",
     icon: "MapPin"
   }
 } as const;

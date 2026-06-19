@@ -2,11 +2,11 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Globe, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { getPublicProfileUrl } from '../lib/env';
 
 interface OnboardingLivePreviewProps {
   name: string;
   specialty: string;
+  subSpecialties?: string[];
   headline?: string;
   slug: string;
   avatar?: string;
@@ -15,6 +15,7 @@ interface OnboardingLivePreviewProps {
 export const OnboardingLivePreview = ({ 
   name, 
   specialty, 
+  subSpecialties = [],
   headline, 
   slug,
   avatar 
@@ -51,19 +52,30 @@ export const OnboardingLivePreview = ({
           
           <div className="flex-1 min-w-0">
             <h4 className="font-serif text-lg text-brand-ink truncate leading-tight">
-              {name || 'Letícia Lima'}
+              {name || 'Seu nome'}
             </h4>
             {specialty || name ? (
               <p className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta mt-1">
-                {specialty || 'Sua Especialidade'}
+                {specialty || 'Seu título'}
               </p>
             ) : null}
             
+            {subSpecialties.length > 0 ? (
+              <p className="text-[10px] text-brand-stone font-light mt-1 truncate">
+                {subSpecialties.slice(0, 3).join(' • ')}
+                {subSpecialties.length > 3 && ` • +${subSpecialties.length - 3} áreas`}
+              </p>
+            ) : (
+              <p className="text-[10px] text-brand-stone/40 font-light mt-1 truncate italic">
+                Suas áreas aparecerão aqui.
+              </p>
+            )}
+            
             <p className={cn(
               "text-[11px] font-light mt-3 line-clamp-2",
-              headline ? "text-brand-stone" : "text-brand-stone/40"
+              headline ? "text-brand-stone" : "text-brand-stone/40 italic"
             )}>
-              {headline || (specialty ? '' : 'As linhas principais da sua vitrine aparecerão aqui.')}
+              {headline ? headline : 'Sua apresentação aparecerá aqui.'}
             </p>
           </div>
         </div>
@@ -71,7 +83,7 @@ export const OnboardingLivePreview = ({
         <div className="mt-6 pt-5 border-t border-brand-mist/50 flex items-center justify-between">
           <div className="flex items-center gap-2 text-brand-stone/40">
             <Globe size={12} />
-            <span className="text-[10px] font-medium tracking-wide">{getPublicProfileUrl(slug || 'link').replace(/^https?:\/\//, '')}</span>
+            <span className="text-[10px] font-medium tracking-wide">usenera.com/p/{slug || 'link'}</span>
           </div>
           
           <div className="flex gap-1">

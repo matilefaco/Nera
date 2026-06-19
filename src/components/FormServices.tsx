@@ -1,5 +1,6 @@
 import React from 'react';
-import { Clock, DollarSign, Plus, X, Briefcase, AlertCircle } from 'lucide-react';
+import { Clock, DollarSign, Plus, X, Briefcase, AlertCircle, Sparkles, ChevronRight } from 'lucide-react';
+import { inferCategory } from '../lib/inferCategory';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 
@@ -8,6 +9,7 @@ export interface ServiceDraft {
   duration: number | string;
   price: string;
   description: string;
+  serviceCategory?: string;
 }
 
 export interface FormServicesProps {
@@ -21,6 +23,7 @@ export interface FormServicesProps {
     endTime: string;
   };
   specialty?: string;
+  allowMultiple?: boolean;
 }
 
 const FormError = ({ message }: { message?: string }) => (
@@ -48,6 +51,22 @@ const DURATION_OPTIONS = [
   { label: '3h', value: 180 },
 ];
 
+const CATEGORIES = [
+  'Bem-estar e Bronzeamento',
+  'Cabelos',
+  'Cílios',
+  'Depilação',
+  'Estética Corporal',
+  'Estética Facial',
+  'Maquiagem',
+  'Massagens e Terapias',
+  'Micropigmentação',
+  'Podologia',
+  'Sobrancelhas',
+  'Unhas',
+  'Outros'
+];
+
 export const FormServices = ({
   services,
   setServices,
@@ -55,9 +74,11 @@ export const FormServices = ({
   title,
   subtitle,
   workingHours = { startTime: '09:00', endTime: '18:00' },
-  specialty
+  specialty,
+  allowMultiple = true
 }: FormServicesProps) => {
   const [showCustom, setShowCustom] = React.useState<Record<number, boolean>>({});
+  const [autoInferredCategory, setAutoInferredCategory] = React.useState<Record<number, boolean>>({});
 
   const getServiceSuggestions = (spec?: string) => {
     if (!spec) {
@@ -269,11 +290,42 @@ export const FormServices = ({
   const updateService = (index: number, field: keyof ServiceDraft, value: any) => {
     const newServices = [...services];
     newServices[index] = { ...newServices[index], [field]: value };
+    
+    // Auto-infer category on name change
+    if (field === 'name') {
+      const inferred = inferCategory(value);
+      if (inferred && (!newServices[index].serviceCategory || autoInferredCategory[index])) {
+        newServices[index].serviceCategory = inferred;
+        setAutoInferredCategory(prev => ({ ...prev, [index]: true }));
+      } else if (!inferred && autoInferredCategory[index]) {
+        newServices[index].serviceCategory = '';
+        setAutoInferredCategory(prev => ({ ...prev, [index]: false }));
+      }
+    }
+    
+    // Clear auto-infer flag on explicit category manual selection
+    if (field === 'serviceCategory') {
+      setAutoInferredCategory(prev => ({ ...prev, [index]: false }));
+    }
+    
     setServices(newServices);
   };
 
   const updateServiceFields = (index: number, updates: Partial<ServiceDraft>) => {
     const newServices = [...services];
+    
+    if (updates.name && !updates.serviceCategory) {
+      const inferred = inferCategory(updates.name);
+      if (inferred) {
+        updates.serviceCategory = inferred;
+        setAutoInferredCategory(prev => ({ ...prev, [index]: true }));
+      }
+    }
+    
+    if (updates.serviceCategory && updates.name === undefined) {
+       setAutoInferredCategory(prev => ({ ...prev, [index]: false }));
+    }
+    
     newServices[index] = { ...newServices[index], ...updates };
     setServices(newServices);
   };
@@ -283,94 +335,106 @@ export const FormServices = ({
     setServices(services.filter((_, i) => i !== index));
   };
 
-  const calculateSlots = (duration: number) => {
-    if (!duration || duration <= 0) return 0;
-    const safeWorkingHours = workingHours || { startTime: '09:00', endTime: '18:00' };
-    const start = safeWorkingHours.startTime || '09:00';
-    const end = safeWorkingHours.endTime || '18:00';
-    
-    const [startH, startM] = start.split(':').map(Number);
-    const [endH, endM] = end.split(':').map(Number);
-    
-    const totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
-    return Math.floor(totalMinutes / duration);
-  };
+  const [showAllSuggestions, setShowAllSuggestions] = React.useState(false);
 
   return (
-    <div className="w-full space-y-10">
+    <div className="w-full space-y-5">
       {(title || subtitle) && (
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-brand-mist">
-            <Briefcase size={32} />
+        <div className="text-center space-y-1">
+          <div className="w-10 h-10 bg-brand-linen text-brand-ink rounded-full flex items-center justify-center mx-auto mb-1 shadow-sm border border-brand-mist">
+            <Briefcase size={20} />
           </div>
-          {title && <h1 className="text-4xl font-serif font-normal text-brand-ink">{title}</h1>}
-          {subtitle && <p className="text-brand-stone font-light italic">{subtitle}</p>}
+          {title && <h1 className="text-xl sm:text-2xl font-serif font-normal text-brand-ink tracking-tight px-4">{title}</h1>}
+          {subtitle && <p className="text-brand-stone font-light text-[12px] sm:text-[13px] px-4 md:px-8 mt-1">{subtitle}</p>}
         </div>
       )}
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {services.map((service, index) => {
           const durationVal = Number(service.duration) || 0;
-          const slots = calculateSlots(durationVal);
           const isCustom = !DURATION_OPTIONS.some(opt => opt.value === durationVal) && durationVal > 0;
           const currentShowCustom = showCustom[index] ?? isCustom;
+          
+          const displayedSuggestions = showAllSuggestions ? suggestions : suggestions.slice(0, 4);
 
           return (
-            <div key={index} className="bg-brand-white p-8 rounded-[40px] border border-brand-mist shadow-sm relative group overflow-hidden">
+            <div key={index} className="bg-brand-white p-5 sm:p-8 rounded-[24px] sm:rounded-[32px] border border-brand-mist shadow-sm relative group overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-brand-mist/20" />
               
               {services.length > 1 && (
                 <button 
                   type="button"
                   onClick={() => removeService(index)}
-                  className="absolute top-6 right-6 w-8 h-8 flex items-center justify-center text-brand-stone hover:text-brand-terracotta transition-colors z-10"
+                  className="absolute top-4 right-4 sm:top-5 sm:right-5 w-8 h-8 flex items-center justify-center text-brand-stone hover:text-brand-terracotta transition-colors z-10"
                 >
                   <X size={18} />
                 </button>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="md:col-span-2 space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+                <div className="md:col-span-2 space-y-1">
                   <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
                     Nome do serviço <span className="text-brand-terracotta">*</span>
                   </label>
                   
                   <div className="mb-3">
-                    <p className="text-[10px] font-medium text-brand-ink ml-1 mb-0.5">Sugestões para começar</p>
-                    <p className="text-[9px] text-brand-stone font-light italic ml-1 mb-2">
-                      Comece pelos serviços que você mais atende. Você pode editar tudo depois.
-                    </p>
-                    <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-none -mx-2 px-2 md:mx-0 md:px-0">
-                      {suggestions.map((sug, idx) => {
-                        const isActive = service.name === sug.name;
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              updateServiceFields(index, {
-                                name: sug.name,
-                                duration: String(sug.duration)
-                              });
-                              setShowCustom(prev => ({ ...prev, [index]: false }));
-                            }}
-                            className={cn(
-                              "flex-shrink-0 px-3 py-1.5 rounded-full text-[10px] font-medium transition-all duration-300 ease-out border flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
-                              isActive
-                                ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
-                                : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
-                            )}
-                          >
-                            {sug.name}{" "}
-                            <span className={cn(
-                              "font-normal tracking-normal normal-case",
-                              isActive ? "text-brand-white/80" : "text-brand-stone/80"
-                            )}>
-                              • {sug.duration} min
-                            </span>
-                          </button>
-                        );
-                      })}
+                    <div className="flex items-center justify-between ml-1 mb-1.5 pr-1 sm:pr-0">
+                      <p className="text-[11px] font-medium text-brand-ink">Sugestões para começar:</p>
+                      {!showAllSuggestions && suggestions.length > 4 && (
+                        <span className="text-[10px] text-brand-stone/80 sm:hidden font-light tracking-wide">
+                          Deslize para ver mais sugestões
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center -mr-5 pr-1 sm:mr-0 sm:pr-0">
+                      <div className="flex-1 flex overflow-x-auto sm:flex-wrap gap-2 pb-2 -ml-5 pl-5 pr-2 sm:ml-0 sm:pl-0 sm:pr-0 no-scrollbar snap-x relative">
+                        {displayedSuggestions.map((sug, idx) => {
+                          const isActive = service.name === sug.name;
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => {
+                                updateServiceFields(index, {
+                                  name: sug.name,
+                                  duration: String(sug.duration)
+                                });
+                                setShowCustom(prev => ({ ...prev, [index]: false }));
+                              }}
+                              className={cn(
+                                "px-3 py-1.5 rounded-full text-[11px] font-medium transition-all duration-300 ease-out border flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1 shrink-0 snap-start",
+                                isActive
+                                  ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm"
+                                  : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white"
+                              )}
+                            >
+                              {sug.name}{" "}
+                              <span className={cn(
+                                "font-normal tracking-normal normal-case",
+                                isActive ? "text-brand-white/80" : "text-brand-stone/80"
+                              )}>
+                                • {sug.duration} min
+                              </span>
+                            </button>
+                          );
+                        })}
+                        {!showAllSuggestions && suggestions.length > 4 && (
+                          <div className="shrink-0 snap-start flex items-center pr-2 sm:pr-0">
+                            <button
+                              type="button"
+                              onClick={() => setShowAllSuggestions(true)}
+                              className="px-3 py-1.5 rounded-full text-[11px] font-medium transition-all duration-300 ease-out border border-transparent bg-transparent text-brand-terracotta hover:bg-brand-terracotta/10"
+                            >
+                              Ver mais
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {!showAllSuggestions && suggestions.length > 4 && (
+                        <div className="shrink-0 pb-2 pl-0.5 pr-2 flex items-center justify-center sm:hidden text-brand-stone/30">
+                          <ChevronRight size={16} />
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -380,19 +444,54 @@ export const FormServices = ({
                     onChange={(e) => updateService(index, 'name', e.target.value)} 
                     placeholder="Ex: Manicure completa" 
                     className={cn(
-                      "w-full px-6 py-4 bg-brand-parchment border rounded-2xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
+                      "w-full px-4 py-3 bg-brand-parchment border rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                       errors[index]?.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20 font-medium" : "border-brand-mist"
                     )}
                   />
                   <FormError message={errors[index]?.name} />
                 </div>
 
-                <div className="md:col-span-1 space-y-4">
-                  <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">
-                    Duração do Atendimento <span className="text-brand-terracotta">*</span>
-                  </label>
+                <div className="md:col-span-2 space-y-2 mt-1">
+                  <div className="flex flex-col gap-1 items-start">
+                    <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">
+                      Categoria do serviço <span className="text-brand-terracotta">*</span>
+                    </label>
+                  </div>
                   
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                    {CATEGORIES.map(cat => {
+                      const isActive = service.serviceCategory === cat;
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => updateService(index, 'serviceCategory', cat)}
+                          className={cn(
+                            "px-3 py-2 rounded-lg border text-[11px] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 w-full sm:w-auto text-center sm:text-left",
+                            isActive
+                              ? "bg-brand-ink text-brand-white border-brand-ink shadow-md font-bold"
+                              : "bg-white text-brand-ink border-brand-mist/80 shadow-sm hover:border-brand-ink/40 hover:bg-brand-linen/30 font-medium"
+                          )}
+                        >
+                          {cat}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <FormError message={errors[index]?.serviceCategory} />
+                </div>
+
+                <div className="md:col-span-1 space-y-2 mt-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest ml-1">
+                      Duração do atendimento <span className="text-brand-terracotta">*</span>
+                    </label>
+                    <p className="text-[11px] text-brand-stone/80 ml-1 leading-relaxed">
+                      Informe quanto tempo você normalmente leva para realizar este serviço. Esse tempo organiza os horários disponíveis para reserva.
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-1.5 pt-1">
                     {DURATION_OPTIONS.map(opt => (
                       <button
                         key={opt.value}
@@ -402,10 +501,10 @@ export const FormServices = ({
                           setShowCustom(prev => ({ ...prev, [index]: false }));
                         }}
                         className={cn(
-                          "px-4 py-2.5 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all",
+                          "px-2.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wider transition-all min-h-[40px]",
                           durationVal === opt.value && !currentShowCustom
-                            ? "bg-brand-terracotta border-brand-terracotta text-brand-white shadow-md font-extrabold"
-                            : "border-brand-mist text-brand-stone hover:border-brand-ink"
+                            ? "bg-brand-terracotta border-brand-terracotta text-brand-white shadow-sm font-extrabold"
+                            : "border-brand-mist text-brand-stone hover:border-brand-ink bg-white"
                         )}
                       >
                         {opt.label}
@@ -415,10 +514,10 @@ export const FormServices = ({
                       type="button"
                       onClick={() => setShowCustom(prev => ({ ...prev, [index]: !currentShowCustom }))}
                       className={cn(
-                        "px-4 py-2.5 rounded-xl border text-[11px] font-bold uppercase tracking-wider transition-all",
+                        "px-2.5 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-wider transition-all min-h-[40px]",
                         currentShowCustom
                           ? "bg-brand-ink border-brand-ink text-brand-white"
-                          : "border-brand-mist text-brand-stone hover:border-brand-ink"
+                          : "border-brand-mist text-brand-stone hover:border-brand-ink bg-white"
                       )}
                     >
                       {currentShowCustom ? 'Voltar' : 'Personalizado'}
@@ -433,7 +532,7 @@ export const FormServices = ({
                         exit={{ opacity: 0, height: 0 }}
                         className="relative pt-2"
                       >
-                        <Clock className="absolute left-4 top-[22px] text-brand-mist/40" size={14} />
+                        <Clock className="absolute left-4 top-[20px] text-brand-mist/40" size={14} />
                         <input 
                           type="number" 
                           min="15"
@@ -443,11 +542,11 @@ export const FormServices = ({
                           onChange={(e) => updateService(index, 'duration', e.target.value)} 
                           placeholder="Ex: 60"
                           className={cn(
-                            "w-full pl-11 pr-12 py-3 bg-brand-parchment border rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
+                            "w-full pl-11 pr-12 py-2.5 bg-brand-parchment border rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                             errors[index]?.duration ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
                           )}
                         />
-                        <span className="absolute right-4 top-[22px] text-[10px] font-bold text-brand-stone uppercase tracking-widest">min</span>
+                        <span className="absolute right-4 top-[18px] text-[10px] font-bold text-brand-stone uppercase tracking-widest">min</span>
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -459,17 +558,6 @@ export const FormServices = ({
                       </div>
                     )}
                   </AnimatePresence>
-
-                  <div className="bg-brand-linen/40 p-5 rounded-3xl border border-dashed border-brand-mist/50 mt-4">
-                    <p className="text-[10px] text-brand-stone font-medium leading-relaxed uppercase tracking-widest mb-2">
-                       Esse é o tempo que você normalmente leva para realizar esse serviço.
-                    </p>
-                    {durationVal > 0 && slots > 0 && (
-                      <p className="text-[10px] text-brand-stone font-light italic leading-relaxed">
-                        Com <span className="text-brand-terracotta font-bold">{durationVal} min</span> por atendimento, sua agenda permite até <span className="text-brand-terracotta font-bold">{slots} atendimentos</span> por dia.
-                      </p>
-                    )}
-                  </div>
                 </div>
 
                 <div className="md:col-span-1 space-y-2">
@@ -482,7 +570,7 @@ export const FormServices = ({
                       onChange={(e) => updateService(index, 'price', e.target.value)} 
                       placeholder="0,00" 
                       className={cn(
-                        "w-full pl-11 pr-4 py-4 bg-brand-parchment border rounded-2xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
+                        "w-full pl-11 pr-4 py-3 bg-brand-parchment border rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm",
                         errors[index]?.price ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist"
                       )}
                     />
@@ -496,7 +584,7 @@ export const FormServices = ({
                     value={service.description} 
                     onChange={(e) => updateService(index, 'description', e.target.value)} 
                     placeholder="Ex: Realçando sua beleza com naturalidade..." 
-                    className="w-full px-6 py-4 bg-brand-parchment border border-brand-mist rounded-2xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm h-24 resize-none"
+                    className="w-full px-4 py-3 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-light text-sm h-20 resize-none"
                   />
                 </div>
               </div>
@@ -504,16 +592,18 @@ export const FormServices = ({
           );
         })}
 
-        <button 
-          type="button"
-          onClick={addService}
-          className="w-full py-8 border-2 border-dashed border-brand-mist rounded-[40px] text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta/30 transition-all flex items-center justify-center gap-3 font-bold uppercase tracking-widest text-[11px] bg-brand-parchment/30"
-        >
-          <div className="w-8 h-8 rounded-full border border-current flex items-center justify-center">
-            <Plus size={16} />
-          </div>
-          Adicionar outro serviço
-        </button>
+        {allowMultiple && (
+          <button 
+            type="button"
+            onClick={addService}
+            className="w-full py-8 border-2 border-dashed border-brand-mist rounded-[40px] text-brand-stone hover:text-brand-terracotta hover:border-brand-terracotta/30 transition-all flex items-center justify-center gap-3 font-bold uppercase tracking-widest text-[11px] bg-brand-parchment/30"
+          >
+            <div className="w-8 h-8 rounded-full border border-current flex items-center justify-center">
+              <Plus size={16} />
+            </div>
+            Adicionar outro serviço
+          </button>
+        )}
       </div>
     </div>
   );

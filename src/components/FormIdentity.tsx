@@ -8,6 +8,8 @@ export interface FormIdentityProps {
   setName: (val: string) => void;
   specialty: string;
   setSpecialty: (val: string) => void;
+  subSpecialties?: string[];
+  setSubSpecialties?: (val: string[]) => void;
   avatar: string;
   avatarPreview: string;
   uploadingImage: boolean;
@@ -76,6 +78,8 @@ export const FormIdentity = ({
   setName,
   specialty,
   setSpecialty,
+  subSpecialties,
+  setSubSpecialties,
   avatar,
   avatarPreview,
   uploadingImage,
@@ -119,25 +123,6 @@ export const FormIdentity = ({
   selectedBioStyle = 'elegante',
   setSelectedBioStyle
 }: FormIdentityProps) => {
-  const [showAllSpecialties, setShowAllSpecialties] = React.useState(false);
-  const specialtySuggestions = [
-    'Lash designer',
-    'Designer de sobrancelhas',
-    'Nail designer',
-    'Manicure',
-    'Maquiadora',
-    'Cabeleireira',
-    'Esteticista',
-    'Micropigmentadora',
-    'Depiladora',
-    'Trancista',
-    'Massoterapeuta',
-    'Designer de cílios',
-    'Bronzeamento',
-    'Terapeuta capilar'
-  ];
-  const displayedSpecialties = showAllSpecialties ? specialtySuggestions : specialtySuggestions.slice(0, 8);
-
   const styles = [
     { id: 'elegante', label: 'Elegante' },
     { id: 'delicada', label: 'Delicada' },
@@ -152,9 +137,12 @@ export const FormIdentity = ({
   return (
     <div className="w-full space-y-6">
       {(title || subtitle) && (
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-3 relative">
+          <span className="inline-block px-3 py-1 bg-brand-linen/50 text-brand-terracotta text-[9px] font-bold uppercase tracking-widest rounded-full mb-2">
+            Leva cerca de 1 minuto
+          </span>
           {title && <h1 className="text-2xl sm:text-3xl font-serif font-normal text-brand-ink">{title}</h1>}
-          {subtitle && <p className="text-[11px] sm:text-sm text-brand-stone font-light">{subtitle}</p>}
+          {subtitle && <p className="text-[11px] sm:text-sm text-brand-ink/70 font-light">{subtitle}</p>}
         </div>
       )}
 
@@ -192,7 +180,7 @@ export const FormIdentity = ({
           </div>
           <div className="flex-1 space-y-1 sm:pt-2">
             <h3 className="text-lg font-serif italic text-brand-ink">Sua melhor foto</h3>
-            <p className="text-[10px] sm:text-xs font-light text-brand-stone leading-relaxed max-w-xs mx-auto sm:mx-0 block">
+            <p className="text-[10px] sm:text-xs font-light text-brand-ink/70 leading-relaxed max-w-xs mx-auto sm:mx-0 block">
               Uma boa foto profissional transmite confiança. <br />
               <span className="italic">Você pode adicionar sua foto agora ou deixar para ajustar depois.</span>
             </p>
@@ -200,10 +188,10 @@ export const FormIdentity = ({
         </div>
 
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-5">
             <div className="space-y-1.5">
               {showLabels && (
-                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
+                <label className="text-[10px] font-bold text-brand-ink uppercase tracking-widest ml-1 mb-1 block">
                   Nome que aparece na agenda <span className="text-brand-terracotta">*</span>
                 </label>
               )}
@@ -213,83 +201,202 @@ export const FormIdentity = ({
                 onChange={(e) => setName(e.target.value)} 
                 placeholder="Ex: Letícia Lima" 
                 className={cn(
-                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
-                  errors.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
+                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/60",
+                  errors.name ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/70"
                 )}
               />
               <FormError message={errors.name} />
             </div>
+            
             <div className="space-y-1.5 flex flex-col">
               {showLabels && (
-                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
-                  Sua Especialidade Principal <span className="text-brand-terracotta">*</span>
+                <label className="text-[10px] font-bold text-brand-ink uppercase tracking-widest ml-1 mb-1 block">
+                  Como você se apresenta? <span className="text-brand-terracotta">*</span>
                 </label>
               )}
               <input 
                 type="text" 
                 value={specialty} 
                 onChange={(e) => setSpecialty(e.target.value)} 
-                placeholder="Ex: Trancista" 
+                placeholder="Ex: Esteticista, Lash designer, Depiladora..." 
                 className={cn(
-                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
-                  errors.specialty ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
+                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/60",
+                  errors.specialty ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/70"
                 )}
               />
-              <p className="text-[10px] text-brand-stone font-light italic ml-1 mt-1">
-                Escolha uma sugestão ou escreva do seu jeito.
+              <p className="text-[10px] text-brand-ink/70 font-light italic ml-1 mt-1 block">
+                Esse título aparece no topo da sua vitrine.
               </p>
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                 {displayedSpecialties.map(s => (
-                   <button
-                     key={s}
-                     type="button"
-                     onClick={() => setSpecialty(s)}
-                     className={cn(
-                       "px-3 py-1.5 rounded-full text-[10px] font-medium transition-all duration-300 ease-out border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
-                       specialty === s
-                         ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
-                         : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
-                     )}
-                   >
-                     {s}
-                   </button>
-                 ))}
-                 {!showAllSpecialties && specialtySuggestions.length > 8 && (
-                   <button
-                     type="button"
-                     onClick={() => setShowAllSpecialties(true)}
-                     className="px-3 py-1.5 rounded-full text-[10px] font-medium text-brand-terracotta underline hover:text-brand-sienna transition-all"
-                   >
-                     Ver mais
-                   </button>
-                 )}
-                 {showAllSpecialties && (
-                   <button
-                     type="button"
-                     onClick={() => setShowAllSpecialties(false)}
-                     className="px-3 py-1.5 rounded-full text-[10px] font-medium text-brand-terracotta underline hover:text-brand-sienna transition-all"
-                   >
-                     Ver menos
-                   </button>
-                 )}
-              </div>
               <FormError message={errors.specialty} />
             </div>
           </div>
 
+          {(subSpecialties !== undefined && setSubSpecialties) && (
+            <div className="space-y-1.5 pt-2">
+              {showLabels && (
+                <label className="text-[10px] font-bold text-brand-ink uppercase tracking-widest ml-1 mb-1 block">
+                  Em quais áreas você atende? <span className="text-brand-terracotta">*</span>
+                </label>
+              )}
+              <p className="text-[10px] text-brand-ink/70 font-light ml-1 mb-2">
+                Selecione uma ou mais áreas.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  'Bem-estar e Bronzeamento',
+                  'Cabelos',
+                  'Cílios',
+                  'Depilação',
+                  'Estética Corporal',
+                  'Estética Facial',
+                  'Maquiagem',
+                  'Massagens e Terapias',
+                  'Micropigmentação',
+                  'Podologia',
+                  'Sobrancelhas',
+                  'Unhas',
+                  'Outros'
+                ].map(area => (
+                  <button
+                    key={area}
+                    type="button"
+                    onClick={() => {
+                      if (subSpecialties.includes(area)) {
+                        setSubSpecialties(subSpecialties.filter(a => a !== area));
+                      } else {
+                        setSubSpecialties([...subSpecialties, area]);
+                      }
+                    }}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-300 border focus-visible:outline-none focus-visible:ring-2",
+                      subSpecialties.includes(area)
+                        ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm"
+                        : "bg-brand-parchment text-brand-ink border-brand-mist hover:bg-white"
+                    )}
+                  >
+                    {area}
+                  </button>
+                ))}
+              </div>
+              <FormError message={errors.subSpecialties} />
+            </div>
+          )}
+
+          {(whatsapp !== undefined && setWhatsapp) && (
+            <div className="space-y-1.5 pt-2">
+              {showLabels && (
+                <label className="text-[10px] font-bold text-brand-ink uppercase tracking-widest ml-1 mb-1 block">
+                  Seu WhatsApp <span className="text-brand-terracotta">*</span>
+                </label>
+              )}
+              <p className="text-[10px] text-brand-ink/70 font-light ml-1 mb-2">
+                Suas clientes vão te chamar por aqui.
+              </p>
+              <input 
+                type="tel" 
+                value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 
+                onChange={(e) => {
+                  const cleaned = cleanWhatsapp(e.target.value);
+                  if (cleaned.length <= 11) {
+                    setWhatsapp?.(cleaned);
+                  }
+                }} 
+                placeholder="(00) 00000-0000" 
+                className={cn(
+                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/60",
+                  errors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/70"
+                )}
+              />
+              <FormError message={errors.whatsapp} />
+            </div>
+          )}
+
+          {(slug !== undefined && setSlug) && (
+            <div className="space-y-1.5 pt-2">
+              {showLabels && (
+                <>
+                  <label className="text-[10px] font-bold text-brand-ink uppercase tracking-widest ml-1 mb-1 block">
+                    Crie seu link profissional <span className="text-brand-terracotta">*</span>
+                  </label>
+                  <p className="text-[9px] text-brand-ink/70 font-light mt-0 mb-2 ml-1">É o link que você compartilha com suas clientes.</p>
+                </>
+              )}
+              <div className={cn(
+                "flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50",
+                slugStatus === 'available' ? "bg-green-50 border-green-200 ring-1 ring-green-100" :
+                slugStatus === 'unavailable' || slugStatus === 'invalid' || errors.slug ? "bg-brand-parchment/60 border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
+                "bg-brand-parchment/60 border-brand-mist/70"
+              )}>
+                <span className="text-brand-stone text-xs ml-1">usenera.com/p/</span>
+                <input 
+                  type="text" 
+                  value={slug} 
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} 
+                  placeholder="seu-nome"
+                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs"
+                />
+                {slugStatus === 'checking' && (
+                  <motion.div 
+                    animate={{ rotate: 360 }} 
+                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+                    className="mr-1"
+                  >
+                    <Sparkles size={14} className="text-brand-stone opacity-40" />
+                  </motion.div>
+                )}
+                {slugStatus === 'available' && (
+                  <CheckCircle2 size={16} className="text-green-500 mr-1" />
+                )}
+                {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
+                  <X size={16} className="text-brand-terracotta mr-1" />
+                )}
+              </div>
+              
+              {slugMessage && (
+                <p className={cn(
+                  "text-[10px] font-medium ml-1 flex items-center gap-1.5",
+                  slugStatus === 'available' ? "text-green-600" : "text-brand-terracotta"
+                )}>
+                  {slugStatus === 'available' ? <CheckCircle2 size={12} /> : <X size={12} />}
+                  {slugMessage}
+                </p>
+              )}
+
+              {slugStatus === 'unavailable' && slugSuggestions.length > 0 && (
+                <div className="space-y-2 pt-1 ml-1">
+                  <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone italic">Sugestões disponíveis:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {slugSuggestions.map(suggestion => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => onSelectSuggestion?.(suggestion)}
+                        className="px-3 py-1.5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <FormError message={errors.slug} />
+            </div>
+          )}
+
           {setYearsExperience && (
             <div className="space-y-1.5 flex flex-col pt-2">
               {showLabels && (
-                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
+                <label className="text-[10px] font-bold text-brand-ink uppercase tracking-widest ml-1 mb-1 block">
                   Há quanto tempo você atende?
                 </label>
               )}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-1.5">
                  {[
                    { label: "Iniciante", value: "Iniciante" },
                    { label: "1 a 2 anos", value: "1-2" },
                    { label: "3 a 5 anos", value: "3-5" },
-                   { label: "5+ anos", value: "5+" },
+                   { label: "5 a 10 anos", value: "5+" },
                    { label: "10+ anos", value: "10+" }
                  ].map(exp => (
                    <button
@@ -297,10 +404,10 @@ export const FormIdentity = ({
                      type="button"
                      onClick={() => setYearsExperience(exp.value)}
                      className={cn(
-                       "px-4 py-2 rounded-xl text-xs font-medium transition-all duration-300 ease-out border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50 focus-visible:ring-offset-1",
+                       "px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-300 border focus-visible:outline-none focus-visible:ring-2",
                        yearsExperience === exp.value
-                         ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm scale-[1.02]"
-                         : "bg-brand-parchment text-brand-stone border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.02] active:scale-[0.98]"
+                         ? "bg-brand-terracotta text-brand-white border-brand-terracotta shadow-sm"
+                         : "bg-brand-parchment text-brand-ink border-brand-mist hover:bg-white"
                      )}
                    >
                      {exp.label}
@@ -501,34 +608,7 @@ export const FormIdentity = ({
             </div>
           )}
 
-          {(whatsapp !== undefined && setWhatsapp) && (
-            <div className="space-y-2">
-              {showLabels && (
-                <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
-                  Seu WhatsApp <span className="text-brand-terracotta">*</span>
-                </label>
-              )}
-              <p className="text-[10px] text-brand-stone font-light mt-1 ml-1 mb-2">
-                Suas clientes vão te chamar por aqui. Também usamos esse número para avisos de agendamento.
-              </p>
-              <input 
-                type="tel" 
-                value={whatsapp ? formatWhatsappDisplay(whatsapp) : ''} 
-                onChange={(e) => {
-                  const cleaned = cleanWhatsapp(e.target.value);
-                  if (cleaned.length <= 11) {
-                    setWhatsapp?.(cleaned);
-                  }
-                }} 
-                placeholder="(00) 00000-0000" 
-                className={cn(
-                  "w-full px-4 py-2.5 bg-brand-parchment/60 border rounded-lg outline-none focus:ring-1 focus:ring-brand-terracotta/30 focus:border-brand-terracotta/50 transition-all font-light text-sm placeholder:text-brand-stone/50",
-                  errors.whatsapp ? "border-brand-terracotta ring-1 ring-brand-terracotta/20" : "border-brand-mist/50"
-                )}
-              />
-              <FormError message={errors.whatsapp} />
-            </div>
-          )}
+
 
           {(instagram !== undefined && setInstagram) && (
             <div className="space-y-2">
@@ -605,78 +685,7 @@ export const FormIdentity = ({
             </div>
           )}
 
-          {(slug !== undefined && setSlug) && (
-            <div className="space-y-3">
-              {showLabels && (
-                <>
-                  <label className="text-[10px] font-medium text-brand-stone/80 uppercase tracking-widest ml-1 mb-1 block">
-                    Crie seu link profissional <span className="text-brand-terracotta">*</span>
-                  </label>
-                  <p className="text-[9px] text-brand-stone/60 font-light mt-0 mb-3 ml-1">É o link que você compartilha com suas clientes.</p>
-                </>
-              )}
-              <div className={cn(
-                "flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all focus-within:ring-1 focus-within:ring-brand-terracotta/30 focus-within:border-brand-terracotta/50",
-                slugStatus === 'available' ? "bg-green-50 border-green-200 ring-1 ring-green-100" :
-                slugStatus === 'unavailable' || slugStatus === 'invalid' || errors.slug ? "bg-brand-parchment/60 border-brand-terracotta ring-1 ring-brand-terracotta/20" : 
-                "bg-brand-parchment/60 border-brand-mist/50"
-              )}>
-                <span className="text-brand-stone text-xs ml-1">usenera.com/p/</span>
-                <input 
-                  type="text" 
-                  value={slug} 
-                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} 
-                  placeholder="seu-nome"
-                  className="flex-1 bg-transparent outline-none text-brand-ink font-medium text-xs"
-                />
-                {slugStatus === 'checking' && (
-                  <motion.div 
-                    animate={{ rotate: 360 }} 
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="mr-1"
-                  >
-                    <Sparkles size={14} className="text-brand-stone opacity-40" />
-                  </motion.div>
-                )}
-                {slugStatus === 'available' && (
-                  <CheckCircle2 size={16} className="text-green-500 mr-1" />
-                )}
-                {(slugStatus === 'unavailable' || slugStatus === 'invalid') && (
-                  <X size={16} className="text-brand-terracotta mr-1" />
-                )}
-              </div>
-              
-              {slugMessage && (
-                <p className={cn(
-                  "text-[10px] font-medium ml-1 flex items-center gap-1.5",
-                  slugStatus === 'available' ? "text-green-600" : "text-brand-terracotta"
-                )}>
-                  {slugStatus === 'available' ? <CheckCircle2 size={12} /> : <X size={12} />}
-                  {slugMessage}
-                </p>
-              )}
 
-              {slugStatus === 'unavailable' && slugSuggestions.length > 0 && (
-                <div className="space-y-2 pt-2 ml-1">
-                  <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone italic">Sugestões disponíveis:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {slugSuggestions.map(suggestion => (
-                      <button
-                        key={suggestion}
-                        type="button"
-                        onClick={() => onSelectSuggestion?.(suggestion)}
-                        className="px-3 py-1.5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-white transition-all shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-terracotta/50"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <FormError message={errors.slug} />
-            </div>
-          )}
 
           {(paymentMethods !== undefined && setPaymentMethods) && (
             <div className="space-y-4 pt-4 border-t border-brand-mist/30">

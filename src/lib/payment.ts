@@ -2,14 +2,15 @@
 /**
  * Canonical payment method IDs
  */
-export type PaymentMethodId = 'pix' | 'credit_card' | 'debit_card' | 'cash' | 'bank_transfer';
+export type PaymentMethodId = 'pix' | 'credit_card' | 'debit_card' | 'cash' | 'bank_transfer' | 'digital_wallet';
 
 export const PAYMENT_METHOD_LABELS: Record<PaymentMethodId, string> = {
   pix: 'Pix',
   credit_card: 'Cartão de Crédito',
   debit_card: 'Cartão de Débito',
   cash: 'Dinheiro',
-  bank_transfer: 'Transferência'
+  bank_transfer: 'Transferência Bancária',
+  digital_wallet: 'Carteira Digital'
 };
 
 /**
@@ -56,7 +57,7 @@ export function getNormalizedPaymentMethods(methods: string[] | null | undefined
   const unique = Array.from(new Set(normalized));
   
   // Sort in a premium order
-  const order: PaymentMethodId[] = ['pix', 'credit_card', 'debit_card', 'cash', 'bank_transfer'];
+  const order: PaymentMethodId[] = ['pix', 'credit_card', 'debit_card', 'cash', 'bank_transfer', 'digital_wallet'];
   
   return unique.sort((a, b) => {
     const indexA = order.indexOf(a);

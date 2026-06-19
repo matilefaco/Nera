@@ -4,13 +4,14 @@ import { UserProfile } from '../types';
 export function useProfileForm(profile: UserProfile | null) {
   const [name, setName] = useState(profile?.name || '');
   const [specialty, setSpecialty] = useState(profile?.professionalIdentity?.mainSpecialty || profile?.specialty || '');
+  const [subSpecialties, setSubSpecialties] = useState<string[]>(profile?.professionalIdentity?.subSpecialties || []);
   const [bio, setBio] = useState(profile?.bio || '');
   const [headline, setHeadline] = useState(profile?.headline || '');
   const [city, setCity] = useState(profile?.city || '');
   const [whatsapp, setWhatsapp] = useState(profile?.whatsapp || '');
   const [instagram, setInstagram] = useState(profile?.instagram || '');
   const [paymentMethods, setPaymentMethods] = useState<string[]>(profile?.paymentMethods || []);
-  const [acceptsInstallments, setAcceptsInstallments] = useState(profile?.acceptsInstallments || false);
+  const [acceptsInstallments, setAcceptsInstallments] = useState<boolean | null>(profile?.acceptsInstallments ?? null);
   const [antiNoShowEnabled, setAntiNoShowEnabled] = useState(profile?.antiNoShowEnabled || false);
   const [advancePaymentRequired, setAdvancePaymentRequired] = useState(profile?.advancePaymentRequired || false);
   const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20 | 0>(profile?.delayTolerance ?? 0);
@@ -57,6 +58,7 @@ export function useProfileForm(profile: UserProfile | null) {
     if (profile) {
       if (profile.name) setName(profile.name);
       if (profile.professionalIdentity?.mainSpecialty || profile.specialty) setSpecialty(profile.professionalIdentity?.mainSpecialty || profile.specialty);
+      if (profile.professionalIdentity?.subSpecialties) setSubSpecialties(profile.professionalIdentity.subSpecialties);
       if (profile.bio) setBio(profile.bio);
       if (profile.headline) setHeadline(profile.headline);
       if (profile.city) setCity(profile.city);
@@ -103,6 +105,7 @@ export function useProfileForm(profile: UserProfile | null) {
   return {
     name, setName,
     specialty, setSpecialty,
+    subSpecialties, setSubSpecialties,
     bio, setBio,
     headline, setHeadline,
     city, setCity,
