@@ -264,7 +264,11 @@ export default function WeeklyRevenueSummary({
                       
                       <div>
                         <h4 className="text-[11px] font-bold text-brand-ink uppercase tracking-widest">{app.clientName}</h4>
-                        <p className="text-[10px] text-brand-stone font-medium italic mt-0.5">{app.serviceName}</p>
+                        <p className="text-[10px] text-brand-stone font-medium italic mt-0.5">
+                          {app.additionalServices?.length > 0 
+                            ? [app.serviceName, ...app.additionalServices.map((s:any) => s.name)].join(" • ")
+                            : app.serviceName}
+                        </p>
                       </div>
                     </div>
 

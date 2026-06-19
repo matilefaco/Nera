@@ -218,10 +218,10 @@ export default function FinancialPage() {
         a.date,
         `"${a.clientName.replace(/"/g, '""')}"`,
         a.clientWhatsapp,
-        `"${a.serviceName.replace(/"/g, '""')}"`,
+        `"${a.additionalServices?.length > 0 ? [a.serviceName, ...a.additionalServices.map((s:any) => s.name)].join(" e ").replace(/"/g, '""') : a.serviceName.replace(/"/g, '""')}"`,
         a.price,
         a.travelFee || 0,
-        (a.price || 0) + (a.travelFee || 0),
+        a.totalPrice ?? a.finalPrice ?? ((a.price || 0) + (a.travelFee || 0)),
         a.status
       ]);
 
@@ -594,11 +594,15 @@ export default function FinancialPage() {
                                         </div>
                                       </td>
                                       <td className="py-4">
-                                        <span className="text-[11px] text-brand-stone">{appt.serviceName}</span>
+                                        <span className="text-[11px] text-brand-stone">
+                                          {appt.additionalServices?.length > 0
+                                            ? [appt.serviceName, ...appt.additionalServices.map((s:any) => s.name)].join(" • ")
+                                            : appt.serviceName}
+                                        </span>
                                       </td>
                                       <td className="py-4">
                                         <span className="text-[11px] text-brand-ink font-bold">
-                                          {formatCurrency((appt.price || 0) + (appt.travelFee || 0))}
+                                          {formatCurrency(appt.totalPrice ?? appt.finalPrice ?? ((appt.price || 0) + (appt.travelFee || 0)))}
                                         </span>
                                       </td>
                                       <td className="py-4 text-right">

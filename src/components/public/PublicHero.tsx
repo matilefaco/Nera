@@ -79,7 +79,7 @@ export const PublicHero = ({
   }, [showInterestPopup, interestPopupDismissed]);
 
   const tagline = getProfileHeroCopy(
-    profile.professionalIdentity?.mainSpecialty || profile.specialty,
+    profile.specialty || profile.professionalIdentity?.mainSpecialty,
     profile.slug || profile.uid
   );
 
@@ -125,12 +125,14 @@ export const PublicHero = ({
           </div>
 
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-8 h-px bg-[var(--theme-primary,var(--color-brand-terracotta))]" />
-              <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-ink">
-                {profile.headline || formatSpecialtyLabel(profile.specialty)}
-              </span>
-            </div>
+            {profile.headline && (
+              <div className="flex items-center gap-4">
+                <div className="w-8 h-px bg-[var(--theme-primary,var(--color-brand-terracotta))]" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.25em] text-brand-ink">
+                  {profile.headline}
+                </span>
+              </div>
+            )}
 
             {/* Social Proof Mini Badges */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
@@ -274,11 +276,11 @@ export const PublicHero = ({
             </div>
           ) : null}
 
-          <p className="body-text text-brand-stone max-w-sm">
-            {((heroBio || profile.bio) && isSanitizedContent(heroBio || profile.bio))
-              ? (heroBio || profile.bio)
-              : (profile.specialty ? `Técnicas de ${formatSpecialtyLabel(profile.specialty)} focadas em resultados e bem-estar.` : 'Atendimento focado em técnica limpa e resultados seguros.')}
-          </p>
+          {((heroBio || profile.bio) && isSanitizedContent(heroBio || profile.bio)) && (
+            <p className="body-text text-brand-stone max-w-sm">
+              {heroBio || profile.bio}
+            </p>
+          )}
 
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-6">

@@ -248,7 +248,9 @@ export default function DayView({
                           "text-[10px] sm:text-[11px] truncate uppercase tracking-widest",
                           isConfirmedOrCompleted ? "text-white/40" : "text-brand-stone/80"
                         )}>
-                          {app.serviceName}
+                          {app.additionalServices?.length > 0
+                            ? [app.serviceName, ...app.additionalServices.map((s:any) => s.name)].join(" • ")
+                            : app.serviceName}
                         </p>
                       </div>
 

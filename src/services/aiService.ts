@@ -178,3 +178,37 @@ export async function categorizePortfolioItem(params: {
     return 'Geral';
   }
 }
+
+export async function suggestBio(params: {
+  context?: string;
+  style?: string;
+  specialty?: string;
+  yearsExperience?: string;
+  differentials?: string[];
+}): Promise<{ bio: string, headline: string }> {
+  try {
+    const token = await auth.currentUser?.getIdToken(true);
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const response = await fetch('/api/ai/suggest-bio', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+       const errResponse = await response.text();
+       throw new Error(`Failed to generate bio: ${errResponse}`);
+    }
+
+    const data = await response.json();
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to generate bio');
+    }
+    return { bio: data.bio || '', headline: data.headline || '' };
+  } catch (error: any) {
+    if (isDev) console.error('[AI SERVICE] suggestBio failed', error);
+    throw error;
+  }
+}

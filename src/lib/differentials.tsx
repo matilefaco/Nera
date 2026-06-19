@@ -5,6 +5,19 @@ import {
   Crown, Home, Coffee, MapPin, Accessibility 
 } from 'lucide-react';
 
+export const PROFESSIONAL_DIFFERENTIALS = [
+  "Pontualidade",
+  "Ambiente confortável",
+  "Atendimento personalizado",
+  "Resultado natural",
+  "Técnica especializada",
+  "Biossegurança",
+  "Atendimento em domicílio",
+  "Produtos premium",
+  "Atendimento acolhedor",
+  "Agilidade",
+];
+
 export interface DifferentialDisplay {
   icon: React.ReactNode;
   title: string;

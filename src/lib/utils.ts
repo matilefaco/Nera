@@ -275,18 +275,29 @@ Deseja aproveitar? Garanta sua reserva aqui: ${baseUrl}/p/${slug}?w=${entryId}`;
  * Generates a premium WhatsApp confirmation message for bookings.
  */
 export function generateBookingConfirmationMessage(
-  serviceName: string,
+  services: string[],
   date: string,
-  time: string
+  time: string,
+  travelFee?: number,
+  totalPrice?: number
 ): string {
   const dateFormatted = formatLocalDate(date, { day: 'numeric', month: 'long' });
+  const serviceNames = services.join(', ');
   
-  return `Oi! Acabei de realizar uma reserva para o serviço *${serviceName}* pelo seu perfil na Nera. ✨ 
-
-🗓️ Data: ${dateFormatted}
-⏰ Horário: ${time}
-
-Poderia me confirmar se está tudo certo?`;
+  let msg = `Oi! Acabei de realizar uma reserva para: *${serviceNames}* pelo seu perfil na Nera. ✨ \n\n`;
+  msg += `🗓️ Data: ${dateFormatted}\n`;
+  msg += `⏰ Horário: ${time}\n`;
+  
+  if (travelFee && travelFee > 0) {
+    msg += `🚕 Deslocamento: ${formatCurrency(travelFee)}\n`;
+  }
+  
+  if (totalPrice) {
+    msg += `💰 Total: ${formatCurrency(totalPrice)}\n`;
+  }
+  
+  msg += `\nPoderia me confirmar se está tudo certo?`;
+  return msg;
 }
 
 /**

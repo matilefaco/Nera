@@ -737,6 +737,10 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
           } : null),
           
       serviceMode: userData.serviceMode,
+      travelFeeMode: userData.travelFeeMode,
+      fixedTravelFee: userData.fixedTravelFee,
+      serviceAreaType: userData.serviceAreaType,
+      serviceAreas: userData.serviceAreas,
       workingHours: userData.workingHours,
       professionalIdentity: userData.professionalIdentity,
       portfolio: (userData.portfolio || []).filter((item: any) => item && item.url && !isDataUriImage(item.url)),
@@ -839,7 +843,6 @@ router.get("/public-directory", publicReadLimiter, async (req, res) => {
           isVerified: (data.planRank || 0) >= 1,
           serviceMode: data.serviceMode,
           professionalIdentity: {
-            mainSpecialty: data.professionalIdentity?.mainSpecialty,
             differentials: data.professionalIdentity?.differentials
           },
           // Temporary field for sorting, will be removed before sending

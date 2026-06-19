@@ -747,7 +747,7 @@ function PublicProfileContent() {
         portfolio={profile.portfolio || []}
         professionalName={profile.name}
         specialty={
-          profile.professionalIdentity?.mainSpecialty || profile.specialty
+          profile.specialty || profile.professionalIdentity?.mainSpecialty
         }
         onBookingClick={() => {
           if (urgencyInfo?.isAgendaFull && features?.waitlist) {

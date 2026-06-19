@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { UserProfile } from '../types';
+import { PROFESSIONAL_DIFFERENTIALS } from '../lib/differentials';
 
 export function useProfileForm(profile: UserProfile | null) {
   const [name, setName] = useState(profile?.name || '');
-  const [specialty, setSpecialty] = useState(profile?.professionalIdentity?.mainSpecialty || profile?.specialty || '');
+  const [specialty, setSpecialty] = useState(profile?.specialty || profile?.professionalIdentity?.mainSpecialty || '');
   const [subSpecialties, setSubSpecialties] = useState<string[]>(profile?.professionalIdentity?.subSpecialties || []);
   const [bio, setBio] = useState(profile?.bio || '');
   const [headline, setHeadline] = useState(profile?.headline || '');
@@ -39,7 +40,9 @@ export function useProfileForm(profile: UserProfile | null) {
   const [travelFeeMode, setTravelFeeMode] = useState<'none' | 'fixed'>(profile?.travelFeeMode || 'none');
   const [fixedTravelFee, setFixedTravelFee] = useState<string>(profile?.fixedTravelFee?.toString() || '');
   const [pricingStrategy, setPricingStrategy] = useState<'extra' | 'none'>(profile?.pricingStrategy || 'none');
-  const [differentials, setDifferentials] = useState<string[]>(profile?.professionalIdentity?.differentials || []);
+  const [differentials, setDifferentials] = useState<string[]>(
+    (profile?.professionalIdentity?.differentials || []).filter(d => PROFESSIONAL_DIFFERENTIALS.includes(d))
+  );
   const [yearsExperience, setYearsExperience] = useState<string>(profile?.professionalIdentity?.yearsExperience || '');
   const [serviceStyle, setServiceStyle] = useState<string[]>(profile?.professionalIdentity?.serviceStyle || []);
   
@@ -57,7 +60,7 @@ export function useProfileForm(profile: UserProfile | null) {
   useEffect(() => {
     if (profile) {
       if (profile.name) setName(profile.name);
-      if (profile.professionalIdentity?.mainSpecialty || profile.specialty) setSpecialty(profile.professionalIdentity?.mainSpecialty || profile.specialty);
+      if (profile.specialty || profile.professionalIdentity?.mainSpecialty) setSpecialty(profile.specialty || profile.professionalIdentity?.mainSpecialty || '');
       if (profile.professionalIdentity?.subSpecialties) setSubSpecialties(profile.professionalIdentity.subSpecialties);
       if (profile.bio) setBio(profile.bio);
       if (profile.headline) setHeadline(profile.headline);
@@ -81,7 +84,9 @@ export function useProfileForm(profile: UserProfile | null) {
       if (profile.travelFeeMode) setTravelFeeMode(profile.travelFeeMode);
       if (profile.fixedTravelFee !== undefined) setFixedTravelFee(profile.fixedTravelFee.toString());
       if (profile.pricingStrategy) setPricingStrategy(profile.pricingStrategy);
-      if (profile.professionalIdentity?.differentials?.length) setDifferentials(profile.professionalIdentity.differentials);
+      if (profile.professionalIdentity?.differentials?.length) {
+        setDifferentials(profile.professionalIdentity.differentials.filter(d => PROFESSIONAL_DIFFERENTIALS.includes(d)));
+      }
       if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
       if (profile.professionalIdentity?.serviceStyle?.length) setServiceStyle(profile.professionalIdentity.serviceStyle);
       

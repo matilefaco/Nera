@@ -85,6 +85,7 @@ import { z } from "zod";
 import { useProfileForm } from "../hooks/useProfileForm";
 import { APP_URL, getPublicProfileUrl } from "../lib/env";
 import { getNormalizedPaymentMethods } from "../lib/payment";
+import { PROFESSIONAL_DIFFERENTIALS } from "../lib/differentials";
 
 type ServiceMode = "home" | "studio" | "hybrid";
 
@@ -96,18 +97,7 @@ const IDENTITY_STYLES = [
   "Natural e leve",
 ];
 
-const ONBOARDING_DIFFERENTIALS = [
-  "Pontualidade",
-  "Ambiente confortável",
-  "Atendimento personalizado",
-  "Resultado natural",
-  "Técnica especializada",
-  "Biossegurança",
-  "Atendimento em domicílio",
-  "Produtos premium",
-  "Atendimento acolhedor",
-  "Agilidade",
-];
+const ONBOARDING_DIFFERENTIALS = PROFESSIONAL_DIFFERENTIALS;
 
 const CopyLinkButton = ({ slug }: { slug: string }) => {
   const [copied, setCopied] = useState(false);
@@ -222,6 +212,32 @@ export default function OnboardingPage() {
     setProfileTheme,
   } = useProfileForm(profile);
 
+  const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  const [bioContext, setBioContext] = useState("");
+  const [selectedBioStyle, setSelectedBioStyle] = useState("elegante");
+
+  const handleGenerateBio = async () => {
+    if (isGeneratingBio) return;
+    setIsGeneratingBio(true);
+    try {
+      const { suggestBio } = await import('../services/aiService');
+      const result = await suggestBio({
+        context: bioContext,
+        style: selectedBioStyle,
+        specialty,
+        yearsExperience,
+        differentials: selectedDifferentials
+      });
+      if (result.bio) setBio(result.bio);
+      if (result.headline) setHeadline(result.headline);
+      notify.success("Texto sugerido com sucesso! Sinta-se à vontade para editar.");
+    } catch (e: any) {
+      notify.error(getHumanError(e.message));
+    } finally {
+      setIsGeneratingBio(false);
+    }
+  };
+
   // Sanitize differentials loaded from profile/elsewhere
   useEffect(() => {
     if (selectedDifferentials.length > 0) {
@@ -233,8 +249,6 @@ export default function OnboardingPage() {
       }
     }
   }, [selectedDifferentials.length]);
-
-  const [bioContext, setBioContext] = useState("");
 
   const [instagramConfirmed, setInstagramConfirmed] = useState(false);
   const instagramStatus = useMemo(() => {
@@ -372,7 +386,6 @@ export default function OnboardingPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
-  const [selectedBioStyle, setSelectedBioStyle] = useState("elegante");
 
   // Step 3: Services
   const [services, setServices] = useState<
@@ -591,8 +604,8 @@ export default function OnboardingPage() {
           let safeStep = profile.onboardingStep;
           const currentName = profile.name || name;
           const currentSpecialty =
-            profile.professionalIdentity?.mainSpecialty ||
             profile.specialty ||
+            profile.professionalIdentity?.mainSpecialty ||
             specialty;
           const currentWhatsapp = profile.whatsapp || whatsapp;
           const currentSlug = profile.slug || slug;
@@ -800,7 +813,6 @@ export default function OnboardingPage() {
         ...(showBreak ? { breakStart, breakEnd } : {}),
       },
       professionalIdentity: {
-        mainSpecialty: specialty,
         subSpecialties,
         yearsExperience,
         serviceStyle: selectedStyles,
@@ -1104,7 +1116,6 @@ export default function OnboardingPage() {
         ...(showBreak ? { breakStart, breakEnd } : {}),
       },
       professionalIdentity: {
-        mainSpecialty: specialty.trim(),
         subSpecialties,
         yearsExperience,
         serviceStyle: selectedStyles,
@@ -1661,6 +1672,12 @@ export default function OnboardingPage() {
                 setWhatsapp={setWhatsapp}
                 showLabels={true}
                 errors={formErrors}
+                onGenerateBio={handleGenerateBio}
+                isGeneratingBio={isGeneratingBio}
+                bioContext={bioContext}
+                setBioContext={setBioContext}
+                selectedBioStyle={selectedBioStyle}
+                setSelectedBioStyle={setSelectedBioStyle}
               />
 
               <button

@@ -114,6 +114,8 @@ export interface PendingEmailPayload {
   date: string;
   time: string;
   price: string;
+  travelFee?: number;
+  totalPrice?: number;
   reservationCode: string;
   manageUrl: string;
   appointmentId?: string;

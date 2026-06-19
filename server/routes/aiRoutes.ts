@@ -198,4 +198,103 @@ Crie a descrição seguindo rigorosamente as regras. A descrição deve estar al
   }
 });
 
+router.post('/suggest-bio', requireFirebaseAuth as any, async (req, res) => {
+  try {
+    const { 
+      context, 
+      style, 
+      specialty, 
+      yearsExperience, 
+      differentials 
+    } = req.body;
+
+    if (!process.env.NVIDIA_API_KEY) {
+      logger.warn('AI', 'NVIDIA_API_KEY not found in env vars for /suggest-bio');
+      return res.status(503).json({ success: false, error: 'AI service not configured' });
+    }
+
+    const systemPrompt = `Você é um copywriter de alto padrão do mercado de beleza e bem-estar.
+Sua tarefa é criar uma bio (biografia curta) e um headline para um perfil profissional.
+
+Regras OBRIGATÓRIAS para a Bio:
+- Use exclusivamente Português do Brasil.
+- Aja como a própria profissional (primeira pessoa do singular: "eu").
+- Máximo de 3 parágrafos curtos.
+- Sem aspas no começo/fim. Sem emojis em excesso (máximo 1 muito sutil).
+- Aborde como atende, qual transformação entrega e por que a cliente pode confiar.
+- PROIBIDO usar "pestanas", "rapariga", "marcação".
+- Evite clichês vazios e frases genéricas ("aumente sua autoestima" ou "melhor profissional").
+
+Regras para o Headline:
+- Frase curtíssima (máx 100 caracteres) de efeito sobre a especialidade e entrega.
+- Ex: "Design de sobrancelhas focado em naturalidade e leveza." ou "Cuidando da sua pele com ciência e carinho."
+
+Retorne os resultados em JSON estritamente válido neste formato:
+{
+  "headline": "...",
+  "bio": "..."
+}`;
+
+    let userPrompt = `Especialidade principal: ${specialty || 'Beleza/Estética'}
+Tempo de experiência: ${yearsExperience || 'Nenhum informado'}
+${differentials && differentials.length > 0 ? `Diferenciais do meu trabalho: ${differentials.join(', ')}\n` : ''}
+${style ? `Estilo/Vibe desejada: ${style}\n` : ''}
+${context ? `Notas adicionais (super importante incorporar isso): ${context}\n` : ''}
+
+Lembre-se de retornar APENAS o JSON válido. Nenhuma outra palavra fora do JSON.`;
+
+    logger.info('AI', 'Bio suggestion request', { specialty, style });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.NVIDIA_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "meta/llama-3.1-70b-instruct",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+        temperature: 0.6,
+        max_tokens: 300,
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        logger.error('AI', `NVIDIA API error: ${response.status} - ${errorText}`);
+        return res.status(response.status).json({ success: false, error: `NVIDIA API Erro: ${response.status}` });
+    }
+
+    const data: any = await response.json();
+    let content = data.choices?.[0]?.message?.content?.trim() || "";
+    
+    // Attempt to extract JSON if LLM returned markdown blocks
+    if (content.includes("```json")) {
+        content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+    }
+
+    try {
+        const parsed = JSON.parse(content);
+        if (!parsed.bio && !parsed.headline) throw new Error("JSON não contém as chaves esperadas");
+        return res.json({ success: true, bio: parsed.bio || '', headline: parsed.headline || '' });
+    } catch(e) {
+        logger.error('AI', 'Failed to parse JSON response for suggest-bio');
+        return res.status(500).json({ success: false, error: 'JSON parsing failed from AI response', content });
+    }
+
+  } catch (error: any) {
+    logger.error('AI', `Error generating bio: ${error.message}\nStack: ${error.stack}`);
+    return res.status(500).json({ success: false, error: `Erro Interno: ${error.message}` });
+  }
+});
+
 export default router;

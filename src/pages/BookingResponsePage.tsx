@@ -184,7 +184,7 @@ export default function BookingResponsePage() {
 
         <h1 className="text-3xl font-serif text-brand-ink mb-2">Confirmar Reserva?</h1>
         <p className="text-sm text-brand-stone font-light mb-10">
-          {appointment.clientName} deseja desfrutar da experiência <strong>{appointment.serviceName}</strong>.
+          {appointment.clientName} deseja desfrutar da experiência <strong>{appointment.additionalServices?.length > 0 ? [appointment.serviceName, ...appointment.additionalServices.map(s => s.name)].join(" e ") : appointment.serviceName}</strong>.
         </p>
 
         <div className="space-y-6 mb-12">

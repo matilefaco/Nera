@@ -1,4 +1,3 @@
-
 /**
  * Nera Email Builder
  * Centralizes the premium visual identity for all transactional emails.
@@ -6,12 +5,12 @@
 
 interface EmailBaseOptions {
   topbarText: string;
-  heroVariant: 'ink' | 'terracotta' | 'parchment';
+  heroVariant: "ink" | "terracotta" | "parchment";
   heroLabel: string;
   heroTitle: string;
   heroTitleItalic?: string;
   badgeText?: string;
-  badgeVariant?: 'pending' | 'success' | 'alert' | 'info';
+  badgeVariant?: "pending" | "success" | "alert" | "info";
   bodyHtml: string;
   ctaText?: string;
   ctaUrl?: string;
@@ -22,18 +21,18 @@ interface EmailBaseOptions {
 }
 
 export const COLORS = {
-  ink: '#18120E',
-  terracotta: '#A85C3A',
-  parchment: '#F9F5F0',
-  linen: '#F2EBE3',
-  stone: '#5C4A3D', // Darkened for better contrast (was #8A7060)
-  mist: '#E5DDD6',
-  white: '#FDFAF7',
+  ink: "#18120E",
+  terracotta: "#A85C3A",
+  parchment: "#F9F5F0",
+  linen: "#F2EBE3",
+  stone: "#5C4A3D", // Darkened for better contrast (was #8A7060)
+  mist: "#E5DDD6",
+  white: "#FDFAF7",
 };
 
 export const FONTS = {
   serif: 'Georgia, "Times New Roman", serif',
-  sans: 'Arial, sans-serif',
+  sans: "Arial, sans-serif",
 };
 
 export function buildEmailBase(options: EmailBaseOptions): string {
@@ -44,7 +43,7 @@ export function buildEmailBase(options: EmailBaseOptions): string {
     heroTitle,
     heroTitleItalic,
     badgeText,
-    badgeVariant = 'info',
+    badgeVariant = "info",
     bodyHtml,
     ctaText,
     ctaUrl,
@@ -55,14 +54,15 @@ export function buildEmailBase(options: EmailBaseOptions): string {
   } = options;
 
   const heroBg = COLORS[heroVariant];
-  const heroText = heroVariant === 'parchment' ? COLORS.ink : COLORS.white;
-  const heroLabelColor = heroVariant === 'parchment' ? COLORS.terracotta : COLORS.linen;
+  const heroText = heroVariant === "parchment" ? COLORS.ink : COLORS.white;
+  const heroLabelColor =
+    heroVariant === "parchment" ? COLORS.terracotta : COLORS.linen;
 
   // Badge styles
   const badgeColors = {
-    pending: { bg: '#FDF2F2', text: '#7E1313', border: '#FBD5D5' },
-    success: { bg: '#F3FAF7', text: '#024030', border: '#DEF7EC' },
-    alert: { bg: '#FFF3E3', text: '#6B3A00', border: '#FFECCF' },
+    pending: { bg: "#FDF2F2", text: "#7E1313", border: "#FBD5D5" },
+    success: { bg: "#F3FAF7", text: "#024030", border: "#DEF7EC" },
+    alert: { bg: "#FFF3E3", text: "#6B3A00", border: "#FFECCF" },
     info: { bg: COLORS.linen, text: COLORS.ink, border: COLORS.mist },
   };
   const badgeStyle = badgeColors[badgeVariant];
@@ -146,11 +146,13 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                         <td>
                           <h1 class="hero-title" style="color: ${heroText}; font-family: ${FONTS.serif}; font-size: 38px; line-height: 1.2; margin: 0; font-weight: normal;">
                             ${heroTitle}
-                            ${heroTitleItalic ? `<br><span style="font-style: italic; color: ${heroText}; opacity: 0.95;">${heroTitleItalic}</span>` : ''}
+                            ${heroTitleItalic ? `<br><span style="font-style: italic; color: ${heroText}; opacity: 0.95;">${heroTitleItalic}</span>` : ""}
                           </h1>
                         </td>
                       </tr>
-                      ${badgeText ? `
+                      ${
+                        badgeText
+                          ? `
                       <tr>
                         <td style="padding-top: 30px;">
                           <table role="presentation" border="0" cellpadding="0" cellspacing="0">
@@ -164,7 +166,9 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                           </table>
                         </td>
                       </tr>
-                      ` : ''}
+                      `
+                          : ""
+                      }
                     </table>
                   </td>
                 </tr>
@@ -179,7 +183,9 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                         </td>
                       </tr>
                       
-                      ${ctaUrl && ctaText ? `
+                      ${
+                        ctaUrl && ctaText
+                          ? `
                       <tr>
                         <td align="center" style="padding-top: 45px;">
                           <!-- Bulletproof Button -->
@@ -193,14 +199,20 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                             </tr>
                           </table>
 
-                          ${ctaSubtext ? `
+                          ${
+                            ctaSubtext
+                              ? `
                           <div style="margin-top: 20px; font-size: 11px; font-family: ${FONTS.sans}; color: ${COLORS.stone}; text-align: center;">
                             ${ctaSubtext}
                           </div>
-                          ` : ''}
+                          `
+                              : ""
+                          }
                         </td>
                       </tr>
-                      ` : ''}
+                      `
+                          : ""
+                      }
                     </table>
                   </td>
                 </tr>
@@ -215,13 +227,17 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                         </td>
                       </tr>
                       
-                      ${footerLinksHtml ? `
+                      ${
+                        footerLinksHtml
+                          ? `
                       <tr>
                         <td align="center" style="padding-bottom: 25px; font-size: 12px; font-family: ${FONTS.sans}; color: ${COLORS.stone};">
                           ${footerLinksHtml}
                         </td>
                       </tr>
-                      ` : ''}
+                      `
+                          : ""
+                      }
 
                       <tr>
                         <td align="center">
@@ -229,13 +245,17 @@ export function buildEmailBase(options: EmailBaseOptions): string {
                             Nera &copy; 2026 &bull; Feita com intenção no Brasil 🇧🇷<br>
                             Para profissionais que valorizam excelência.
                           </p>
-                          ${showUnsubscribe && unsubscribeUrl ? `
+                          ${
+                            showUnsubscribe && unsubscribeUrl
+                              ? `
                             <div style="margin-top: 15px;">
                               <a href="${unsubscribeUrl}" style="color: ${COLORS.stone}; font-size: 10px; text-decoration: underline; font-family: ${FONTS.sans};">
                                 Descadastrar desta lista
                               </a>
                             </div>
-                          ` : ''}
+                          `
+                              : ""
+                          }
                         </td>
                       </tr>
                     </table>
@@ -259,26 +279,30 @@ export function buildEmailBase(options: EmailBaseOptions): string {
   `;
 }
 
-export function buildEmailCard(items: { label: string; value: string; valueUrl?: string }[]): string {
+export function buildEmailCard(
+  items: { label: string; value: string; valueUrl?: string }[],
+): string {
   return `
     <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="${COLORS.parchment}" style="border: 1px solid ${COLORS.mist}; margin: 30px 0;">
       <tr>
         <td style="padding: 30px;">
           <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-            ${items.map((item, index) => {
-              const displayValue = item.valueUrl 
-                ? `<a href="${item.valueUrl}" style="color: ${COLORS.terracotta}; text-decoration: underline;">${item.value}</a>`
-                : item.value;
+            ${items
+              .map((item, index) => {
+                const displayValue = item.valueUrl
+                  ? `<a href="${item.valueUrl}" style="color: ${COLORS.terracotta}; text-decoration: underline;">${item.value}</a>`
+                  : item.value;
 
-              return `
+                return `
                 <tr>
-                  <td style="padding-bottom: ${index === items.length - 1 ? '0' : '20px'};">
+                  <td style="padding-bottom: ${index === items.length - 1 ? "0" : "20px"};">
                     <font style="display: block; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.15em; color: ${COLORS.stone}; margin-bottom: 6px; font-family: ${FONTS.sans};">${item.label}</font>
                     <font style="display: block; font-size: 16px; color: ${COLORS.ink}; font-family: ${FONTS.serif}; line-height: 1.4;">${displayValue}</font>
                   </td>
                 </tr>
               `;
-            }).join('')}
+              })
+              .join("")}
           </table>
         </td>
       </tr>

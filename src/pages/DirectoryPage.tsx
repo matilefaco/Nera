@@ -265,7 +265,7 @@ export default function DirectoryPage() {
                   <div className="p-6">
                     <div className="mb-4">
                       <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-terracotta mb-1">
-                        {formatSpecialtyLabel(pro.professionalIdentity?.mainSpecialty || pro.specialty)}
+                        {formatSpecialtyLabel(pro.specialty || pro.professionalIdentity?.mainSpecialty)}
                       </p>
                       <h3 className="text-xl font-serif text-brand-ink italic truncate">{pro.name}</h3>
                       <div className="flex items-center gap-1 text-brand-stone text-[10px] mt-1">

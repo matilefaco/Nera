@@ -82,7 +82,7 @@ export default function ReviewPage() {
 
         if (data.serviceName) {
            setBooking({
-             serviceName: data.serviceName,
+             serviceName: data.additionalServices?.length > 0 ? [data.serviceName, ...data.additionalServices.map((s:any) => s.name)].join(" e ") : data.serviceName,
              date: data.appointmentDate
            } as any);
         }

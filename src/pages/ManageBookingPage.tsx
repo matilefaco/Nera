@@ -361,7 +361,8 @@ setBlockedSchedules(dayBlocked);
     const start = new Date(year, month - 1, day, hours, minutes);
     const end = new Date(start.getTime() + (Number(appointment.duration) || 60) * 60000); 
     const formatTemplate = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'; 
-    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Reserva Nera: ' + appointment.serviceName)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent('Agendamento realizado via Nera.')}&location=${encodeURIComponent(professional.city || '')}`; 
+    const serviceNames = appointment.additionalServices?.length > 0 ? [appointment.serviceName, ...appointment.additionalServices.map((s:any) => s.name)].join(" e ") : appointment.serviceName;
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Reserva Nera: ' + serviceNames)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent('Agendamento realizado via Nera.')}&location=${encodeURIComponent(professional.city || '')}`; 
     window.open(url, '_blank');
   };
 
@@ -581,7 +582,9 @@ setBlockedSchedules(dayBlocked);
               <div className="bg-brand-white rounded-[40px] p-10 shadow-2xl border border-brand-mist overflow-hidden relative">
                 <div className="flex flex-col mb-8 relative z-10">
                   <span className="text-[10px] text-brand-terracotta uppercase tracking-[0.3em] font-bold mb-2">Detalhes do Agendamento</span>
-                  <h4 className="text-3xl font-serif text-brand-ink">{appointment.serviceName}</h4>
+                  <h4 className="text-3xl font-serif text-brand-ink">
+                    {appointment.additionalServices?.length > 0 ? [appointment.serviceName, ...appointment.additionalServices.map((s:any) => s.name)].join(" • ") : appointment.serviceName}
+                  </h4>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-8">
@@ -681,7 +684,14 @@ setBlockedSchedules(dayBlocked);
                 
                 <div className="border-t border-brand-mist pt-6 flex justify-between items-center">
                   <span className="text-[10px] text-brand-stone uppercase tracking-[0.2em] font-bold">Valor Total</span>
-                  <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(appointment.totalPrice || appointment.price)}</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-2xl font-serif text-brand-terracotta">{formatCurrency(appointment.totalPrice ?? appointment.finalPrice ?? ((appointment.price || 0) + (appointment.travelFee || 0)))}</span>
+                    {appointment.travelFee > 0 && (
+                      <span className="text-[10px] text-brand-stone font-medium mt-1">
+                        (Inclui {formatCurrency(appointment.travelFee)} func. domicílio)
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {appointment.rescheduledAt && (
@@ -775,7 +785,7 @@ setBlockedSchedules(dayBlocked);
               <div className="bg-brand-white rounded-[40px] p-8 shadow-xl border border-brand-mist">
                 <h3 className="text-2xl font-serif text-brand-ink mb-4">Novo Horário</h3>
                 <p className="text-sm text-brand-stone font-light italic mb-8 leading-relaxed">
-                  Escolha um novo dia e horário para seu atendimento de {appointment.serviceName}.
+                  Escolha um novo dia e horário para seu atendimento de {appointment.additionalServices?.length > 0 ? [appointment.serviceName, ...appointment.additionalServices.map((s:any) => s.name)].join(" e ") : appointment.serviceName}.
                 </p>
 
                 <div className="space-y-8">

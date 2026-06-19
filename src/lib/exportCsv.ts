@@ -84,21 +84,27 @@ export async function exportAppointmentsCsv(professionalId: string) {
       return;
     }
 
-    const headers = ['Data', 'Hora', 'Cliente', 'WhatsApp', 'Servico', 'Valor', 'Status', 'Tipo'];
+    const headers = ['Data', 'Hora', 'Cliente', 'WhatsApp', 'Servico', 'Valor', 'Taxa Deslocamento', 'Total', 'Status', 'Tipo'];
     const rows: string[] = [];
     rows.push(headers.join(','));
 
     snap.docs.forEach(docSnap => {
       const data = docSnap.data() as Appointment;
+      const basePrice = data.price || 0;
+      const travelFee = data.travelFee || 0;
+      const total = data.totalPrice ?? data.finalPrice ?? (basePrice + travelFee);
+      
       const row = [
         escapeCSV(data.date),
         escapeCSV(data.time),
         escapeCSV(data.clientName),
         escapeCSV(data.clientWhatsapp),
-        escapeCSV(data.serviceName),
-        escapeCSV(data.price),
+        escapeCSV(data.additionalServices?.length > 0 ? [data.serviceName, ...data.additionalServices.map((s:any) => s.name)].join(" e ") : data.serviceName),
+        escapeCSV(basePrice),
+        escapeCSV(travelFee),
+        escapeCSV(total),
         escapeCSV(data.status),
-        escapeCSV(data.isHomecare ? 'Homecare' : 'Estudio')
+        escapeCSV(data.isHomecare || data.locationType === 'home' ? 'Homecare' : 'Estudio')
       ];
       rows.push(row.join(','));
     });
@@ -144,11 +150,11 @@ export async function exportFinancialCsv(professionalId: string) {
       const data = docSnap.data() as Appointment;
       const price = data.price || 0;
       const travel = data.travelFee || 0;
-      const total = price + travel;
+      const total = data.totalPrice ?? data.finalPrice ?? (price + travel);
 
       const row = [
         escapeCSV(data.date),
-        escapeCSV(data.serviceName),
+        escapeCSV(data.additionalServices?.length > 0 ? [data.serviceName, ...data.additionalServices.map((s:any) => s.name)].join(" e ") : data.serviceName),
         escapeCSV(data.clientName),
         escapeCSV(price),
         escapeCSV(travel),

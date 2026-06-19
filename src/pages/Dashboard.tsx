@@ -1598,7 +1598,7 @@ export default function Dashboard() {
                       <div className="flex-1">
                         <p className="text-[11px] font-bold text-red-900 leading-tight">Cancelamento de última hora!</p>
                         <p className="text-[10px] text-red-700 font-light mt-1">
-                          {alert.clientName} cancelou {alert.serviceName} às {alert.scheduledTime}. 
+                          {alert.clientName} cancelou {alert.additionalServices?.length > 0 ? [alert.serviceName, ...alert.additionalServices.map((s:any) => s.name)].join(" e ") : alert.serviceName} às {alert.scheduledTime}. 
                           <span className="font-bold ml-1">Faltavam apenas {alert.hoursUntil}h.</span>
                         </p>
                       </div>
@@ -1792,7 +1792,11 @@ export default function Dashboard() {
                               <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.clientName}</h4>
                               {isCompletedStatus(appt.status) && <CheckCircle2 size={12} className="text-brand-stone shrink-0" />}
                             </div>
-                            <p className="text-[11px] text-brand-stone font-light truncate leading-tight pr-2 mt-0.5">{appt.serviceName}</p>
+                            <p className="text-[11px] text-brand-stone font-light truncate leading-tight pr-2 mt-0.5">
+                              {appt.additionalServices?.length > 0 
+                                ? [appt.serviceName, ...appt.additionalServices.map((s:any) => s.name)].join(" • ") 
+                                : appt.serviceName}
+                            </p>
                           </div>
                         </div>
                         
@@ -1883,23 +1887,27 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Serviço</p>
-                      <p className="text-brand-ink font-medium">{selectedRequest.serviceName}</p>
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Serviço<span className="none">{selectedRequest.additionalServices?.length ? 's' : ''}</span></p>
+                      <p className="text-brand-ink font-medium">
+                        {selectedRequest.additionalServices?.length > 0 
+                          ? [selectedRequest.serviceName, ...selectedRequest.additionalServices.map((s:any) => s.name)].join(" • ")
+                          : selectedRequest.serviceName}
+                      </p>
                     </div>
                     <div className="space-y-1">
                       <p className="text-[10px] text-brand-stone uppercase tracking-widest">Financeiro</p>
                       <div className="flex flex-col">
-                        <span className="text-brand-ink font-bold text-lg">{formatCurrency((selectedRequest.finalPrice ?? (selectedRequest.price || 0)) + (selectedRequest.travelFee || 0))}</span>
+                        <span className="text-brand-ink font-bold text-lg">{formatCurrency(selectedRequest.totalPrice ?? selectedRequest.finalPrice ?? (selectedRequest.price || 0))}</span>
                         <div className="flex flex-col text-[10px] text-brand-stone mt-1">
                           {selectedRequest.couponCode && selectedRequest.discountAmount > 0 ? (
                             <>
                               <span className="text-brand-terracotta bg-brand-terracotta/5 border border-brand-terracotta/20 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider w-fit mb-1">
                                 Cupom {selectedRequest.couponCode} aplicado
                               </span>
-                              <span className="opacity-80">Base: De <span className="line-through">{formatCurrency(selectedRequest.originalPrice || 0)}</span> por {formatCurrency(selectedRequest.finalPrice ?? (selectedRequest.price || 0))}</span>
+                              <span className="opacity-80">Base: De <span className="line-through">{formatCurrency(selectedRequest.originalPrice || 0)}</span> por {formatCurrency(Math.max(0, (selectedRequest.originalPrice || 0) - selectedRequest.discountAmount))}</span>
                             </>
                           ) : (
-                            <span className="opacity-80">Base: {formatCurrency(selectedRequest.price || 0)}</span>
+                            <span className="opacity-80">Base: {formatCurrency(selectedRequest.originalPrice ?? (selectedRequest.price || 0))}</span>
                           )}
                           {selectedRequest.travelFee > 0 && <span className="opacity-80">Taxa Extra: {formatCurrency(selectedRequest.travelFee)}</span>}
                         </div>

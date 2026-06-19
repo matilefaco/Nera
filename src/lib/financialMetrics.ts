@@ -1,11 +1,11 @@
-import { Appointment } from '../types';
-import { 
-  isCompletedStatus, 
-  isConfirmedLikeStatus, 
-  isPendingStatus, 
+import { Appointment } from "../types";
+import {
+  isCompletedStatus,
+  isConfirmedLikeStatus,
+  isPendingStatus,
   isCancelledStatus,
-  isRevenueStatus
-} from '../constants/appointmentStatus';
+  isRevenueStatus,
+} from "../constants/appointmentStatus";
 
 export interface RevenueByService {
   name: string;
@@ -14,16 +14,16 @@ export interface RevenueByService {
 }
 
 export interface FinancialMetrics {
-  monthlyRevenue: number;          // Completed + Confirmed + Accepted
-  receivedRevenue: number;         // Completed only
-  receivableRevenue: number;       // Confirmed + Accepted only
+  monthlyRevenue: number; // Completed + Confirmed + Accepted
+  receivedRevenue: number; // Completed only
+  receivableRevenue: number; // Confirmed + Accepted only
   pendingConfirmationRevenue: number; // Pending only
-  cancelledRevenue: number;        // Cancelled only
+  cancelledRevenue: number; // Cancelled only
   completedCount: number;
   confirmedCount: number;
   cancelledCount: number;
   pendingCount: number;
-  totalValidAppointments: number;  // Completed + Confirmed + Accepted
+  totalValidAppointments: number; // Completed + Confirmed + Accepted
   averageTicket: number;
   revenueByService: RevenueByService[];
 }
@@ -33,23 +33,28 @@ export interface FinancialMetrics {
  * NOTE: The appointments passed here should be pre-filtered by the desired date range.
  * For standardized monthly metrics, pass appointments from the 1st to the last day of the month.
  */
-export function calculateFinancialMetrics(appointments: Appointment[]): FinancialMetrics {
+export function calculateFinancialMetrics(
+  appointments: Appointment[],
+): FinancialMetrics {
   let monthlyRevenue = 0;
   let receivedRevenue = 0;
   let receivableRevenue = 0;
   let pendingConfirmationRevenue = 0;
   let cancelledRevenue = 0;
-  
+
   let completedCount = 0;
   let confirmedCount = 0;
   let cancelledCount = 0;
   let pendingCount = 0;
-  
+
   const servicesMap: Record<string, { count: number; revenue: number }> = {};
 
-  appointments.forEach(app => {
+  appointments.forEach((app) => {
     // Determine monetary value
-    const val = (app.price || 0) + (app.travelFee || 0);
+    const val =
+      app.finalPrice ??
+      app.totalPrice ??
+      (app.price || 0) + (app.travelFee || 0);
 
     const isCompleted = isCompletedStatus(app.status);
     const isConfirmed = isConfirmedLikeStatus(app.status);
@@ -74,7 +79,9 @@ export function calculateFinancialMetrics(appointments: Appointment[]): Financia
 
     // Revenue by service logic: only for valid financially
     if (isCompleted || isConfirmed) {
-      const sName = app.serviceName || '-';
+      const sName = app.additionalServices?.length > 0 
+        ? [app.serviceName, ...app.additionalServices.map(s => s.name)].join(" + ")
+        : (app.serviceName || "-");
       if (!servicesMap[sName]) servicesMap[sName] = { count: 0, revenue: 0 };
       servicesMap[sName].count++;
       servicesMap[sName].revenue += val;
@@ -82,7 +89,8 @@ export function calculateFinancialMetrics(appointments: Appointment[]): Financia
   });
 
   const totalValidAppointments = completedCount + confirmedCount;
-  const averageTicket = totalValidAppointments > 0 ? (monthlyRevenue / totalValidAppointments) : 0;
+  const averageTicket =
+    totalValidAppointments > 0 ? monthlyRevenue / totalValidAppointments : 0;
 
   const revenueByService = Object.entries(servicesMap)
     .map(([name, data]) => ({ name, ...data }))
@@ -100,22 +108,27 @@ export function calculateFinancialMetrics(appointments: Appointment[]): Financia
     pendingCount,
     totalValidAppointments,
     averageTicket,
-    revenueByService
+    revenueByService,
   };
 }
 
 /**
  * Helper to filter appointments by exact month boundaries.
  */
-export function filterAppointmentsByCurrentMonth(appointments: Appointment[], refDate: Date = new Date()): Appointment[] {
+export function filterAppointmentsByCurrentMonth(
+  appointments: Appointment[],
+  refDate: Date = new Date(),
+): Appointment[] {
   const currentMonth = refDate.getMonth();
   const currentYear = refDate.getFullYear();
-  
-  return appointments.filter(app => {
+
+  return appointments.filter((app) => {
     if (!app.date) return false;
     // ensure parsing doesn't shift timezone bounds
-    const dObj = new Date(app.date + 'T12:00:00');
-    return dObj.getMonth() === currentMonth && dObj.getFullYear() === currentYear;
+    const dObj = new Date(app.date + "T12:00:00");
+    return (
+      dObj.getMonth() === currentMonth && dObj.getFullYear() === currentYear
+    );
   });
 }
 
@@ -123,8 +136,12 @@ export function filterAppointmentsByCurrentMonth(appointments: Appointment[], re
  * Helper to filter appointments by strict date range [startStr, endStr].
  * Format: 'YYYY-MM-DD'
  */
-export function filterAppointmentsByDateRange(appointments: Appointment[], startStr: string, endStr: string): Appointment[] {
-  return appointments.filter(app => {
+export function filterAppointmentsByDateRange(
+  appointments: Appointment[],
+  startStr: string,
+  endStr: string,
+): Appointment[] {
+  return appointments.filter((app) => {
     if (!app.date) return false;
     return app.date >= startStr && app.date <= endStr;
   });

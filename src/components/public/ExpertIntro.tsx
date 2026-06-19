@@ -35,17 +35,17 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
               >
                 Técnica e <em className="italic">Precisão</em>
               </motion.h2>
-              <motion.p 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.2 }}
-                className="text-brand-stone font-light leading-relaxed max-w-2xl mx-auto italic text-lg"
-              >
-                {((customBio || profile.bio) && isSanitizedContent(customBio || profile.bio)) 
-                  ? (customBio || profile.bio) 
-                  : 'Protocolos focados em resultados duradouros e respeito à estrutura natural.'}
-              </motion.p>
+              {((customBio || profile.bio) && isSanitizedContent(customBio || profile.bio)) && (
+                <motion.p 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 }}
+                  className="text-brand-stone font-light leading-relaxed max-w-2xl mx-auto italic text-lg"
+                >
+                  {customBio || profile.bio}
+                </motion.p>
+              )}
             </div>
 
             {/* Differentials Badges */}

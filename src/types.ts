@@ -54,7 +54,7 @@ export interface WorkingHours {
 }
 
 export interface ProfessionalIdentity {
-  mainSpecialty: string;
+  mainSpecialty?: string; // Legado: migrado para specialty root
   subSpecialties: string[];
   yearsExperience: string; // "1-2", "3-5", "5+"
   serviceStyle: string[]; // e.g., ["Delicada e detalhista", "Rápida e eficiente"]

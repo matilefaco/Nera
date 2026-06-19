@@ -24,22 +24,12 @@ import { analyzePortfolio } from '../services/aiService';
 import { useProfileForm } from '../hooks/useProfileForm';
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import { getNormalizedPaymentMethods } from '../lib/payment';
+import { PROFESSIONAL_DIFFERENTIALS } from '../lib/differentials';
 import UpgradeModal from '../components/UpgradeModal';
 import PremiumButton from '../components/PremiumButton';
 import SilentConfirmModal from '../components/SilentConfirmModal';
 
-const IDENTITY_DIFFERENTIALS = [
-  'Pontualidade',
-  'Biossegurança rigorosa',
-  'Atendimento focado',
-  'Ativos de alta performance',
-  'Ambiente confortável',
-  'Técnica baseada em fundamentos',
-  'Resultado duradouro',
-  'Acompanhamento contínuo',
-  'Estrutura natural',
-  'Experiência técnica'
-];
+const IDENTITY_DIFFERENTIALS = PROFESSIONAL_DIFFERENTIALS;
 
 const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
 const devLog = (...args: any[]) => isDev && console.log(...args);
@@ -139,6 +129,32 @@ export default function ProfilePage() {
     delayTolerance, setDelayTolerance,
     profileTheme, setProfileTheme
   } = useProfileForm(profile);
+
+  const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  const [bioContext, setBioContext] = useState('');
+  const [selectedBioStyle, setSelectedBioStyle] = useState('elegante');
+
+  const handleGenerateBio = async () => {
+    if (isGeneratingBio) return;
+    setIsGeneratingBio(true);
+    try {
+      const { suggestBio } = await import('../services/aiService');
+      const result = await suggestBio({
+        context: bioContext,
+        style: selectedBioStyle,
+        specialty,
+        yearsExperience,
+        differentials
+      });
+      if (result.bio) setBio(result.bio);
+      if (result.headline) setHeadline(result.headline);
+      notify.success("Texto sugerido com sucesso! Sinta-se à vontade para editar.");
+    } catch (e: any) {
+      notify.error(getHumanError(e.message));
+    } finally {
+      setIsGeneratingBio(false);
+    }
+  };
 
   const { plan, allowedThemes, portfolioLimit } = usePlanFeatures();
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -657,7 +673,6 @@ export default function ProfilePage() {
           ...(showBreak ? { breakStart, breakEnd } : { breakStart: null, breakEnd: null })
         },
         professionalIdentity: {
-          mainSpecialty: sanitizedSpecialty,
           differentials: differentials,
           yearsExperience: yearsExperience,
           serviceStyle: serviceStyle,
@@ -1101,6 +1116,12 @@ export default function ProfilePage() {
                 setBio={setBio}
                 showLabels={true}
                 errors={formErrors}
+                onGenerateBio={handleGenerateBio}
+                isGeneratingBio={isGeneratingBio}
+                bioContext={bioContext}
+                setBioContext={setBioContext}
+                selectedBioStyle={selectedBioStyle}
+                setSelectedBioStyle={setSelectedBioStyle}
               />
             </div>
           </section>

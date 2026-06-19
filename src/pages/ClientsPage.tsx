@@ -387,6 +387,10 @@ export default function ClientsPage() {
         const key = phone ? phone.replace(/\D/g, '') : appt.clientName.toLowerCase().trim();
         const summaryId = `${user.uid}_${key}`;
         
+        const serviceNames = appt.additionalServices?.length > 0 
+          ? [appt.serviceName, ...appt.additionalServices.map((s:any) => s.name)].join(" e ")
+          : appt.serviceName || '';
+          
         const existing = batchMap.get(summaryId) || {
           professionalId: user.uid,
           clientKey: key,
@@ -401,7 +405,7 @@ export default function ClientsPage() {
           firstAppointmentDate: appt.date,
           lastAppointmentDate: appt.date,
           lastServiceId: appt.serviceId || '',
-          lastServiceName: appt.serviceName || '',
+          lastServiceName: serviceNames,
           segment: 'new',
           notes: '',
           services: []
@@ -417,20 +421,20 @@ export default function ClientsPage() {
 
         if (isConfirmed) {
           existing.confirmedAppointments += 1;
-          existing.totalSpent += (Number(appt.price) || 0);
+          existing.totalSpent += (appt.totalPrice ?? appt.finalPrice ?? ((Number(appt.price) || 0) + (Number(appt.travelFee) || 0)));
         }
         if (isNoShow) existing.noShowCount += 1;
         if (isCancelled) existing.cancelledAppointments += 1;
         
         if (!existing.services) existing.services = [];
-        if (!existing.services.includes(appt.serviceName || '') && appt.serviceName) {
-          existing.services.push(appt.serviceName);
+        if (!existing.services.includes(serviceNames) && serviceNames) {
+          existing.services.push(serviceNames);
         }
         
         if (appt.date > existing.lastAppointmentDate) {
           existing.lastAppointmentDate = appt.date;
           existing.lastServiceId = appt.serviceId || '';
-          existing.lastServiceName = appt.serviceName || '';
+          existing.lastServiceName = serviceNames;
         }
         if (appt.date < existing.firstAppointmentDate) {
           existing.firstAppointmentDate = appt.date;

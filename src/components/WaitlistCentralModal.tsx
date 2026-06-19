@@ -74,7 +74,8 @@ setLoading(false);
       await inviteFromWaitlist(entry.id, targetTime);
       notify.success(`Convite enviado para ${entry.clientName}!`);
       
-      const msg = `Oi ${entry.clientName}! 🌟 Vimos que você está na nossa lista de espera. Acabou de surgir uma vaga para ${entry.serviceName} dia ${formatLocalDate(entry.requestedDate, { day: 'numeric', month: 'numeric' })} às ${targetTime}. Tem interesse?`;
+      const formattedServiceName = entry.additionalServices?.length > 0 ? [entry.serviceName, ...entry.additionalServices.map((s:any) => s.name)].join(" e ") : entry.serviceName;
+      const msg = `Oi ${entry.clientName}! 🌟 Vimos que você está na nossa lista de espera. Acabou de surgir uma vaga para ${formattedServiceName} dia ${formatLocalDate(entry.requestedDate, { day: 'numeric', month: 'numeric' })} às ${targetTime}. Tem interesse?`;
       window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
       
       onClose();
@@ -168,7 +169,9 @@ setLoading(false);
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h5 className="text-lg font-serif text-brand-ink mb-1">{entry.clientName}</h5>
-                        <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest">{entry.serviceName}</p>
+                        <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest">
+                          {entry.additionalServices?.length > 0 ? [entry.serviceName, ...entry.additionalServices.map((s:any) => s.name)].join(" • ") : entry.serviceName}
+                        </p>
                       </div>
                       {entry.period !== 'any' && (
                         <span className="px-3 py-1 bg-brand-linen text-brand-stone text-[8px] font-bold uppercase tracking-widest rounded-full">

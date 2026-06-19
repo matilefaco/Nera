@@ -217,7 +217,7 @@ export default function ServicesPage() {
 
     setIsGeneratingAI(true);
     try {
-      const specialty = profile?.professionalIdentity?.mainSpecialty || profile?.specialty || 'Beleza';
+      const specialty = profile?.specialty || profile?.professionalIdentity?.mainSpecialty || 'Beleza';
       const style = profile?.professionalIdentity?.serviceStyle?.[0] || 'elegante';
       
       const result = await generateServiceDescription({
