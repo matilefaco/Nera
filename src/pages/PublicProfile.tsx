@@ -143,7 +143,7 @@ function PublicProfileContent() {
   const features = PLAN_CONFIGS[profilePlan]?.features;
 
   const { hero: heroBio, about: aboutBio } = React.useMemo(() => {
-    return splitSmartBio(profile?.bio);
+    return { hero: '', about: profile?.bio || '' };
   }, [profile?.bio]);
 
   useEffect(() => {
@@ -309,7 +309,12 @@ function PublicProfileContent() {
 
         if (isMounted) {
           devLog(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
-          setProfile(userData as UserProfile);
+          
+          // DO NOT inject legacy portfolio immediately to prevent UI flash. Data will be fetched from subcollection.
+          const initialProfileData = { ...userData };
+          delete initialProfileData.portfolio;
+          
+          setProfile(initialProfileData as UserProfile);
           
           if (userData.services) setServices(userData.services);
           if (userData.reviews) {
@@ -331,29 +336,46 @@ function PublicProfileContent() {
         devLog(`[PublicProfile] Starting secondary background tasks`);
         // Parallel fetches for portfolio (since it's not and shouldn't be in the main payload for size reasons)
         Promise.allSettled([
-            // Portfolio (Legacy & for completeness)
+            // Portfolio Subcollection (Single Source of Truth)
             (async () => {
-              if (!userData.portfolio || userData.portfolio.length === 0) {
+              try {
                 const portfolioQ = query(
-                  collection(db, "users", professionalId, "portfolio"),
-                  orderBy("createdAt", "desc"),
-                  limit(12)
+                  collection(db, 'users', professionalId, 'portfolio'),
+                  orderBy('createdAt', 'desc'),
+                  limit(30)
                 );
                 const portfolioSnapshot = await getDocs(portfolioQ);
                 if (!isMounted) return;
+                
                 if (!portfolioSnapshot.empty) {
-                  const portfolioItems = portfolioSnapshot.docs.map((doc) => ({
+                  let portfolioItems = portfolioSnapshot.docs.map((doc) => ({
                     id: doc.id,
                     url: doc.data().url || doc.data().imageUrl,
                     category: doc.data().category,
                     categoryId: doc.data().categoryId,
                     categoryLabel: doc.data().categoryLabel,
+                    linkedServiceId: doc.data().linkedServiceId,
+                    linkedServiceName: doc.data().linkedServiceName,
                     isFeatured: doc.data().isFeatured,
                     orderIdx: doc.data().orderIdx,
                     createdAt: doc.data().createdAt || new Date().toISOString(),
                   }));
+                  
+                  // Sort locally to prioritize orderIdx, then fallback to descending createdAt
+                  portfolioItems.sort((a: any, b: any) => {
+                    if (a.orderIdx !== undefined && b.orderIdx !== undefined) {
+                      return a.orderIdx - b.orderIdx;
+                    }
+                    return 0; // Maintain createdAt desc
+                  });
+                  
                   setProfile((prev) => prev ? { ...prev, portfolio: portfolioItems } : null);
+                } else if (userData.portfolio && userData.portfolio.length > 0) {
+                  // Fallback to legacy array if subcollection is entirely empty
+                  setProfile((prev) => prev ? { ...prev, portfolio: userData.portfolio } : null);
                 }
+              } catch (err) {
+                devLog('[PublicProfile] Error fetching portfolio subcollection:', err);
               }
             })()
           ]);
@@ -749,6 +771,7 @@ function PublicProfileContent() {
       />
       <PortfolioSection
         portfolio={profile.portfolio || []}
+        services={services}
         professionalName={profile.name}
         specialty={
           profile.specialty || profile.professionalIdentity?.mainSpecialty

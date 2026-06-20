@@ -38,6 +38,8 @@ export interface FormIdentityProps {
   onSelectSuggestion?: (val: string) => void;
   differentials?: string[];
   setDifferentials?: (val: string[]) => void;
+  editorialPillar?: string;
+  setEditorialPillar?: (val: string) => void;
   availableDifferentials?: string[];
   yearsExperience?: string;
   setYearsExperience?: (val: string) => void;
@@ -80,6 +82,8 @@ export const FormIdentity = ({
   setSpecialty,
   subSpecialties,
   setSubSpecialties,
+  editorialPillar,
+  setEditorialPillar,
   avatar,
   avatarPreview,
   uploadingImage,
@@ -381,6 +385,56 @@ export const FormIdentity = ({
               )}
               
               <FormError message={errors.slug} />
+            </div>
+          )}
+
+          {setEditorialPillar && (
+            <div className="space-y-1.5 flex flex-col pt-2">
+              <label className="text-[10px] font-bold text-brand-ink uppercase tracking-widest ml-1 mb-1 block">
+                Como você deseja ser percebida pelas suas clientes?
+              </label>
+              <p className="text-[11px] text-brand-stone/80 ml-1 mb-3">Essa escolha ajuda a definir a personalidade da sua vitrine e influencia os textos gerados pela IA.</p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {[
+                  { value: 'Precisão', subtitle: 'Técnica e Precisão', desc: 'Segurança, confiança, técnica e qualidade.' },
+                  { value: 'Elegância', subtitle: 'Beleza com Sofisticação', desc: 'Sofisticação, refinamento e bom gosto.' },
+                  { value: 'Naturalidade', subtitle: 'Sua Melhor Versão', desc: 'Leveza, harmonia e autenticidade.' },
+                  { value: 'Transformação', subtitle: 'Transformação com Propósito', desc: 'Mudança, confiança e impacto visual.' },
+                  { value: 'Experiência', subtitle: 'Uma Experiência Pensada para Você', desc: 'Acolhimento, conforto e atenção.' },
+                  { value: 'Arte', subtitle: 'Criatividade em Cada Detalhe', desc: 'Criatividade, estilo próprio e originalidade.' }
+                ].map(p => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setEditorialPillar(p.value)}
+                    className={cn(
+                      "text-left p-3 rounded-xl border transition-all duration-300 relative overflow-hidden group",
+                      editorialPillar === p.value 
+                        ? "bg-brand-terracotta/5 border-brand-terracotta ring-1 ring-brand-terracotta" 
+                        : "bg-white border-brand-sand hover:border-brand-terracotta/30"
+                    )}
+                  >
+                    {editorialPillar === p.value && (
+                      <div className="absolute top-2 right-2 text-brand-terracotta">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                    )}
+                    <span className={cn(
+                      "block text-[11px] font-bold uppercase tracking-wider mb-0.5",
+                      editorialPillar === p.value ? "text-brand-terracotta" : "text-brand-ink"
+                    )}>
+                      {p.value}
+                    </span>
+                    <span className="block text-[13px] font-medium text-brand-ink italic leading-tight mb-1">
+                      "{p.subtitle}"
+                    </span>
+                    <span className="block text-[11px] text-brand-stone leading-relaxed">
+                      {p.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

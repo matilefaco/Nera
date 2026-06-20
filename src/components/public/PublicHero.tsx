@@ -118,7 +118,7 @@ export const PublicHero = ({
                 </span>
               </div>
             )}
-            <h1 className="display-hero text-brand-ink break-words overflow-hidden">
+            <h1 className="display-hero text-brand-ink break-words pb-4">
               {firstName}<br />
               <em className="font-serif italic text-brand-stone block md:inline">{lastName}</em>
             </h1>
@@ -275,12 +275,6 @@ export const PublicHero = ({
               )}
             </div>
           ) : null}
-
-          {((heroBio || profile.bio) && isSanitizedContent(heroBio || profile.bio)) && (
-            <p className="body-text text-brand-stone max-w-sm">
-              {heroBio || profile.bio}
-            </p>
-          )}
 
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-6">

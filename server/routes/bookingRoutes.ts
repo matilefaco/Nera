@@ -1338,93 +1338,98 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 
     const baseUrl = PUBLIC_APP_URL;
 
-    // Background task: Send notifications safely without failing the booking
-    (async () => {
-      try {
-        const proDoc = await db
-          .collection("users")
-          .doc(appointmentData.professionalId)
-          .get();
-        const proData = proDoc.exists ? proDoc.data() : null;
+    // Send notifications safely without failing the booking
+    // Using Promise.allSettled avoids freezing in serverless environments (Cloud Run/Firebase Functions) 
+    // before the async task finishes, while also executing them in parallel.
+    await Promise.allSettled([
+      (async () => {
+        try {
+          const proDoc = await db
+            .collection("users")
+            .doc(appointmentData.professionalId)
+            .get();
+          const proData = proDoc.exists ? proDoc.data() : null;
 
-        let paymentMethodsArr: string[] = Array.isArray(
-          appointmentData.paymentMethods,
-        )
-          ? appointmentData.paymentMethods
-          : appointmentData.paymentMethods
-            ? [String(appointmentData.paymentMethods)]
-            : [];
+          let paymentMethodsArr: string[] = Array.isArray(
+            appointmentData.paymentMethods,
+          )
+            ? appointmentData.paymentMethods
+            : appointmentData.paymentMethods
+              ? [String(appointmentData.paymentMethods)]
+              : [];
 
-        // Need to determine location conditionally if service was home service
-        const isHomeService =
-          finalData.locationType === "home" ||
-          finalData.locationType === "domicilio";
-        let locationDetail = "No Estúdio";
-        if (isHomeService) {
-          locationDetail = `${finalData.neighborhood || "Bairro omitido"}, ${proData?.city || "Cidade omitida"}`;
+          const isHomeService =
+            finalData.locationType === "home" ||
+            finalData.locationType === "domicilio";
+          let locationDetail = "No Estúdio";
+          if (isHomeService) {
+            locationDetail = `${finalData.neighborhood || "Bairro omitido"}, ${proData?.city || "Cidade omitida"}`;
+          }
+
+          const displayServiceName =
+            finalData.additionalServices?.length > 0
+              ? [
+                  finalData.serviceName,
+                  ...finalData.additionalServices.map((s: any) => s.name),
+                ].join(", ")
+              : finalData.serviceName;
+
+          // Executa os envios em paralelo para não atrasar a resposta
+          await Promise.allSettled([
+            sendBookingPendingClientNotification(
+              {
+                clientEmail: appointmentData.clientEmail,
+                clientName: appointmentData.clientName,
+                professionalName: proData?.name || "Profissional",
+                professionalWhatsapp: proData?.whatsapp || "",
+                serviceName: displayServiceName,
+                date: finalData.date,
+                time: finalData.time,
+                price: `R$ ${(finalData.price || 0).toFixed(2).replace(".", ",")}`,
+                travelFee: finalData.travelFee,
+                totalPrice: finalData.finalPrice,
+                reservationCode,
+                manageUrl: `${baseUrl}/r/${manageSlug}`,
+                appointmentId: apptRef.id,
+                paymentMethods: paymentMethodsArr,
+              },
+              baseUrl,
+            ),
+            sendNewBookingRequestNotification(
+              {
+                professionalId: appointmentData.professionalId,
+                clientName: appointmentData.clientName,
+                serviceName: displayServiceName,
+                date: finalData.date,
+                time: finalData.time,
+                totalPrice: finalData.finalPrice,
+                travelFee: finalData.travelFee,
+                price: finalData.price,
+                appointmentId: apptRef.id,
+                token: manageSlug,
+                paymentMethods: paymentMethodsArr,
+                locationDetail: locationDetail,
+                clientWhatsapp:
+                  appointmentData.clientWhatsapp ||
+                  appointmentData.clientPhone ||
+                  "",
+                clientEmail: appointmentData.clientEmail,
+              },
+              baseUrl,
+            )
+          ]);
+        } catch (err: any) {
+          logger.error(
+            "NOTIFICATION",
+            "Failed to send post-booking notifications",
+            {
+              appointmentId: apptRef.id,
+              error: err.message,
+            },
+          );
         }
-
-        const displayServiceName =
-          finalData.additionalServices?.length > 0
-            ? [
-                finalData.serviceName,
-                ...finalData.additionalServices.map((s: any) => s.name),
-              ].join(", ")
-            : finalData.serviceName;
-
-        await sendBookingPendingClientNotification(
-          {
-            clientEmail: appointmentData.clientEmail,
-            clientName: appointmentData.clientName,
-            professionalName: proData?.name || "Profissional",
-            professionalWhatsapp: proData?.whatsapp || "",
-            serviceName: displayServiceName,
-            date: finalData.date,
-            time: finalData.time,
-            price: `R$ ${(finalData.price || 0).toFixed(2).replace(".", ",")}`,
-            travelFee: finalData.travelFee,
-            totalPrice: finalData.finalPrice,
-            reservationCode,
-            manageUrl: `${baseUrl}/r/${manageSlug}`,
-            appointmentId: apptRef.id,
-            paymentMethods: paymentMethodsArr,
-          },
-          baseUrl,
-        );
-
-        await sendNewBookingRequestNotification(
-          {
-            professionalId: appointmentData.professionalId,
-            clientName: appointmentData.clientName,
-            serviceName: displayServiceName,
-            date: finalData.date,
-            time: finalData.time,
-            totalPrice: finalData.finalPrice,
-            travelFee: finalData.travelFee,
-            price: finalData.price,
-            appointmentId: apptRef.id,
-            token: manageSlug,
-            paymentMethods: paymentMethodsArr,
-            locationDetail: locationDetail,
-            clientWhatsapp:
-              appointmentData.clientWhatsapp ||
-              appointmentData.clientPhone ||
-              "",
-            clientEmail: appointmentData.clientEmail,
-          },
-          baseUrl,
-        );
-      } catch (err: any) {
-        logger.error(
-          "NOTIFICATION",
-          "Failed to send post-booking notifications",
-          {
-            appointmentId: apptRef.id,
-            error: err.message,
-          },
-        );
-      }
-    })();
+      })()
+    ]);
 
     res.json({
       success: true,
@@ -2360,33 +2365,44 @@ router.post(
         return { success: true, appointmentId, lockId, status: "confirmed" };
       });
 
-      // Create Google Calendar event and send notification (background tasks)
-      (async () => {
-        try {
-          const apptDoc = await db
-            .collection("appointments")
-            .doc(appointmentId)
-            .get();
-          if (apptDoc.exists) {
-            const apptData = apptDoc.data();
-            // 1. Google Calendar Integration
-            createGoogleCalendarEvent(
-              { id: appointmentId, ...apptData },
-              professionalId,
-            );
-            // 2. Email Confirmation to Client
-            await sendBookingConfirmedClientNotification(
-              { appointmentId },
-              PUBLIC_APP_URL,
-            );
+      // Create Google Calendar event and send notification
+      // Await safely to avoid serverless container freezing
+      await Promise.allSettled([
+        (async () => {
+          try {
+            const apptDoc = await db
+              .collection("appointments")
+              .doc(appointmentId)
+              .get();
+            if (apptDoc.exists) {
+              const apptData = apptDoc.data();
+              
+              const p1 = (async () => {
+                // 1. Google Calendar Integration
+                createGoogleCalendarEvent(
+                  { id: appointmentId, ...apptData },
+                  professionalId,
+                );
+              })();
+
+              const p2 = (async () => {
+                // 2. Email Confirmation to Client
+                await sendBookingConfirmedClientNotification(
+                  { appointmentId },
+                  PUBLIC_APP_URL,
+                );
+              })();
+              
+              await Promise.allSettled([p1, p2]);
+            }
+          } catch (err: any) {
+            logger.error("NOTIFICATION", "Post-confirmation tasks failed", {
+              appointmentId,
+              error: err.message,
+            });
           }
-        } catch (err: any) {
-          logger.error("NOTIFICATION", "Post-confirmation tasks failed", {
-            appointmentId,
-            error: err.message,
-          });
-        }
-      })();
+        })()
+      ]);
 
       return res.json(result);
     } catch (err: any) {

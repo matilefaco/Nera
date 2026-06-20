@@ -39,6 +39,8 @@ export interface PortfolioItem {
   category?: string; // Legacy
   categoryId?: string;
   categoryLabel?: string;
+  linkedServiceId?: string;
+  linkedServiceName?: string;
   isFeatured?: boolean;
   orderIdx?: number;
   createdAt: string;
@@ -63,6 +65,7 @@ export interface ProfessionalIdentity {
   yearsExperience: string; // "1-2", "3-5", "5+"
   serviceStyle: string[]; // e.g., ["Delicada e detalhista", "Rápida e eficiente"]
   differentials: string[]; // e.g., ["Pontualidade", "Biossegurança"]
+  editorialPillar?: string; // "Precisão", "Elegância", "Naturalidade", "Transformação", "Experiência", "Arte"
   attendsAt: 'studio' | 'home' | 'hybrid';
 }
 
@@ -127,6 +130,7 @@ export interface UserProfile {
   services: Service[];
   serviceAreas?: ServiceArea[];
   portfolio?: PortfolioItem[];
+  portfolioMigratedToSubcollection?: boolean;
   
   studioAddress?: {
     street: string;

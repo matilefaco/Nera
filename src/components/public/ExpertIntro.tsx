@@ -7,10 +7,23 @@ import { isSanitizedContent } from '../../lib/validation';
 interface ExpertIntroProps {
   profile: UserProfile;
   stats?: any;
-  customBio?: string;
+  customBio?: string | null;
+  customTitle?: React.ReactNode;
 }
 
-export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
+export function ExpertIntro({ profile, stats, customBio, customTitle }: ExpertIntroProps) {
+  const defaultTitles = {
+    'Precisão': <>Técnica e <em className="italic">Precisão</em></>,
+    'Elegância': <>Beleza com <em className="italic">Sofisticação</em></>,
+    'Naturalidade': <>Sua Melhor <em className="italic">Versão</em></>,
+    'Transformação': <>Transformação com <em className="italic">Propósito</em></>,
+    'Experiência': <>Uma Experiência <em className="italic">Pensada para Você</em></>,
+    'Arte': <>Criatividade em Cada <em className="italic">Detalhe</em></>,
+  };
+  
+  const editorialPillar = profile.professionalIdentity?.editorialPillar as keyof typeof defaultTitles;
+  const resolvedTitle = customTitle || (editorialPillar ? defaultTitles[editorialPillar] : <>Técnica e <em className="italic">Precisão</em></>);
+
   return (
     <section className="py-16 md:py-24 px-4 sm:px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
@@ -33,18 +46,20 @@ export function ExpertIntro({ profile, stats, customBio }: ExpertIntroProps) {
                 transition={{ delay: 0.1 }}
                 className="text-[clamp(28px,8vw,36px)] md:text-5xl font-serif text-brand-ink leading-tight"
               >
-                Técnica e <em className="italic">Precisão</em>
+                {resolvedTitle}
               </motion.h2>
               {((customBio || profile.bio) && isSanitizedContent(customBio || profile.bio)) && (
-                <motion.p 
+                <motion.div 
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.2 }}
-                  className="text-brand-stone font-light leading-relaxed max-w-2xl mx-auto italic text-lg"
+                  className="text-brand-stone font-light leading-relaxed max-w-2xl mx-auto text-base sm:text-lg flex flex-col gap-4 text-center"
                 >
-                  {customBio || profile.bio}
-                </motion.p>
+                  {(customBio || profile.bio)?.split('\n').filter(Boolean).map((paragraph, index) => (
+                    <p key={index}>{paragraph}</p>
+                  ))}
+                </motion.div>
               )}
             </div>
 

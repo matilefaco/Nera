@@ -1286,7 +1286,7 @@ export default function OnboardingPage() {
     if (files && files.length > 0 && user) {
       const file = files[0];
       setPendingPortfolioFile(file);
-      setPendingPortfolioCategory(specialty || "Bem-estar e Bronzeamento");
+      setPendingPortfolioCategory(services[0]?.serviceCategory || "Sem categoria");
       setPendingPortfolioFeatured(false);
 
       if (portfolioInputRef.current) portfolioInputRef.current.value = "";

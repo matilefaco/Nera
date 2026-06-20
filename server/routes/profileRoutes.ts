@@ -632,7 +632,7 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
     const endStr = endOfMonth.toISOString().split('T')[0];
 
     // 4. Fetch extra public data to consolidate payload (Improves security and performance)
-    const [servicesSnap, reviewsSnap, statsSnap, apptsSnap] = await Promise.all([
+    const [servicesSnap, reviewsSnap, statsSnap, apptsSnap, portfolioSnap] = await Promise.all([
       db.collection("services")
         .where("professionalId", "==", uid)
         .where("active", "==", true)
@@ -650,6 +650,11 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
         .where("date", ">=", startStr)
         .where("date", "<=", endStr)
         .limit(300)
+        .get(),
+      db.collection("users")
+        .doc(uid)
+        .collection("portfolio")
+        .orderBy("createdAt", "desc")
         .get()
     ]);
 
@@ -708,6 +713,27 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
     const statsData = statsSnap.exists ? statsSnap.data() : { averageRating: 0, totalReviews: 0 };
     statsData.totalCompletedBookings = roundedBookings;
 
+    // Use portfolioSnap if available, otherwise fallback to userData.portfolio
+    let finalPortfolio: any[] = [];
+    if (!portfolioSnap.empty) {
+      finalPortfolio = portfolioSnap.docs.map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          url: d.url || d.imageUrl,
+          category: d.category,
+          categoryId: d.categoryId,
+          categoryLabel: d.categoryLabel,
+          linkedServiceId: d.linkedServiceId,
+          linkedServiceName: d.linkedServiceName,
+          isFeatured: d.isFeatured,
+          orderIdx: d.orderIdx
+        };
+      });
+    } else {
+      finalPortfolio = (userData.portfolio || []).filter((item: any) => item && item.url && !isDataUriImage(item.url));
+    }
+
     // 5. Sanitize data - Return ONLY what's needed for the public profile
     const sanitizedData: any = {
       professionalId: uid, // Renamed from uid for consistency
@@ -743,7 +769,7 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       serviceAreas: userData.serviceAreas,
       workingHours: userData.workingHours,
       professionalIdentity: userData.professionalIdentity,
-      portfolio: (userData.portfolio || []).filter((item: any) => item && item.url && !isDataUriImage(item.url)),
+      portfolio: finalPortfolio,
       coverImage: isDataUriImage(userData.coverImage) ? null : userData.coverImage,
       profileTheme: userData.profileTheme,
       paymentMethods: userData.paymentMethods || [],

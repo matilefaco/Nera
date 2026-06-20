@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useAuth } from '../AuthContext';
 import { db, storage, auth, app, handleFirestoreError, OperationType, uploadImageToStorage, saveProfilePartial, savePortfolioItem, deletePortfolioItem } from '../firebase';
-import { doc, updateDoc, collection, query, orderBy, getDocs, deleteDoc, setDoc } from 'firebase/firestore';
+import { doc, updateDoc, collection, query, orderBy, getDocs, deleteDoc, setDoc, deleteField, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable, uploadString } from 'firebase/storage';
 import { 
   Calendar, List, Settings, Save, User, MapPin, Home, Building2, Briefcase,
   Phone, Link as LinkIcon, Camera, Sparkles, ExternalLink, Users, X, Plus, ShieldCheck, LogOut,
-  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, ChevronLeft, Key, Check
+  RefreshCw, CheckCircle2, AlertCircle, Trash2, Lock, DollarSign, Ticket, Gift, ChevronRight, ChevronLeft, Key, Check, Star
 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { notify } from '../lib/notify';
@@ -25,6 +25,7 @@ import { analyzePortfolio } from '../services/aiService';
 import { useProfileForm } from '../hooks/useProfileForm';
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import { getNormalizedPaymentMethods } from '../lib/payment';
+import { normalizePortfolioCategory } from '../lib/portfolioUtils';
 import { PROFESSIONAL_DIFFERENTIALS } from '../lib/differentials';
 import UpgradeModal from '../components/UpgradeModal';
 import PremiumButton from '../components/PremiumButton';
@@ -107,6 +108,7 @@ export default function ProfilePage() {
     neighborhood, setNeighborhood,
     headline, setHeadline,
     instagram, setInstagram,
+    editorialPillar, setEditorialPillar,
     differentials, setDifferentials,
     serviceMode, setServiceMode,
     studioAddress, setStudioAddress,
@@ -140,18 +142,33 @@ export default function ProfilePage() {
     setIsGeneratingBio(true);
     try {
       const { suggestBio } = await import('../services/aiService');
-      const result = await suggestBio({
+      
+      const getExperienceLabel = (val: string) => {
+        switch (val) {
+          case 'beginner': return 'Iniciante';
+          case '1-2': return '1 a 2 anos';
+          case '3-5': return '3 a 5 anos';
+          case '5-10': return '5 a 10 anos';
+          case '10+': return 'Mais de 10 anos';
+          default: return val || 'Não informado';
+        }
+      };
+      
+      const payload = {
         context: bioContext,
         style: selectedBioStyle,
         specialty,
-        yearsExperience,
+        editorialPillar,
+        yearsExperience: getExperienceLabel(yearsExperience),
         differentials
-      });
+      };
+
+      const result = await suggestBio(payload);
       if (result.bio) setBio(result.bio);
       if (result.headline) setHeadline(result.headline);
       notify.success("Texto sugerido com sucesso! Sinta-se à vontade para editar.");
     } catch (e: any) {
-      notify.error(getHumanError(e.message));
+      notify.error(getHumanError(e.message) || "Não conseguimos gerar agora. Tente novamente em alguns instantes.");
     } finally {
       setIsGeneratingBio(false);
     }
@@ -184,15 +201,58 @@ export default function ProfilePage() {
   const [portfolioStatus, setPortfolioStatus] = useState<'idle' | 'loading' | 'loaded' | 'stalled' | 'error'>(() => {
     return user && profilePortfolioCache.has(user.uid) ? 'loaded' : 'loading';
   });
-  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category?: string, categoryId?: string, categoryLabel?: string, isFeatured?: boolean, isUploading?: boolean}[]>(() => {
+  const [portfolio, setPortfolio] = useState<{id?: string, url: string, category?: string, categoryId?: string, categoryLabel?: string, linkedServiceId?: string, linkedServiceName?: string, isFeatured?: boolean, orderIdx?: number, isUploading?: boolean}[]>(() => {
     return user ? (profilePortfolioCache.get(user.uid) || []) : [];
   });
   const [pendingPortfolioFile, setPendingPortfolioFile] = useState<File | null>(null);
   const [pendingPortfolioCategory, setPendingPortfolioCategory] = useState<string>('');
+  const [pendingPortfolioLinkedServiceId, setPendingPortfolioLinkedServiceId] = useState<string>('');
   const [pendingPortfolioFeatured, setPendingPortfolioFeatured] = useState<boolean>(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  
+  const [serviceCategories, setServiceCategories] = useState<{id: string, label: string}[]>([]);
+  const [professionalServices, setProfessionalServices] = useState<{id: string, name: string, categoryLabel: string}[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchServices = async () => {
+      try {
+        const q = query(collection(db, 'services'), where('professionalId', '==', user.uid), where('active', '==', true));
+        const snap = await getDocs(q);
+        const categoriesMap = new Map<string, string>();
+        const servicesList: {id: string, name: string, categoryLabel: string}[] = [];
+        
+        snap.docs.forEach(doc => {
+          const data = doc.data();
+          const label = data.serviceCategory || '';
+          
+          if (data.name) {
+            servicesList.push({
+              id: doc.id,
+              name: data.name,
+              categoryLabel: label || 'Sem categoria'
+            });
+          }
+
+          if (label && label.trim().length > 0) {
+            const id = label.toLowerCase().replace(/[^a-z0-9]/g, '-');
+            if (!categoriesMap.has(id)) {
+              categoriesMap.set(id, label);
+            }
+          }
+        });
+
+        const sortedCats = Array.from(categoriesMap.entries()).map(([id, label]) => ({id, label})).sort((a, b) => a.label.localeCompare(b.label));
+        setServiceCategories(sortedCats);
+        setProfessionalServices(servicesList);
+      } catch (err) {
+        if (isDev) console.error("Error fetching services for categories:", err);
+      }
+    };
+    fetchServices();
+  }, [user]);
 
   const [savedSnapshotString, setSavedSnapshotString] = useState<string | null>(null);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
@@ -225,7 +285,7 @@ export default function ProfilePage() {
   }, [
     name, specialty, whatsapp, slug, city, neighborhood, serviceMode, 
     workingDays, startTime, endTime, avatar, avatarPreview, 
-    headline, bio, portfolio, differentials, instagram, paymentMethods, 
+    headline, bio, portfolio, editorialPillar, differentials, instagram, paymentMethods, 
     googleCalendarConnected, studioAddress
   ]);
 
@@ -283,6 +343,7 @@ export default function ProfilePage() {
     if (profile?.uid && savedSnapshotString === null) {
       const initialSnapshot = buildSnapshot({
         ...profile,
+        editorialPillar: profile.professionalIdentity?.editorialPillar,
         differentials: profile.professionalIdentity?.differentials,
         yearsExperience: profile.professionalIdentity?.yearsExperience,
         serviceStyle: profile.professionalIdentity?.serviceStyle,
@@ -302,14 +363,14 @@ export default function ProfilePage() {
       name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
       studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
       advancePaymentRequired, delayTolerance, profileTheme,
-      differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
+      editorialPillar, differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
       acceptsInstallments
     });
   }, [
     name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
     studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
     advancePaymentRequired, delayTolerance, profileTheme?.variant,
-    differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
+    editorialPillar, differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
     acceptsInstallments
   ]);
 
@@ -320,62 +381,123 @@ export default function ProfilePage() {
     if (profile && user) {
       setAvatarPreview(profile.avatar || '');
 
-      // Load portfolio from profile array (Single Source of Truth)
-      if (profile.portfolio && profile.portfolio.length > 0) {
-        profilePortfolioCache.set(user.uid, profile.portfolio as any);
-        if (isMounted) {
-          setPortfolio(profile.portfolio as any);
-          setPortfolioStatus('loaded');
-        }
-      } else {
-        // Fallback: Fetch portfolio from sub-collection if array is empty
-        const fetchPortfolio = async () => {
-          if (isMounted) setPortfolioStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
-          
-          // Timeout to release stalled state
-          const stallTimeout = setTimeout(() => {
-            if (isMounted) setPortfolioStatus(prev => prev === 'loading' ? 'stalled' : prev);
-          }, 2000);
-          
-          try {
-            if (isDev) console.log('[Profile] Fetching portfolio sub-collection...');
-            const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
-            const q = query(portfolioRef, orderBy('createdAt', 'desc'));
-            const snapshot = await getDocs(q);
-            const items = snapshot.docs.map(doc => ({
-              id: doc.id,
-              url: doc.data().imageUrl || doc.data().url,
-              category: doc.data().category
-            }));
+      // NEW ARCHITECTURE: Sub-collection is the single source of truth
+      const fetchPortfolioAndMigrateIfNecessary = async () => {
+        if (!user) return;
+        if (isMounted) setPortfolioStatus(prev => prev === 'loaded' ? 'loaded' : 'loading');
+
+        // Timeout to release stalled state
+        const stallTimeout = setTimeout(() => {
+          if (isMounted) setPortfolioStatus(prev => prev === 'loading' ? 'stalled' : prev);
+        }, 2000);
+
+        try {
+          const portfolioRef = collection(db, 'users', user.uid, 'portfolio');
+          const q = query(portfolioRef, orderBy('createdAt', 'desc')); // Keep createdAt or use orderIdx if populated
+          const snapshot = await getDocs(q);
+
+          let items = snapshot.docs.map(doc => ({
+            id: doc.id,
+            url: doc.data().url || doc.data().imageUrl,
+            category: doc.data().category,
+            categoryId: doc.data().categoryId,
+            categoryLabel: doc.data().categoryLabel,
+            linkedServiceId: doc.data().linkedServiceId,
+            linkedServiceName: doc.data().linkedServiceName,
+            isFeatured: doc.data().isFeatured,
+            orderIdx: doc.data().orderIdx
+          }));
+
+          clearTimeout(stallTimeout);
+
+          // Migration from legacy array
+          if (items.length === 0 && profile.portfolio && profile.portfolio.length > 0 && !profile.portfolioMigratedToSubcollection) {
+            if (isDev) console.log('[Portfolio Migration] Migrating legacy array to subcollection...');
+            const legacyItems = profile.portfolio as any[];
+            const migratedItems: any[] = [];
             
-            clearTimeout(stallTimeout);
-            
-            if (isMounted) {
-              if (isDev) console.log('[Profile] Portfolio items fetched from sub-collection:', items.length);
-              if (items.length > 0) {
-                profilePortfolioCache.set(user.uid, items);
-                setPortfolio(items);
-                setPortfolioStatus('loaded');
-              } else {
-                // If it came from cache and is empty, we cannot be sure it's TRULY empty (might be offline/not cached yet).
-                // Wait for the real server fetch or just stay stalled.
-                if (snapshot.metadata.fromCache) {
-                  if (isDev) console.log('[Profile] Portfolio fetched as empty from cache, marking as stalled to prevent false zero.');
-                  setPortfolioStatus('stalled');
-                } else {
-                  // Confirmed empty from server
-                  setPortfolioStatus('loaded');
-                }
+            for (let i = 0; i < legacyItems.length; i++) {
+              const legacyItem = legacyItems[i];
+              if (!legacyItem.url) continue;
+
+              const docId = legacyItem.id || `migrated-${Date.now()}-${i}`;
+              const categoryLabelToSave = legacyItem.category || legacyItem.categoryLabel || 'Sem categoria';
+              const categoryIdToSave = categoryLabelToSave.toLowerCase().replace(/[^a-z0-9]/g, '-');
+              
+              const newItem = {
+                url: legacyItem.url,
+                category: categoryLabelToSave,
+                categoryId: categoryIdToSave,
+                categoryLabel: categoryLabelToSave,
+                isFeatured: legacyItem.isFeatured || false,
+                orderIdx: legacyItem.orderIdx || i,
+                createdAt: legacyItem.createdAt || new Date().toISOString()
+              };
+
+              try {
+                await setDoc(doc(db, 'users', user.uid, 'portfolio', docId), newItem);
+                migratedItems.push({ id: docId, ...newItem });
+              } catch (err) {
+                if (isDev) console.error('[Portfolio Migration] Failed to save item', err);
               }
             }
-          } catch (err) {
-            clearTimeout(stallTimeout);
-            if (isDev) console.error('[Profile] Error fetching portfolio:', err);
-            if (isMounted) setPortfolioStatus('error');
+
+            // Always mark as migrated if we attempted it, so it doesn't loop forever
+            try {
+              const userRef = doc(db, 'users', user.uid);
+              await updateDoc(userRef, { 
+                portfolio: deleteField(),
+                portfolioMigratedToSubcollection: true
+              });
+            } catch (cleanErr) {
+              if (isDev) console.warn('[Portfolio Migration] Failed to clean up legacy array, continuing anyway...');
+            }
+
+            if (migratedItems.length > 0) {
+              if (isDev) console.log('[Portfolio Migration] Success');
+              items = migratedItems;
+            }
+          } else if (items.length === 0 && profile.portfolio && profile.portfolio.length > 0 && profile.portfolioMigratedToSubcollection) {
+            // Already migrated in the past, but the legacy array somehow came back (e.g. archaic backend behavior).
+            // Do NOT resurrect them. We optionally clean it up.
+            try {
+              const userRef = doc(db, 'users', user.uid);
+              await updateDoc(userRef, { portfolio: deleteField() });
+            } catch (e) {
+              // ignore
+            }
           }
-        };
-        fetchPortfolio();
-      }
+
+          if (isMounted) {
+            if (items.length > 0) {
+              // Sort by orderIdx if available, otherwise by createdAt desc
+              items.sort((a: any, b: any) => {
+                if (a.orderIdx !== undefined && b.orderIdx !== undefined) {
+                  return a.orderIdx - b.orderIdx;
+                }
+                return 0; // Maintain original fetch order (which is desc createdAt)
+              });
+
+              profilePortfolioCache.set(user.uid, items);
+              setPortfolio(items);
+              setPortfolioStatus('loaded');
+            } else {
+              if (snapshot.metadata.fromCache) {
+                if (isDev) console.log('[Profile] Portfolio fetched as empty from cache, marking as stalled to prevent false zero.');
+                setPortfolioStatus('stalled');
+              } else {
+                setPortfolioStatus('loaded');
+              }
+            }
+          }
+        } catch (err) {
+          clearTimeout(stallTimeout);
+          if (isDev) console.error('[Profile] Error fetching/migrating portfolio:', err);
+          if (isMounted) setPortfolioStatus('error');
+        }
+      };
+
+      fetchPortfolioAndMigrateIfNecessary();
     }
     return () => {
       isMounted = false;
@@ -677,6 +799,7 @@ export default function ProfilePage() {
           ...(showBreak ? { breakStart, breakEnd } : { breakStart: null, breakEnd: null })
         },
         professionalIdentity: {
+          editorialPillar: editorialPillar,
           differentials: differentials,
           yearsExperience: yearsExperience,
           serviceStyle: serviceStyle,
@@ -800,6 +923,24 @@ export default function ProfilePage() {
     }
   };
 
+  const toggleFeatured = async (index: number) => {
+    const item = portfolio[index];
+    if (!user || !item || !item.id || item.id.startsWith('temp-')) return;
+    
+    const newFeatured = !item.isFeatured;
+    const newPortfolio = [...portfolio];
+    newPortfolio[index].isFeatured = newFeatured;
+    setPortfolio(newPortfolio);
+    if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
+    
+    try {
+      const docRef = doc(db, 'users', user.uid, 'portfolio', item.id);
+      await updateDoc(docRef, { isFeatured: newFeatured });
+    } catch (err) {
+      if (isDev) console.error('[Portfolio] Error updating featured:', err);
+    }
+  };
+
   const movePortfolioItem = async (index: number, direction: 'left' | 'right') => {
     if (direction === 'left' && index === 0) return;
     if (direction === 'right' && index === portfolio.length - 1) return;
@@ -810,16 +951,32 @@ export default function ProfilePage() {
     newPortfolio[index] = newPortfolio[targetIndex];
     newPortfolio[targetIndex] = temp;
     
+    // Update local orderIdx
+    newPortfolio.forEach((item, idx) => {
+      item.orderIdx = idx;
+    });
+    
     setPortfolio(newPortfolio);
     if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
+    
     if (user) {
       try {
-        const userRef = doc(db, 'users', user.uid);
-        await updateDoc(userRef, { portfolio: newPortfolio });
+        // Update all orderIdx in the subcollection
+        const promises = newPortfolio.map((item) => {
+          if (!item.id || item.id.startsWith('temp-')) return Promise.resolve();
+          const docRef = doc(db, 'users', user.uid, 'portfolio', item.id);
+          return updateDoc(docRef, { orderIdx: item.orderIdx });
+        });
+        await Promise.all(promises);
       } catch (err) {
         if (isDev) console.error('[Portfolio] Error updating order:', err);
       }
     }
+  };
+
+  const handlePendingCategoryChange = (val: string) => {
+    setPendingPortfolioCategory(val);
+    setPendingPortfolioLinkedServiceId('');
   };
 
   const handlePortfolioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -833,7 +990,7 @@ export default function ProfilePage() {
     if (files && files.length > 0 && user) {
       const file = files[0];
       setPendingPortfolioFile(file);
-      setPendingPortfolioCategory(specialty || 'Bem-estar e Bronzeamento');
+      setPendingPortfolioCategory(serviceCategories[0]?.label || 'Sem categoria');
       setPendingPortfolioFeatured(false);
       
       // Cleanup the input
@@ -888,6 +1045,8 @@ export default function ProfilePage() {
     sessionStorage.setItem('last_portfolio_upload', file.name);
 
     // 1. Immediate Local Preview
+    const selectedService = professionalServices.find(s => s.id === pendingPortfolioLinkedServiceId);
+    
     try {
       const localUrl = URL.createObjectURL(file);
       setPortfolio(prev => [{ 
@@ -896,6 +1055,8 @@ export default function ProfilePage() {
         category: pendingPortfolioCategory, 
         categoryId: pendingPortfolioCategory.toLowerCase().replace(/[^a-z0-9]/g, '-'),
         categoryLabel: pendingPortfolioCategory,
+        linkedServiceId: pendingPortfolioLinkedServiceId || undefined,
+        linkedServiceName: selectedService?.name,
         isFeatured: pendingPortfolioFeatured,
         isUploading: true 
       }, ...prev]);
@@ -922,13 +1083,20 @@ export default function ProfilePage() {
         const categoryLabelToSave = pendingPortfolioCategory;
         const categoryIdToSave = pendingPortfolioCategory.toLowerCase().replace(/[^a-z0-9]/g, '-');
         
-        const docId = await savePortfolioItem(user.uid, {
+        const payloadToSave: any = {
           url, 
           category: categoryLabelToSave, 
           categoryId: categoryIdToSave,
           categoryLabel: categoryLabelToSave,
           isFeatured: pendingPortfolioFeatured
-        });
+        };
+
+        if (pendingPortfolioLinkedServiceId) {
+          payloadToSave.linkedServiceId = pendingPortfolioLinkedServiceId;
+          payloadToSave.linkedServiceName = selectedService?.name || '';
+        }
+
+        const docId = await savePortfolioItem(user.uid, payloadToSave);
         
         if (isDev) console.log('[Portfolio] saved successfully with ID:', docId);
         
@@ -941,6 +1109,8 @@ export default function ProfilePage() {
               category: categoryLabelToSave,
               categoryId: categoryIdToSave,
               categoryLabel: categoryLabelToSave,
+              linkedServiceId: pendingPortfolioLinkedServiceId || undefined,
+              linkedServiceName: selectedService?.name,
               isFeatured: pendingPortfolioFeatured 
             } : item
           );
@@ -1137,6 +1307,8 @@ export default function ProfilePage() {
                 setName={setName}
                 specialty={specialty}
                 setSpecialty={setSpecialty}
+                editorialPillar={editorialPillar}
+                setEditorialPillar={setEditorialPillar}
                 avatar={avatar}
                 avatarPreview={avatarPreview}
                 uploadingImage={uploadingImage}
@@ -1259,6 +1431,22 @@ export default function ProfilePage() {
                         />
                         
                         {!item.isUploading && (
+                          <div className="absolute top-2 left-2 z-20">
+                            {item.isFeatured && (
+                              <div className="px-2 py-1 bg-brand-ink/80 backdrop-blur-sm border border-brand-white/10 rounded-full text-[8px] font-bold uppercase tracking-widest text-brand-white shadow-sm flex items-center gap-1.5 cursor-pointer hover:scale-105 transition-all" onClick={() => toggleFeatured(idx)}>
+                                <Star size={10} className="fill-brand-terracotta text-brand-terracotta" />
+                                <span>Destaque</span>
+                              </div>
+                            )}
+                            {!item.isFeatured && (
+                                <div className="px-2 py-1 bg-black/30 backdrop-blur-sm border border-brand-white/20 rounded-full shadow-sm flex items-center gap-1.5 opacity-0 group-hover:opacity-100 cursor-pointer hover:scale-105 transition-all hover:bg-brand-ink/80" onClick={() => toggleFeatured(idx)}>
+                                  <Star size={12} className="text-white" />
+                                </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {!item.isUploading && (
                           <div className="absolute top-2 right-2 flex flex-col gap-2 z-20">
                             <button 
                               type="button"
@@ -1304,29 +1492,104 @@ export default function ProfilePage() {
                         )}
                       </div>
                       
-                      <div className="bg-brand-white p-2 border-t border-brand-mist flex items-center z-20">
-                        <input 
-                          type="text" 
-                          value={item.category} 
+                      <div className="bg-brand-white p-2 border-t border-brand-mist flex flex-col gap-2 z-20">
+                        <select 
+                          value={normalizePortfolioCategory(item.categoryLabel || item.category, serviceCategories)}
                           onChange={async (e) => {
                             const newCategory = e.target.value;
+                            if (newCategory === 'Sem categoria') return; // Cannot explicitly switch to it if not currently set
+                            
+                            const newCategoryId = newCategory.toLowerCase().replace(/[^a-z0-9]/g, '-');
                             const newPortfolio = [...portfolio];
                             newPortfolio[idx].category = newCategory;
+                            newPortfolio[idx].categoryLabel = newCategory;
+                            newPortfolio[idx].categoryId = newCategoryId;
+                            newPortfolio[idx].linkedServiceId = undefined;
+                            newPortfolio[idx].linkedServiceName = undefined;
                             setPortfolio(newPortfolio);
                             if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
                             
-                            if (user) {
+                            if (user && item.id && !item.id.startsWith('temp-')) {
                               try {
-                                const userRef = doc(db, 'users', user.uid);
-                                await updateDoc(userRef, { portfolio: newPortfolio });
+                                const docRef = doc(db, 'users', user.uid, 'portfolio', item.id);
+                                await updateDoc(docRef, { 
+                                  category: newCategory,
+                                  categoryLabel: newCategory,
+                                  categoryId: newCategoryId,
+                                  linkedServiceId: deleteField(),
+                                  linkedServiceName: deleteField()
+                                });
                               } catch (err) {
                                 console.error('[Portfolio] Error updating category:', err);
                               }
                             }
                           }}
-                          className="w-full bg-[#FAF9F8] border border-brand-mist/60 rounded-xl px-2 h-10 text-[11px] text-brand-ink placeholder:text-brand-stone/60 outline-none text-center font-medium focus:bg-brand-white focus:border-brand-mist/80 transition-colors"
-                          placeholder="Categoria"
-                        />
+                          className="w-full bg-[#FAF9F8] border border-brand-mist/60 rounded-xl px-2 h-10 text-[11px] text-brand-ink outline-none text-center font-medium focus:bg-brand-white focus:border-brand-mist/80 transition-colors"
+                        >
+                          {(() => {
+                            const currentVal = normalizePortfolioCategory(item.categoryLabel || item.category, serviceCategories);
+                                               
+                            const inList = serviceCategories.some(c => c.label === currentVal);
+                            
+                            return (
+                              <>
+                                {(!inList || currentVal === 'Sem categoria') && (
+                                  <option value={currentVal}>{currentVal === 'Sem categoria' ? 'Sem categoria' : `${currentVal} (Inválida)`}</option>
+                                )}
+                                {serviceCategories.map(cat => (
+                                  <option key={cat.id} value={cat.label}>{cat.label}</option>
+                                ))}
+                              </>
+                            );
+                          })()}
+                        </select>
+                        
+                        {(() => {
+                          const currentVal = normalizePortfolioCategory(item.categoryLabel || item.category, serviceCategories);
+                          const availableServices = professionalServices.filter(s => s.categoryLabel === currentVal);
+                          if (availableServices.length > 0) {
+                            return (
+                              <select
+                                value={item.linkedServiceId || ''}
+                                onChange={async (e) => {
+                                  const newServiceId = e.target.value;
+                                  const selectedService = availableServices.find(s => s.id === newServiceId);
+                                  const newPortfolio = [...portfolio];
+                                  newPortfolio[idx].linkedServiceId = newServiceId || undefined;
+                                  newPortfolio[idx].linkedServiceName = selectedService?.name;
+                                  setPortfolio(newPortfolio);
+                                  if (user?.uid) profilePortfolioCache.set(user.uid, newPortfolio);
+                                  
+                                  if (user && item.id && !item.id.startsWith('temp-')) {
+                                    try {
+                                      const docRef = doc(db, 'users', user.uid, 'portfolio', item.id);
+                                      if (newServiceId) {
+                                        await updateDoc(docRef, { 
+                                          linkedServiceId: newServiceId,
+                                          linkedServiceName: selectedService?.name || ''
+                                        });
+                                      } else {
+                                        await updateDoc(docRef, { 
+                                          linkedServiceId: deleteField(),
+                                          linkedServiceName: deleteField()
+                                        });
+                                      }
+                                    } catch (err) {
+                                      console.error('[Portfolio] Error updating linked service:', err);
+                                    }
+                                  }
+                                }}
+                                className="w-full bg-[#FAF9F8] border border-brand-mist/60 rounded-xl px-2 h-10 text-[10px] text-brand-stone outline-none text-center focus:bg-brand-white focus:border-brand-mist/80 transition-colors"
+                              >
+                                <option value="">Sem serviço específico</option>
+                                {availableServices.map(subSvc => (
+                                  <option key={subSvc.id} value={subSvc.id}>{subSvc.name}</option>
+                                ))}
+                              </select>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                   ))}
@@ -1377,17 +1640,40 @@ export default function ProfilePage() {
 
                   <div className="space-y-5">
                     <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-2">Categoria Oficial</label>
+                      <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-2">Categoria da foto</label>
                       <select
                         value={pendingPortfolioCategory}
-                        onChange={(e) => setPendingPortfolioCategory(e.target.value)}
+                        onChange={(e) => handlePendingCategoryChange(e.target.value)}
                         className="w-full h-12 bg-white border border-brand-mist rounded-xl px-4 text-sm text-brand-ink focus:outline-none focus:border-brand-terracotta focus:ring-1 focus:ring-brand-terracotta transition-colors"
                       >
-                        {OFFICIAL_CATEGORIES.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
+                        {serviceCategories.length > 0 ? (
+                          serviceCategories.map(cat => (
+                            <option key={cat.id} value={cat.label}>{cat.label}</option>
+                          ))
+                        ) : (
+                          <option value="Sem categoria">Cadastre seus serviços antes de organizar o portfólio por categoria.</option>
+                        )}
                       </select>
                     </div>
+
+                    {pendingPortfolioCategory && professionalServices.filter(s => s.categoryLabel === pendingPortfolioCategory).length > 0 && (
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-ink mb-2">Serviço Específico (Opcional)</label>
+                        <select
+                          value={pendingPortfolioLinkedServiceId}
+                          onChange={(e) => setPendingPortfolioLinkedServiceId(e.target.value)}
+                          className="w-full h-12 bg-white border border-brand-mist rounded-xl px-4 text-sm text-brand-ink focus:outline-none focus:border-brand-terracotta focus:ring-1 focus:ring-brand-terracotta transition-colors"
+                        >
+                          <option value="">Não associar a serviço específico</option>
+                          {professionalServices
+                            .filter(s => s.categoryLabel === pendingPortfolioCategory)
+                            .map(s => (
+                              <option key={s.id} value={s.id}>{s.name}</option>
+                            ))
+                          }
+                        </select>
+                      </div>
+                    )}
 
                     <div className="flex items-start gap-3 p-3 bg-brand-parchment border border-brand-mist rounded-xl cursor-pointer" onClick={() => setPendingPortfolioFeatured(!pendingPortfolioFeatured)}>
                       <div className={cn(

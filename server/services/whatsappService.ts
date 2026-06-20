@@ -184,7 +184,12 @@ export async function sendWhatsApp(
   const baseUrl = process.env.ZAPI_BASE_URL || 'https://api.z-api.io';
 
   if (!instanceId || !token) {
-    logger.error("WHATSAPP", 'Missing Z-API credentials');
+    logger.error("WHATSAPP", '[WHATSAPP_NOTIFY_FAILED] Missing Z-API credentials', {
+      hasInstanceId: !!instanceId,
+      hasToken: !!token,
+      env: process.env.NODE_ENV,
+      requiresVariables: "ZAPI_INSTANCE_ID, (ZAPI_INSTANCE_TOKEN or ZAPI_TOKEN)"
+    });
     return { success: false, error: 'Missing Z-API credentials' };
   }
 

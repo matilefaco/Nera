@@ -251,6 +251,19 @@ export const sendNewBookingRequestNotification = async (
       const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
       const activePlan = isExpired ? "free" : plan;
 
+      logger.info(
+        "NOTIFICATION",
+        "[WHATSAPP_NOTIFY_START]",
+        {
+          professionalId: payload.professionalId,
+          appointmentId: payload.appointmentId,
+          source: process.env.NODE_ENV === "production" ? "production" : "dev",
+          hasWhatsappToken: !!(process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN),
+          hasProfessionalPhone: !!proPhone,
+          planAllowsWhatsapp: activePlan === "pro",
+        }
+      );
+
       if (activePlan === "pro") {
         const formattedDate = payload.date.split("-").reverse().join("/");
         const msg = buildNewBookingMessageForPro({
@@ -264,14 +277,36 @@ export const sendNewBookingRequestNotification = async (
           linkManage: `${baseUrl}/pedidos?id=${payload.appointmentId}&token=${payload.token}`,
         });
 
-        await sendWhatsApp(db, proPhone, msg, {
-          appointmentId: payload.appointmentId,
-          userId: payload.professionalId,
-          type: "professional_new_booking",
-          clientName: payload.clientName,
-          clientWhatsapp: payload.clientWhatsapp || "",
-        });
+        try {
+          const waResult = await sendWhatsApp(db, proPhone, msg, {
+            appointmentId: payload.appointmentId,
+            userId: payload.professionalId,
+            type: "professional_new_booking",
+            clientName: payload.clientName,
+            clientWhatsapp: payload.clientWhatsapp || "",
+          });
+          
+          if (waResult.success) {
+            logger.info("NOTIFICATION", "[WHATSAPP_NOTIFY_SUCCESS]", { appointmentId: payload.appointmentId });
+          } else {
+            logger.error("NOTIFICATION", "[WHATSAPP_NOTIFY_FAILED]", { 
+              appointmentId: payload.appointmentId,
+              error: waResult.error
+            });
+          }
+        } catch (waErr: any) {
+          logger.error("NOTIFICATION", "[WHATSAPP_NOTIFY_FAILED]", { 
+            appointmentId: payload.appointmentId,
+            error: waErr?.message || "Unknown error"
+          });
+        }
       }
+    } else {
+      logger.info(
+        "NOTIFICATION",
+        "[WHATSAPP_NOTIFY_START] Skipped - No professional phone",
+        { professionalId: payload.professionalId, appointmentId: payload.appointmentId }
+      );
     }
 
     // Add UI Alert

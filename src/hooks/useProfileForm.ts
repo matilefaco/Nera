@@ -43,6 +43,7 @@ export function useProfileForm(profile: UserProfile | null) {
   const [differentials, setDifferentials] = useState<string[]>(
     (profile?.professionalIdentity?.differentials || []).filter(d => PROFESSIONAL_DIFFERENTIALS.includes(d))
   );
+  const [editorialPillar, setEditorialPillar] = useState<string>(profile?.professionalIdentity?.editorialPillar || '');
   const [yearsExperience, setYearsExperience] = useState<string>(profile?.professionalIdentity?.yearsExperience || '');
   const [serviceStyle, setServiceStyle] = useState<string[]>(profile?.professionalIdentity?.serviceStyle || []);
   
@@ -87,6 +88,7 @@ export function useProfileForm(profile: UserProfile | null) {
       if (profile.professionalIdentity?.differentials?.length) {
         setDifferentials(profile.professionalIdentity.differentials.filter(d => PROFESSIONAL_DIFFERENTIALS.includes(d)));
       }
+      if (profile.professionalIdentity?.editorialPillar) setEditorialPillar(profile.professionalIdentity.editorialPillar);
       if (profile.professionalIdentity?.yearsExperience) setYearsExperience(profile.professionalIdentity.yearsExperience);
       if (profile.professionalIdentity?.serviceStyle?.length) setServiceStyle(profile.professionalIdentity.serviceStyle);
       
@@ -132,6 +134,7 @@ export function useProfileForm(profile: UserProfile | null) {
     fixedTravelFee, setFixedTravelFee,
     pricingStrategy, setPricingStrategy,
     differentials, setDifferentials,
+    editorialPillar, setEditorialPillar,
     yearsExperience, setYearsExperience,
     serviceStyle, setServiceStyle,
     workingDays, setWorkingDays,
