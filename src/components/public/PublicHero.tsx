@@ -157,7 +157,10 @@ export const PublicHero = ({
                   elements.push(
                     <div key="bookings" className="flex items-center gap-1.5">
                       <Users size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
-                      <span className="text-[10px] font-bold text-brand-ink">+{stats?.totalCompletedBookings}</span>
+                      <span className="text-[10px] font-bold text-brand-ink">
+                        {stats?.totalCompletedBookings && stats.totalCompletedBookings >= 5 ? '+' : ''}
+                        {stats?.totalCompletedBookings}
+                      </span>
                       <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">
                         {stats?.totalCompletedBookings === 1 ? 'atendimento pela Nera' : 'atendimentos pela Nera'}
                       </span>
@@ -279,7 +282,7 @@ export const PublicHero = ({
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-6">
               <PremiumButton
-                onClick={() => isAgendaFull && hasWaitlistFeature ? onWaitlistClick?.() : onBookingClick(services[0])}
+                onClick={() => isAgendaFull && hasWaitlistFeature ? onWaitlistClick?.() : onBookingClick()}
                 variant="terracotta"
                 className="px-10 py-5 text-[10px] tracking-[0.22em] shadow-xl"
               >

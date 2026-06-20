@@ -647,9 +647,8 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
         .get(),
       db.collection("appointments")
         .where("professionalId", "==", uid)
-        .where("date", ">=", startStr)
-        .where("date", "<=", endStr)
-        .limit(300)
+        .where("status", "==", "completed")
+        .select("status")
         .get(),
       db.collection("users")
         .doc(uid)
@@ -658,20 +657,24 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
         .get()
     ]);
 
-    let monthlyAppointmentsCount = 0;
-    apptsSnap.forEach(doc => {
-      const status = doc.data().status;
-      if (['confirmed', 'completed', 'accepted'].includes(status)) {
-        monthlyAppointmentsCount++;
-      }
-    });
-
+    let totalCompleted = apptsSnap.size;
     let roundedBookings = 0;
-    if (monthlyAppointmentsCount >= 100) roundedBookings = 100;
-    else if (monthlyAppointmentsCount >= 50) roundedBookings = 50;
-    else if (monthlyAppointmentsCount >= 20) roundedBookings = 20;
-    else if (monthlyAppointmentsCount >= 10) roundedBookings = 10;
-    else roundedBookings = monthlyAppointmentsCount;
+
+    if (totalCompleted >= 50) {
+      roundedBookings = Math.floor(totalCompleted / 10) * 10;
+    } else if (totalCompleted >= 25) {
+      roundedBookings = Math.floor(totalCompleted / 5) * 5;
+    } else if (totalCompleted >= 20) {
+      roundedBookings = 20;
+    } else if (totalCompleted >= 15) {
+      roundedBookings = 15;
+    } else if (totalCompleted >= 10) {
+      roundedBookings = 10;
+    } else if (totalCompleted >= 5) {
+      roundedBookings = 5;
+    } else {
+      roundedBookings = totalCompleted;
+    }
 
     const sanitizedServices = servicesSnap.docs.map(doc => {
       const d = doc.data();

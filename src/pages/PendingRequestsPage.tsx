@@ -611,16 +611,14 @@ export default function PendingRequestsPage() {
                       </div>
                     </div>
 
-                    {request.notes && (
-                      <div className="mb-8 px-5 py-4 bg-amber-50/50 border border-amber-100 rounded-[24px] relative">
-                        <span className="absolute -top-2 left-6 px-2 bg-brand-white text-[7px] font-bold uppercase text-brand-stone border border-brand-mist rounded-full">
-                          Recado da Cliente
-                        </span>
-                        <p className="text-[11px] text-brand-ink/80 italic leading-relaxed">
-                          "{request.notes}"
-                        </p>
-                      </div>
-                    )}
+                    <div className="mb-8 px-5 py-4 bg-amber-50/50 border border-amber-100 rounded-[24px] relative">
+                      <span className="absolute -top-2 left-6 px-2 bg-brand-white text-[7px] font-bold uppercase text-brand-stone border border-brand-mist rounded-full">
+                        Observações da Cliente
+                      </span>
+                      <p className="text-[11px] text-brand-ink/80 italic leading-relaxed">
+                        {request.notes ? `"${request.notes}"` : "Nenhuma observação enviada."}
+                      </p>
+                    </div>
 
                     <div className="flex flex-col gap-3 mt-auto pt-4">
                       <div className="flex gap-3">
@@ -980,13 +978,13 @@ export default function PendingRequestsPage() {
                   <div className="space-y-10">
                     <div>
                       <h4 className="text-[11px] font-bold text-brand-stone uppercase tracking-widest mb-4">
-                        Nota da Cliente
+                        Observações da Cliente
                       </h4>
                       <div className="p-8 bg-brand-linen/40 rounded-[32px] border border-brand-mist/40 italic text-sm text-brand-ink/80 leading-relaxed min-h-[160px] relative overflow-hidden">
                         <div className="relative z-10">
                           {selectedRequest.notes
                             ? `"${selectedRequest.notes}"`
-                            : "A cliente não deixou observações específicas para este agendamento."}
+                            : "Nenhuma observação enviada."}
                         </div>
                         <Sparkles className="absolute -bottom-4 -right-4 w-16 h-16 text-brand-mist/20 rotate-12" />
                       </div>

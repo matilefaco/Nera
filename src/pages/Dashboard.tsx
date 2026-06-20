@@ -1181,31 +1181,6 @@ export default function Dashboard() {
           </motion.div>
         )}
 
-        {/* WhatsApp Activation Banner for PRO users */}
-        {plan === 'pro' && (!profile?.whatsappInstanceId || profile?.whatsappStatus !== 'active') && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-brand-linen/80 border border-brand-mist/50 p-4 rounded-2xl flex items-center justify-between gap-4 shadow-sm backdrop-blur-sm"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-stone shrink-0">
-                <MessageCircle size={20} />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold text-brand-ink leading-tight">Integração WhatsApp em ativação</p>
-                <p className="text-[10px] text-brand-stone font-light italic">Sua conta Pro habilitou as notificações via WhatsApp. Nossa equipe está ativando sua integração.</p>
-              </div>
-            </div>
-            <Link 
-              to="/whatsapp-history" 
-              className="px-4 py-2 bg-white border border-brand-mist/60 rounded-full text-[9px] font-bold uppercase tracking-widest text-brand-ink hover:bg-brand-linen transition-all shrink-0 whitespace-nowrap"
-            >
-              Ver Status
-            </Link>
-          </motion.div>
-        )}
-
         {/* 1. HEADER LIMPO */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div className="space-y-3">
@@ -1950,14 +1925,12 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {selectedRequest.notes && (
-                    <div className="pt-6 border-t border-brand-mist">
-                      <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-2">Observações da Cliente</p>
-                      <div className="p-4 bg-brand-linen rounded-2xl text-xs text-brand-ink italic font-light">
-                        "{selectedRequest.notes}"
-                      </div>
+                  <div className="pt-6 border-t border-brand-mist">
+                    <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-2">Observações da Cliente</p>
+                    <div className="p-4 bg-brand-linen rounded-2xl text-xs text-brand-ink italic font-light">
+                      {selectedRequest.notes ? `"${selectedRequest.notes}"` : "Nenhuma observação enviada."}
                     </div>
-                  )}
+                  </div>
 
                   {/* ANTI-NO-SHOW: CLIENT SCORE & WAITLIST */}
                   <div className="pt-6 border-t border-brand-mist grid grid-cols-1 md:grid-cols-2 gap-4">

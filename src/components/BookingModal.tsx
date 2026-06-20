@@ -105,7 +105,7 @@ export default function BookingModal({
   >(null);
   const allSelectedServices = selectedService
     ? [selectedService, ...additionalServices]
-    : [];
+    : [...additionalServices];
   const totalDuration = allSelectedServices.reduce(
     (acc, s) => acc + (Number(s.duration) || 0),
     0,
@@ -135,6 +135,7 @@ export default function BookingModal({
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [clientEmail, setClientEmail] = useState("");
+  const [clientNotes, setClientNotes] = useState("");
   const [clientAddress, setClientAddress] = useState("");
   const [addressStreet, setAddressStreet] = useState("");
   const [addressNumber, setAddressNumber] = useState("");
@@ -269,6 +270,7 @@ export default function BookingModal({
       clientName,
       clientPhone,
       clientEmail,
+      clientNotes,
       selectedAreaId: selectedArea?.name,
     };
 
@@ -283,6 +285,7 @@ export default function BookingModal({
         clientName,
         clientPhone,
         clientEmail,
+        clientNotes,
         selectedAreaId: selectedArea?.name,
         address: {
           street: addressStreet,
@@ -303,6 +306,7 @@ export default function BookingModal({
     clientName,
     clientPhone,
     clientEmail,
+    clientNotes,
     selectedArea,
     profile?.professionalId,
     profile?.uid,
@@ -365,6 +369,7 @@ export default function BookingModal({
       if (draft.clientName) setClientName(draft.clientName);
       if (draft.clientPhone) setClientPhone(draft.clientPhone);
       if (draft.clientEmail) setClientEmail(draft.clientEmail);
+      if (draft.clientNotes) setClientNotes(draft.clientNotes);
       if (draft.address) {
         if (draft.address.street) setAddressStreet(draft.address.street);
         if (draft.address.number) setAddressNumber(draft.address.number);
@@ -474,6 +479,7 @@ export default function BookingModal({
     setClientName("");
     setClientPhone("");
     setClientEmail("");
+    setClientNotes("");
     setClientAddress("");
     setAddressStreet("");
     setAddressNumber("");
@@ -915,6 +921,7 @@ export default function BookingModal({
           clientName: clientName.trim(),
           clientWhatsapp: clientPhone.replace(/\D/g, ""),
           clientEmail: clientEmail.trim().toLowerCase(),
+          notes: clientNotes.trim(),
           date: selectedDate,
           time: selectedTime,
           couponId: appliedCoupon?.id,
@@ -1060,9 +1067,11 @@ export default function BookingModal({
 
                   <div className="space-y-8">
                     <div className="space-y-4">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
-                        Serviços Selecionados
-                      </label>
+                      {allSelectedServices.length > 0 && (
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
+                          Serviços Selecionados
+                        </label>
+                      )}
                       <div className="space-y-3">
                         {allSelectedServices.map((service, idx) => (
                           <div
@@ -1089,26 +1098,37 @@ export default function BookingModal({
                               <div className="text-xl font-serif text-brand-terracotta relative z-10">
                                 {formatCurrency(service.price || 0)}
                               </div>
-                              {idx > 0 && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (selectedService && service.id === selectedService.id && idx === 0) {
+                                    setAdditionalServices((prev) => {
+                                      if (prev.length > 0) {
+                                        setSelectedService(prev[0]);
+                                        return prev.slice(1);
+                                      } else {
+                                        setSelectedService(null);
+                                        return [];
+                                      }
+                                    });
+                                  } else {
+                                    const additionalIdx = selectedService ? idx - 1 : idx;
                                     setAdditionalServices((prev) =>
-                                      prev.filter((_, i) => i !== idx - 1),
+                                      prev.filter((_, i) => i !== additionalIdx),
                                     );
-                                  }}
-                                  className="text-brand-stone/50 hover:text-brand-terracotta transition-colors p-2"
-                                  aria-label="Remover serviço"
-                                >
-                                  <X size={16} />
-                                </button>
-                              )}
+                                  }
+                                }}
+                                className="text-brand-stone/50 hover:text-brand-terracotta transition-colors p-2"
+                                aria-label="Remover serviço"
+                              >
+                                <X size={16} />
+                              </button>
                             </div>
                           </div>
                         ))}
                       </div>
 
-                      {!showServiceSelector ? (
+                      {(!showServiceSelector && allSelectedServices.length > 0) ? (
                         <button
                           onClick={() => {
                             setShowServiceSelector(true);
@@ -1137,18 +1157,20 @@ export default function BookingModal({
                               </div>
                             ) : (
                               <h5 className="font-serif text-brand-ink text-lg">
-                                Adicionar Serviço
+                                {allSelectedServices.length === 0 ? "Escolha uma experiência para continuar" : "Adicionar Serviço"}
                               </h5>
                             )}
-                            <button
-                              onClick={() => {
-                                setShowServiceSelector(false);
-                                setSelectedServiceCategory(null);
-                              }}
-                              className="text-brand-stone hover:text-brand-ink"
-                            >
-                              <X size={20} />
-                            </button>
+                            {allSelectedServices.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  setShowServiceSelector(false);
+                                  setSelectedServiceCategory(null);
+                                }}
+                                className="text-brand-stone hover:text-brand-ink"
+                              >
+                                <X size={20} />
+                              </button>
+                            )}
                           </div>
 
                           <div className="max-h-[300px] overflow-y-auto no-scrollbar">
@@ -1171,9 +1193,9 @@ export default function BookingModal({
                               if (!selectedServiceCategory) {
                                 const categories = Array.from(
                                   new Set(
-                                    availableServices.map(
-                                      (s) => s.category || "Outros",
-                                    ),
+                                    availableServices
+                                      .map((s) => s.serviceCategory?.trim())
+                                      .filter(Boolean) as string[]
                                   ),
                                 );
                                 return (
@@ -1201,7 +1223,7 @@ export default function BookingModal({
 
                               const filteredServices = availableServices.filter(
                                 (s) =>
-                                  (s.category || "Outros") ===
+                                  s.serviceCategory?.trim() ===
                                   selectedServiceCategory,
                               );
                               return (
@@ -1210,10 +1232,14 @@ export default function BookingModal({
                                     <button
                                       key={service.id}
                                       onClick={() => {
-                                        setAdditionalServices((prev) => [
-                                          ...prev,
-                                          service,
-                                        ]);
+                                        if (!selectedService) {
+                                          setSelectedService(service);
+                                        } else {
+                                          setAdditionalServices((prev) => [
+                                            ...prev,
+                                            service,
+                                          ]);
+                                        }
                                         setShowServiceSelector(false);
                                         setSelectedServiceCategory(null);
                                       }}
@@ -1239,50 +1265,53 @@ export default function BookingModal({
                         </div>
                       )}
 
-                      <div className="p-4 md:p-5 bg-brand-ink rounded-[24px] text-brand-white">
-                        <div className="flex justify-between items-start mb-1">
-                          <span className="text-[10px] uppercase tracking-widest font-bold">
-                            {allSelectedServices.length}{" "}
-                            {allSelectedServices.length === 1
-                              ? "serviço selecionado"
-                              : "serviços selecionados"}
-                          </span>
-                          <span className="text-[10px] uppercase tracking-widest font-bold text-brand-white/50">
-                            {totalDuration} min
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] uppercase tracking-widest text-brand-white/70">
-                            Subtotal
-                          </span>
-                          <div className="font-serif text-lg text-brand-terracotta">
-                            {formatCurrency(
-                              allSelectedServices.reduce(
-                                (acc, s) => acc + (Number(s.price) || 0),
-                                0,
-                              ),
-                            )}
-                          </div>
-                        </div>
-                        {getTravelFee() > 0 && (
-                          <div className="mt-2 pt-2 border-t border-brand-white/10 flex justify-between items-center opacity-80">
-                            <span className="text-[9px] uppercase tracking-widest">
-                              + {formatCurrency(getTravelFee())} deslocamento
+                      {allSelectedServices.length > 0 && (
+                        <div className="p-4 md:p-5 bg-brand-ink rounded-[24px] text-brand-white">
+                          <div className="flex justify-between items-start mb-1">
+                            <span className="text-[10px] uppercase tracking-widest font-bold">
+                              {allSelectedServices.length}{" "}
+                              {allSelectedServices.length === 1
+                                ? "serviço selecionado"
+                                : "serviços selecionados"}
                             </span>
-                            <span className="text-[11px] font-serif">
-                              Total: {formatCurrency(calculateTotalPrice())}
+                            <span className="text-[10px] uppercase tracking-widest font-bold text-brand-white/50">
+                              {totalDuration} min
                             </span>
                           </div>
-                        )}
-                      </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] uppercase tracking-widest text-brand-white/70">
+                              Subtotal
+                            </span>
+                            <div className="font-serif text-lg text-brand-terracotta">
+                              {formatCurrency(
+                                allSelectedServices.reduce(
+                                  (acc, s) => acc + (Number(s.price) || 0),
+                                  0,
+                                ),
+                              )}
+                            </div>
+                          </div>
+                          {getTravelFee() > 0 && (
+                            <div className="mt-2 pt-2 border-t border-brand-white/10 flex justify-between items-center opacity-80">
+                              <span className="text-[9px] uppercase tracking-widest">
+                                + {formatCurrency(getTravelFee())} deslocamento
+                              </span>
+                              <span className="text-[11px] font-serif">
+                                Total: {formatCurrency(calculateTotalPrice())}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
-                    <div className="pt-8 border-t border-brand-mist/30">
-                      <div className="flex items-center justify-between mb-4">
-                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1 block">
-                          Selecione o melhor momento
-                        </label>
-                        <div className="hidden md:flex items-center gap-1">
+                    {allSelectedServices.length > 0 && (
+                      <div className="pt-8 border-t border-brand-mist/30">
+                        <div className="flex items-center justify-between mb-4">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1 block">
+                            Selecione o melhor momento
+                          </label>
+                          <div className="hidden md:flex items-center gap-1">
                           <button
                             onClick={() => scrollDates("left")}
                             className={cn(
@@ -1493,12 +1522,13 @@ export default function BookingModal({
                         )}
                       </div>
                     </div>
+                  )}
 
-                    <PremiumButton
+                  <PremiumButton
                       className="w-full mt-8 hidden md:flex"
                       variant="terracotta"
                       disabled={
-                        !selectedService ||
+                        allSelectedServices.length === 0 ||
                         !selectedDate ||
                         !selectedTime ||
                         isLoadingSlots ||
@@ -1693,6 +1723,20 @@ export default function BookingModal({
                             atualizações da reserva e informações importantes
                             sobre seu atendimento.
                           </p>
+                        </div>
+
+                        <div className="space-y-1.5 min-w-0">
+                          <label className="flex flex-col text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
+                            <span>Observações para a profissional (Opcional)</span>
+                            <span className="text-[9px] lowercase font-medium text-brand-stone/70 normal-case mt-0.5 tracking-normal">Compartilhe qualquer informação que possa ajudar no seu atendimento.</span>
+                          </label>
+                          <textarea
+                            value={clientNotes}
+                            onChange={(e) => setClientNotes(e.target.value)}
+                            maxLength={500}
+                            placeholder="Exemplos:&#10;• Tenho alergia a gel&#10;• Quero um resultado mais natural&#10;• Tenho alongamento antigo para remover"
+                            className="w-full px-5 py-4 min-h-[120px] bg-brand-parchment border border-brand-mist rounded-[18px] outline-none focus:ring-1 focus:ring-brand-ink transition-all text-xs min-w-0 resize-none"
+                          />
                         </div>
                       </div>
 
@@ -2177,7 +2221,7 @@ export default function BookingModal({
                 className="w-full py-7"
                 disabled={
                   (step === 1 &&
-                    (!selectedService ||
+                    (allSelectedServices.length === 0 ||
                       !selectedDate ||
                       !selectedTime ||
                       isLoadingSlots ||
@@ -2210,14 +2254,15 @@ export default function BookingModal({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-brand-white z-[300] flex flex-col items-center p-6 sm:p-8 text-center overflow-y-auto no-scrollbar pt-16 pb-32 md:justify-center md:pt-8 md:pb-8"
+            className="fixed inset-0 bg-brand-white z-[300] overflow-y-auto no-scrollbar flex flex-col"
           >
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", damping: 15 }}
-              className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"
-            >
+            <div className="flex flex-col items-center m-auto py-16 md:py-24 px-6 sm:px-8 w-full max-w-lg text-center shrink-0">
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", damping: 15 }}
+                className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"
+              >
               <Check size={48} />
             </motion.div>
             <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">

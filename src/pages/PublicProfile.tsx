@@ -717,7 +717,7 @@ function PublicProfileContent() {
                   if (urgencyInfo?.isAgendaFull && features?.waitlist) {
                     setIsWaitlistOpen(true);
                   } else {
-                    if (services.length > 0) setPreSelectedService(services[0]);
+                    if (services.length > 0) setPreSelectedService(null);
                     setIsBookingModalOpen(true);
                   }
                 }}
@@ -745,7 +745,11 @@ function PublicProfileContent() {
           if (urgencyInfo?.isAgendaFull && features?.waitlist) {
             setIsWaitlistOpen(true);
           } else {
-            if (s) setPreSelectedService(s);
+            if (s) {
+              setPreSelectedService(s);
+            } else {
+              setPreSelectedService(null);
+            }
             setIsBookingModalOpen(true);
           }
         }}
@@ -802,7 +806,7 @@ function PublicProfileContent() {
             setIsWaitlistOpen(true);
           } else if (day?.status !== "closed") {
             setSelectedInitialDate(date);
-            if (services.length > 0) setPreSelectedService(services[0]);
+            if (services.length > 0) setPreSelectedService(null);
             setIsBookingModalOpen(true);
           } else {
             notify.info("A profissional não atende neste dia.");

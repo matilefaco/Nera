@@ -2136,16 +2136,14 @@ export default function AgendaPage() {
                         </div>
                       )}
 
-                      {selectedAppointment.notes && (
-                        <div className="p-5 sm:p-6 bg-brand-linen/30 rounded-[24px] sm:rounded-[32px] border border-brand-mist/40">
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-2">
-                            Observações
-                          </p>
-                          <p className="text-sm text-brand-ink font-light italic leading-relaxed">
-                            "{selectedAppointment.notes}"
-                          </p>
-                        </div>
-                      )}
+                      <div className="p-5 sm:p-6 bg-brand-linen/30 rounded-[24px] sm:rounded-[32px] border border-brand-mist/40">
+                        <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-2">
+                          Observações da Cliente
+                        </p>
+                        <p className="text-sm text-brand-ink font-light italic leading-relaxed">
+                          {selectedAppointment.notes ? `"${selectedAppointment.notes}"` : "Nenhuma observação enviada."}
+                        </p>
+                      </div>
 
                       {selectedAppointment.timeline &&
                         selectedAppointment.timeline.length > 0 && (
