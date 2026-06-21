@@ -1,0 +1,95 @@
+src/components/SharingPreviewSection.tsx:                    Sua vitrine pronta para circular.
+src/components/SharingPreviewSection.tsx:                        QR Code da sua vitrine
+src/components/UpgradeModal.tsx:          title: "Personalize sua vitrine",
+src/components/public/PublicHero.tsx:                aria-label="Vitrine PRO"
+src/components/DeleteAccountState.tsx:          Recebemos o seu pedido com segurança. A sua vitrine já foi removida da experiência pública da Nera e o acesso às áreas da conta foi protegido enquanto concluímos o processo.
+src/components/FormLocation.tsx:            <h3 className="text-[11px] font-bold text-brand-ink uppercase tracking-widest text-left">Região principal da sua vitrine</h3>
+src/components/FormLocation.tsx:              Essa região aparece na sua vitrine para ajudar clientes a entenderem onde você atende.
+src/components/FormLocation.tsx:                <span className="text-[9px] text-brand-stone italic mt-0.5">Esse endereço fica salvo na Nera. Você escolhe abaixo se ele aparece completo na vitrine ou apenas após a reserva confirmada.</span>
+src/components/FormLocation.tsx:                      <p className="text-[11px] text-brand-stone font-light leading-tight">Clientes poderão ver o endereço completo na sua vitrine.</p>
+src/components/FormLocation.tsx:                      <p className="text-[11px] text-brand-stone font-light leading-tight">Clientes veem sua região na vitrine. O endereço completo é liberado após a reserva confirmada.</p>
+src/components/ActivationChecklist.tsx:      label: 'Divulgar vitrine',
+src/components/ActivationChecklist.tsx:  // Se a profissional já tiver qualquer histórico de reserva, a vitrine já está em operação ("já recebeu movimento").
+src/components/ActivationChecklist.tsx:            A beleza da sua nova vitrine ✨
+src/components/ActivationChecklist.tsx:              Ver minha vitrine
+src/components/ActivationChecklist.tsx:                  ? "Sua vitrine está 100% otimizada! Compartilhe agora." 
+src/components/BookingModal.tsx:                    vitrine de demonstração oficial da Nera
+src/components/ShareVitrineModal.tsx:interface ShareVitrineModalProps {
+src/components/ShareVitrineModal.tsx:export default function ShareVitrineModal({ isOpen, onClose, profile }: ShareVitrineModalProps) {
+src/components/ShareVitrineModal.tsx:                <h3 className="text-lg font-serif text-brand-ink">Minha Vitrine</h3>
+src/components/ShareVitrineModal.tsx:                Copiar link da vitrine
+src/components/ShowcaseSequence.tsx:    title: 'Sua vitrine pronta',
+src/components/ShowcaseSequence.tsx:    desc: 'Envie sua vitrine premium para suas clientes no Instagram ou WhatsApp.',
+src/components/ShowcaseSequence.tsx:      <h3 className="text-lg font-serif text-brand-ink leading-tight">Crie sua vitrine</h3>
+src/components/FormIdentity.tsx:                Esse título aparece no topo da sua vitrine.
+src/components/FormIdentity.tsx:              <p className="text-[11px] text-brand-stone/80 ml-1 mb-3">Essa escolha ajuda a definir a personalidade da sua vitrine e influencia os textos gerados pela IA.</p>
+src/components/FormIdentity.tsx:                Essa descrição aparece na sua vitrine e ajuda a cliente a entender seu valor antes de agendar.
+src/components/FormIdentity.tsx:                  Selecione os pontos que tornam seu atendimento único. Eles aparecerão em uma seção especial na sua vitrine.
+src/pages/LandingPage.tsx:              Uma presença que trabalha enquanto você atende. Sua vitrine, sua agenda e seu histórico — num único link com a sua cara.
+src/pages/LandingPage.tsx:              <Link to="/p/helena-prado" className="btn-ghost" aria-label="Ver vitrine de exemplo">
+src/pages/LandingPage.tsx:                Ver vitrine de exemplo →
+src/pages/LandingPage.tsx:            <h3 className="feat-title">Vitrine digital</h3>
+src/pages/LandingPage.tsx:            Sua vitrine não é só bonita. Ela organiza a primeira impressão: mostra seu trabalho, explica seus serviços e transforma interesse em agendamento.
+src/pages/Dashboard.tsx:import ShareVitrineModal from '../components/ShareVitrineModal';
+src/pages/Dashboard.tsx:                      <p className="text-[13px] font-serif text-brand-ink italic">Visão de sua vitrine</p>
+src/pages/Dashboard.tsx:                    <p className="text-sm font-serif text-brand-ink mb-1 italic">Sua vitrine está pronta para prosperar</p>
+src/pages/Dashboard.tsx:                    <h4 className="text-xl font-serif text-brand-ink mb-3 tracking-tight">Insights avançados da sua vitrine</h4>
+src/pages/Dashboard.tsx:                         <p className="text-[8px] font-bold uppercase tracking-widest text-brand-stone mb-1">Visitas na vitrine (30d)</p>
+src/pages/Dashboard.tsx:            {/* Crescimento da Vitrine / Compartilhamento */}
+src/pages/Dashboard.tsx:                  <h4 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3 leading-tight italic">Sua vitrine está pronta.</h4>
+src/pages/Dashboard.tsx:                      Ver minha vitrine
+src/pages/Dashboard.tsx:      <ShareVitrineModal 
+src/pages/AuthActionPage.tsx:              Sua conta na Nera foi ativada. Agora você pode acessar sua agenda e construir sua vitrine profissional.
+src/pages/ReviewsModerationPage.tsx:              Aprove ou oculte as avaliações recentes antes que apareçam na sua vitrine.
+src/pages/PrivacyPage.tsx:            <li>Fornecer a infraestrutura de vitrine digital, sistema de agendamento e gerenciamento de clientes.</li>
+src/pages/PrivacyPage.tsx:            <li><strong className="font-semibold text-brand-ink">Google Calendar:</strong> Se ativado pelo profissional, sincronizamos apenas as datas/horários dos blocos para evitar conflitos na sua vitrine.</li>
+src/pages/PublicProfile.tsx:            Não conseguimos carregar esta vitrine agora
+src/pages/PublicProfile.tsx:          `Conheça a vitrine profissional de ${profile.name} na Nera.`
+src/pages/PublicProfile.tsx:              Exemplo de vitrine
+src/pages/AgendaPage.tsx:import ShareVitrineModal from "../components/ShareVitrineModal";
+src/pages/AgendaPage.tsx:        <ShareVitrineModal
+src/pages/TermsPage.tsx:            Bem-vinda à <strong className="font-semibold text-brand-ink">Nera</strong>. Ao acessar nossa plataforma ou utilizar a infraestrutura da nossa vitrine de agendamentos, você concorda com estes termos. Este documento é claro e direto para estabelecer uma relação transparente de parceria.
+src/pages/TermsPage.tsx:            A Nera é um software de gestão e uma vitrine digital (SaaS) desenhada exclusivamente para profissionais de beleza, estética e bem-estar. Nós fornecemos a tecnologia de hospedagem do seu perfil, sistema de marcações de horários e integrações; contudo, a Nera não realiza os serviços oferecidos e não atua em nome dos profissionais na prestação de serviço fim.
+src/pages/TermsPage.tsx:            Ao utilizar o sistema de agendamento (Nera Vitrine):
+src/pages/TermsPage.tsx:            <li>Disseminação de conteúdo ofensivo, violento, preconceituoso ou explícito nas vitrines.</li>
+src/pages/VerifyEmailPage.tsx:          Nera · Sua vitrine profissional
+src/pages/RegisterPage.tsx:              Para criar uma nova vitrine, você precisa sair da conta atual ({(profile?.name || currentUser.displayName || currentUser.email)}).
+src/pages/RegisterPage.tsx:            <p className="text-[11px] text-brand-stone font-light leading-snug mb-3">Para criar sua vitrine e começar no seu ritmo.</p>
+src/pages/DirectoryPage.tsx:              Criar minha vitrine
+src/pages/SettingsPage.tsx:                    : "A exclusão da sua conta será feita com cuidado para proteger seus dados, agenda e assinatura. Ao confirmar, sua vitrine será desativada com segurança e o processo administrativo será iniciado."}
+src/pages/ServicesPage.tsx:              <p className="text-brand-stone text-sm font-light mb-10 max-w-xs mx-auto text-balance">Personalize sua vitrine adicionando os serviços que você oferece.</p>
+src/pages/ServicesPage.tsx:                      <span className="text-[10px] text-brand-stone/70">Ajuda a organizar sua vitrine por área de atendimento.</span>
+src/pages/ServicesPage.tsx:                        <span className="text-[10px] text-brand-stone/70">Ajuda a destacar serviços importantes na sua vitrine.</span>
+src/pages/ReferralsPage.tsx:                  const whatsappMessage = `Descobri uma plataforma linda para profissionais da beleza ✨\n\nA Nera organiza agenda, atendimento e vitrine de forma muito mais profissional.\n\nSe quiser conhecer:\n${referralLink}`;
+src/pages/OnboardingPage.tsx:      if (!slug.trim()) errors.slug = "O link da sua vitrine é obrigatório";
+src/pages/OnboardingPage.tsx:        notify.error("Revise os campos destacados para publicar sua vitrine.");
+src/pages/OnboardingPage.tsx:              . Para começar seu teste de 15 dias e configurar sua vitrine, é
+src/pages/OnboardingPage.tsx:                { label: "Vitrine", idx: 3 },
+src/pages/OnboardingPage.tsx:                    Estamos criando a vitrine.
+src/pages/OnboardingPage.tsx:                      Essas informações aparecem na sua vitrine para evitar
+src/pages/OnboardingPage.tsx:                      Publicar minha vitrine <CheckCircle2 size={18} />
+src/pages/ProfilePage.tsx:    if (!slug.trim()) errors.slug = 'O link da sua vitrine é obrigatório';
+src/pages/ProfilePage.tsx:            <p className="text-sm text-brand-stone font-light">Configure as informações que aparecem na sua vitrine.</p>
+src/pages/ProfilePage.tsx:              { id: 'profile-vitrine', label: '2. Vitrine' },
+src/pages/ProfilePage.tsx:          {/* 2. VITRINE */}
+src/pages/ProfilePage.tsx:          <section id="profile-vitrine" className="space-y-6 pt-10 border-t border-brand-mist/50 scroll-mt-24">
+src/pages/ProfilePage.tsx:              <h2 className="text-xl font-serif text-brand-ink">2. Vitrine</h2>
+src/pages/ProfilePage.tsx:                    Adicione fotos reais dos seus atendimentos, detalhes e resultados. Sua vitrine fica mais confiável quando ela vê o seu padrão de entrega.
+src/pages/ProfilePage.tsx:                  <p className="text-[11px] text-brand-stone mb-6">Esta foto aparecerá de forma organizada na sua vitrine inteligente.</p>
+src/pages/ProfilePage.tsx:                        <p className="text-sm font-medium text-brand-ink">Destaque na Vitrine</p>
+src/pages/ProfilePage.tsx:            {/* Estilo da vitrine */}
+src/pages/ProfilePage.tsx:                    Estilo da sua vitrine
+src/pages/ProfilePage.tsx:                    const mood = THEME_MOODS[variant] || { label: theme.name, subtitle: 'Tema visual para a vitrine.' };
+src/pages/ProfilePage.tsx:                        <p className="text-[9px] text-brand-stone/60 font-light leading-none">Exibido na vitrine se selecionado cartão de crédito.</p>
+src/hooks/useDashboardMetrics.ts:       growthInsight = "Sua vitrine está atraindo bastante gente, mas a conversão pode melhorar. Ajuste os nomes e descrições dos serviços para atraí-las.";
+src/hooks/useDashboardMetrics.ts:       growthInsight = `Sua vitrine atraiu novas pessoas nos últimos 7 dias. Continue divulgando seu link para crescer.`;
+src/lib/brandVoice.ts:    PUBLIC_PAGE: 'Vitrine',
+src/lib/bookingUtils.ts: * Garante paridade total entre a vitrine (badge) e a agenda.
+src/backup_landing_v1/LandingPage.tsx:              <Link to="/p/helena-prado" className="btn-ghost" aria-label="Ver vitrine de exemplo">
+src/backup_landing_v1/LandingPage.tsx:                Ver vitrine de exemplo →
+src/backup_landing_v1/LandingPage.tsx:                <p className="step-desc">Fotos, serviços, preços e disponibilidade. Sua vitrine pública fica pronta para receber clientes antes de você terminar o café.</p>
+src/backup_landing_v1/LandingPage.tsx:            <h3 className="feat-title">Vitrine digital</h3>
+src/backup_landing_v1/LandingPage.tsx:            Sua vitrine não é só bonita. Ela organiza a primeira impressão: mostra seu trabalho, explica seus serviços e transforma interesse em agendamento.
+src/config/plans.ts:    subtitle: 'Sua vitrine impecável e agenda sob controle.',
+src/config/plans.ts:      { text: 'Vitrine pública premium com seus serviços' },
+src/config/plans.ts:      { text: 'Badge Pro na vitrine' },
