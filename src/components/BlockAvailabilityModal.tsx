@@ -12,6 +12,8 @@ import { cn, getTodayLocale, getTodayLocaleTime } from '../lib/utils';
 import { BlockedSchedule, Appointment, WorkingHours } from '../types';
 import PremiumButton from './PremiumButton';
 import { isCancelledStatus } from '../constants/appointmentStatus';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
+import { Link } from 'react-router-dom';
 
 interface BlockAvailabilityModalProps {
   open: boolean;
@@ -44,6 +46,7 @@ export default function BlockAvailabilityModal({
   initialStartTime,
   initialEndTime
 }: BlockAvailabilityModalProps) {
+  const { plan } = usePlanFeatures();
   const [step, setStep] = useState<'custom' | 'conflicts'>('custom');
   const [tab, setTab] = useState<'single' | 'recurring'>('recurring');
   const [date, setDate] = useState(selectedDate);
@@ -235,6 +238,20 @@ export default function BlockAvailabilityModal({
                         <CalendarIcon size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-brand-stone pointer-events-none" />
                       </div>
                     </div>
+                  ) : plan === 'free' ? (
+                    <div className="p-6 bg-brand-linen/40 rounded-2xl border border-brand-mist flex flex-col items-center text-center">
+                      <div className="w-10 h-10 bg-brand-white rounded-full flex items-center justify-center border border-brand-mist mb-3">
+                        <Lock size={16} className="text-brand-stone" />
+                      </div>
+                      <h4 className="text-[13px] font-medium text-brand-ink mb-1">Regras recorrentes</h4>
+                      <p className="text-[11px] text-brand-stone font-light leading-relaxed mb-4">
+                        Disponível nos planos Essencial e Pro.<br/>
+                        Automatize bloqueios semanais e horários recorrentes.
+                      </p>
+                      <Link to="/planos" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline">
+                        Conhecer planos
+                      </Link>
+                    </div>
                   ) : (
                     <div className="space-y-2">
                       <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">Repetir toda(s)</label>
@@ -304,9 +321,11 @@ export default function BlockAvailabilityModal({
 
                 <div className="mt-8">
                   <PremiumButton 
-                    className="w-full py-5 text-[11px]"
+                    className={cn("w-full py-5 text-[11px]", tab === 'recurring' && plan === 'free' ? "opacity-50 cursor-not-allowed pointer-events-none" : "")}
+                    disabled={tab === 'recurring' && plan === 'free'}
                     loading={loading}
                     onClick={() => {
+                        if (tab === 'recurring' && plan === 'free') return;
                         const conflicting = checkConflicts(startTime, endTime);
                         if (conflicting.length > 0) {
                             setConflicts(conflicting);

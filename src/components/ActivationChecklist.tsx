@@ -170,16 +170,6 @@ export const ActivationChecklist = ({
       icon: Share2,
       isComplete: hasShared || !!profile?.hasSharedLink,
       action: handleShareClick
-    },
-    {
-      id: 'first_booking',
-      label: 'Receber sua primeira reserva',
-      description: 'O momento mais esperado!',
-      icon: Star,
-      isComplete: hasHistoricalBooking || appointments.some(app => 
-        app.status && 
-        !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(app.status)
-      )
     }
   ];
 
@@ -208,6 +198,11 @@ export const ActivationChecklist = ({
   };
 
   if (isLoading || isFetchingHistory) return null;
+
+  // Se a profissional já tiver qualquer histórico de reserva, a vitrine já está em operação ("já recebeu movimento").
+  // Retornamos null para remover o card gigante de onboarding (e a própria checklist condicional).
+  // Assim o Dashboard foca apenas na operação diária.
+  if (hasHistoricalBooking) return null;
 
   if (checklistProgress === 100) {
     if (wowDismissed) return null;

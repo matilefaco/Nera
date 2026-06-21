@@ -713,24 +713,22 @@ export default function PendingRequestsPage() {
                               animate={{ opacity: 1, y: 0 }}
                               className="w-full flex flex-col items-center text-center"
                             >
-                              <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-6">
-                                <MessageCircle
+                              <div className="w-16 h-16 bg-[#25D366]/10 rounded-full flex items-center justify-center mb-6">
+                                <CheckCircle2
                                   size={32}
-                                  className="text-green-500"
+                                  className="text-[#25D366]"
                                 />
                               </div>
-                              <h4 className="text-sm font-bold uppercase tracking-widest mb-3">
-                                Avisar cliente?
+                              <h4 className="text-[13px] font-bold text-brand-ink uppercase tracking-widest mb-2 leading-relaxed">
+                                Cliente já foi avisada por e-mail ✨
                               </h4>
-                              <p className="text-[11px] opacity-60 mb-8 leading-relaxed max-w-[200px] italic">
-                                "Oi {request.clientName}, seu horário para{" "}
-                                {request.additionalServices?.length > 0 
-                                  ? [request.serviceName, ...request.additionalServices.map((s:any) => s.name)].join(" e ")
-                                  : request.serviceName} dia{" "}
-                                {request.date.split("-").reverse().join("/")} às{" "}
-                                {request.time} foi confirmado 💛"
+                              <p className="text-[11px] text-brand-stone mb-2 max-w-[220px]">
+                                A Nera enviou automaticamente a confirmação da reserva.
                               </p>
-                              <div className="flex flex-col w-full gap-4">
+                              <p className="text-[10px] text-brand-stone/70 mb-8 max-w-[220px]">
+                                Você também pode enviar uma mensagem pelo WhatsApp, se quiser dar um toque mais pessoal.
+                              </p>
+                              <div className="flex flex-col w-full gap-3">
                                 <a
                                   href={buildWhatsappLink(
                                     request.clientWhatsapp,
@@ -742,18 +740,18 @@ export default function PendingRequestsPage() {
                                     setConfirmedId(null);
                                     setWhatsappCtaId(null);
                                   }}
-                                  className="w-full py-5 bg-green-500 text-white rounded-[24px] text-[10px] font-bold uppercase tracking-widest shadow-xl shadow-green-500/20 active:scale-95 transition-all flex items-center justify-center gap-2"
+                                  className="w-full py-4 bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 border border-[#25D366]/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2"
                                 >
-                                  Enviar agora
+                                  <MessageCircle size={16} /> Enviar WhatsApp
                                 </a>
                                 <button
                                   onClick={() => {
                                     setConfirmedId(null);
                                     setWhatsappCtaId(null);
                                   }}
-                                  className="text-[10px] font-bold uppercase py-2 tracking-widest opacity-40 hover:opacity-100 transition-opacity"
+                                  className="w-full py-4 text-brand-stone hover:bg-brand-mist/20 rounded-2xl text-[10px] font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
                                 >
-                                  Fazer depois
+                                  Concluir
                                 </button>
                               </div>
                             </motion.div>

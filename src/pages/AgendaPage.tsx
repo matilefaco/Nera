@@ -1345,7 +1345,7 @@ export default function AgendaPage() {
               >
                 <button
                   onClick={() => {
-                    setIsBlockModalOpen(true);
+                    setIsQuickBlockOpen(true);
                     setIsFabOpen(false);
                   }}
                   className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[20px] flex items-center gap-3 transition-colors group"

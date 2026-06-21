@@ -15,18 +15,50 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
   const profileUrl = `https://usenera.com/p/${profile.slug}`;
   const [copiedTemplate, setCopiedTemplate] = useState<number | null>(null);
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
   const storyCardRef = useRef<HTMLDivElement>(null);
 
-  const safeInitial = (profile?.name || 'N').trim().charAt(0).toUpperCase();
+  useEffect(() => {
+    if (!profile.avatar) {
+      setAvatarBase64(null);
+      return;
+    }
 
-  const formatSlugForStory = (slug: string) => {
-    if (!slug) return '';
-    if (slug.length <= 22) return `/${slug}`;
-    const firstPart = slug.substring(0, 9);
-    const lastPart = slug.substring(slug.length - 8);
-    return `/${firstPart}...${lastPart}`;
-  };
+    let isMounted = true;
+    const fetchImageBase64 = async () => {
+      try {
+         // Attempt to fetch the image to convert it to base64, avoiding html2canvas CORS issues
+         const response = await fetch(profile.avatar as string);
+         if (!response.ok) throw new Error('Failed to fetch avatar image');
+         const blob = await response.blob();
+         
+         // Basic validation that we actually got an image
+         if (!blob.type.startsWith('image/')) {
+           throw new Error('Fetched file is not an image');
+         }
+
+         const reader = new FileReader();
+         reader.onloadend = () => {
+           if (isMounted) {
+             setAvatarBase64(reader.result as string);
+           }
+         };
+         reader.readAsDataURL(blob);
+      } catch (err) {
+         console.warn('Could not load avatar for Story Card (falling back to Model B):', err);
+         if (isMounted) {
+           setAvatarBase64(null);
+         }
+      }
+    };
+
+    fetchImageBase64();
+
+    return () => { isMounted = false; };
+  }, [profile.avatar]);
+
+  const safeInitial = (profile?.name || 'N').trim().charAt(0).toUpperCase();
 
   const handleDownloadStoryCard = useCallback(async () => {
     if (!storyCardRef.current) return;
@@ -49,7 +81,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
       const exportOptions = {
         cacheBust: true,
         pixelRatio: 3,
-        backgroundColor: '#F9F5F0',
+        backgroundColor: avatarBase64 ? '#000000' : '#F9F5F0',
         style: {
           borderRadius: '20px',
           margin: '0',
@@ -122,7 +154,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
         {/* 2. MENSAGEM PARA DIVULGAR */}
         <div className="bg-white rounded-[24px] p-5 sm:p-6 border border-brand-mist shadow-sm flex flex-col h-full">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 bg-[#E8F8EE] rounded-full flex items-center justify-center text-[#128C7E]">
+            <div className="w-8 h-8 bg-brand-linen rounded-full flex items-center justify-center text-brand-ink">
               <MessageCircle size={16} />
             </div>
             <div>
@@ -142,14 +174,14 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
               onClick={() => handleCopyText(whatsappTemplates[0], 0)}
               className="flex-1 py-3 bg-brand-linen text-brand-ink rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 hover:bg-brand-parchment"
             >
-              {copiedTemplate === 0 ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+              {copiedTemplate === 0 ? <Check size={14} className="text-brand-ink" /> : <Copy size={14} />}
               Copiar
             </button>
             <a 
               href={`https://wa.me/?text=${defaultWhatsappShare}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-3 bg-[#128C7E] text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 hover:bg-[#075E54] shadow-sm"
+              className="flex-1 py-3 bg-brand-ink text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all flex items-center justify-center gap-2 hover:bg-brand-ink/90 shadow-sm"
             >
               <MessageCircle size={14} />
               WhatsApp
@@ -162,7 +194,7 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
           {/* STORIES */}
           <div className="bg-white rounded-[24px] p-5 sm:p-6 border border-brand-mist shadow-sm flex flex-col justify-between">
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-8 h-8 bg-gradient-to-tr from-[#FEDA75] via-[#D62976] to-[#962FBF] rounded-full flex items-center justify-center text-white shrink-0">
+              <div className="w-8 h-8 bg-brand-linen rounded-full flex items-center justify-center text-brand-ink shrink-0">
                 <Instagram size={16} />
               </div>
               <div>
@@ -177,72 +209,96 @@ export function SharingPreviewSection({ profile }: SharingPreviewSectionProps) {
                 {/* The card container to be exported */}
                 <div 
                   ref={storyCardRef}
-                  className="w-[180px] h-[320px] rounded-[16px] overflow-hidden bg-[#F8F6F2] relative flex flex-col items-center justify-between py-6 px-4 shadow-[inset_0_0_40px_rgba(137,103,88,0.05)]"
+                  className={cn(
+                    "w-[180px] h-[320px] rounded-[16px] overflow-hidden relative flex flex-col justify-between py-6 px-4 shadow-[inset_0_0_40px_rgba(0,0,0,0.05)]",
+                    avatarBase64 ? "bg-black" : "bg-[#F8F6F2] py-8"
+                  )}
                 >
-                  {/* CSS Grain */}
-                  <div className="absolute inset-0 opacity-[0.035] mix-blend-multiply pointer-events-none" style={{ backgroundImage: 'radial-gradient(#896758 1px, transparent 1px)', backgroundSize: '4px 4px' }}></div>
+                  {avatarBase64 ? (
+                    /* MODELO A - COM FOTO */
+                    <>
+                      {/* Imagem de Fundo (Base64) - resolve problemas de CORS no download */}
+                      <img 
+                        src={avatarBase64} 
+                        alt={profile.name}
+                        className="absolute inset-0 w-full h-full object-cover opacity-90"
+                      />
+                      
+                      {/* Gradiente para garantir leitura (superior e inferior) mais suave */}
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/10 to-black/70 pointer-events-none z-0"></div>
 
-                  {/* Editorial Inner Border */}
-                  <div className="absolute inset-2 border-[0.5px] border-brand-terracotta/20 rounded-[10px] pointer-events-none z-10"></div>
+                      {/* Header */}
+                      <div className="relative z-10 flex flex-col items-center mt-2.5">
+                        <span className="text-[6.5px] font-medium text-white/90 uppercase tracking-[0.4em] mb-1.5 drop-shadow-md">Agenda Aberta</span>
+                        <div className="w-5 h-[0.5px] bg-white/40"></div>
+                      </div>
 
-                  {/* Giant Abstract Initial Monogram Background */}
-                  <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-[0.03] select-none">
-                     <span className="text-[400px] font-serif text-brand-ink leading-none mt-10 mix-blend-multiply">{safeInitial}</span>
-                  </div>
+                      {/* Middle / Footer Content */}
+                      <div className="relative z-10 w-full flex flex-col items-center mt-auto mb-2 text-center px-3">
+                        <h4 className="text-[17px] font-serif text-white leading-tight text-balance mb-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]">
+                           {profile.name}
+                        </h4>
+                        
+                        {(profile.specialty || profile.category) && (
+                          <span className="text-[6.5px] font-medium text-white/80 uppercase tracking-[0.3em] mb-5 drop-shadow-md">
+                             {profile.specialty || profile.category}
+                          </span>
+                        )}
 
-                  {/* 1. Header label */}
-                  <div className="relative z-10 flex flex-col items-center mt-2">
-                    <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.35em] mb-1.5">Agenda Online</span>
-                    <div className="w-8 h-[0.5px] bg-brand-terracotta/40"></div>
-                  </div>
+                        {/* CTA Instagram Link Sticker Mockup */}
+                        <div className="bg-white/95 backdrop-blur-sm px-4 py-2.5 rounded-[8px] flex items-center justify-center border border-white/20 shadow-lg mb-1 w-[85%]">
+                           <span className="text-[8px] font-bold text-brand-ink uppercase tracking-[0.15em] leading-none">
+                             Agende online
+                           </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    /* MODELO B - SEM FOTO */
+                    <>
+                      {/* CSS Grain */}
+                      <div className="absolute inset-0 opacity-[0.035] mix-blend-multiply pointer-events-none z-0" style={{ backgroundImage: 'radial-gradient(#896758 1px, transparent 1px)', backgroundSize: '4px 4px' }}></div>
 
-                  {/* 2. Middle Content (Name & Speciality) */}
-                  <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full px-2 text-center -mt-2">
-                    <h4 className="text-[18px] sm:text-[20px] font-serif text-brand-ink leading-[1.1] text-balance max-w-[150px]">
-                       {profile.name}
-                    </h4>
-                    
-                    {(profile.specialty || profile.category) && (
-                      <div className="mt-3 pt-2.5 border-t border-brand-mist/60 px-4">
-                        <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.25em] relative top-[-1px]">
-                           {profile.specialty || profile.category}
+                      {/* Monogram Background */}
+                      <div className="absolute inset-0 flex items-center justify-center overflow-hidden pointer-events-none opacity-[0.03] select-none z-0">
+                         <span className="text-[400px] font-serif text-brand-ink leading-none mt-10 mix-blend-multiply flex-shrink-0">{safeInitial}</span>
+                      </div>
+
+                      {/* Top Branding */}
+                      <div className="relative z-10 flex w-full justify-center mt-2">
+                        <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.4em] opacity-60">
+                           {profile.specialty || profile.category || "Profissional"}
                         </span>
                       </div>
-                    )}
 
-                    <div className="mt-6 flex flex-col items-center">
-                       <span className="w-1 h-1 rounded-full bg-brand-terracotta/60 mb-3"></span>
-                       <p className="text-[14px] font-serif text-brand-terracotta italic leading-snug tracking-wide max-w-[140px]">
-                         {profile.headline || "Reserve seu horário"}
-                       </p>
-                       <p className="text-[7px] text-brand-stone uppercase tracking-[0.15em] mt-1.5 font-bold">
-                         Agendamento disponível
-                       </p>
-                    </div>
-                  </div>
+                      {/* Middle Content */}
+                      <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full px-4 text-center -mt-4">
+                        <h4 className="text-[17px] font-serif text-brand-ink leading-[1.1] text-balance mb-4">
+                           {profile.name}
+                        </h4>
 
-                  {/* 3. Link Sticker & Footer */}
-                  <div className="relative z-10 flex flex-col items-center w-full gap-2.5 mt-auto mb-1">
-                    {/* Link Sticker */}
-                    <div className="bg-white/95 px-3 py-1.5 rounded-[12px] flex items-center justify-center gap-2 w-[92%] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.12)] border border-[#EFECE8] shrink-0 transform hover:scale-[1.02] transition-transform">
-                      <div className="bg-brand-ink rounded-full w-[16px] h-[16px] flex items-center justify-center shrink-0">
-                         <Share2 size={8} className="text-white" strokeWidth={2.5} />
+                        <div className="w-8 h-[0.5px] bg-brand-terracotta/30 mb-5"></div>
+                        
+                        <div className="flex flex-col items-center">
+                           <p className="text-[13px] font-serif text-brand-terracotta italic leading-snug tracking-wide text-balance">
+                             Agenda disponível
+                           </p>
+                           <p className="text-[7px] text-brand-stone uppercase tracking-[0.25em] mt-2 font-medium opacity-80">
+                             Atendimentos abertos
+                           </p>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-start min-w-0 overflow-hidden text-left pt-[1px] pb-[1px]">
-                        <span className="text-[5.5px] font-bold text-brand-stone uppercase tracking-[0.15em] leading-none mb-1">
-                          usenera.com/p
-                        </span>
-                        <span className="text-[8.5px] font-bold text-brand-ink w-full truncate tracking-tight leading-none mb-[1px]">
-                          {formatSlugForStory(profile.slug || '')}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Footer Signature */}
-                    <div className="mt-0.5 items-center justify-center flex opacity-30">
-                       <span className="text-[3.5px] font-bold text-brand-stone tracking-[0.4em] uppercase">Nera • Agendamento Online</span>
-                    </div>
-                  </div>
+                      {/* Link Sticker CTA */}
+                      <div className="relative z-10 flex flex-col items-center w-full mt-auto mb-2">
+                        <div className="bg-brand-ink px-4 py-2.5 rounded-[8px] flex items-center justify-center shadow-lg w-[85%]">
+                           <span className="text-[8px] font-bold text-white uppercase tracking-[0.15em] leading-none">
+                             Agende online
+                           </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

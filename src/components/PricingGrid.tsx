@@ -25,6 +25,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <ul className="plan-features">
             <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium (foto, bio e serviços)</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Até 15 agendamentos por mês</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio simples de horários</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Notificações básicas por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Link direto para bio</li>
           </ul>
@@ -52,8 +53,8 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <ul className="plan-features">
             <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos ilimitados</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Experiência profissional por e-mail</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Confirmações e lembretes por e-mail</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio de horários</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Confirmações e lembretes automáticos por e-mail</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Bloqueios recorrentes e avançados</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Histórico completo de clientes</li>
           </ul>
           {isLanding ? (

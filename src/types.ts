@@ -111,7 +111,6 @@ export interface UserProfile {
   // Anti No-Show Settings
   antiNoShowEnabled?: boolean;
   advancePaymentRequired?: boolean;
-  delayTolerance?: 10 | 15 | 20 | 0;
 
   pinterest?: string;
   facebook?: string;

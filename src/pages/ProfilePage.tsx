@@ -135,7 +135,6 @@ export default function ProfilePage() {
     serviceStyle, setServiceStyle,
     antiNoShowEnabled, setAntiNoShowEnabled,
     advancePaymentRequired, setAdvancePaymentRequired,
-    delayTolerance, setDelayTolerance,
     profileTheme, setProfileTheme
   } = useProfileForm(profile);
 
@@ -328,7 +327,6 @@ export default function ProfilePage() {
       pricingStrategy: data.pricingStrategy || 'none',
       antiNoShowEnabled: data.antiNoShowEnabled || false,
       advancePaymentRequired: data.advancePaymentRequired || false,
-      delayTolerance: data.delayTolerance ?? 0,
       profileTheme: data.profileTheme?.variant || data.profileTheme || 'terracotta',
       differentials: [...(Array.isArray(data.differentials) ? data.differentials : [])].sort(),
       yearsExperience: data.yearsExperience || '',
@@ -368,14 +366,14 @@ export default function ProfilePage() {
     return buildSnapshot({
       name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
       studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
-      advancePaymentRequired, delayTolerance, profileTheme,
+      advancePaymentRequired, profileTheme,
       editorialPillar, differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
       acceptsInstallments
     });
   }, [
     name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
     studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
-    advancePaymentRequired, delayTolerance, profileTheme?.variant,
+    advancePaymentRequired, profileTheme?.variant,
     editorialPillar, differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
     acceptsInstallments
   ]);
@@ -797,7 +795,6 @@ export default function ProfilePage() {
         acceptsInstallments,
         antiNoShowEnabled,
         advancePaymentRequired,
-        delayTolerance,
         workingHours: {
           startTime,
           endTime,
@@ -2209,24 +2206,47 @@ export default function ProfilePage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between py-3 border-b border-brand-mist/30">
                     <div>
-                      <p className="text-[13px] font-medium text-brand-ink mb-0.5">Lembrete por e-mail 24h antes</p>
-                      <p className="text-[11px] text-brand-stone font-light">Envia um e-mail automático pedindo confirmação da cliente antes do atendimento.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAntiNoShowEnabled(!antiNoShowEnabled)}
-                      className={cn(
-                        "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 focus-visible:ring-offset-2 active:scale-[0.92] border",
-                        antiNoShowEnabled
-                          ? "bg-brand-ink border-brand-ink"
-                          : "bg-brand-mist/30 border-brand-mist/40 hover:border-brand-mist/60"
+                      <p className="text-[13px] font-medium text-brand-ink mb-0.5 flex items-center gap-2">
+                        {plan === 'free' && <Lock size={12} className="text-brand-stone" />}
+                        Lembrete por e-mail 24h antes
+                      </p>
+                      {plan === 'free' ? (
+                        <div className="mt-2 text-left">
+                          <p className="text-[11px] text-brand-stone font-light italic leading-relaxed">
+                            Disponível nos planos Essencial e Pro.<br/>
+                            Ajuda a reduzir faltas e confirmar presença automaticamente.
+                          </p>
+                          <Link to="/planos" className="text-[10px] font-bold uppercase tracking-widest text-brand-terracotta hover:underline mt-2 inline-block">Conhecer planos</Link>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-brand-stone font-light">Envia um e-mail automático pedindo confirmação da cliente antes do atendimento.</p>
                       )}
-                    >
-                      <div className={cn(
-                        "absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shadow-[0_2px_4px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)]",
-                        antiNoShowEnabled ? "left-[17px] shadow-[0_1px_3px_rgba(0,0,0,0.15),0_0_1px_rgba(0,0,0,0.1)]" : "left-[1px]"
-                      )} />
-                    </button>
+                    </div>
+                    {plan === 'free' ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-[40px] h-[24px] rounded-full transition-colors duration-500 relative shrink-0 border bg-brand-mist/20 border-brand-mist/30 cursor-not-allowed"
+                      >
+                        <div className="absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white/50 left-[1px]" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setAntiNoShowEnabled(!antiNoShowEnabled)}
+                        className={cn(
+                          "w-[40px] h-[24px] rounded-full transition-colors duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] relative shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 focus-visible:ring-offset-2 active:scale-[0.92] border",
+                          antiNoShowEnabled
+                            ? "bg-brand-ink border-brand-ink"
+                            : "bg-brand-mist/30 border-brand-mist/40 hover:border-brand-mist/60"
+                        )}
+                      >
+                        <div className={cn(
+                          "absolute top-[1px] w-[20px] h-[20px] rounded-full bg-white transition-all duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)] shadow-[0_2px_4px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.05)]",
+                          antiNoShowEnabled ? "left-[17px] shadow-[0_1px_3px_rgba(0,0,0,0.15),0_0_1px_rgba(0,0,0,0.1)]" : "left-[1px]"
+                        )} />
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between py-3 border-b border-brand-mist/30">
@@ -2252,30 +2272,6 @@ export default function ProfilePage() {
                         false ? "left-[17px]" : "left-[1px]"
                       )} />
                     </button>
-                  </div>
-
-                  <div className="pt-3">
-                    <p className="text-[13px] font-medium text-brand-ink mb-0.5 flex items-center gap-2">
-                       Política de atraso
-                    </p>
-                    <p className="text-[11px] text-brand-stone font-light mb-3">Defina uma orientação para sua organização. A Nera ainda não libera horários automaticamente.</p>
-                    <div className="flex flex-wrap gap-2">
-                      {[0, 10, 15, 20].map(val => (
-                        <button
-                          key={val}
-                          type="button"
-                          onClick={() => setDelayTolerance(val as 0 | 10 | 15 | 20)}
-                          className={cn(
-                            "px-4 py-2.5 rounded-full text-[11px] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/30 border",
-                            delayTolerance === val
-                              ? "bg-brand-white text-brand-ink border-brand-mist/60 shadow-sm font-medium"
-                              : "bg-transparent text-brand-stone/70 border-brand-mist/40 hover:border-brand-mist hover:text-brand-stone"
-                          )}
-                        >
-                          {val === 0 ? "Flexível" : `Até ${val} min`}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </div>

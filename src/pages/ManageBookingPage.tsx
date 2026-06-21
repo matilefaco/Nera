@@ -419,7 +419,7 @@ setBlockedSchedules(dayBlocked);
                   {isCancelled ? <X size={40} /> : isCompleted ? <Sparkles size={40} /> : isConfirmed ? <Check size={40} /> : <Clock size={40} className="animate-pulse" />}
                 </div>
 
-                <div className="relative z-10">
+                <div className="relative z-10 w-full text-center">
                   <h3 className={cn(
                     "text-2xl font-serif mb-2",
                     isCancelled ? "text-red-700" : isCompleted ? "text-brand-terracotta" : isConfirmed ? "text-green-700" : "text-brand-ink"
@@ -428,28 +428,34 @@ setBlockedSchedules(dayBlocked);
                      isCompleted ? 'Atendimento concluído' :
                      isConfirmed ? 'Reserva confirmada' : 'Pedido recebido'}
                   </h3>
-                  {isPending && (
-                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone/60 mb-2">
-                      Aguardando confirmação
-                    </p>
-                  )}
                   {appointment.reservationCode && (
-                    <div className="inline-flex items-center gap-2 bg-brand-linen/60 px-3 py-1 rounded-full border border-brand-mist/30">
+                    <div className="inline-flex items-center gap-2 bg-brand-linen/60 px-3 py-1 rounded-full border border-brand-mist/30 mt-2 mb-4">
                       <span className="text-[8px] text-brand-stone uppercase tracking-widest font-bold">Reserva:</span>
                       <span className="text-[9px] font-mono font-bold text-brand-terracotta">{appointment.reservationCode}</span>
+                    </div>
+                  )}
+                  
+                  {isPending && (
+                    <div className="p-5 bg-brand-linen/40 rounded-3xl border border-brand-mist/50 mt-2 text-left">
+                      <p className="text-sm text-brand-ink font-serif mb-2">Seu pedido foi enviado com sucesso e está aguardando confirmação da profissional.</p>
+                      <p className="text-xs text-brand-stone font-light leading-relaxed">
+                        Esta é sua central de acompanhamento. Por aqui, você pode consultar o status da reserva e cancelar a solicitação caso precise.
+                      </p>
+                    </div>
+                  )}
+
+                  {isConfirmed && !isPast && (
+                    <div className="p-5 bg-brand-white/60 rounded-3xl border border-brand-mist/40 mt-2 text-left">
+                      <p className="text-sm text-brand-ink font-serif mb-2">Seu horário está garantido.</p>
+                      <p className="text-xs text-brand-stone font-light leading-relaxed">
+                        Se precisar alterar sua data ou horário, use esta página para reagendar ou cancelar sem precisar chamar a profissional diretamente.
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {isPending && (
-                  <div className="space-y-4 w-full">
-                    <div className="p-6 bg-brand-linen/40 rounded-3xl border border-brand-mist/50">
-                      <p className="text-sm text-brand-ink font-serif mb-2">Pedido recebido</p>
-                      <p className="text-xs text-brand-stone font-light leading-relaxed italic">
-                        {getBookingNotificationCopy(professional?.plan, !!professional?.whatsapp).professional}
-                      </p>
-                    </div>
-                    
+                  <div className="space-y-4 w-full mt-4">
                     <div className="grid grid-cols-1 gap-3">
                       {professional.plan === 'pro' && (
                         <a 
@@ -706,28 +712,6 @@ setBlockedSchedules(dayBlocked);
 
               {/* Secondary Actions Section */}
               <div className="space-y-6 pt-4">
-                {/* Permanent Link Section (Secondary) */}
-                <div className="bg-brand-white rounded-[32px] p-6 border border-brand-mist/60 shadow-sm opacity-80 hover:opacity-100 transition-opacity">
-                  <div className="flex items-center gap-2 mb-3">
-                    <LinkIcon size={14} className="text-brand-stone" />
-                    <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest">Link de Acesso Permanente</p>
-                  </div>
-                  <div className="flex items-center gap-2 p-3 bg-brand-linen rounded-xl border border-brand-mist/30">
-                    <div className="flex-1 truncate text-[9px] text-brand-stone font-mono">
-                      {window.location.origin}/r/{appointment.token}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/r/${appointment.token}`);
-                        notify.success('Link copiado!');
-                      }}
-                      className="p-2 hover:bg-brand-white rounded-lg text-brand-stone transition-colors"
-                    >
-                      <Copy size={12} />
-                    </button>
-                   </div>
-                </div>
-
                 {/* Indication Section (Tertiary or Post-Service) */}
                 <div className={cn(
                   "border border-brand-mist border-dashed rounded-[40px] p-10 text-center transition-all",

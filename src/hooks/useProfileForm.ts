@@ -15,7 +15,6 @@ export function useProfileForm(profile: UserProfile | null) {
   const [acceptsInstallments, setAcceptsInstallments] = useState<boolean | null>(profile?.acceptsInstallments ?? null);
   const [antiNoShowEnabled, setAntiNoShowEnabled] = useState(profile?.antiNoShowEnabled || false);
   const [advancePaymentRequired, setAdvancePaymentRequired] = useState(profile?.advancePaymentRequired || false);
-  const [delayTolerance, setDelayTolerance] = useState<10 | 15 | 20 | 0>(profile?.delayTolerance ?? 0);
   const [slug, setSlug] = useState(profile?.slug || '');
   const [avatar, setAvatar] = useState(profile?.avatar || '');
   const [neighborhood, setNeighborhood] = useState(profile?.neighborhood || '');
@@ -72,7 +71,6 @@ export function useProfileForm(profile: UserProfile | null) {
       if (profile.acceptsInstallments !== undefined) setAcceptsInstallments(profile.acceptsInstallments);
       if (profile.antiNoShowEnabled !== undefined) setAntiNoShowEnabled(profile.antiNoShowEnabled);
       if (profile.advancePaymentRequired !== undefined) setAdvancePaymentRequired(profile.advancePaymentRequired);
-      if (profile.delayTolerance !== undefined) setDelayTolerance(profile.delayTolerance);
       if (profile.slug) setSlug(profile.slug);
       if (profile.avatar) setAvatar(profile.avatar);
       if (profile.neighborhood) setNeighborhood(profile.neighborhood);
@@ -122,7 +120,6 @@ export function useProfileForm(profile: UserProfile | null) {
     acceptsInstallments, setAcceptsInstallments,
     antiNoShowEnabled, setAntiNoShowEnabled,
     advancePaymentRequired, setAdvancePaymentRequired,
-    delayTolerance, setDelayTolerance,
     slug, setSlug,
     avatar, setAvatar,
     neighborhood, setNeighborhood,
