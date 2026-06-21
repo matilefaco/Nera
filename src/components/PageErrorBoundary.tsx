@@ -53,9 +53,11 @@ export class PageErrorBoundary extends Component<Props, State> {
             {this.props.message || "Tivemos um pequeno erro ao exibir esta aba."}
           </p>
 
-          <p className="text-xs text-brand-stone/60 mb-8 max-w-md bg-brand-mist/20 p-2 rounded">
-            Erro: {this.state.error?.message || "Desconhecido"}
-          </p>
+          {(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-dev-'))) && (
+            <p className="text-xs text-brand-stone/60 mb-8 max-w-md bg-brand-mist/20 p-2 rounded">
+              Erro: {this.state.error?.message || "Desconhecido"}
+            </p>
+          )}
 
           <button 
             onClick={this.handleRetry}

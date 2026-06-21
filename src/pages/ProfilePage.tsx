@@ -73,8 +73,14 @@ class ProfileErrorBoundary extends React.Component<{children: React.ReactNode}, 
     if (this.state.hasError) {
       return (
         <div className="p-12 text-center text-red-500 bg-red-50 rounded-lg m-12 relative z-50">
-          <h2 className="text-xl font-bold mb-4">Erro fatal na ProfilePage</h2>
-          <pre className="text-xs text-left overflow-auto p-4 bg-white rounded border">{this.state.error?.message || String(this.state.error)}</pre>
+          <h2 className="text-xl font-bold mb-4">Algo saiu do ritmo por um instante.</h2>
+          <p className="mb-4">Recarregue a página para continuar.</p>
+          {(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-dev-'))) && (
+            <pre className="text-xs text-left overflow-auto p-4 bg-white rounded border">{this.state.error?.message || String(this.state.error)}</pre>
+          )}
+          <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-red-100 text-red-600 rounded-lg font-medium hover:bg-red-200 transition-colors">
+            Recarregar Página
+          </button>
         </div>
       );
     }

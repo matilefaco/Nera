@@ -2214,23 +2214,25 @@ export default function Dashboard() {
       />
 
       {/* 9. PRIMEIRA EXPERIÊNCIA / HINT (Se não houver bloqueios ativos) */}
-      {!blockTipDismissed && blockedSchedules.length === 0 && (!isSupported || isSubscribed || pushBannerDismissed || isNewAccount) && (
+      {!blockTipDismissed && (!isSupported || isSubscribed || pushBannerDismissed || isNewAccount) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
           <motion.div 
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="bg-brand-ink text-white p-4 rounded-2xl shadow-xl border border-white/10 flex items-center gap-4 relative pr-12"
+            className="bg-brand-ink text-white p-4 rounded-2xl shadow-xl border border-white/10 flex items-center gap-4 relative pr-12 cursor-pointer"
+            onClick={() => setIsShareModalOpen(true)}
           >
             <div className="w-8 h-8 bg-brand-terracotta rounded-full flex items-center justify-center shrink-0">
-              <Lock size={16} />
+              <Share2 size={16} />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5">Dica Profissional</p>
-              <p className="text-[11px] text-white/70 leading-tight">Vai viajar ou descansar? Use o <span className="text-white font-bold">Bloquear Agenda</span> para evitar reservas indevidas.</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5">Dica de Crescimento</p>
+              <p className="text-[11px] text-white/70 leading-tight">Seu link oficial já está pronto. <span className="text-white font-bold">Compartilhe sua página</span> para receber clientes.</p>
             </div>
             <button 
-              onClick={() => {
-                localStorage.setItem("nera_block_tip_dismissed", "true");
+              onClick={(e) => {
+                e.stopPropagation();
+                localStorage.setItem("nera_share_tip_dismissed", "true");
                 setBlockTipDismissed(true);
                 handleDismissTip("blockTip");
               }} 
@@ -2239,7 +2241,7 @@ export default function Dashboard() {
             >
               <X size={14} />
             </button>
-            <button onClick={() => setIsQuickBlockOpen(true)} className="p-2 hover:bg-white/10 rounded-full text-white/60">
+            <button onClick={() => setIsShareModalOpen(true)} className="p-2 hover:bg-white/10 rounded-full text-white/60">
               <ChevronRight size={18} />
             </button>
           </motion.div>

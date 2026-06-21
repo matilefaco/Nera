@@ -1911,8 +1911,12 @@ export default function BookingModal({
                       )}
 
                       <p className="text-[9px] text-brand-stone/70 font-medium uppercase tracking-wider ml-2 mt-4 leading-relaxed italic">
-                        Você receberá a confirmação e atualizações do
-                        agendamento por e-mail.
+                        {
+                          getBookingNotificationCopy(
+                            profile.plan,
+                            !!profile.whatsapp,
+                          ).notification
+                        }
                       </p>
                     </div>
                     <div className="hidden md:block">
@@ -2254,9 +2258,9 @@ export default function BookingModal({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="fixed inset-0 bg-brand-white z-[300] overflow-y-auto no-scrollbar flex flex-col"
+            className="fixed inset-0 bg-brand-white z-[300] overflow-y-auto no-scrollbar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
           >
-            <div className="flex flex-col items-center m-auto py-16 md:py-24 px-6 sm:px-8 w-full max-w-lg text-center shrink-0">
+            <div className="min-h-full flex flex-col items-center justify-start md:justify-center py-16 md:py-24 px-6 sm:px-8 w-full max-w-lg mx-auto text-center">
               <motion.div
                 initial={{ scale: 0.5, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -2378,51 +2382,6 @@ export default function BookingModal({
                       </span>
                     </div>
                   </div>
-
-                  {/* Payment Methods in Success Screen */}
-                  <div className="pt-4 border-t border-brand-mist/30">
-                    <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-2">
-                      Pagamento
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {profile.paymentMethods &&
-                      profile.paymentMethods.length > 0 ? (
-                        profile.paymentMethods.map((id) => {
-                          const names: Record<string, string> = {
-                            pix: "Pix",
-                            credito: "Crédito",
-                            debito: "Débito",
-                            dinheiro: "Dinheiro",
-                            transferencia: "Transferência",
-                          };
-                          return (
-                            <span
-                              key={id}
-                              className="px-2 py-0.5 bg-brand-linen border border-brand-mist rounded-md text-[8px] font-bold text-brand-ink uppercase tracking-wider"
-                            >
-                              {names[id] || id}
-                            </span>
-                          );
-                        })
-                      ) : (
-                        <span className="text-[9px] text-brand-stone/60 italic">
-                          A combinar com a profissional.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Link de Gerenciamento - Temporário conforme pedido */}
-                  {appointmentToken && (
-                    <div className="mt-4 pt-4 border-t border-brand-mist/30">
-                      <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-1">
-                        Link de Gerenciamento
-                      </span>
-                      <p className="text-[8px] font-mono text-brand-ink/60 break-all">
-                        {window.location.origin}/r/{appointmentToken}
-                      </p>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             )}
@@ -2432,7 +2391,7 @@ export default function BookingModal({
                   variant="secondary"
                   className="w-full py-4 !text-[9px]"
                   onClick={() => {
-                    if (!selectedDate || !selectedTime) return;
+                    if (!selectedDate || !selectedTime || !selectedService) return;
                     const [year, month, day] = selectedDate
                       .split("-")
                       .map(Number);
@@ -2448,22 +2407,22 @@ export default function BookingModal({
                     );
                     const end = new Date(
                       start.getTime() +
-                        (Number(selectedService?.duration) || 60) * 60000,
+                        (Number(selectedService.duration) || 60) * 60000,
                     );
                     const formatTemplate = (d: Date) =>
                       d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Reserva: " + selectedService?.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent("Agendamento realizado via Nera.")}&location=${encodeURIComponent(profile?.city || "")}`;
-                    window.open(url, "_blank");
+                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Reserva: " + selectedService.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent("Agendamento realizado via Nera.")}&location=${encodeURIComponent(profile?.city || "")}`;
+                    if (typeof window !== 'undefined') window.open(url, "_blank");
                   }}
                 >
-                  <CalendarIcon size={14} /> Adicionar calendário
+                  <CalendarIcon size={14} /> Adicionar ao calendário
                 </PremiumButton>
 
                 {appointmentToken && (
                   <div className="space-y-3">
                     <button
                       onClick={() => {
-                        window.location.href = `/r/${appointmentToken}`;
+                        if (typeof window !== 'undefined') window.location.href = `/r/${appointmentToken}`;
                       }}
                       className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all border border-brand-ink shadow-lg shadow-brand-ink/10"
                     >
@@ -2507,19 +2466,22 @@ export default function BookingModal({
                   variant="primary"
                   className="w-full py-5 !text-[10px]"
                   onClick={async () => {
+                    const origin = typeof window !== 'undefined' ? window.location.origin : '';
                     const url =
-                      window.location.origin + "/p/" + (profile?.slug || "");
+                      origin + "/p/" + (profile?.slug || "");
                     const text = "Te recomendo essa profissional ✨";
                     const fullText = `${text} Reserve online aqui: ${url}`;
                     try {
-                      if (navigator.share) {
+                      if (typeof navigator !== 'undefined' && navigator.share) {
                         await navigator
                           .share({ title: profile?.name, text: text, url: url })
                           .catch(async () => {
-                            await navigator.clipboard.writeText(fullText);
-                            notify.success("Link de indicação copiado!");
+                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                              await navigator.clipboard.writeText(fullText);
+                              notify.success("Link de indicação copiado!");
+                            }
                           });
-                      } else {
+                      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
                         await navigator.clipboard.writeText(fullText);
                         notify.success("Link de indicação copiado!");
                       }
@@ -2545,6 +2507,7 @@ export default function BookingModal({
                 Voltar para o perfil
               </button>
             </div>
+          </div>
           </motion.div>
         )}
       </AnimatePresence>

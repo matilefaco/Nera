@@ -15,7 +15,7 @@ export const getAppUrl = () => {
   return window.location.origin;
 };
 
-export const APP_URL = import.meta.env.VITE_APP_URL || 'https://usenera.com';
+export const APP_URL = (import.meta.env.VITE_APP_URL || 'https://usenera.com').replace(/\/+$/, '');
 
 export function getPublicProfileUrl(slug?: string) {
   if (!slug) return APP_URL;

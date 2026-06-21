@@ -133,7 +133,7 @@ export const ActivationChecklist = ({
   const steps: Step[] = [
     {
       id: 'avatar',
-      label: 'Adicionar foto de perfil',
+      label: 'Adicione sua foto de perfil',
       description: 'Perfis com foto recebem 3x mais cliques.',
       icon: Camera,
       isComplete: !!profile?.avatar,
@@ -141,32 +141,32 @@ export const ActivationChecklist = ({
     },
     {
       id: 'bio',
-      label: 'Escrever sua bio',
-      description: 'Conte quem você é e sua especialidade.',
+      label: 'Escreva sua bio',
+      description: 'Conecte-se com clientes contando sua história.',
       icon: FileText,
       isComplete: !!profile?.bio,
       link: '/profile#bio'
     },
     {
       id: 'service',
-      label: 'Cadastre seu primeiro serviço',
-      description: 'Suas clientes precisam saber o que você faz.',
+      label: 'Cadastre serviços',
+      description: 'Destaque seus serviços para receber agendamentos.',
       icon: Settings,
       isComplete: services.length > 0,
       link: '/services'
     },
     {
       id: 'schedule',
-      label: 'Defina seus horários',
-      description: 'Escolha os dias e horas que você atende.',
+      label: 'Otimize horários',
+      description: 'Ajuste sua disponibilidade para evitar conflitos.',
       icon: Calendar,
       isComplete: (profile?.workingHours?.workingDays?.length ?? 0) > 0,
       link: '/profile#horarios'
     },
     {
       id: 'share',
-      label: 'Seu link profissional',
-      description: 'Divulgue sua vitrine para suas clientes.',
+      label: 'Divulgar vitrine',
+      description: 'Compartilhe seu link para atrair clientes.',
       icon: Share2,
       isComplete: hasShared || !!profile?.hasSharedLink,
       action: handleShareClick
@@ -283,14 +283,12 @@ export const ActivationChecklist = ({
             </div>
             <div>
               <h3 className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone">
-                Checklist de Ativação
+                Potencialize seu Perfil
               </h3>
               <p className="text-sm font-serif text-brand-ink">
                 {isFullyComplete 
-                  ? "Sua vitrine está pronta! Compartilhe agora." 
-                  : checklistProgress < 60 
-                    ? "Sua vitrine ainda não está pronta" 
-                    : "Quase lá! Finalize seu perfil"}
+                  ? "Sua vitrine está 100% otimizada! Compartilhe agora." 
+                  : "Sua página já está pronta para receber clientes ✨"}
               </p>
             </div>
           </div>

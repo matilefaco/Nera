@@ -35,6 +35,8 @@ import {
   sendBookingConfirmedClientNotification,
 } from "../services/notificationService.js";
 import { PUBLIC_APP_URL, shouldSendEmail, markEmailSent } from "../utils.js";
+import { buildCancellationByProMessageForClient, buildBookingRejectedMessageForClient } from "../services/whatsappMessages.js";
+import { sendWhatsApp } from "../services/whatsappService.js";
 
 const router = express.Router();
 
@@ -2726,6 +2728,30 @@ router.post(
           });
           await markEmailSent(appointmentId, eventKey);
         }
+
+        // WhatsApp: BOOKING_REJECTED
+        if (result.updatedData.clientWhatsapp) {
+          const profileUrl = proData?.slug
+            ? `${PUBLIC_APP_URL}/p/${proData.slug}`
+            : PUBLIC_APP_URL;
+            
+          const formattedDate = result.updatedData.date.split('-').reverse().join('/');
+          const msg = buildBookingRejectedMessageForClient({
+            clientName: result.updatedData.clientName,
+            serviceName: result.updatedData.serviceName,
+            date: formattedDate,
+            time: result.updatedData.time,
+            professionalPageUrl: profileUrl
+          });
+          
+          await sendWhatsApp(db, result.updatedData.clientWhatsapp, msg, {
+            appointmentId: result.appointmentId,
+            userId: result.updatedData.professionalId,
+            type: 'booking_rejected',
+            clientName: result.updatedData.clientName,
+            clientWhatsapp: result.updatedData.clientWhatsapp
+          });
+        }
       }
 
       return res.json({ success: true, appointmentId: result.appointmentId });
@@ -2854,6 +2880,30 @@ router.post(
             if (res.success) {
               await markEmailSent(appointmentId, eventKey);
             }
+          });
+        }
+
+        // WhatsApp: BOOKING_CANCELLED (by pro)
+        if (result.updatedData.clientWhatsapp) {
+          const profileUrl = proData?.slug
+            ? `${PUBLIC_APP_URL}/p/${proData.slug}`
+            : PUBLIC_APP_URL;
+
+          const formattedDate = result.updatedData.date.split('-').reverse().join('/');
+          const waMsg = buildCancellationByProMessageForClient({
+            clientName: result.updatedData.clientName,
+            serviceName: result.updatedData.serviceName,
+            date: formattedDate,
+            time: result.updatedData.time,
+            professionalPageUrl: profileUrl
+          });
+
+          await sendWhatsApp(db, result.updatedData.clientWhatsapp, waMsg, {
+            appointmentId: result.appointmentId,
+            userId: result.updatedData.professionalId,
+            type: 'booking_cancelled_client',
+            clientName: result.updatedData.clientName,
+            clientWhatsapp: result.updatedData.clientWhatsapp
           });
         }
 

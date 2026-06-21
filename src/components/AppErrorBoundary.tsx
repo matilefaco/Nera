@@ -98,6 +98,14 @@ export class AppErrorBoundary extends Component<Props, State> {
             <p className="text-brand-stone text-sm mb-8">
               Recarregue a página para continuar usando a Nera. Isso ajuda a sincronizar as informações mais recentes.
             </p>
+
+            {this.state.error && (import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-dev-'))) && (
+              <div id="error-trace" className="text-left bg-red-50 p-4 rounded-lg mb-8 text-xs text-red-500 overflow-auto max-w-full">
+                <strong>Error:</strong> {this.state.error.message}
+                <br/>
+                <pre>{this.state.error.stack}</pre>
+              </div>
+            )}
             
             <button
               onClick={this.handleReload}

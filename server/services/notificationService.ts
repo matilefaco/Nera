@@ -5,7 +5,10 @@ import {
   sendProfessionalNewBookingEmail,
   sendBookingConfirmedEmail,
 } from "../emails/sendEmail.js";
-import { buildNewBookingMessageForPro } from "./whatsappMessages.js";
+import { 
+  buildNewBookingMessageForPro,
+  buildBookingConfirmedMessageForClient
+} from "./whatsappMessages.js";
 import { sendWhatsApp } from "./whatsappService.js";
 import { logger, maskEmail } from "../utils/logger.js";
 
@@ -171,6 +174,25 @@ export const sendBookingConfirmedClientNotification = async (
       });
 
       if (result.success) await markEmailSent(payload.appointmentId, eventKey);
+
+      // Envia WhatsApp para a cliente
+      if (apptData.clientWhatsapp) {
+        const formattedDate = apptData.date.split('-').reverse().join('/');
+        const waMsg = buildBookingConfirmedMessageForClient({
+          serviceName: apptData.serviceName,
+          date: formattedDate,
+          time: apptData.time,
+          professionalName: pro?.name || "Profissional"
+        });
+        await sendWhatsApp(db, apptData.clientWhatsapp, waMsg, {
+          appointmentId: payload.appointmentId,
+          userId: apptData.professionalId,
+          type: 'booking_confirmed_client',
+          clientName: apptData.clientName,
+          clientWhatsapp: apptData.clientWhatsapp
+        });
+      }
+
       return result;
     }
     return { success: true, skipped: "duplicate" };

@@ -119,11 +119,11 @@ async function createLastMinuteAlert(payload: any) {
 
 import { 
   buildNewBookingMessageForPro, 
-  buildBookingConfirmedMessageForClient, 
-  buildReminderMessage24h, 
-  buildWaitlistInviteMessage, 
-  buildCancellationMessage, 
-  buildReviewRequestMessage 
+  buildBookingConfirmedMessageForClient,
+  buildBookingRejectedMessageForClient,
+  buildCancellationByProMessageForClient,
+  buildRescheduledByProMessageForClient,
+  buildReminderMessage24h
 } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta, PUBLIC_APP_URL } from "../utils.js";
 import { sendProfessionalBookingRescheduledEmail } from '../emails/sendEmail.js';
@@ -555,7 +555,14 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
         }
 
         const profileLink = `${baseUrl}/p/${slug || 'app'}`;
-        const msg = `Olá ${clientName}, infelizmente esse horário não está disponível. Você pode escolher outro horário no link:\n${profileLink}`;
+        const formattedDate = date.split('-').reverse().join('/');
+        const msg = buildBookingRejectedMessageForClient({
+          clientName,
+          serviceName,
+          date: formattedDate,
+          time,
+          professionalPageUrl: profileLink
+        });
         
         await sendWhatsApp(db, clientWhatsapp, msg, {
           userId: professionalId,
@@ -762,6 +769,25 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
             if (result.success) await markEmailSent(appointmentId, eventKey);
           }
         }
+
+        // Notify client via WhatsApp ONLY if PROFESSIONAL rescheduled
+        if (payload.clientWhatsapp && rescheduledBy === 'professional') {
+          const newFormatted = date.split('-').reverse().join('/');
+          const msg = buildRescheduledByProMessageForClient({
+            clientName,
+            date: newFormatted,
+            time,
+            serviceName,
+            professionalName: pro?.name || 'Sua Profissional'
+          });
+          await sendWhatsAppMeta(payload.clientWhatsapp, msg, {
+            userId: professionalId,
+            appointmentId,
+            clientName,
+            clientWhatsapp: payload.clientWhatsapp,
+            type: 'booking_rescheduled_client'
+          });
+        }
         
         // Update Google Calendar Event
         const apptDoc = await db.collection('appointments').doc(appointmentId).get();
@@ -906,15 +932,9 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
         const diaSemana = weekdays[dateObj.getDay()];
 
         const msg = buildReminderMessage24h({
-          clienteNome: appt.clientName,
-          diaSemana,
-          data: `${d}/${m}/${y}`,
-          horario: appt.time,
-          servicoNome: appt.serviceName,
-          profissionalNome: pro?.name || 'Profissional',
-          local: pro?.location || 'Stúdio',
-          linkConfirmar: `${appUrl}/manage/${apptId}?action=confirm-presence`,
-          linkManage: `${appUrl}/manage/${apptId}`
+          serviceName: appt.serviceName,
+          time: appt.time,
+          professionalName: pro?.name || 'Profissional'
         });
 
         const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {

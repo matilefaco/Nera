@@ -33,7 +33,7 @@ export class PublicProfileErrorBoundary extends Component<Props, State> {
         <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
           <h2 className="text-xl font-serif text-brand-espresso mb-4">Ops! Algo deu errado ao carregar o perfil.</h2>
           <p className="text-brand-stone mb-8 max-w-md">Ocorreu um erro inesperado no navegador. Tente recarregar a página ou voltar mais tarde.</p>
-          {import.meta.env.DEV && (
+          {(import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-dev-'))) && (
             <pre className="text-xs bg-red-100 p-4 rounded text-left overflow-auto max-w-full">
               {this.state.error?.message}
             </pre>

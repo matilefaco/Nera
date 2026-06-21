@@ -3,7 +3,7 @@ import admin from "firebase-admin";
 import { logWhatsAppMessage, normalizePhone } from "./services/whatsappService.js";
 import { logger } from "./utils/logger.js";
 
-export const PUBLIC_APP_URL = process.env.APP_URL || "https://usenera.com";
+export const PUBLIC_APP_URL = (process.env.APP_URL || "https://usenera.com").replace(/\/+$/, "");
 
 // Helper to format Brazilian phone numbers for WhatsApp Cloud API
 export function formatBRNumber(phone: string): string {
@@ -71,6 +71,61 @@ export async function markEmailSent(appointmentId: string, eventKey: string) {
 // WhatsApp Notification Handler (Official Meta Cloud API)
 export async function sendWhatsAppMeta(to: string, message: string, metadata: { userId?: string, appointmentId?: string, type?: string, clientName?: string, clientWhatsapp?: string } = {}) {
   const db = getDb();
+
+  // ----- INÍCIO DA POLÍTICA WA GLOBAL (META) -----
+  const clientTypes = [
+    'booking_confirmed_client',
+    'booking_rejected',
+    'booking_cancelled_client',
+    'booking_rescheduled_client',
+    'reminder_24h',
+    'waitlist_invitation',
+    'review_request',
+    'reminder_2h'
+  ];
+
+  const allowedClientTypes = [
+    'booking_confirmed_client',
+    'booking_rejected',
+    'booking_cancelled_client',
+    'booking_rescheduled_client',
+    'reminder_24h'
+  ];
+
+  if (metadata.userId && metadata.userId !== 'admin') {
+    const proDoc = await db.collection("users").doc(metadata.userId).get();
+    const pro = proDoc.data();
+    
+    if (!pro) {
+      return false;
+    }
+    
+    const plan = pro.plan || 'free';
+    const expiresAt = pro.planExpiresAt;
+    const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+    const activePlan = isExpired ? 'free' : plan;
+
+    // Se não for PRO nem tiver flag explícita, bloqueia o envio geral de WhatsApp
+    if (activePlan !== 'pro' && !pro.whatsappNotifications) {
+      logger.info("WHATSAPP-META", `Policy block: User is not PRO. WhatsApp blocked for type: ${metadata.type}`, {
+        userId: metadata.userId
+      });
+      return false;
+    }
+
+    // Se for mensagem destinada ao cliente, aplica filtro adicional de tipos permitidos
+    if (metadata.type && clientTypes.includes(metadata.type)) {
+      if (!allowedClientTypes.includes(metadata.type)) {
+        logger.info("WHATSAPP-META", `Policy block: WhatsApp blocked for client for type: ${metadata.type}`, {
+          userId: metadata.userId,
+          type: metadata.type
+        });
+        return false;
+      }
+    }
+  }
+  // ----- FIM DA POLÍTICA WA GLOBAL (META) -----
+
   const accessToken = process.env.META_ACCESS_TOKEN;
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
 

@@ -178,6 +178,61 @@ export async function sendWhatsApp(
   metadata: WhatsAppMetadata
 ) {
   const db = getDb();
+
+  // ----- INÍCIO DA POLÍTICA WA GLOBAL -----
+  const clientTypes = [
+    'booking_confirmed_client',
+    'booking_rejected',
+    'booking_cancelled_client',
+    'booking_rescheduled_client',
+    'reminder_24h',
+    'waitlist_invitation',
+    'review_request',
+    'reminder_2h'
+  ];
+
+  const allowedClientTypes = [
+    'booking_confirmed_client',
+    'booking_rejected',
+    'booking_cancelled_client',
+    'booking_rescheduled_client',
+    'reminder_24h'
+  ];
+
+  if (metadata.userId && metadata.userId !== 'admin') {
+    const proDoc = await db.collection("users").doc(metadata.userId).get();
+    const pro = proDoc.data();
+    
+    if (!pro) {
+      return { success: true, skipped: 'user_not_found' };
+    }
+    
+    const plan = pro.plan || 'free';
+    const expiresAt = pro.planExpiresAt;
+    const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+    const activePlan = isExpired ? 'free' : plan;
+
+    // Se não for PRO nem tiver flag explícita, bloqueia o envio geral de WhatsApp
+    if (activePlan !== 'pro' && !pro.whatsappNotifications) {
+      logger.info("WHATSAPP", `Policy block: User is not PRO. WhatsApp blocked for type: ${metadata.type}`, {
+        userId: metadata.userId
+      });
+      return { success: true, skipped: 'requires_pro_plan' };
+    }
+
+    // Se for mensagem destinada ao cliente, aplica filtro adicional de tipos permitidos
+    if (metadata.type && clientTypes.includes(metadata.type)) {
+      if (!allowedClientTypes.includes(metadata.type)) {
+        logger.info("WHATSAPP", `Policy block: WhatsApp blocked for client for type: ${metadata.type}`, {
+          userId: metadata.userId,
+          type: metadata.type
+        });
+        return { success: true, skipped: 'blocked_by_policy' };
+      }
+    }
+  }
+  // ----- FIM DA POLÍTICA WA GLOBAL -----
+
   const instanceId = process.env.ZAPI_INSTANCE_ID;
   const token = process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN;
   const clientToken = process.env.ZAPI_CLIENT_TOKEN;
