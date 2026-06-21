@@ -14,6 +14,8 @@ export interface PlanConfig {
     analytics: boolean;
     reports: boolean;
     referrals: boolean;
+    exportCsv: boolean;
+    crm: boolean;
   };
 }
 
@@ -31,6 +33,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       analytics: false,
       reports: false,
       referrals: false,
+      exportCsv: false,
+      crm: false,
     }
   },
   essencial: {
@@ -43,9 +47,11 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       waitlist: false,
       antiNoShow: true,
       coupons: false,
-      analytics: false,
+      analytics: true,
       reports: false,
       referrals: false,
+      exportCsv: true,
+      crm: false,
     }
   },
   pro: {
@@ -61,6 +67,8 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       analytics: true,
       reports: true,
       referrals: true,
+      exportCsv: true,
+      crm: true,
     }
   }
 };

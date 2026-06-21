@@ -79,6 +79,8 @@ export interface PlanFeatures {
   analytics: boolean;
   reports: boolean;
   referrals: boolean;
+  exportCsv: boolean;
+  crm: boolean;
 }
 
 export interface UserProfile {

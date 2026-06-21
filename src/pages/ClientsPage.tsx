@@ -7,7 +7,7 @@ import { collection, query, where, onSnapshot, orderBy, limit, getDocs, getDoc, 
 import { 
   Users, Search, MessageCircle, 
   TrendingUp, Calendar, ChevronRight, Star,
-  X, AlertCircle, RefreshCw, ChevronDown
+  X, AlertCircle, RefreshCw, ChevronDown, Lock, Zap
 } from 'lucide-react';
 import { formatCurrency, buildWhatsappLink, cn } from '../lib/utils';
 import AppLayout from '../components/AppLayout';
@@ -16,6 +16,7 @@ import { ClientSummary, Appointment } from '../types';
 import PremiumButton from '../components/PremiumButton';
 import { notify } from '../lib/notify';
 import { exportClientsCsv } from '../lib/exportCsv';
+import { usePlanFeatures } from '../hooks/usePlanFeatures';
 
 const PAGE_SIZE = 50;
 
@@ -144,6 +145,8 @@ export default function ClientsPage() {
     closeUpgradeModal, 
     checkFeatureAccess 
   } = useUpgradeTriggers();
+
+  const { plan, isProPlan } = usePlanFeatures();
 
   const [clientsStatus, setClientsStatus] = useState<'idle' | 'loading' | 'loaded' | 'stalled' | 'error'>(() => {
     return user && clientsPageCache.has(user.uid) ? 'loaded' : 'loading';
@@ -598,10 +601,21 @@ export default function ClientsPage() {
           <div className="flex flex-col md:flex-row gap-4">
             {clients.length > 0 && (
               <button 
-                onClick={() => user && exportClientsCsv(user.uid)}
-                className="px-6 py-4 bg-brand-white text-brand-ink text-[10px] font-bold uppercase tracking-widest hover:border-brand-mist border-brand-mist shadow-sm border rounded-full transition-all flex items-center justify-center gap-2"
+                onClick={() => {
+                  if (plan === 'free') {
+                    checkFeatureAccess('exportCsv');
+                    return;
+                  }
+                  user && exportClientsCsv(user.uid);
+                }}
+                className={cn(
+                  "px-6 py-4 text-[10px] font-bold uppercase tracking-widest border rounded-full transition-all flex items-center justify-center gap-2",
+                  plan === 'free' 
+                    ? "bg-brand-white text-brand-stone border-brand-mist hover:bg-brand-mist/20" 
+                    : "bg-brand-white text-brand-ink hover:border-brand-mist border-brand-mist shadow-sm"
+                )}
               >
-                Exportar CSV
+                {plan === 'free' && <Lock size={12} className="text-brand-stone" />} Exportar CSV
               </button>
             )}
             {clients.length === 0 && clientsStatus === 'loaded' && (
@@ -618,54 +632,121 @@ export default function ClientsPage() {
           </div>
         </header>
 
-        {/* Opportunity Card */}
-        {clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length > 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-10 p-8 bg-brand-ink text-white rounded-[40px] shadow-xl relative overflow-hidden group"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl -mr-16 -mt-16" />
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-2">
-                <span className="text-[10px] font-bold text-brand-terracotta uppercase tracking-[0.3em] block">Retenção de Clientes</span>
-                <h3 className="text-2xl font-serif">
-                  Você tem {clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length} clientes sem voltar há 30+ dias.
-                </h3>
-                <p className="text-white/70 text-xs font-light leading-relaxed max-w-md">
-                  Um acompanhamento cuidadoso pode ajudar a trazer algumas delas de volta para sua agenda.
-                </p>
-              </div>
-              <button 
-                onClick={() => setFilterStatus('inactive')}
-                className="px-8 py-4 bg-brand-terracotta text-white rounded-full text-[11px] font-bold uppercase tracking-widest hover:bg-brand-sienna transition-all shadow-lg whitespace-nowrap"
-              >
-                Chamar cliente
-              </button>
-            </div>
-          </motion.div>
-        )}
-
         {/* Stats Row */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5 mb-10">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-10">
           <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Clientes</p>
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Total de Clientes</p>
             <p className="text-2xl sm:text-3xl font-serif text-brand-ink leading-none">{clients.length}{hasMore ? '+' : ''}</p>
           </div>
           <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Retorno Estimado</p>
-            <p className="text-xl sm:text-2xl lg:text-3xl font-serif text-brand-terracotta leading-none truncate">{formatCurrency(clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).reduce((acc, curr) => acc + (curr.totalSpent / curr.confirmedAppointments || 0), 0))}</p>
-            <p className="text-[8px] text-brand-stone/60 mt-1 truncate">clientes ausentes</p>
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Novas Atendidas (30D)</p>
+            <p className="text-2xl sm:text-3xl font-serif text-brand-ink leading-none">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) < 30 && c.confirmedAppointments === 1).length}</p>
           </div>
           <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Sumidas há 30D</p>
-            <p className="text-2xl sm:text-3xl font-serif text-brand-ink leading-none">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) >= 30).length}</p>
-          </div>
-          <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Atendidas recentemente</p>
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Atendidas Recentemente</p>
             <p className="text-2xl sm:text-3xl font-serif text-green-600/90 leading-none">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) < 30).length}</p>
           </div>
+          <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
+            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Ticket Médio Geral</p>
+            <p className="text-xl sm:text-2xl font-serif text-brand-ink leading-none">{formatCurrency((clients.reduce((acc, curr) => acc + curr.totalSpent, 0) / Math.max(1, clients.reduce((acc, curr) => acc + curr.confirmedAppointments, 0))))}</p>
+          </div>
         </div>
+
+        {/* CRM Inteligente (Pro) - Only Full Dashboard Here */}
+        {isProPlan() && (
+          <div className="mb-10">
+            <div className="flex items-center gap-2 mb-4 px-2">
+              <Zap size={14} className="text-brand-terracotta" />
+              <h2 className="text-sm font-bold text-brand-ink uppercase tracking-widest">Inteligência de Clientes</h2>
+            </div>
+
+            {(() => {
+              const atRisk = clients.filter(c => c.confirmedAppointments >= 1 && getDaysSinceLastVisit(c.lastAppointmentDate) >= 30);
+              const potentialRev = atRisk.reduce((acc, curr) => acc + ((curr.totalSpent / curr.confirmedAppointments) || 0), 0);
+              const vip = clients.filter(c => c.confirmedAppointments >= 2);
+              const recent = clients.filter(c => c.confirmedAppointments >= 1 && getDaysSinceLastVisit(c.lastAppointmentDate) < 30);
+              const topOpps = [...atRisk].sort((a,b) => b.totalSpent - a.totalSpent).slice(0, 3);
+              
+              const hasEnoughData = clients.filter(c => c.confirmedAppointments >= 1).length >= 3;
+              
+              if (!hasEnoughData) {
+                return (
+                  <div className="rounded-[24px] border border-dashed border-brand-mist/80 bg-brand-white/50 p-10 text-center flex flex-col items-center justify-center">
+                    <div className="w-12 h-12 bg-brand-linen rounded-full flex items-center justify-center mb-4 text-brand-terracotta">
+                      <TrendingUp size={20} />
+                    </div>
+                    <p className="text-brand-ink font-bold mb-2">Construindo sua inteligência</p>
+                    <p className="text-brand-stone text-sm max-w-sm">
+                      Continue atendendo clientes pela Nera. Assim que houver histórico suficiente, seus insights de retorno aparecerão aqui.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="col-span-1 md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="bg-[#FFF4F0]/60 p-5 rounded-[20px] border border-brand-terracotta/10 flex flex-col justify-between">
+                      <p className="text-[9px] font-bold text-brand-terracotta uppercase tracking-widest mb-3">Oportunidade de Retorno</p>
+                      <div>
+                        <p className="text-3xl font-serif text-brand-ink leading-none mb-1">{formatCurrency(potentialRev)}</p>
+                        <p className="text-[10px] text-brand-stone font-light">Até este valor pode ser recuperado se as {atRisk.length} clientes em risco voltarem.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-rows-2 gap-4">
+                      <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between">
+                        <div>
+                          <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Clientes VIP</p>
+                          <p className="text-xl font-serif text-brand-ink leading-none">{vip.length}</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-brand-ink/5 flex items-center justify-center">
+                          <Star size={16} className="text-brand-ink" />
+                        </div>
+                      </div>
+                      <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between">
+                        <div>
+                          <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Voltas Recentes</p>
+                          <p className="text-xl font-serif text-green-600 leading-none">{recent.length}</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
+                          <TrendingUp size={16} className="text-green-600" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-brand-ink text-white p-5 rounded-[20px] flex flex-col">
+                    <p className="text-[9px] font-bold text-white/60 uppercase tracking-widest mb-4">Ações Sugeridas</p>
+                    {topOpps.length > 0 ? (
+                      <div className="flex flex-col gap-3 flex-1">
+                        {topOpps.map(opp => {
+                          const avgTicket = opp.totalSpent / Math.max(1, opp.confirmedAppointments);
+                          return (
+                            <div key={opp.id} className="bg-white/10 p-3 rounded-[12px] flex flex-col gap-1.5">
+                              <div className="flex justify-between items-center">
+                                <span className="text-sm font-bold truncate max-w-[120px]">{opp.clientName}</span>
+                                <span className="text-[10px] text-brand-terracotta font-bold">{formatCurrency(avgTicket)}</span>
+                              </div>
+                              <div className="flex justify-between items-end">
+                                <span className="text-[9px] text-white/50 leading-tight">Última vez há {getDaysSinceLastVisit(opp.lastAppointmentDate)} dias</span>
+                                <span className="text-[8px] uppercase tracking-widest text-white/80 bg-white/10 px-2 py-0.5 rounded border border-white/10">Chamar p/ retorno</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex items-center justify-center text-center">
+                         <span className="text-sm font-light text-white/50">Você não tem clientes em risco no momento. Ótimo trabalho!</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
 
         {/* Search & Advanced Filters */}
         <div className="space-y-6 mb-10">
@@ -712,26 +793,38 @@ export default function ClientsPage() {
             {/* Status Tabs */}
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {[
-                { id: 'all', label: 'Todas' },
-                { id: 'vip', label: 'VIP' },
-                { id: 'recurring', label: 'Frequentes' },
-                { id: 'at_risk', label: 'Esfriando' },
-                { id: 'inactive', label: 'Ausentes' },
-                { id: 'new', label: 'Novas' }
-              ].map(f => (
-                <button
-                  key={f.id}
-                  onClick={() => setFilterStatus(f.id as typeof filterStatus)}
-                  className={cn(
-                    "px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap",
-                    filterStatus === f.id
-                      ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
-                      : "bg-brand-white text-brand-stone/80 border-brand-mist/60 hover:border-brand-stone/50 hover:text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]"
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
+                { id: 'all', label: 'Todas', advanced: false },
+                { id: 'new', label: 'Novas', advanced: false },
+                { id: 'vip', label: 'VIP', advanced: true },
+                { id: 'recurring', label: 'Frequentes', advanced: true },
+                { id: 'at_risk', label: 'Esfriando', advanced: true },
+                { id: 'inactive', label: 'Ausentes', advanced: true }
+              ].map(f => {
+                const isLocked = plan === 'free' && f.advanced;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => {
+                      if (isLocked) {
+                        checkFeatureAccess('analytics');
+                        return;
+                      }
+                      setFilterStatus(f.id as typeof filterStatus);
+                    }}
+                    className={cn(
+                      "px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap flex items-center gap-1",
+                      filterStatus === f.id
+                        ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
+                        : isLocked 
+                          ? "bg-brand-mist/10 text-brand-stone/60 border-brand-mist/40 hover:bg-brand-mist/20"
+                          : "bg-brand-white text-brand-stone/80 border-brand-mist/60 hover:border-brand-stone/50 hover:text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]"
+                    )}
+                  >
+                    {isLocked && <Lock size={10} className="text-brand-stone/50" />}
+                    {f.label}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex flex-col gap-3">
@@ -772,6 +865,33 @@ export default function ClientsPage() {
             </div>
           </div>
         </div>
+
+        {/* CRM Inteligente (Pro) - Compact Banner for Free/Essential */}
+        {!isProPlan() && (
+          <div className="mb-8 p-4 rounded-2xl border border-brand-mist/60 bg-brand-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.02)]">
+            <div className="flex items-center gap-4">
+               <div className="w-10 h-10 bg-brand-linen rounded-full hidden sm:flex items-center justify-center shrink-0">
+                  <Zap size={16} className="text-brand-terracotta" />
+               </div>
+               <div>
+                  <h3 className="text-sm font-bold text-brand-ink uppercase tracking-widest flex items-center gap-2 mb-1">
+                    Inteligência de Clientes Pro
+                    <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest bg-brand-mist/30 px-2 py-0.5 rounded-sm">
+                      Pro
+                    </span>
+                  </h3>
+                  <p className="text-xs text-brand-stone leading-relaxed">
+                    {plan === 'free'
+                      ? "Descubra quem pode voltar, quem está sumindo e oportunidades de aumentar seu faturamento."
+                      : "Veja clientes em risco de não voltar, oportunidades de retorno e estimativas de receita recuperável."}
+                  </p>
+               </div>
+            </div>
+            <PremiumButton onClick={() => checkFeatureAccess('crm')} className="w-full sm:w-auto px-6 py-2.5 text-[10px] whitespace-nowrap shrink-0">
+               {plan === 'free' ? "Conhecer Plano Pro →" : "Fazer Upgrade →"}
+            </PremiumButton>
+          </div>
+        )}
 
         {/* Clients List */}
         <div className="space-y-4">

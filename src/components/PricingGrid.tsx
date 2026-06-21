@@ -23,10 +23,11 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <div className="plan-period">para sempre</div>
           <p className="plan-tagline">Para começar, sentir a diferença e nunca mais voltar atrás.</p>
           <ul className="plan-features">
-            <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium (foto, bio e serviços)</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium com foto, bio e serviços</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Até 15 agendamentos por mês</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Notificações por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio simples de horários</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Notificações básicas por e-mail</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Lista de clientes</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Link direto para bio</li>
           </ul>
           {isLanding ? (
@@ -55,7 +56,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
             <li className="plan-feat"><span className="feat-bullet"></span>Experiência profissional por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Confirmações e lembretes automáticos por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Bloqueios recorrentes e avançados</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Histórico completo de clientes</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Filtros e exportação de clientes em CSV</li>
           </ul>
           {isLanding ? (
             <Link to="/register?plan=essencial" className="btn-plan white-solid">Ativar teste gratuito</Link>
@@ -80,9 +81,10 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <p className="plan-tagline">&nbsp;</p>
           <ul className="plan-features">
             <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial + Notificações WhatsApp</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente para preencher horários</li>
+            <li className="plan-feat highlight"><span className="feat-bullet"></span>CRM inteligente com oportunidades de retorno</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Relatórios de performance</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Cupons de desconto e fidelidade</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Relatório mensal de performance</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Link de indicação premiado</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Suporte prioritário</li>
           </ul>

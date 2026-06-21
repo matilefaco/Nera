@@ -3,10 +3,12 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, TrendingUp, Zap, Sparkles, Heart, Target, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { UpgradeFeature } from '../hooks/useUpgradeTriggers';
+
 interface UpgradeModalProps {
   open: boolean;
   onClose: () => void;
-  feature?: 'unlimitedBookings' | 'whatsappNotifications' | 'advancedDashboard' | 'waitlist' | 'antiNoShow' | 'coupons' | 'analytics' | 'reports' | 'theme' | 'referrals';
+  feature?: UpgradeFeature | 'theme';
   count?: number;
   totalClients?: number;
   averageTicket?: number;
@@ -66,6 +68,18 @@ export default function UpgradeModal({
           title: "Indicação Premiada",
           desc: "Compartilhe a Nera com outras profissionais e acumule créditos.",
           limit: "Cresça junto com a Nera"
+        };
+      case 'crm':
+        return {
+          title: "Inteligência de Clientes",
+          desc: "Entenda exatamente quem pode voltar, quem esfriou e onde existe oportunidade de retorno.",
+          limit: "CRM Inteligente"
+        };
+      case 'exportCsv':
+        return {
+          title: "Exporte sua base de clientes",
+          desc: "Organize sua base em planilha para acompanhar retornos, campanhas e histórico com mais controle.",
+          limit: "Exportação Avançada"
         };
       case 'analytics':
         return {
