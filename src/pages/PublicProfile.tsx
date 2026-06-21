@@ -7,7 +7,14 @@ import {
   handleBookingError,
   logAnalyticsEvent,
 } from "../firebase";
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit,
+} from "firebase/firestore";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Clock,
@@ -35,7 +42,7 @@ import {
   cn,
   buildWhatsappLink,
   splitSmartBio,
-  isFakeContent
+  isFakeContent,
 } from "../lib/utils";
 import { formatSpecialtyLabel } from "../lib/copy";
 import { getTheme } from "../lib/themes";
@@ -69,7 +76,9 @@ import { PaymentMethods } from "../components/public/PaymentMethods";
 import SEOHead from "../components/SEOHead";
 import { PublicProfileErrorBoundary } from "../components/public/PublicProfileErrorBoundary";
 
-const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
+const isDev =
+  import.meta.env.DEV ||
+  (typeof window !== "undefined" && window.location.hostname.includes("ais-"));
 const devLog = (...args: any[]) => isDev && console.log(...args);
 
 import { Skeleton } from "../components/ui/Skeleton";
@@ -108,7 +117,7 @@ function PublicProfileContent() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<'timeout' | null>(null);
+  const [loadError, setLoadError] = useState<"timeout" | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const servicesRef = useRef<HTMLDivElement>(null);
   const finalCtaRef = useRef<HTMLDivElement>(null);
@@ -143,7 +152,7 @@ function PublicProfileContent() {
   const features = PLAN_CONFIGS[profilePlan]?.features;
 
   const { hero: heroBio, about: aboutBio } = React.useMemo(() => {
-    return { hero: '', about: profile?.bio || '' };
+    return { hero: "", about: profile?.bio || "" };
   }, [profile?.bio]);
 
   useEffect(() => {
@@ -178,7 +187,7 @@ function PublicProfileContent() {
   useEffect(() => {
     let isMounted = true;
     devLog(`[PublicProfile] effect started for slug: ${slug}`);
-    
+
     const fetchData = async () => {
       if (!slug) {
         devLog(`[PublicProfile] No slug, setting loading to false`);
@@ -187,78 +196,158 @@ function PublicProfileContent() {
       }
 
       // --- HELENA PRADO MOCK FALLBACK ---
-      if (slug === 'helena-prado') {
+      if (slug === "helena-prado") {
         devLog(`[PublicProfile] Loading static Helena Prado demo`);
-        
+
         const HELENA_MOCK = {
-          name: 'Helena Prado',
-          slug: 'helena-prado',
-          uid: 'demo-helena-prado',
-          professionalId: 'demo-helena-prado',
-          email: 'demo@usenera.com',
-          specialty: 'Sobrancelhas e Harmonização do Olhar',
-          city: 'São Paulo',
-          neighborhood: 'Jardins',
-          serviceMode: 'hybrid',
-          headline: 'Design anatômico de sobrancelhas e harmonização',
-          bio: 'Trabalho com técnicas avançadas de design de sobrancelhas, focando em anatomia e biossegurança. Realizo avaliações cuidadosas antes de qualquer procedimento para garantir resultados naturais e duradouros.',
-          avatar: 'https://i.imgur.com/gBdf3tO.png',
-          coverImage: 'https://images.unsplash.com/photo-1600125867375-9c5ae5cf61ac?q=80&w=1200&auto=format&fit=crop',
+          name: "Helena Prado",
+          slug: "helena-prado",
+          uid: "demo-helena-prado",
+          professionalId: "demo-helena-prado",
+          email: "demo@usenera.com",
+          specialty: "Sobrancelhas e Harmonização do Olhar",
+          city: "São Paulo",
+          neighborhood: "Jardins",
+          serviceMode: "hybrid",
+          headline: "Design anatômico de sobrancelhas e harmonização",
+          bio: "Trabalho com técnicas avançadas de design de sobrancelhas, focando em anatomia e biossegurança. Realizo avaliações cuidadosas antes de qualquer procedimento para garantir resultados naturais e duradouros.",
+          avatar: "https://i.imgur.com/gBdf3tO.png",
+          coverImage:
+            "https://images.unsplash.com/photo-1600125867375-9c5ae5cf61ac?q=80&w=1200&auto=format&fit=crop",
           professionalIdentity: {
-            yearsExperience: '8',
-            mainSpecialty: 'Design de Sobrancelhas',
-            subSpecialties: ['Brow Lamination', 'Micropigmentação Natural', 'Design com Henna'],
-            serviceStyle: ['Minimalista e Natural', 'Técnico e Personalizado'],
-            differentials: ['Biossegurança rigorosa', 'Atendimento pontual', 'Produtos de alta performance']
+            yearsExperience: "8",
+            mainSpecialty: "Design de Sobrancelhas",
+            subSpecialties: [
+              "Brow Lamination",
+              "Micropigmentação Natural",
+              "Design com Henna",
+            ],
+            serviceStyle: ["Minimalista e Natural", "Técnico e Personalizado"],
+            differentials: [
+              "Biossegurança rigorosa",
+              "Atendimento pontual",
+              "Produtos de alta performance",
+            ],
           },
           profileTheme: {
-            variant: 'terracotta'
+            variant: "terracotta",
           },
-          whatsapp: '5511999999999',
-          instagram: 'helenaprado.beauty',
+          whatsapp: "5511999999999",
+          instagram: "helenaprado.beauty",
           indexable: false,
           published: true,
-          plan: 'pro',
-          paymentMethods: ['pix', 'credit_card', 'debit_card'],
+          plan: "pro",
+          paymentMethods: ["pix", "credit_card", "debit_card"],
           acceptsInstallments: false,
+          workingHours: {
+            startTime: "09:00",
+            endTime: "18:00",
+            workingDays: [1, 2, 3, 4, 5],
+          },
           workingDays: [1, 2, 3, 4, 5],
-          startTime: '09:00',
-          endTime: '18:00',
+          startTime: "09:00",
+          endTime: "18:00",
           serviceAreas: [],
           studioAddress: {
-            street: 'Rua Oscar Freire',
-            number: '1234',
-            complement: 'Conj. 41',
-            neighborhood: 'Jardins',
-            city: 'São Paulo',
-            privacyMode: 'reveal_after_booking',
+            street: "Rua Oscar Freire",
+            number: "1234",
+            complement: "Conj. 41",
+            neighborhood: "Jardins",
+            city: "São Paulo",
+            privacyMode: "reveal_after_booking",
             hasParking: true,
-            parkingInfo: 'Valet no local',
-            isSafeLocation: true
+            parkingInfo: "Valet no local",
+            isSafeLocation: true,
           },
           portfolio: [
-            { id: '1', url: 'https://i.imgur.com/O9b1cB9.png', category: 'Processo' },
-            { id: '2', url: 'https://i.imgur.com/pk8kE8K_d.webp?maxwidth=760&fidelity=grand', category: 'Resultado' },
-            { id: '3', url: 'https://i.imgur.com/D8hEvtH_d.webp?maxwidth=1520&fidelity=grand', category: 'Antes e Depois' }
-          ]
+            {
+              id: "1",
+              url: "https://i.imgur.com/O9b1cB9.png",
+              category: "Processo",
+            },
+            {
+              id: "2",
+              url: "https://i.imgur.com/pk8kE8K_d.webp?maxwidth=760&fidelity=grand",
+              category: "Resultado",
+            },
+            {
+              id: "3",
+              url: "https://i.imgur.com/D8hEvtH_d.webp?maxwidth=1520&fidelity=grand",
+              category: "Antes e Depois",
+            },
+          ],
         };
-        
+
         const HELENA_SERVICES = [
-          { id: '1', name: 'Sobrancelhas Harmonizadas', price: 150, duration: 45, description: 'Sobrancelhas alinhadas ao seu rosto, com resultado natural e harmonioso que valoriza seu olhar.' },
-          { id: '2', name: 'Brow Lamination Estrutural', price: 280, duration: 60, description: 'Efeito de sobrancelhas cheias e disciplinadas, focado em estrutura e alinhamento duradouro.' },
-          { id: '3', name: 'Micropigmentação Soft', price: 950, duration: 150, description: 'Preenchimento fio a fio ultra-realista para quem deseja praticidade e correção de falhas.' }
+          {
+            id: "1",
+            name: "Sobrancelhas Harmonizadas",
+            category: "Sobrancelhas",
+            serviceCategory: "Sobrancelhas",
+            active: true,
+            price: 150,
+            duration: 45,
+            description:
+              "Sobrancelhas alinhadas ao seu rosto, com resultado natural e harmonioso que valoriza seu olhar.",
+          },
+          {
+            id: "2",
+            name: "Brow Lamination Estrutural",
+            category: "Sobrancelhas",
+            serviceCategory: "Sobrancelhas",
+            active: true,
+            price: 280,
+            duration: 60,
+            description:
+              "Efeito de sobrancelhas cheias e disciplinadas, focado em estrutura e alinhamento duradouro.",
+          },
+          {
+            id: "3",
+            name: "Micropigmentação Soft",
+            category: "Sobrancelhas",
+            serviceCategory: "Sobrancelhas",
+            active: true,
+            price: 950,
+            duration: 150,
+            description:
+              "Preenchimento fio a fio ultra-realista para quem deseja praticidade e correção de falhas.",
+          },
         ];
 
         const HELENA_REVIEWS = [
-          { id: '1', comment: 'Técnica muito segura! A Helena conseguiu manter a naturalidade que eu tanto queria.', firstName: 'Mariana', neighborhood: 'Pinheiros', rating: 5, createdAt: new Date().toISOString() },
-          { id: '2', comment: 'Profissional super atenciosa, o estúdio é lindo e o resultado superou minhas expectativas.', firstName: 'Beatriz', neighborhood: 'Vila Madalena', rating: 5, createdAt: new Date().toISOString() },
-          { id: '3', comment: 'Já fiz com várias outras pessoas, mas ninguém faz a harmonização como ela.', firstName: 'Carolina', neighborhood: 'Jardins', rating: 5, createdAt: new Date().toISOString() }
+          {
+            id: "1",
+            comment:
+              "Técnica muito segura! A Helena conseguiu manter a naturalidade que eu tanto queria.",
+            firstName: "Mariana",
+            neighborhood: "Pinheiros",
+            rating: 5,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: "2",
+            comment:
+              "Profissional super atenciosa, o estúdio é lindo e o resultado superou minhas expectativas.",
+            firstName: "Beatriz",
+            neighborhood: "Vila Madalena",
+            rating: 5,
+            createdAt: new Date().toISOString(),
+          },
+          {
+            id: "3",
+            comment:
+              "Já fiz com várias outras pessoas, mas ninguém faz a harmonização como ela.",
+            firstName: "Carolina",
+            neighborhood: "Jardins",
+            rating: 5,
+            createdAt: new Date().toISOString(),
+          },
         ];
 
         const HELENA_STATS = {
-          rating: 5.0,
-          reviewCount: 42,
-          completedBookings: 180
+          averageRating: 5.0,
+          totalReviews: 42,
+          totalCompletedBookings: 180,
         };
 
         if (isMounted) {
@@ -273,11 +362,13 @@ function PublicProfileContent() {
       // --- END MOCK ---
 
       try {
-        devLog(`[PublicProfile] starting robust resolution for slug: ${slug} via API`);
-        
+        devLog(
+          `[PublicProfile] starting robust resolution for slug: ${slug} via API`,
+        );
+
         // 1. Fetch sanitized profile from backend API
         const response = await fetch(`/api/profile/public-profile/${slug}`);
-        
+
         if (!response.ok) {
           if (response.status === 404) {
             devLog(`[PublicProfile] No user found for slug: ${slug}`);
@@ -287,14 +378,17 @@ function PublicProfileContent() {
             }
             return;
           }
-          
+
           if (response.status === 409) {
-             if (isDev) console.error(`[PublicProfile] High priority conflict for slug: ${slug}`);
-             if (isMounted) {
-               setLoading(false);
-               setProfile(null);
-             }
-             return;
+            if (isDev)
+              console.error(
+                `[PublicProfile] High priority conflict for slug: ${slug}`,
+              );
+            if (isMounted) {
+              setLoading(false);
+              setProfile(null);
+            }
+            return;
           }
 
           throw new Error(`API_ERROR_${response.status}`);
@@ -305,25 +399,31 @@ function PublicProfileContent() {
 
         if (!isMounted) return;
 
-        devLog(`[PublicProfile] Resolved user fetch completed via API. ProfessionalId: ${professionalId}`);
+        devLog(
+          `[PublicProfile] Resolved user fetch completed via API. ProfessionalId: ${professionalId}`,
+        );
 
         if (isMounted) {
-          devLog(`[PublicProfile] setting profile for ${professionalId} and ending loading`);
-          
+          devLog(
+            `[PublicProfile] setting profile for ${professionalId} and ending loading`,
+          );
+
           // DO NOT inject legacy portfolio immediately to prevent UI flash. Data will be fetched from subcollection.
           const initialProfileData = { ...userData };
           delete initialProfileData.portfolio;
-          
+
           setProfile(initialProfileData as UserProfile);
-          
+
           if (userData.services) setServices(userData.services);
           if (userData.reviews) {
-            const cleanReviews = (userData.reviews as Review[]).filter(r => !isFakeContent(r.comment) && !isFakeContent(r.firstName));
+            const cleanReviews = (userData.reviews as Review[]).filter(
+              (r) => !isFakeContent(r.comment) && !isFakeContent(r.firstName),
+            );
             setReviews(cleanReviews);
           }
           if (userData.stats) setStats(userData.stats);
-          
-          setLoading(false); 
+
+          setLoading(false);
         }
 
         // Growth Analytics: Log Visit
@@ -336,58 +436,68 @@ function PublicProfileContent() {
         devLog(`[PublicProfile] Starting secondary background tasks`);
         // Parallel fetches for portfolio (since it's not and shouldn't be in the main payload for size reasons)
         Promise.allSettled([
-            // Portfolio Subcollection (Single Source of Truth)
-            (async () => {
-              try {
-                const portfolioQ = query(
-                  collection(db, 'users', professionalId, 'portfolio'),
-                  orderBy('createdAt', 'desc'),
-                  limit(30)
+          // Portfolio Subcollection (Single Source of Truth)
+          (async () => {
+            try {
+              const portfolioQ = query(
+                collection(db, "users", professionalId, "portfolio"),
+                orderBy("createdAt", "desc"),
+                limit(30),
+              );
+              const portfolioSnapshot = await getDocs(portfolioQ);
+              if (!isMounted) return;
+
+              if (!portfolioSnapshot.empty) {
+                let portfolioItems = portfolioSnapshot.docs.map((doc) => ({
+                  id: doc.id,
+                  url: doc.data().url || doc.data().imageUrl,
+                  category: doc.data().category,
+                  categoryId: doc.data().categoryId,
+                  categoryLabel: doc.data().categoryLabel,
+                  linkedServiceId: doc.data().linkedServiceId,
+                  linkedServiceName: doc.data().linkedServiceName,
+                  isFeatured: doc.data().isFeatured,
+                  orderIdx: doc.data().orderIdx,
+                  createdAt: doc.data().createdAt || new Date().toISOString(),
+                }));
+
+                // Sort locally to prioritize orderIdx, then fallback to descending createdAt
+                portfolioItems.sort((a: any, b: any) => {
+                  if (a.orderIdx !== undefined && b.orderIdx !== undefined) {
+                    return a.orderIdx - b.orderIdx;
+                  }
+                  return 0; // Maintain createdAt desc
+                });
+
+                setProfile((prev) =>
+                  prev ? { ...prev, portfolio: portfolioItems } : null,
                 );
-                const portfolioSnapshot = await getDocs(portfolioQ);
-                if (!isMounted) return;
-                
-                if (!portfolioSnapshot.empty) {
-                  let portfolioItems = portfolioSnapshot.docs.map((doc) => ({
-                    id: doc.id,
-                    url: doc.data().url || doc.data().imageUrl,
-                    category: doc.data().category,
-                    categoryId: doc.data().categoryId,
-                    categoryLabel: doc.data().categoryLabel,
-                    linkedServiceId: doc.data().linkedServiceId,
-                    linkedServiceName: doc.data().linkedServiceName,
-                    isFeatured: doc.data().isFeatured,
-                    orderIdx: doc.data().orderIdx,
-                    createdAt: doc.data().createdAt || new Date().toISOString(),
-                  }));
-                  
-                  // Sort locally to prioritize orderIdx, then fallback to descending createdAt
-                  portfolioItems.sort((a: any, b: any) => {
-                    if (a.orderIdx !== undefined && b.orderIdx !== undefined) {
-                      return a.orderIdx - b.orderIdx;
-                    }
-                    return 0; // Maintain createdAt desc
-                  });
-                  
-                  setProfile((prev) => prev ? { ...prev, portfolio: portfolioItems } : null);
-                } else if (userData.portfolio && userData.portfolio.length > 0) {
-                  // Fallback to legacy array if subcollection is entirely empty
-                  setProfile((prev) => prev ? { ...prev, portfolio: userData.portfolio } : null);
-                }
-              } catch (err) {
-                devLog('[PublicProfile] Error fetching portfolio subcollection:', err);
+              } else if (userData.portfolio && userData.portfolio.length > 0) {
+                // Fallback to legacy array if subcollection is entirely empty
+                setProfile((prev) =>
+                  prev ? { ...prev, portfolio: userData.portfolio } : null,
+                );
               }
-            })()
-          ]);
+            } catch (err) {
+              devLog(
+                "[PublicProfile] Error fetching portfolio subcollection:",
+                err,
+              );
+            }
+          })(),
+        ]);
       } catch (error: any) {
-        if (isDev) console.error("Critical error fetching public profile:", error);
+        if (isDev)
+          console.error("Critical error fetching public profile:", error);
         if (error.message === "FIRESTORE_TIMEOUT") {
-          if (isMounted) setLoadError('timeout');
+          if (isMounted) setLoadError("timeout");
         } else {
           notify.error("Não foi possível carregar as informações do perfil.");
         }
       } finally {
-        devLog(`[PublicProfile] finally block executed. isMounted: ${isMounted}`);
+        devLog(
+          `[PublicProfile] finally block executed. isMounted: ${isMounted}`,
+        );
         if (isMounted) setLoading(false);
       }
     };
@@ -438,8 +548,7 @@ function PublicProfileContent() {
   useEffect(() => {
     const findAvailabilityData = async () => {
       const profId = profile?.professionalId || profile?.uid;
-      if (!profId || !profile?.workingHours || services.length === 0)
-        return;
+      if (!profId || !profile?.workingHours || services.length === 0) return;
 
       devLog(`[NEXT_SLOT] Starting calculation for pro: ${profId}`);
 
@@ -449,7 +558,9 @@ function PublicProfileContent() {
         if (preSelectedService) {
           duration = Number(preSelectedService.duration) || 60;
         } else if (services.length > 0) {
-          const minDuration = Math.min(...services.map(s => Number(s.duration) || 60));
+          const minDuration = Math.min(
+            ...services.map((s) => Number(s.duration) || 60),
+          );
           duration = minDuration > 0 ? minDuration : 60;
         }
 
@@ -468,10 +579,21 @@ function PublicProfileContent() {
         const endGame = new Date();
         endGame.setDate(endGame.getDate() + 14);
         const endGameStr = getLocalDateStr(endGame);
-  
-        const slotsResponse = await fetch(`/api/public/occupied-slots/${profId}?start=${todayStr}&end=${endGameStr}`);
-        const { slots: allAppts } = await slotsResponse.json();
-  
+
+        let allAppts: any[] = [];
+        if (profId === "demo-helena-prado") {
+          allAppts = [];
+          if (isDev) devLog(`[NEXT_SLOT] Mocked slots for demo-helena-prado`);
+        } else {
+          const slotsResponse = await fetch(
+            `/api/public/occupied-slots/${profId}?start=${todayStr}&end=${endGameStr}`,
+          );
+          if (slotsResponse.ok) {
+            const data = await slotsResponse.json();
+            allAppts = data.slots;
+          }
+        }
+
         const result = getNextAvailableSlot({
           workingHours: profile.workingHours,
           appointments: allAppts as any[],
@@ -590,39 +712,50 @@ function PublicProfileContent() {
 
   if (loading) return <PublicProfileSkeleton />;
 
-  if (loadError === 'timeout') {
+  if (loadError === "timeout") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-brand-parchment p-6 text-center">
         <motion.div
-           initial={{ opacity: 0, scale: 0.95 }}
-           animate={{ opacity: 1, scale: 1 }}
-           className="bg-brand-white p-8 md:p-10 rounded-[40px] shadow-2xl max-w-md w-full border border-brand-sand/30"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-brand-white p-8 md:p-10 rounded-[40px] shadow-2xl max-w-md w-full border border-brand-sand/30"
         >
           <div className="w-20 h-20 bg-brand-terracotta/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <svg className="w-10 h-10 text-brand-terracotta" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-10 h-10 text-brand-terracotta"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           </div>
           <h1 className="font-playfair text-2xl md:text-3xl text-brand-navy mb-4">
             Não conseguimos carregar esta vitrine agora
           </h1>
           <p className="font-outfit text-brand-brown/80 mb-8 max-w-[280px] mx-auto text-sm md:text-base">
-            A conexão demorou mais que o esperado. Tente novamente ou abra no navegador.
+            A conexão demorou mais que o esperado. Tente novamente ou abra no
+            navegador.
           </p>
           <div className="flex flex-col gap-4">
             <button
-               onClick={() => {
-                 setLoading(true);
-                 setLoadError(null);
-                 setRetryCount(c => c + 1);
-               }}
-               className="w-full py-4 px-6 bg-brand-terracotta text-white rounded-2xl font-outfit font-medium hover:bg-brand-navy transition-colors shadow-lg shadow-brand-terracotta/30"
+              onClick={() => {
+                setLoading(true);
+                setLoadError(null);
+                setRetryCount((c) => c + 1);
+              }}
+              className="w-full py-4 px-6 bg-brand-terracotta text-white rounded-2xl font-outfit font-medium hover:bg-brand-navy transition-colors shadow-lg shadow-brand-terracotta/30"
             >
               Tentar novamente
             </button>
             <button
-               onClick={() => window.open(window.location.href, '_blank')}
-               className="w-full py-4 px-6 bg-transparent border border-brand-sand text-brand-navy rounded-2xl font-outfit font-medium hover:bg-brand-sand/30 transition-colors"
+              onClick={() => window.open(window.location.href, "_blank")}
+              className="w-full py-4 px-6 bg-transparent border border-brand-sand text-brand-navy rounded-2xl font-outfit font-medium hover:bg-brand-sand/30 transition-colors"
             >
               Abrir no navegador
             </button>
@@ -676,22 +809,39 @@ function PublicProfileContent() {
       }
     >
       <SEOHead
-        title={profile.specialty ? `${profile.name} | ${formatSpecialtyLabel(profile.specialty)} | Nera` : `${profile.name} | Nera`}
+        title={
+          profile.specialty
+            ? `${profile.name} | ${formatSpecialtyLabel(profile.specialty)} | Nera`
+            : `${profile.name} | Nera`
+        }
         description={
           profile.bio ||
           `Conheça a vitrine profissional de ${profile.name} na Nera.`
         }
-        image={profile.ogImageUrl || profile.avatar || "https://usenera.com/og-default.png"}
+        image={
+          profile.ogImageUrl ||
+          profile.avatar ||
+          "https://usenera.com/og-default.png"
+        }
         url={`https://usenera.com/p/${profile.slug}`}
       />
-      {slug === 'helena-prado' && (
+      {slug === "helena-prado" && (
         <div className="w-full bg-brand-white/80 backdrop-blur-sm border-b border-brand-mist/50 py-2 sm:py-3 px-4 sm:px-6 sticky top-0 z-[200] flex flex-col sm:flex-row items-center justify-center sm:justify-between gap-1 sm:gap-0">
-          <Link to="/" className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors">
-            <ArrowLeft size={12} className="sm:w-3.5 sm:h-3.5" /> Voltar para o início
+          <Link
+            to="/"
+            className="flex items-center gap-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors"
+          >
+            <ArrowLeft size={12} className="sm:w-3.5 sm:h-3.5" /> Voltar para o
+            início
           </Link>
           <div className="flex items-center gap-1 sm:gap-1.5 bg-brand-parchment border border-brand-mist/50 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full">
-            <Sparkles size={10} className="text-brand-terracotta sm:w-3 sm:h-3" />
-            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-brand-stone">Exemplo de vitrine</span>
+            <Sparkles
+              size={10}
+              className="text-brand-terracotta sm:w-3 sm:h-3"
+            />
+            <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-widest text-brand-stone">
+              Exemplo de vitrine
+            </span>
           </div>
         </div>
       )}
@@ -711,8 +861,11 @@ function PublicProfileContent() {
               <button
                 onClick={() => {
                   const profId = profile?.professionalId || profile?.uid;
-                  if (!profile?.internalAccount && !profile?.excludeFromAnalytics) {
-                    logAnalyticsEvent(profId || '', "click_book_sticky");
+                  if (
+                    !profile?.internalAccount &&
+                    !profile?.excludeFromAnalytics
+                  ) {
+                    logAnalyticsEvent(profId || "", "click_book_sticky");
                   }
                   if (urgencyInfo?.isAgendaFull && features?.waitlist) {
                     setIsWaitlistOpen(true);
@@ -768,11 +921,7 @@ function PublicProfileContent() {
           }}
         />
       </div>
-      <ExpertIntro
-        profile={profile}
-        stats={stats}
-        customBio={aboutBio}
-      />
+      <ExpertIntro profile={profile} stats={stats} customBio={aboutBio} />
       <PortfolioSection
         portfolio={profile.portfolio || []}
         services={services}
@@ -789,8 +938,8 @@ function PublicProfileContent() {
         }}
       />
       <ReviewsSection reviews={reviews} stats={stats} />
-      <PaymentMethods 
-        professionalName={profile.name} 
+      <PaymentMethods
+        professionalName={profile.name}
         paymentMethods={profile.paymentMethods}
         acceptsInstallments={profile.acceptsInstallments}
       />
@@ -799,7 +948,7 @@ function PublicProfileContent() {
         onSelectDate={(date) => {
           const profId = profile?.professionalId || profile?.uid;
           if (!profile?.internalAccount && !profile?.excludeFromAnalytics) {
-            logAnalyticsEvent(profId || '', "week_calendar_click");
+            logAnalyticsEvent(profId || "", "week_calendar_click");
           }
           const day = weeklyAvailability.find((d) => d.date === date);
           if (day?.status === "full" && features?.waitlist) {
@@ -821,46 +970,45 @@ function PublicProfileContent() {
             onBookingClick={() => {
               const profId = profile?.professionalId || profile?.uid;
               if (!profile?.internalAccount && !profile?.excludeFromAnalytics) {
-                logAnalyticsEvent(profId || '', "click_book_final");
+                logAnalyticsEvent(profId || "", "click_book_final");
               }
               setIsBookingModalOpen(true);
             }}
             completedBookings={stats?.totalCompletedBookings}
           />
         ) : null}
-        
         <div className="h-24 md:hidden" /> {/* Bottom spacing for mobile CTA */}
         {urgencyInfo?.isAgendaFull && features?.waitlist && (
           <section className="px-6 pb-16 md:pb-20 -mt-10">
             <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="max-w-xl mx-auto bg-brand-ink text-brand-white p-10 rounded-[50px] text-center relative overflow-hidden shadow-2xl border border-white/5"
-          >
-            <div className="absolute top-0 right-0 w-40 h-40 bg-brand-terracotta/20 rounded-full -mr-20 -mt-20 blur-3xl opacity-50" />
-            <div className="relative z-10">
-              <div className="w-16 h-16 bg-brand-linen/10 rounded-full flex items-center justify-center mx-auto mb-6 text-brand-terracotta">
-                <Users size={32} />
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="max-w-xl mx-auto bg-brand-ink text-brand-white p-10 rounded-[50px] text-center relative overflow-hidden shadow-2xl border border-white/5"
+            >
+              <div className="absolute top-0 right-0 w-40 h-40 bg-brand-terracotta/20 rounded-full -mr-20 -mt-20 blur-3xl opacity-50" />
+              <div className="relative z-10">
+                <div className="w-16 h-16 bg-brand-linen/10 rounded-full flex items-center justify-center mx-auto mb-6 text-brand-terracotta">
+                  <Users size={32} />
+                </div>
+                <h3 className="text-3xl font-serif mb-4 leading-tight">
+                  Agenda lotada?
+                </h3>
+                <p className="text-sm text-brand-stone/80 font-light mb-10 leading-relaxed max-w-xs mx-auto italic">
+                  Não se preocupe. Entre na nossa lista de prioridade e seja
+                  avisada assim que surgir uma desistência.
+                </p>
+                <PremiumButton
+                  variant="terracotta"
+                  className="w-full py-5"
+                  onClick={() => setIsWaitlistOpen(true)}
+                >
+                  Entrar na lista de espera
+                </PremiumButton>
               </div>
-              <h3 className="text-3xl font-serif mb-4 leading-tight">
-                Agenda lotada?
-              </h3>
-              <p className="text-sm text-brand-stone/80 font-light mb-10 leading-relaxed max-w-xs mx-auto italic">
-                Não se preocupe. Entre na nossa lista de prioridade e seja
-                avisada assim que surgir uma desistência.
-              </p>
-              <PremiumButton
-                variant="terracotta"
-                className="w-full py-5"
-                onClick={() => setIsWaitlistOpen(true)}
-              >
-                Entrar na lista de espera
-              </PremiumButton>
-            </div>
-          </motion.div>
-        </section>
-      )}
+            </motion.div>
+          </section>
+        )}
       </div>
       <footer className="bg-brand-parchment border-t border-brand-mist/30 py-12 md:py-16 px-6 text-center">
         <div className="max-w-7xl mx-auto flex flex-col items-center gap-8">
@@ -878,7 +1026,7 @@ function PublicProfileContent() {
               Seja uma Profissional
             </Link>
           </div>
-          
+
           <div className="flex gap-5">
             {profile.instagram && (
               <a
@@ -890,7 +1038,7 @@ function PublicProfileContent() {
                 <Instagram size={16} />
               </a>
             )}
-            {profile.whatsapp && profile.plan === 'pro' && (
+            {profile.whatsapp && profile.plan === "pro" && (
               <a
                 href={buildWhatsappLink(profile.whatsapp)}
                 target="_blank"
@@ -901,12 +1049,20 @@ function PublicProfileContent() {
               </a>
             )}
           </div>
-          
+
           <div className="pt-8 border-t border-brand-mist/20 w-full max-w-xs mx-auto">
-            <a href="/" className="inline-block mb-3 font-serif text-xl tracking-tight text-brand-stone hover:text-brand-ink transition-colors">nera</a>
+            <a
+              href="/"
+              className="inline-block mb-3 font-serif text-xl tracking-tight text-brand-stone hover:text-brand-ink transition-colors"
+            >
+              nera
+            </a>
             <p className="text-[9px] uppercase tracking-[0.2em] text-brand-stone/60 leading-loose">
-              © {new Date().getFullYear()} Nera<br />
-              <span className="opacity-60">Plataforma para profissionais da beleza</span>
+              © {new Date().getFullYear()} Nera
+              <br />
+              <span className="opacity-60">
+                Plataforma para profissionais da beleza
+              </span>
             </p>
           </div>
         </div>

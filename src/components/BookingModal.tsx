@@ -681,47 +681,57 @@ export default function BookingModal({
 
         // 2. Fetch Appointments securely via backend
         try {
-          if (isDev) console.log(`[Slots] fetching occupied slots securely`);
-
-          let fetchTimeoutId: any;
-          const fetchTimeoutPromise = new Promise<never>((_, reject) => {
-            fetchTimeoutId = setTimeout(
-              () => reject(new Error("FETCH_TIMEOUT")),
-              20000,
-            );
-          });
-          fetchTimeoutPromise.catch(() => {});
-
-          const today = new Date();
-          const endDate = new Date();
-          endDate.setDate(endDate.getDate() + 15);
-          const startStr = formatDateKey(today);
-          const endStr = formatDateKey(endDate);
-
-          const res = await Promise.race([
-            fetch(
-              `/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}`,
-            ),
-            fetchTimeoutPromise,
-          ]);
-          clearTimeout(fetchTimeoutId);
-
-          if (res instanceof Response && res.ok) {
-            const data = await res.json();
-            const allAppts = data.slots as Appointment[];
-            currentAppts = allAppts.filter((a) => isActiveSlotStatus(a.status));
+          if (profId === "demo-helena-prado") {
+            // Mock data for Helena Prado so demo is always available
+            currentAppts = [];
+            currentBlocked = [];
             if (isDev)
-              console.log(
-                `[Slots] appointments fetch success count=${currentAppts.length}`,
-              );
+              console.log(`[Slots] Mocked data loaded for demo-helena-prado`);
           } else {
-            console.error(
-              "[Slots] Error fetching occupied slots, res not ok",
-              res,
-            );
-            setSlotsLoadError("timeout");
-            setSelectedTime("");
-            return; // Abort loading slots if backend request failed
+            if (isDev) console.log(`[Slots] fetching occupied slots securely`);
+
+            let fetchTimeoutId: any;
+            const fetchTimeoutPromise = new Promise<never>((_, reject) => {
+              fetchTimeoutId = setTimeout(
+                () => reject(new Error("FETCH_TIMEOUT")),
+                20000,
+              );
+            });
+            fetchTimeoutPromise.catch(() => {});
+
+            const today = new Date();
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + 15);
+            const startStr = formatDateKey(today);
+            const endStr = formatDateKey(endDate);
+
+            const res = await Promise.race([
+              fetch(
+                `/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}`,
+              ),
+              fetchTimeoutPromise,
+            ]);
+            clearTimeout(fetchTimeoutId);
+
+            if (res instanceof Response && res.ok) {
+              const data = await res.json();
+              const allAppts = data.slots as Appointment[];
+              currentAppts = allAppts.filter((a) =>
+                isActiveSlotStatus(a.status),
+              );
+              if (isDev)
+                console.log(
+                  `[Slots] appointments fetch success count=${currentAppts.length}`,
+                );
+            } else {
+              console.error(
+                "[Slots] Error fetching occupied slots, res not ok",
+                res,
+              );
+              setSlotsLoadError("timeout");
+              setSelectedTime("");
+              return; // Abort loading slots if backend request failed
+            }
           }
         } catch (error) {
           if (isDev)
@@ -1101,7 +1111,11 @@ export default function BookingModal({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  if (selectedService && service.id === selectedService.id && idx === 0) {
+                                  if (
+                                    selectedService &&
+                                    service.id === selectedService.id &&
+                                    idx === 0
+                                  ) {
                                     setAdditionalServices((prev) => {
                                       if (prev.length > 0) {
                                         setSelectedService(prev[0]);
@@ -1112,9 +1126,13 @@ export default function BookingModal({
                                       }
                                     });
                                   } else {
-                                    const additionalIdx = selectedService ? idx - 1 : idx;
+                                    const additionalIdx = selectedService
+                                      ? idx - 1
+                                      : idx;
                                     setAdditionalServices((prev) =>
-                                      prev.filter((_, i) => i !== additionalIdx),
+                                      prev.filter(
+                                        (_, i) => i !== additionalIdx,
+                                      ),
                                     );
                                   }
                                 }}
@@ -1128,7 +1146,8 @@ export default function BookingModal({
                         ))}
                       </div>
 
-                      {(!showServiceSelector && allSelectedServices.length > 0) ? (
+                      {!showServiceSelector &&
+                      allSelectedServices.length > 0 ? (
                         <button
                           onClick={() => {
                             setShowServiceSelector(true);
@@ -1157,7 +1176,9 @@ export default function BookingModal({
                               </div>
                             ) : (
                               <h5 className="font-serif text-brand-ink text-lg">
-                                {allSelectedServices.length === 0 ? "Escolha uma experiência para continuar" : "Adicionar Serviço"}
+                                {allSelectedServices.length === 0
+                                  ? "Escolha uma experiência para continuar"
+                                  : "Adicionar Serviço"}
                               </h5>
                             )}
                             {allSelectedServices.length > 0 && (
@@ -1195,7 +1216,7 @@ export default function BookingModal({
                                   new Set(
                                     availableServices
                                       .map((s) => s.serviceCategory?.trim())
-                                      .filter(Boolean) as string[]
+                                      .filter(Boolean) as string[],
                                   ),
                                 );
                                 return (
@@ -1312,219 +1333,223 @@ export default function BookingModal({
                             Selecione o melhor momento
                           </label>
                           <div className="hidden md:flex items-center gap-1">
-                          <button
-                            onClick={() => scrollDates("left")}
-                            className={cn(
-                              "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
-                              showLeftScroll
-                                ? "bg-brand-linen text-brand-ink hover:bg-brand-mist"
-                                : "bg-transparent text-brand-stone/30 cursor-default",
-                            )}
-                            disabled={!showLeftScroll}
-                            aria-label="Rolar para a esquerda"
-                          >
-                            <ChevronLeft size={16} />
-                          </button>
-                          <button
-                            onClick={() => scrollDates("right")}
-                            className={cn(
-                              "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
-                              showRightScroll
-                                ? "bg-brand-linen text-brand-ink hover:bg-brand-mist"
-                                : "bg-transparent text-brand-stone/30 cursor-default",
-                            )}
-                            disabled={!showRightScroll}
-                            aria-label="Rolar para a direita"
-                          >
-                            <ChevronRight size={16} />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="relative">
-                        <div
-                          className={cn(
-                            "hidden md:block absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-brand-white to-transparent z-10 pointer-events-none transition-opacity duration-300",
-                            showLeftScroll ? "opacity-100" : "opacity-0",
-                          )}
-                        />
-                        <div
-                          className={cn(
-                            "hidden md:block absolute right-0 top-0 bottom-4 w-6 bg-gradient-to-l from-brand-white to-transparent z-10 pointer-events-none transition-opacity duration-300",
-                            showRightScroll ? "opacity-100" : "opacity-0",
-                          )}
-                        />
-
-                        <div
-                          ref={dateScrollRef}
-                          onScroll={handleDateScroll}
-                          className="flex overflow-x-auto gap-3 pb-4 mb-6 no-scrollbar -mx-2 px-2"
-                        >
-                          {[
-                            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
-                          ].map((offset) => {
-                            const date = new Date();
-                            date.setDate(date.getDate() + offset);
-                            const dateStr = formatDateKey(date);
-                            const isSelected = selectedDate === dateStr;
-                            const dayOfWeek = date.getDay();
-                            const isWorkingDay =
-                              profile?.workingHours?.workingDays?.includes(
-                                dayOfWeek,
-                              );
-                            return (
-                              <button
-                                key={offset}
-                                onClick={() => {
-                                  if (!isWorkingDay) {
-                                    notify.info(
-                                      "A profissional não atende neste dia",
-                                    );
-                                    return;
-                                  }
-                                  setSelectedDate(dateStr);
-                                  setSelectedTime("");
-                                }}
-                                className={cn(
-                                  "min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0",
-                                  isSelected
-                                    ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105"
-                                    : isWorkingDay
-                                      ? "bg-brand-parchment border-brand-mist hover:border-brand-ink"
-                                      : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed",
-                                )}
-                              >
-                                <span
-                                  className={cn(
-                                    "text-[8px] font-bold uppercase tracking-widest mb-1",
-                                    isWorkingDay ? "opacity-40" : "opacity-20",
-                                  )}
-                                >
-                                  {date
-                                    .toLocaleDateString("pt-BR", {
-                                      weekday: "short",
-                                    })
-                                    .replace(".", "")}
-                                </span>
-                                <span
-                                  className={cn(
-                                    "text-lg font-serif",
-                                    !isWorkingDay && "opacity-40",
-                                  )}
-                                >
-                                  {date.getDate()}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                        {selectedDate ? (
-                          !profile?.workingHours ? (
-                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
-                              <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">
-                                Sem expediente
-                              </p>
-                              <p className="text-[9px] text-brand-stone/60">
-                                Esta profissional ainda não configurou horários
-                                de atendimento.
-                              </p>
-                            </div>
-                          ) : slotsLoadError ? (
-                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
-                              <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">
-                                Não conseguimos carregar os horários agora.
-                              </p>
-                              <p className="text-[9px] text-brand-stone/60 mb-4">
-                                Verifique sua conexão ou tente novamente.
-                              </p>
-                              <button
-                                onClick={() => setRetrySlotsCount((c) => c + 1)}
-                                className="px-4 py-2 border border-brand-sand text-brand-navy rounded-full text-[10px] hover:bg-brand-sand/20 transition-colors mx-auto block"
-                              >
-                                Tentar novamente
-                              </button>
-                            </div>
-                          ) : isLoadingSlots ? (
-                            <div className="col-span-3 space-y-4 py-2">
-                              <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest text-center animate-pulse">
-                                Buscando horários disponíveis...
-                              </p>
-                              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                                {[1, 2, 3, 4, 5, 6].map((i) => (
-                                  <div
-                                    key={i}
-                                    className="py-3.5 rounded-xl border border-brand-mist bg-brand-mist/10 animate-pulse h-[42px] flex items-center justify-center"
-                                  >
-                                    <div className="h-3 w-12 bg-brand-mist/40 rounded-full"></div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : availableSlots.length > 0 ? (
-                            availableSlots.map((time) => (
-                              <button
-                                key={time}
-                                onClick={() => setSelectedTime(time)}
-                                className={cn(
-                                  "py-3.5 rounded-xl border transition-all text-[11px] font-bold flex items-center justify-center gap-1.5",
-                                  selectedTime === time
-                                    ? "bg-brand-ink text-brand-white border-brand-ink"
-                                    : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-stone",
-                                )}
-                              >
-                                <Clock
-                                  size={12}
-                                  className={
-                                    selectedTime === time
-                                      ? "text-brand-terracotta"
-                                      : "text-brand-mist/40"
-                                  }
-                                />
-                                {time}
-                              </button>
-                            ))
-                          ) : features?.waitlist ? (
-                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
-                              <p className="text-[10px] text-brand-terracotta font-bold uppercase tracking-widest mb-2">
-                                Alta procura neste dia
-                              </p>
-                              <button
-                                onClick={() => setIsWaitlistOpen(true)}
-                                className="flex items-center gap-2 bg-brand-ink text-brand-white px-5 py-3 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-xl mx-auto"
-                              >
-                                <Zap
-                                  size={12}
-                                  className="fill-brand-terracotta text-brand-terracotta"
-                                />{" "}
-                                Entrar na Lista
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
-                              <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">
-                                Não há horários disponíveis neste dia.
-                              </p>
-                              <p className="text-[9px] text-brand-stone/60">
-                                Escolha outra data ou fale diretamente com a
-                                profissional.
-                              </p>
-                            </div>
-                          )
-                        ) : (
-                          <div className="col-span-3 py-10 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
-                            <p className="text-[10px] text-brand-stone font-light italic uppercase tracking-widest">
-                              Selecione uma data acima
-                            </p>
+                            <button
+                              onClick={() => scrollDates("left")}
+                              className={cn(
+                                "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
+                                showLeftScroll
+                                  ? "bg-brand-linen text-brand-ink hover:bg-brand-mist"
+                                  : "bg-transparent text-brand-stone/30 cursor-default",
+                              )}
+                              disabled={!showLeftScroll}
+                              aria-label="Rolar para a esquerda"
+                            >
+                              <ChevronLeft size={16} />
+                            </button>
+                            <button
+                              onClick={() => scrollDates("right")}
+                              className={cn(
+                                "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
+                                showRightScroll
+                                  ? "bg-brand-linen text-brand-ink hover:bg-brand-mist"
+                                  : "bg-transparent text-brand-stone/30 cursor-default",
+                              )}
+                              disabled={!showRightScroll}
+                              aria-label="Rolar para a direita"
+                            >
+                              <ChevronRight size={16} />
+                            </button>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+                        </div>
 
-                  <PremiumButton
+                        <div className="relative">
+                          <div
+                            className={cn(
+                              "hidden md:block absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-brand-white to-transparent z-10 pointer-events-none transition-opacity duration-300",
+                              showLeftScroll ? "opacity-100" : "opacity-0",
+                            )}
+                          />
+                          <div
+                            className={cn(
+                              "hidden md:block absolute right-0 top-0 bottom-4 w-6 bg-gradient-to-l from-brand-white to-transparent z-10 pointer-events-none transition-opacity duration-300",
+                              showRightScroll ? "opacity-100" : "opacity-0",
+                            )}
+                          />
+
+                          <div
+                            ref={dateScrollRef}
+                            onScroll={handleDateScroll}
+                            className="flex overflow-x-auto gap-3 pb-4 mb-6 no-scrollbar -mx-2 px-2"
+                          >
+                            {[
+                              0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+                            ].map((offset) => {
+                              const date = new Date();
+                              date.setDate(date.getDate() + offset);
+                              const dateStr = formatDateKey(date);
+                              const isSelected = selectedDate === dateStr;
+                              const dayOfWeek = date.getDay();
+                              const isWorkingDay =
+                                profile?.workingHours?.workingDays?.includes(
+                                  dayOfWeek,
+                                );
+                              return (
+                                <button
+                                  key={offset}
+                                  onClick={() => {
+                                    if (!isWorkingDay) {
+                                      notify.info(
+                                        "A profissional não atende neste dia",
+                                      );
+                                      return;
+                                    }
+                                    setSelectedDate(dateStr);
+                                    setSelectedTime("");
+                                  }}
+                                  className={cn(
+                                    "min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0",
+                                    isSelected
+                                      ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105"
+                                      : isWorkingDay
+                                        ? "bg-brand-parchment border-brand-mist hover:border-brand-ink"
+                                        : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed",
+                                  )}
+                                >
+                                  <span
+                                    className={cn(
+                                      "text-[8px] font-bold uppercase tracking-widest mb-1",
+                                      isWorkingDay
+                                        ? "opacity-40"
+                                        : "opacity-20",
+                                    )}
+                                  >
+                                    {date
+                                      .toLocaleDateString("pt-BR", {
+                                        weekday: "short",
+                                      })
+                                      .replace(".", "")}
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      "text-lg font-serif",
+                                      !isWorkingDay && "opacity-40",
+                                    )}
+                                  >
+                                    {date.getDate()}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                          {selectedDate ? (
+                            !profile?.workingHours ? (
+                              <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                                <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">
+                                  Sem expediente
+                                </p>
+                                <p className="text-[9px] text-brand-stone/60">
+                                  Esta profissional ainda não configurou
+                                  horários de atendimento.
+                                </p>
+                              </div>
+                            ) : slotsLoadError ? (
+                              <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                                <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">
+                                  Não conseguimos carregar os horários agora.
+                                </p>
+                                <p className="text-[9px] text-brand-stone/60 mb-4">
+                                  Verifique sua conexão ou tente novamente.
+                                </p>
+                                <button
+                                  onClick={() =>
+                                    setRetrySlotsCount((c) => c + 1)
+                                  }
+                                  className="px-4 py-2 border border-brand-sand text-brand-navy rounded-full text-[10px] hover:bg-brand-sand/20 transition-colors mx-auto block"
+                                >
+                                  Tentar novamente
+                                </button>
+                              </div>
+                            ) : isLoadingSlots ? (
+                              <div className="col-span-3 space-y-4 py-2">
+                                <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest text-center animate-pulse">
+                                  Buscando horários disponíveis...
+                                </p>
+                                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                                    <div
+                                      key={i}
+                                      className="py-3.5 rounded-xl border border-brand-mist bg-brand-mist/10 animate-pulse h-[42px] flex items-center justify-center"
+                                    >
+                                      <div className="h-3 w-12 bg-brand-mist/40 rounded-full"></div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : availableSlots.length > 0 ? (
+                              availableSlots.map((time) => (
+                                <button
+                                  key={time}
+                                  onClick={() => setSelectedTime(time)}
+                                  className={cn(
+                                    "py-3.5 rounded-xl border transition-all text-[11px] font-bold flex items-center justify-center gap-1.5",
+                                    selectedTime === time
+                                      ? "bg-brand-ink text-brand-white border-brand-ink"
+                                      : "bg-brand-white border-brand-mist hover:border-brand-ink text-brand-stone",
+                                  )}
+                                >
+                                  <Clock
+                                    size={12}
+                                    className={
+                                      selectedTime === time
+                                        ? "text-brand-terracotta"
+                                        : "text-brand-mist/40"
+                                    }
+                                  />
+                                  {time}
+                                </button>
+                              ))
+                            ) : features?.waitlist ? (
+                              <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                                <p className="text-[10px] text-brand-terracotta font-bold uppercase tracking-widest mb-2">
+                                  Alta procura neste dia
+                                </p>
+                                <button
+                                  onClick={() => setIsWaitlistOpen(true)}
+                                  className="flex items-center gap-2 bg-brand-ink text-brand-white px-5 py-3 rounded-full text-[9px] font-bold uppercase tracking-widest shadow-xl mx-auto"
+                                >
+                                  <Zap
+                                    size={12}
+                                    className="fill-brand-terracotta text-brand-terracotta"
+                                  />{" "}
+                                  Entrar na Lista
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="col-span-3 py-10 text-center bg-brand-linen/30 rounded-3xl border border-dashed border-brand-mist px-6">
+                                <p className="text-[10px] text-brand-stone font-bold uppercase tracking-widest mb-2">
+                                  Não há horários disponíveis neste dia.
+                                </p>
+                                <p className="text-[9px] text-brand-stone/60">
+                                  Escolha outra data ou fale diretamente com a
+                                  profissional.
+                                </p>
+                              </div>
+                            )
+                          ) : (
+                            <div className="col-span-3 py-10 text-center bg-brand-parchment/50 rounded-3xl border border-dashed border-brand-mist">
+                              <p className="text-[10px] text-brand-stone font-light italic uppercase tracking-widest">
+                                Selecione uma data acima
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <PremiumButton
                       className="w-full mt-8 hidden md:flex"
                       variant="terracotta"
                       disabled={
@@ -1727,8 +1752,13 @@ export default function BookingModal({
 
                         <div className="space-y-1.5 min-w-0">
                           <label className="flex flex-col text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
-                            <span>Observações para a profissional (Opcional)</span>
-                            <span className="text-[9px] lowercase font-medium text-brand-stone/70 normal-case mt-0.5 tracking-normal">Compartilhe qualquer informação que possa ajudar no seu atendimento.</span>
+                            <span>
+                              Observações para a profissional (Opcional)
+                            </span>
+                            <span className="text-[9px] lowercase font-medium text-brand-stone/70 normal-case mt-0.5 tracking-normal">
+                              Compartilhe qualquer informação que possa ajudar
+                              no seu atendimento.
+                            </span>
                           </label>
                           <textarea
                             value={clientNotes}
@@ -2267,247 +2297,268 @@ export default function BookingModal({
                 transition={{ type: "spring", damping: 15 }}
                 className="w-24 h-24 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mb-8 shrink-0"
               >
-              <Check size={48} />
-            </motion.div>
-            <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">
-              Sua reserva foi registrada
-            </h2>
-            <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
-              {
-                getBookingNotificationCopy(profile.plan, !!profile.whatsapp)
-                  .notification
-              }
-              <span className="block mt-2 text-[10px] text-brand-stone italic">
-                Verifique sua caixa de entrada e spam ✨
-              </span>
-            </p>
-            {allSelectedServices.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="bg-brand-parchment rounded-3xl border border-brand-mist p-8 w-full max-w-md mb-12 text-left shadow-sm"
-              >
-                <div className="flex justify-between items-center mb-6 border-b border-brand-mist/50 pb-4">
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block">
-                    Resumo da reserva
-                  </span>
-                  {reservationCode && (
-                    <div className="text-right">
-                      <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-0.5">
-                        Código
+                <Check size={48} />
+              </motion.div>
+              <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">
+                Sua reserva foi registrada
+              </h2>
+              <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
+                {
+                  getBookingNotificationCopy(profile.plan, !!profile.whatsapp)
+                    .notification
+                }
+                <span className="block mt-2 text-[10px] text-brand-stone italic">
+                  Verifique sua caixa de entrada e spam ✨
+                </span>
+              </p>
+              {allSelectedServices.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="bg-brand-parchment rounded-3xl border border-brand-mist p-8 w-full max-w-md mb-12 text-left shadow-sm"
+                >
+                  <div className="flex justify-between items-center mb-6 border-b border-brand-mist/50 pb-4">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block">
+                      Resumo da reserva
+                    </span>
+                    {reservationCode && (
+                      <div className="text-right">
+                        <span className="text-[7px] text-brand-stone uppercase tracking-widest block mb-0.5">
+                          Código
+                        </span>
+                        <span className="text-[10px] font-mono font-bold text-brand-terracotta">
+                          {reservationCode}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">
+                        Serviços ({allSelectedServices.length})
                       </span>
-                      <span className="text-[10px] font-mono font-bold text-brand-terracotta">
-                        {reservationCode}
-                      </span>
+                      <ul className="space-y-1 mt-2">
+                        {allSelectedServices.map((service, idx) => (
+                          <li
+                            key={idx}
+                            className="font-serif text-brand-ink flex justify-between items-center text-sm"
+                          >
+                            <span className="truncate pr-2">
+                              {service.name}
+                            </span>
+                            <span className="font-sans text-xs text-brand-stone tabular-nums">
+                              {formatCurrency(service.price)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">
+                          Data
+                        </span>
+                        <span className="text-sm font-medium text-brand-ink">
+                          {selectedDate
+                            ? (() => {
+                                const [year, month, day] = selectedDate
+                                  .split("-")
+                                  .map(Number);
+                                return new Date(
+                                  year,
+                                  month - 1,
+                                  day,
+                                ).toLocaleDateString("pt-BR", {
+                                  day: "numeric",
+                                  month: "short",
+                                });
+                              })()
+                            : "---"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">
+                          Horário
+                        </span>
+                        <span className="text-sm font-medium text-brand-ink">
+                          {selectedTime}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-brand-mist/30 space-y-2">
+                      {getTravelFee() > 0 && (
+                        <>
+                          <div className="flex justify-between text-[11px] text-brand-stone">
+                            <span>Subtotal</span>
+                            <span>
+                              {formatCurrency(
+                                allSelectedServices.reduce(
+                                  (acc, s) => acc + (Number(s.price) || 0),
+                                  0,
+                                ),
+                              )}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-[11px] text-brand-stone">
+                            <span>Taxa de deslocamento</span>
+                            <span>{formatCurrency(getTravelFee())}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex justify-between items-center text-brand-ink font-serif pt-1">
+                        <span className="text-sm">Total</span>
+                        <span className="text-lg text-brand-terracotta">
+                          {formatCurrency(calculateTotalPrice())}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+              <div className="w-full max-w-sm space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <PremiumButton
+                    variant="secondary"
+                    className="w-full py-4 !text-[9px]"
+                    onClick={() => {
+                      if (!selectedDate || !selectedTime || !selectedService)
+                        return;
+                      const [year, month, day] = selectedDate
+                        .split("-")
+                        .map(Number);
+                      const [hours, minutes] = selectedTime
+                        .split(":")
+                        .map(Number);
+                      const start = new Date(
+                        year,
+                        month - 1,
+                        day,
+                        hours,
+                        minutes,
+                      );
+                      const end = new Date(
+                        start.getTime() +
+                          (Number(selectedService.duration) || 60) * 60000,
+                      );
+                      const formatTemplate = (d: Date) =>
+                        d.toISOString().replace(/[-:]/g, "").split(".")[0] +
+                        "Z";
+                      const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Reserva: " + selectedService.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent("Agendamento realizado via Nera.")}&location=${encodeURIComponent(profile?.city || "")}`;
+                      if (typeof window !== "undefined")
+                        window.open(url, "_blank");
+                    }}
+                  >
+                    <CalendarIcon size={14} /> Adicionar ao calendário
+                  </PremiumButton>
+
+                  {appointmentToken && (
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => {
+                          if (typeof window !== "undefined")
+                            window.location.href = `/r/${appointmentToken}`;
+                        }}
+                        className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all border border-brand-ink shadow-lg shadow-brand-ink/10"
+                      >
+                        <Settings size={14} className="animate-spin-slow" />{" "}
+                        Gerenciar reserva
+                      </button>
                     </div>
                   )}
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">
-                      Serviços ({allSelectedServices.length})
-                    </span>
-                    <ul className="space-y-1 mt-2">
-                      {allSelectedServices.map((service, idx) => (
-                        <li
-                          key={idx}
-                          className="font-serif text-brand-ink flex justify-between items-center text-sm"
-                        >
-                          <span className="truncate pr-2">{service.name}</span>
-                          <span className="font-sans text-xs text-brand-stone tabular-nums">
-                            {formatCurrency(service.price)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">
-                        Data
-                      </span>
-                      <span className="text-sm font-medium text-brand-ink">
-                        {selectedDate
-                          ? (() => {
-                              const [year, month, day] = selectedDate
-                                .split("-")
-                                .map(Number);
-                              return new Date(
-                                year,
-                                month - 1,
-                                day,
-                              ).toLocaleDateString("pt-BR", {
-                                day: "numeric",
-                                month: "short",
-                              });
-                            })()
-                          : "---"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-brand-stone uppercase tracking-wide block mb-1">
-                        Horário
-                      </span>
-                      <span className="text-sm font-medium text-brand-ink">
-                        {selectedTime}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="pt-4 border-t border-brand-mist/30 space-y-2">
-                    {getTravelFee() > 0 && (
-                      <>
-                        <div className="flex justify-between text-[11px] text-brand-stone">
-                          <span>Subtotal</span>
-                          <span>
-                            {formatCurrency(
-                              allSelectedServices.reduce(
-                                (acc, s) => acc + (Number(s.price) || 0),
-                                0,
-                              ),
-                            )}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-[11px] text-brand-stone">
-                          <span>Taxa de deslocamento</span>
-                          <span>{formatCurrency(getTravelFee())}</span>
-                        </div>
-                      </>
-                    )}
-                    <div className="flex justify-between items-center text-brand-ink font-serif pt-1">
-                      <span className="text-sm">Total</span>
-                      <span className="text-lg text-brand-terracotta">
-                        {formatCurrency(calculateTotalPrice())}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-            <div className="w-full max-w-sm space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <PremiumButton
-                  variant="secondary"
-                  className="w-full py-4 !text-[9px]"
-                  onClick={() => {
-                    if (!selectedDate || !selectedTime || !selectedService) return;
-                    const [year, month, day] = selectedDate
-                      .split("-")
-                      .map(Number);
-                    const [hours, minutes] = selectedTime
-                      .split(":")
-                      .map(Number);
-                    const start = new Date(
-                      year,
-                      month - 1,
-                      day,
-                      hours,
-                      minutes,
-                    );
-                    const end = new Date(
-                      start.getTime() +
-                        (Number(selectedService.duration) || 60) * 60000,
-                    );
-                    const formatTemplate = (d: Date) =>
-                      d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
-                    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent("Reserva: " + selectedService.name)}&dates=${formatTemplate(start)}/${formatTemplate(end)}&details=${encodeURIComponent("Agendamento realizado via Nera.")}&location=${encodeURIComponent(profile?.city || "")}`;
-                    if (typeof window !== 'undefined') window.open(url, "_blank");
-                  }}
-                >
-                  <CalendarIcon size={14} /> Adicionar ao calendário
-                </PremiumButton>
-
-                {appointmentToken && (
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => {
-                        if (typeof window !== 'undefined') window.location.href = `/r/${appointmentToken}`;
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-brand-ink text-brand-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all border border-brand-ink shadow-lg shadow-brand-ink/10"
+                  {profile.plan === "pro" && (
+                    <a
+                      href={buildWhatsappLink(
+                        profile?.whatsapp || "",
+                        generateBookingConfirmationMessage(
+                          allSelectedServices.map((s) => s.name),
+                          selectedDate,
+                          selectedTime,
+                          getTravelFee(),
+                          calculateTotalPrice(),
+                        ),
+                      )}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist sm:col-span-2"
                     >
-                      <Settings size={14} className="animate-spin-slow" />{" "}
-                      Gerenciar reserva
-                    </button>
-                  </div>
-                )}
-
-                {profile.plan === "pro" && (
-                  <a
-                    href={buildWhatsappLink(
-                      profile?.whatsapp || "",
-                      generateBookingConfirmationMessage(
-                        allSelectedServices.map((s) => s.name),
-                        selectedDate,
-                        selectedTime,
-                        getTravelFee(),
-                        calculateTotalPrice(),
-                      ),
-                    )}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 px-6 py-4 bg-brand-linen text-brand-ink rounded-full text-[9px] font-medium uppercase tracking-widest hover:bg-brand-mist transition-all border border-brand-mist sm:col-span-2"
-                  >
-                    <MessageCircle size={14} /> Falar com a profissional
-                  </a>
-                )}
-              </div>
-              <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-6 md:p-8 mt-8 md:mt-12 text-center w-full">
-                <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm">
-                  <Heart size={24} className="fill-brand-terracotta/10" />
+                      <MessageCircle size={14} /> Falar com a profissional
+                    </a>
+                  )}
                 </div>
-                <h4 className="text-lg font-serif text-brand-ink mb-2">
-                  Gostou da experiência? Indique uma amiga.
-                </h4>
-                <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">
-                  Compartilhe sua descoberta com quem você ama
-                </p>
-                <PremiumButton
-                  variant="primary"
-                  className="w-full py-5 !text-[10px]"
-                  onClick={async () => {
-                    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                    const url =
-                      origin + "/p/" + (profile?.slug || "");
-                    const text = "Te recomendo essa profissional ✨";
-                    const fullText = `${text} Reserve online aqui: ${url}`;
-                    try {
-                      if (typeof navigator !== 'undefined' && navigator.share) {
-                        await navigator
-                          .share({ title: profile?.name, text: text, url: url })
-                          .catch(async () => {
-                            if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                              await navigator.clipboard.writeText(fullText);
-                              notify.success("Link de indicação copiado!");
-                            }
-                          });
-                      } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
-                        await navigator.clipboard.writeText(fullText);
-                        notify.success("Link de indicação copiado!");
+                <div className="bg-brand-linen/30 border border-brand-mist rounded-[32px] p-6 md:p-8 mt-8 md:mt-12 text-center w-full">
+                  <div className="w-12 h-12 bg-brand-white rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-terracotta shadow-sm">
+                    <Heart size={24} className="fill-brand-terracotta/10" />
+                  </div>
+                  <h4 className="text-lg font-serif text-brand-ink mb-2">
+                    Gostou da experiência? Indique uma amiga.
+                  </h4>
+                  <p className="text-[10px] text-brand-stone uppercase tracking-widest mb-6">
+                    Compartilhe sua descoberta com quem você ama
+                  </p>
+                  <PremiumButton
+                    variant="primary"
+                    className="w-full py-5 !text-[10px]"
+                    onClick={async () => {
+                      const origin =
+                        typeof window !== "undefined"
+                          ? window.location.origin
+                          : "";
+                      const url = origin + "/p/" + (profile?.slug || "");
+                      const text = "Te recomendo essa profissional ✨";
+                      const fullText = `${text} Reserve online aqui: ${url}`;
+                      try {
+                        if (
+                          typeof navigator !== "undefined" &&
+                          navigator.share
+                        ) {
+                          await navigator
+                            .share({
+                              title: profile?.name,
+                              text: text,
+                              url: url,
+                            })
+                            .catch(async () => {
+                              if (
+                                typeof navigator !== "undefined" &&
+                                navigator.clipboard
+                              ) {
+                                await navigator.clipboard.writeText(fullText);
+                                notify.success("Link de indicação copiado!");
+                              }
+                            });
+                        } else if (
+                          typeof navigator !== "undefined" &&
+                          navigator.clipboard
+                        ) {
+                          await navigator.clipboard.writeText(fullText);
+                          notify.success("Link de indicação copiado!");
+                        }
+                      } catch (err) {
+                        console.error("[Share] error:", err);
                       }
-                    } catch (err) {
-                      console.error("[Share] error:", err);
-                    }
+                    }}
+                  >
+                    Compartilhar perfil <Share2 size={14} className="ml-1" />
+                  </PremiumButton>
+                </div>
+                <button
+                  onClick={() => {
+                    setStep(1);
+                    setSelectedService(null);
+                    setSelectedDate("");
+                    setSelectedTime("");
+                    setBookingSuccess(false);
+                    onClose();
                   }}
+                  className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors"
                 >
-                  Compartilhar perfil <Share2 size={14} className="ml-1" />
-                </PremiumButton>
+                  Voltar para o perfil
+                </button>
               </div>
-              <button
-                onClick={() => {
-                  setStep(1);
-                  setSelectedService(null);
-                  setSelectedDate("");
-                  setSelectedTime("");
-                  setBookingSuccess(false);
-                  onClose();
-                }}
-                className="mt-8 text-[10px] font-bold text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors"
-              >
-                Voltar para o perfil
-              </button>
             </div>
-          </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,13 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { notify } from '../../lib/notify';
-import { ShieldCheck, Instagram, ChevronRight, MapPin, Home, Users, Star, X, CheckCircle2, Clock, Copy, Car, Award, MessageCircle } from 'lucide-react';
-import { cn, formatCurrency } from '../../lib/utils';
-import { getLocalDateStr, parseLocalDate } from '../../lib/bookingUtils';
-import { isSanitizedContent } from '../../lib/validation';
-import PremiumButton from '../PremiumButton';
-import { UserProfile, Service } from '../../types';
-import { getProfileHeroCopy, getServiceModeLabel, formatSpecialtyLabel, getServiceLocationCopy } from '../../lib/copy';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { notify } from "../../lib/notify";
+import {
+  ShieldCheck,
+  Instagram,
+  ChevronRight,
+  MapPin,
+  Home,
+  Users,
+  Star,
+  X,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Car,
+  Award,
+  MessageCircle,
+} from "lucide-react";
+import { cn, formatCurrency } from "../../lib/utils";
+import { getLocalDateStr, parseLocalDate } from "../../lib/bookingUtils";
+import { isSanitizedContent } from "../../lib/validation";
+import PremiumButton from "../PremiumButton";
+import { UserProfile, Service } from "../../types";
+import {
+  getProfileHeroCopy,
+  getServiceModeLabel,
+  formatSpecialtyLabel,
+  getServiceLocationCopy,
+} from "../../lib/copy";
 
 interface PublicHeroProps {
   profile: UserProfile;
@@ -15,62 +35,78 @@ interface PublicHeroProps {
   nextSlot: { date: string; time: string } | null;
   onBookingClick: (service?: Service) => void;
   heroBio?: string;
-  stats?: { averageRating: number; totalCompletedBookings: number; totalReviews?: number } | null;
+  stats?: {
+    averageRating: number;
+    totalCompletedBookings: number;
+    totalReviews?: number;
+  } | null;
   isAgendaFull?: boolean;
   hasWaitlistFeature?: boolean;
   onWaitlistClick?: () => void;
   totalWeeklySlots?: number | null;
 }
 
-export const PublicHero = ({ 
-  profile, 
-  services, 
-  nextSlot, 
-  onBookingClick, 
+export const PublicHero = ({
+  profile,
+  services,
+  nextSlot,
+  onBookingClick,
   heroBio,
   stats,
   isAgendaFull,
   hasWaitlistFeature,
   onWaitlistClick,
-  totalWeeklySlots
+  totalWeeklySlots,
 }: PublicHeroProps) => {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [showInterestPopup, setShowInterestPopup] = useState(false);
   const [interestPopupDismissed, setInterestPopupDismissed] = useState(false);
-  
-  const fullName = profile.name || '';
-  const firstName = fullName.split(' ')[0] || 'Profissional';
-  const lastName = fullName.split(' ').slice(1).join(' ');
-  const initials = fullName ? fullName.split(" ").map(w => w ? w[0] : "").filter(Boolean).slice(0, 2).join("").toUpperCase() : "P";
+
+  const fullName = profile.name || "";
+  const firstName = fullName.split(" ")[0] || "Profissional";
+  const lastName = fullName.split(" ").slice(1).join(" ");
+  const initials = fullName
+    ? fullName
+        .split(" ")
+        .map((w) => (w ? w[0] : ""))
+        .filter(Boolean)
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "P";
 
   useEffect(() => {
     let timeElapsed = false;
     const timer = setTimeout(() => {
       timeElapsed = true;
-    }, 15000); // 15 seconds
+    }, 30000); // 30 seconds
 
     const handleScroll = () => {
       setScrollY(window.scrollY);
-      
+
       if (showInterestPopup || interestPopupDismissed) return;
-      
+
       // Dynamic logic for interest popup
       const docHeight = document.documentElement.scrollHeight;
       const winHeight = window.innerHeight;
-      
+
       if (docHeight <= winHeight) return;
-      
+
       const scrollPercent = window.scrollY / (docHeight - winHeight);
-      const passedHero = window.scrollY > winHeight * 0.4;
-      
-      // Trigger if scrolled past 45% of the page
-      // OR 15 seconds have passed AND user has scrolled past the hero section
-      if ((scrollPercent > 0.45 || (timeElapsed && passedHero)) && !showInterestPopup && !interestPopupDismissed) {
+      const passedHero = window.scrollY > winHeight * 0.5;
+
+      // Trigger if scrolled past 70% of the page
+      // OR 30 seconds have passed AND user has scrolled past the hero section
+      if (
+        (scrollPercent > 0.7 || (timeElapsed && passedHero)) &&
+        !showInterestPopup &&
+        !interestPopupDismissed
+      ) {
         setShowInterestPopup(true);
       }
     };
-    
+
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", handleScroll);
@@ -80,14 +116,17 @@ export const PublicHero = ({
 
   const tagline = getProfileHeroCopy(
     profile.specialty || profile.professionalIdentity?.mainSpecialty,
-    profile.slug || profile.uid
+    profile.slug || profile.uid,
   );
 
   const interestPopupText = (() => {
-    if (totalWeeklySlots === 0) return hasWaitlistFeature ? "A agenda está fechada. Você pode entrar na lista de espera." : "Não há horários disponíveis no momento. Fale com a profissional.";
-    if (totalWeeklySlots !== null && totalWeeklySlots <= 5) return `Restam apenas ${totalWeeklySlots} vaga${totalWeeklySlots === 1 ? "" : "s"} esta semana.`;
-    if (totalWeeklySlots !== null && totalWeeklySlots <= 10) return `A agenda de ${firstName} está quase cheia esta semana.`;
-    return `A agenda da ${firstName} costuma fechar rápido esta semana.`;
+    if (totalWeeklySlots === 0)
+      return hasWaitlistFeature
+        ? "A agenda está fechada no momento. Entre na lista de espera para ser notificada quando surgirem horários."
+        : "Não há horários disponíveis no momento online.";
+    if (totalWeeklySlots !== null && totalWeeklySlots <= 5)
+      return `Últimos ${totalWeeklySlots} horários disponíveis esta semana.`;
+    return `Agendamento 100% online. Escolha a data e o horário mais convenientes para você.`;
   })();
 
   return (
@@ -105,12 +144,16 @@ export const PublicHero = ({
         >
           <div className="space-y-4">
             <p className="text-[10px] font-bold uppercase tracking-[0.35em] text-brand-stone/60">
-              {tagline.main} <span className="font-serif italic lowercase">{tagline.accent}</span>
+              {tagline.main}{" "}
+              <span className="font-serif italic lowercase">
+                {tagline.accent}
+              </span>
             </p>
           </div>
 
           <div className="flex flex-col gap-2">
-            {(profile.plan === 'pro' || profile.professionalId === 'demo-helena-prado') && (
+            {(profile.plan === "pro" ||
+              profile.professionalId === "demo-helena-prado") && (
               <div className="inline-flex items-center gap-1.5 w-fit opacity-70">
                 <Star size={10} className="text-brand-stone fill-brand-stone" />
                 <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-brand-stone leading-none pt-[1px]">
@@ -119,8 +162,11 @@ export const PublicHero = ({
               </div>
             )}
             <h1 className="display-hero text-brand-ink break-words pb-4">
-              {firstName}<br />
-              <em className="font-serif italic text-brand-stone block md:inline">{lastName}</em>
+              {firstName}
+              <br />
+              <em className="font-serif italic text-brand-stone block md:inline">
+                {lastName}
+              </em>
             </h1>
           </div>
 
@@ -137,57 +183,85 @@ export const PublicHero = ({
             {/* Social Proof Mini Badges */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-2">
               {(() => {
-                const showRating = stats && stats.averageRating > 0 && (stats.totalReviews || 0) > 0;
+                const showRating =
+                  stats &&
+                  stats.averageRating > 0 &&
+                  (stats.totalReviews || 0) > 0;
                 const showBookings = stats && stats.totalCompletedBookings > 0;
-                const showExperience = !!profile.professionalIdentity?.yearsExperience;
-                
+                const showExperience =
+                  !!profile.professionalIdentity?.yearsExperience;
+
                 const elements = [];
-                
+
                 if (showRating) {
                   elements.push(
                     <div key="rating" className="flex items-center gap-1.5">
-                      <Star size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))] fill-[var(--theme-primary,var(--color-brand-terracotta))]" />
-                      <span className="text-[10px] font-bold text-brand-ink">{stats?.averageRating}</span>
-                      <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Avaliação</span>
-                    </div>
+                      <Star
+                        size={12}
+                        className="text-[var(--theme-primary,var(--color-brand-terracotta))] fill-[var(--theme-primary,var(--color-brand-terracotta))]"
+                      />
+                      <span className="text-[10px] font-bold text-brand-ink">
+                        {stats?.averageRating}
+                      </span>
+                      <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">
+                        Avaliação
+                      </span>
+                    </div>,
                   );
                 }
-                
+
                 if (showBookings) {
                   elements.push(
                     <div key="bookings" className="flex items-center gap-1.5">
-                      <Users size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
+                      <Users
+                        size={12}
+                        className="text-[var(--theme-primary,var(--color-brand-terracotta))]"
+                      />
                       <span className="text-[10px] font-bold text-brand-ink">
-                        {stats?.totalCompletedBookings && stats.totalCompletedBookings >= 5 ? '+' : ''}
+                        {stats?.totalCompletedBookings &&
+                        stats.totalCompletedBookings >= 5
+                          ? "+"
+                          : ""}
                         {stats?.totalCompletedBookings}
                       </span>
                       <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">
-                        {stats?.totalCompletedBookings === 1 ? 'atendimento pela Nera' : 'atendimentos pela Nera'}
+                        {stats?.totalCompletedBookings === 1
+                          ? "atendimento pela Nera"
+                          : "atendimentos pela Nera"}
                       </span>
-                    </div>
+                    </div>,
                   );
                 }
-                
+
                 if (showExperience) {
                   elements.push(
                     <div key="experience" className="flex items-center gap-1.5">
-                      <Award size={12} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
+                      <Award
+                        size={12}
+                        className="text-[var(--theme-primary,var(--color-brand-terracotta))]"
+                      />
                       <span className="text-[10px] font-bold text-brand-ink">
-                        {profile.professionalIdentity?.yearsExperience === 'Iniciante' 
-                          ? 'Iniciante' 
+                        {profile.professionalIdentity?.yearsExperience ===
+                        "Iniciante"
+                          ? "Iniciante"
                           : `${profile.professionalIdentity?.yearsExperience} anos`}
                       </span>
-                      {profile.professionalIdentity?.yearsExperience !== 'Iniciante' && (
-                        <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">Experiência</span>
+                      {profile.professionalIdentity?.yearsExperience !==
+                        "Iniciante" && (
+                        <span className="text-[10px] text-brand-stone uppercase tracking-widest opacity-60">
+                          Experiência
+                        </span>
                       )}
-                    </div>
+                    </div>,
                   );
                 }
-                
+
                 return elements.map((el, i) => (
                   <React.Fragment key={i}>
                     {el}
-                    {i < elements.length - 1 && <div className="w-px h-3 bg-brand-mist/50 my-auto hidden sm:block" />}
+                    {i < elements.length - 1 && (
+                      <div className="w-px h-3 bg-brand-mist/50 my-auto hidden sm:block" />
+                    )}
                   </React.Fragment>
                 ));
               })()}
@@ -195,16 +269,20 @@ export const PublicHero = ({
 
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3 text-brand-stone/60">
-                <MapPin size={14} className="text-[var(--theme-primary,var(--color-brand-terracotta))] shrink-0" />
+                <MapPin
+                  size={14}
+                  className="text-[var(--theme-primary,var(--color-brand-terracotta))] shrink-0"
+                />
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-ink">
                     {getServiceLocationCopy(profile)}
                   </span>
                 </div>
               </div>
-              
-              {(profile.serviceMode === 'studio' || profile.serviceMode === 'hybrid') && (
-                <button 
+
+              {(profile.serviceMode === "studio" ||
+                profile.serviceMode === "hybrid") && (
+                <button
                   onClick={() => setShowLocationModal(true)}
                   className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-widest text-[var(--theme-primary,var(--color-brand-terracotta))] hover:opacity-80 transition-colors group w-fit"
                 >
@@ -212,7 +290,9 @@ export const PublicHero = ({
                     <MapPin size={10} />
                   </div>
                   <span className="border-b border-[var(--theme-primary,var(--color-brand-terracotta))]/20 group-hover:border-[var(--theme-primary,var(--color-brand-terracotta))] transition-all">
-                    {profile.studioAddress?.privacyMode === 'public_full' ? 'Como chegar' : 'Ver localização'}
+                    {profile.studioAddress?.privacyMode === "public_full"
+                      ? "Como chegar"
+                      : "Ver localização"}
                   </span>
                 </button>
               )}
@@ -221,7 +301,7 @@ export const PublicHero = ({
 
           {nextSlot ? (
             <div className="flex flex-col gap-2 relative z-20">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="inline-flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3 bg-brand-white border border-brand-mist px-5 py-3.5 rounded-2xl md:rounded-full shadow-sm w-fit group"
@@ -239,15 +319,23 @@ export const PublicHero = ({
                     const tomorrowDate = new Date();
                     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
                     const tomorrow = getLocalDateStr(tomorrowDate);
-                    
-                    if (nextSlot.date === today) return `Hoje às ${nextSlot.time}`;
-                    if (nextSlot.date === tomorrow) return `Amanhã às ${nextSlot.time}`;
-                    
+
+                    if (nextSlot.date === today)
+                      return `Hoje às ${nextSlot.time}`;
+                    if (nextSlot.date === tomorrow)
+                      return `Amanhã às ${nextSlot.time}`;
+
                     const dateObj = parseLocalDate(nextSlot.date);
-                    const weekDay = dateObj.toLocaleDateString('pt-BR', { weekday: 'long' }).split('-')[0].split(',')[0];
-                    const day = String(dateObj.getDate()).padStart(2, '0');
-                    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-                    
+                    const weekDay = dateObj
+                      .toLocaleDateString("pt-BR", { weekday: "long" })
+                      .split("-")[0]
+                      .split(",")[0];
+                    const day = String(dateObj.getDate()).padStart(2, "0");
+                    const month = String(dateObj.getMonth() + 1).padStart(
+                      2,
+                      "0",
+                    );
+
                     return `${weekDay.charAt(0).toUpperCase() + weekDay.slice(1)} às ${nextSlot.time}`;
                   })()}
                 </span>
@@ -282,23 +370,31 @@ export const PublicHero = ({
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-6">
               <PremiumButton
-                onClick={() => isAgendaFull && hasWaitlistFeature ? onWaitlistClick?.() : onBookingClick()}
+                onClick={() =>
+                  isAgendaFull && hasWaitlistFeature
+                    ? onWaitlistClick?.()
+                    : onBookingClick()
+                }
                 variant="terracotta"
                 className="px-10 py-5 text-[10px] tracking-[0.22em] shadow-xl"
               >
-                {isAgendaFull && hasWaitlistFeature ? 'Entrar na lista de prioridade' : 'Reservar minha experiência'}
+                {isAgendaFull && hasWaitlistFeature
+                  ? "Entrar na lista de prioridade"
+                  : "Reservar minha experiência"}
                 <ChevronRight size={14} className="ml-2" />
               </PremiumButton>
 
               {profile.instagram && (
                 <a
-                  href={`https://instagram.com/${profile.instagram.replace('@', '')}`}
+                  href={`https://instagram.com/${profile.instagram.replace("@", "")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2.5 text-[10px] font-medium uppercase tracking-[0.15em] text-brand-stone hover:text-brand-ink transition-colors group"
                 >
                   <Instagram size={16} />
-                  <span className="border-b border-transparent group-hover:border-brand-stone transition-all">Ver Instagram</span>
+                  <span className="border-b border-transparent group-hover:border-brand-stone transition-all">
+                    Ver Instagram
+                  </span>
                 </a>
               )}
             </div>
@@ -312,14 +408,24 @@ export const PublicHero = ({
       {/* Visual Side */}
       <div className="relative flex items-center justify-center p-4 sm:p-8 md:p-16 lg:p-24 order-1 lg:order-2 bg-brand-parchment lg:bg-transparent min-h-[60vh] sm:min-h-[70vh] lg:min-h-screen">
         <motion.div
-           initial={{ opacity: 0, scale: 0.95, y: 20 }}
-           animate={{ opacity: 1, scale: 1, y: 0 }}
-           transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-           style={scrollY > 0 && typeof window !== 'undefined' && window.innerWidth >= 1024 ? { transform: `translateY(${scrollY * 0.08}px)` } : {}}
-           className="relative w-full max-w-[420px]"
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+          style={
+            scrollY > 0 &&
+            typeof window !== "undefined" &&
+            window.innerWidth >= 1024
+              ? { transform: `translateY(${scrollY * 0.08}px)` }
+              : {}
+          }
+          className="relative w-full max-w-[420px]"
         >
           {/* Organic Border SVG */}
-          <svg className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)] z-10 pointer-events-none overflow-visible" viewBox="0 0 420 560" preserveAspectRatio="none">
+          <svg
+            className="absolute -inset-1 w-[calc(100%+8px)] h-[calc(100%+8px)] z-10 pointer-events-none overflow-visible"
+            viewBox="0 0 420 560"
+            preserveAspectRatio="none"
+          >
             <path
               className="fill-none stroke-[var(--theme-primary,var(--color-brand-terracotta))]/40 stroke-[1.5] animate-draw"
               d="M12,48 Q8,12 48,8 L372,6 Q412,4 416,44 L418,512 Q420,552 380,556 L40,558 Q0,560 4,520 Z"
@@ -327,12 +433,19 @@ export const PublicHero = ({
           </svg>
 
           <div className="relative z-0 mt-8 lg:mt-0">
-            {(profile.plan === 'pro' || profile.professionalId === 'demo-helena-prado') && (
-              <div className="absolute top-6 right-6 md:top-8 md:right-8 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-brand-mist/50 z-20" aria-label="Vitrine PRO">
-                <ShieldCheck size={24} className="text-[var(--theme-primary,var(--color-brand-terracotta))]" />
+            {(profile.plan === "pro" ||
+              profile.professionalId === "demo-helena-prado") && (
+              <div
+                className="absolute top-6 right-6 md:top-8 md:right-8 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-2xl flex items-center justify-center shadow-lg border border-brand-mist/50 z-20"
+                aria-label="Vitrine PRO"
+              >
+                <ShieldCheck
+                  size={24}
+                  className="text-[var(--theme-primary,var(--color-brand-terracotta))]"
+                />
               </div>
             )}
-             {profile.avatar ? (
+            {profile.avatar ? (
               <img
                 src={profile.avatar}
                 alt={profile.name}
@@ -349,16 +462,18 @@ export const PublicHero = ({
                 <div className="absolute inset-0 border border-white/10 rounded-[48px_48px_48px_12px]" />
               </div>
             )}
-            
-              <div className="flex items-center justify-between p-5 flex-wrap gap-2 z-20">
-                <span className="font-signature text-3xl text-brand-ink/70 leading-none">{firstName}</span>
-                <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.25em] text-[var(--theme-accent,var(--color-brand-terracotta))]">
-                  <div className="w-1 h-1 rounded-full bg-current" />
-                  {profile.neighborhood ? `${profile.neighborhood}, ${profile.city || ''}` : profile.city}
-                </div>
+
+            <div className="flex items-center justify-between p-5 flex-wrap gap-2 z-20">
+              <span className="font-signature text-3xl text-brand-ink/70 leading-none">
+                {firstName}
+              </span>
+              <div className="flex items-center gap-2 text-[8px] font-bold uppercase tracking-[0.25em] text-[var(--theme-accent,var(--color-brand-terracotta))]">
+                <div className="w-1 h-1 rounded-full bg-current" />
+                {profile.neighborhood
+                  ? `${profile.neighborhood}, ${profile.city || ""}`
+                  : profile.city}
               </div>
-
-
+            </div>
           </div>
         </motion.div>
       </div>
@@ -367,15 +482,18 @@ export const PublicHero = ({
       <AnimatePresence>
         {showInterestPopup && (
           <div className="fixed bottom-6 left-4 right-4 md:bottom-8 md:left-auto md:right-10 md:w-96 z-[400]">
-            <motion.div 
-              initial={{ y: 100, opacity: 0, scale: 0.9 }} 
-              animate={{ y: 0, opacity: 1, scale: 1 }} 
-              exit={{ y: 100, opacity: 0, scale: 0.9 }} 
+            <motion.div
+              initial={{ y: 100, opacity: 0, scale: 0.9 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 100, opacity: 0, scale: 0.9 }}
               className="bg-brand-ink text-brand-white p-6 md:p-8 rounded-[32px] md:rounded-[40px] shadow-2xl relative overflow-hidden border border-white/10"
             >
               <div className="absolute -top-10 -right-10 w-32 h-32 bg-brand-terracotta/20 rounded-full blur-3xl pointer-events-none" />
-              <button 
-                onClick={() => { setShowInterestPopup(false); setInterestPopupDismissed(true); }} 
+              <button
+                onClick={() => {
+                  setShowInterestPopup(false);
+                  setInterestPopupDismissed(true);
+                }}
                 className="absolute top-4 xl:top-6 right-4 xl:right-6 p-3 z-20 text-white/40 hover:text-white transition-colors"
               >
                 <X size={18} />
@@ -388,27 +506,36 @@ export const PublicHero = ({
                   </span>
                 </div>
                 <h3 className="text-xl font-serif mb-2 leading-tight">
-                  Ainda está pensando?
+                  Horários disponíveis
                 </h3>
                 <p className="text-xs text-white/60 font-light mb-6 md:mb-8 leading-relaxed">
                   {interestPopupText}
                 </p>
                 <div className="flex flex-col gap-3">
-                  <PremiumButton 
-                    variant="terracotta" 
-                    className="w-full py-4 text-[10px]" 
-                    onClick={() => { 
-                      setShowInterestPopup(false); 
+                  <PremiumButton
+                    variant="terracotta"
+                    className="w-full py-4 text-[10px]"
+                    onClick={() => {
+                      setShowInterestPopup(false);
                       isAgendaFull ? onWaitlistClick?.() : onBookingClick();
                     }}
                   >
-                    {isAgendaFull ? 'Entrar na lista de espera' : 'Reservar agora'}
+                    {isAgendaFull
+                      ? "Entrar na lista de espera"
+                      : "Ver os horários"}
                   </PremiumButton>
-                  {profile.whatsapp && profile.plan === 'pro' && (
-                    <a href={`https://wa.me/${profile.whatsapp?.replace(/\D/g, '')}`} target="_blank" className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors">
-                      <MessageCircle size={14} /> Falar no WhatsApp
-                    </a>
-                  )}
+                  <button
+                    onClick={() => {
+                      setShowInterestPopup(false);
+                      setInterestPopupDismissed(true);
+                      document
+                        .getElementById("services")
+                        ?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="flex items-center justify-center gap-2 py-4 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white transition-colors"
+                  >
+                    Continuar vendo perfil
+                  </button>
                 </div>
               </div>
             </motion.div>
@@ -418,9 +545,9 @@ export const PublicHero = ({
       <AnimatePresence>
         {showLocationModal && (
           <div className="fixed inset-0 z-[500] flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }} 
-              animate={{ opacity: 1 }} 
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowLocationModal(false)}
               className="absolute inset-0 bg-brand-ink/80 backdrop-blur-sm"
@@ -432,8 +559,8 @@ export const PublicHero = ({
               className="relative w-full max-w-sm bg-brand-white rounded-[40px] p-10 shadow-2xl overflow-hidden border border-brand-mist"
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-brand-linen/50 rounded-full -mr-16 -mt-16 blur-2xl" />
-              
-              <button 
+
+              <button
                 onClick={() => setShowLocationModal(false)}
                 className="absolute top-8 right-8 p-1 text-brand-stone hover:text-brand-ink transition-colors z-10"
               >
@@ -444,75 +571,117 @@ export const PublicHero = ({
                 <div className="w-16 h-16 bg-brand-linen text-brand-terracotta rounded-full flex items-center justify-center mx-auto shadow-sm border border-brand-mist">
                   <MapPin size={32} />
                 </div>
-                
+
                 <div className="space-y-3">
-                  <h3 className="font-serif text-2xl text-brand-ink">Nosso Espaço</h3>
-                  <p className="text-brand-stone font-light text-sm italic">Endereço do estúdio</p>
+                  <h3 className="font-serif text-2xl text-brand-ink">
+                    Nosso Espaço
+                  </h3>
+                  <p className="text-brand-stone font-light text-sm italic">
+                    Endereço do estúdio
+                  </p>
                 </div>
 
                 <div className="space-y-6 bg-brand-parchment/50 p-7 rounded-[32px] border border-brand-mist/50">
                   <div className="space-y-4 text-center">
                     <div className="space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-terracotta">Localização</p>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-terracotta">
+                        Localização
+                      </p>
                       <p className="text-sm font-medium text-brand-ink leading-relaxed">
-                        {profile.studioAddress?.privacyMode === 'public_full' && profile.studioAddress?.street ? (
+                        {profile.studioAddress?.privacyMode === "public_full" &&
+                        profile.studioAddress?.street ? (
                           <>
-                            {profile.studioAddress.street}, {profile.studioAddress.number}
-                            {profile.studioAddress.complement && <span className="block">{profile.studioAddress.complement}</span>}
-                            <span className="block opacity-60">{profile.studioAddress.neighborhood}, {profile.studioAddress.city}</span>
+                            {profile.studioAddress.street},{" "}
+                            {profile.studioAddress.number}
+                            {profile.studioAddress.complement && (
+                              <span className="block">
+                                {profile.studioAddress.complement}
+                              </span>
+                            )}
+                            <span className="block opacity-60">
+                              {profile.studioAddress.neighborhood},{" "}
+                              {profile.studioAddress.city}
+                            </span>
                           </>
-                        ) : profile.studioAddress?.privacyMode === 'neighborhood_only' ? (
+                        ) : profile.studioAddress?.privacyMode ===
+                          "neighborhood_only" ? (
                           <>
-                            <span className="block">{profile.neighborhood ? `${profile.neighborhood}, ${profile.city || ''}` : profile.city}</span>
+                            <span className="block">
+                              {profile.neighborhood
+                                ? `${profile.neighborhood}, ${profile.city || ""}`
+                                : profile.city}
+                            </span>
                           </>
                         ) : (
                           <>
-                            <span className="block">{profile.neighborhood ? `${profile.neighborhood}, ${profile.city || ''}` : profile.city}</span>
-                            <span className="block text-[11px] font-light italic text-brand-stone mt-2">Estúdio particular. O endereço completo é compartilhado após a confirmação.</span>
+                            <span className="block">
+                              {profile.neighborhood
+                                ? `${profile.neighborhood}, ${profile.city || ""}`
+                                : profile.city}
+                            </span>
+                            <span className="block text-[11px] font-light italic text-brand-stone mt-2">
+                              Estúdio particular. O endereço completo é
+                              compartilhado após a confirmação.
+                            </span>
                           </>
                         )}
                       </p>
                     </div>
 
                     <div className="flex flex-col gap-2">
-                      {profile.studioAddress?.privacyMode === 'public_full' && profile.studioAddress?.street && (
-                        <>
-                          <button 
-                            onClick={() => {
-                              const addr = `${profile.studioAddress!.street}, ${profile.studioAddress!.number}, ${profile.studioAddress!.neighborhood}, ${profile.studioAddress!.city}`;
-                              window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
-                            }}
-                            className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-white border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all shadow-sm"
-                          >
-                            <MapPin size={14} className="text-brand-terracotta" /> Abrir no Google Maps
-                          </button>
-                          
-                          <button 
-                            onClick={() => {
-                              const addr = `${profile.studioAddress!.street}, ${profile.studioAddress!.number} - ${profile.studioAddress!.neighborhood}, ${profile.studioAddress!.city}`;
-                              navigator.clipboard.writeText(addr);
-                              notify.success('Endereço copiado!');
-                            }}
-                            className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-linen/50 border border-brand-mist/30 rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all"
-                          >
-                            <Copy size={14} className="text-brand-stone" /> Copiar endereço
-                          </button>
-                        </>
-                      )}
+                      {profile.studioAddress?.privacyMode === "public_full" &&
+                        profile.studioAddress?.street && (
+                          <>
+                            <button
+                              onClick={() => {
+                                const addr = `${profile.studioAddress!.street}, ${profile.studioAddress!.number}, ${profile.studioAddress!.neighborhood}, ${profile.studioAddress!.city}`;
+                                window.open(
+                                  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`,
+                                  "_blank",
+                                );
+                              }}
+                              className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-white border border-brand-mist rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all shadow-sm"
+                            >
+                              <MapPin
+                                size={14}
+                                className="text-brand-terracotta"
+                              />{" "}
+                              Abrir no Google Maps
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const addr = `${profile.studioAddress!.street}, ${profile.studioAddress!.number} - ${profile.studioAddress!.neighborhood}, ${profile.studioAddress!.city}`;
+                                navigator.clipboard.writeText(addr);
+                                notify.success("Endereço copiado!");
+                              }}
+                              className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand-linen/50 border border-brand-mist/30 rounded-xl text-[10px] font-bold uppercase tracking-widest text-brand-ink hover:border-brand-ink transition-all"
+                            >
+                              <Copy size={14} className="text-brand-stone" />{" "}
+                              Copiar endereço
+                            </button>
+                          </>
+                        )}
                     </div>
                   </div>
 
                   {/* Conditional Badges */}
-                  {(profile.studioAddress?.hasParking || profile.studioAddress?.hasAccessibility || profile.studioAddress?.isSafeLocation) && (
+                  {(profile.studioAddress?.hasParking ||
+                    profile.studioAddress?.hasAccessibility ||
+                    profile.studioAddress?.isSafeLocation) && (
                     <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 pt-2 border-t border-brand-mist/30">
                       {profile.studioAddress?.hasParking && (
                         <div className="flex flex-col items-center gap-1">
                           <div className="flex items-center gap-1.5 text-brand-ink">
                             <Car size={12} className="text-brand-terracotta" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest">Estacionamento</span>
+                            <span className="text-[9px] font-bold uppercase tracking-widest">
+                              Estacionamento
+                            </span>
                           </div>
                           {profile.studioAddress.parkingInfo && (
-                            <span className="text-[8px] text-brand-stone/60 uppercase">{profile.studioAddress.parkingInfo}</span>
+                            <span className="text-[8px] text-brand-stone/60 uppercase">
+                              {profile.studioAddress.parkingInfo}
+                            </span>
                           )}
                         </div>
                       )}
@@ -520,8 +689,13 @@ export const PublicHero = ({
                       {profile.studioAddress?.hasAccessibility && (
                         <div className="flex flex-col items-center gap-1">
                           <div className="flex items-center gap-1.5 text-brand-ink">
-                            <CheckCircle2 size={12} className="text-brand-terracotta" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest">Acessível</span>
+                            <CheckCircle2
+                              size={12}
+                              className="text-brand-terracotta"
+                            />
+                            <span className="text-[9px] font-bold uppercase tracking-widest">
+                              Acessível
+                            </span>
                           </div>
                         </div>
                       )}
@@ -529,8 +703,13 @@ export const PublicHero = ({
                       {profile.studioAddress?.isSafeLocation && (
                         <div className="flex flex-col items-center gap-1">
                           <div className="flex items-center gap-1.5 text-brand-ink">
-                            <ShieldCheck size={12} className="text-brand-terracotta" />
-                            <span className="text-[9px] font-bold uppercase tracking-widest">Local seguro</span>
+                            <ShieldCheck
+                              size={12}
+                              className="text-brand-terracotta"
+                            />
+                            <span className="text-[9px] font-bold uppercase tracking-widest">
+                              Local seguro
+                            </span>
                           </div>
                         </div>
                       )}
@@ -538,9 +717,12 @@ export const PublicHero = ({
                   )}
                 </div>
 
-                <PremiumButton 
-                  onClick={() => { setShowLocationModal(false); onBookingClick(); }}
-                  variant="terracotta" 
+                <PremiumButton
+                  onClick={() => {
+                    setShowLocationModal(false);
+                    onBookingClick();
+                  }}
+                  variant="terracotta"
                   className="w-full py-5 text-[10px]"
                 >
                   Continuar para reserva
