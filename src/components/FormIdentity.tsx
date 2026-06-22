@@ -36,6 +36,7 @@ export interface FormIdentityProps {
   slugMessage?: string;
   slugSuggestions?: string[];
   onSelectSuggestion?: (val: string) => void;
+  onRetrySlugCheck?: () => void;
   differentials?: string[];
   setDifferentials?: (val: string[]) => void;
   editorialPillar?: string;
@@ -108,6 +109,7 @@ export const FormIdentity = ({
   slugMessage,
   slugSuggestions = [],
   onSelectSuggestion,
+  onRetrySlugCheck,
   differentials,
   setDifferentials,
   availableDifferentials = [],
@@ -357,13 +359,25 @@ export const FormIdentity = ({
               </div>
               
               {slugMessage && (
-                <p className={cn(
-                  "text-[10px] font-medium ml-1 flex items-center gap-1.5",
-                  slugStatus === 'available' ? "text-green-600" : "text-brand-terracotta"
-                )}>
-                  {slugStatus === 'available' ? <CheckCircle2 size={12} /> : <X size={12} />}
-                  {slugMessage}
-                </p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className={cn(
+                    "text-[10px] font-medium ml-1 flex items-center gap-1.5",
+                    slugStatus === 'available' ? "text-green-600" : "text-brand-terracotta"
+                  )}>
+                    {slugStatus === 'available' ? <CheckCircle2 size={12} /> : <X size={12} />}
+                    {slugMessage}
+                  </p>
+                  
+                  {slugStatus === 'invalid' && onRetrySlugCheck && (
+                    <button 
+                      type="button" 
+                      onClick={onRetrySlugCheck}
+                      className="text-[9px] font-bold uppercase tracking-widest text-[var(--theme-accent,var(--color-brand-terracotta))] px-2 py-1 rounded-md hover:bg-brand-mist/20 transition-colors border border-transparent hover:border-[var(--theme-accent,var(--color-brand-terracotta))]/20"
+                    >
+                      Tentar novamente
+                    </button>
+                  )}
+                </div>
               )}
 
               {slugStatus === 'unavailable' && slugSuggestions.length > 0 && (

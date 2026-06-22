@@ -185,6 +185,7 @@ export async function suggestBio(params: {
   specialty?: string;
   yearsExperience?: string;
   differentials?: string[];
+  editorialPillar?: string;
 }): Promise<{ bio: string, headline: string }> {
   try {
     const token = await auth.currentUser?.getIdToken(true);

@@ -211,6 +211,8 @@ export default function OnboardingPage() {
     setAvatarSkipped,
     profileTheme,
     setProfileTheme,
+    editorialPillar,
+    setEditorialPillar,
   } = useProfileForm(profile);
 
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
@@ -227,6 +229,7 @@ export default function OnboardingPage() {
         style: selectedBioStyle,
         specialty,
         yearsExperience,
+        editorialPillar,
         differentials: selectedDifferentials
       });
       if (result.bio) setBio(result.bio);
@@ -265,6 +268,7 @@ export default function OnboardingPage() {
   >("idle");
   const [slugMessage, setSlugMessage] = useState("");
   const [slugSuggestions, setSlugSuggestions] = useState<string[]>([]);
+  const [slugRetryTrigger, setSlugRetryTrigger] = useState(0);
   const slugCheckRef = useRef<string>("");
 
   // Auto-generate slug when name changes, but only if slug was empty or matched the previous name
@@ -376,7 +380,7 @@ export default function OnboardingPage() {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [slug]);
+  }, [slug, city, user?.uid, slugRetryTrigger]);
 
   // Step 2: Service Mode Details
   const [newAreaName, setNewAreaName] = useState("");
@@ -666,6 +670,7 @@ export default function OnboardingPage() {
           name,
           specialty,
           yearsExperience,
+          editorialPillar,
           serviceStyle: selectedStyles,
           differentials: selectedDifferentials,
           bioStyle: selectedBioStyle,
@@ -819,6 +824,7 @@ export default function OnboardingPage() {
       professionalIdentity: {
         subSpecialties,
         yearsExperience,
+        editorialPillar,
         serviceStyle: selectedStyles,
         differentials: selectedDifferentials,
         attendsAt: serviceMode as any,
@@ -1122,6 +1128,7 @@ export default function OnboardingPage() {
       professionalIdentity: {
         subSpecialties,
         yearsExperience,
+        editorialPillar,
         serviceStyle: selectedStyles,
         differentials: selectedDifferentials,
         attendsAt: serviceMode as any,
@@ -1683,10 +1690,17 @@ export default function OnboardingPage() {
                 slugMessage={slugMessage}
                 slugSuggestions={slugSuggestions}
                 onSelectSuggestion={(val) => setSlug(val)}
+                onRetrySlugCheck={() => {
+                  setSlugStatus("idle"); // Clear the "invalid/error" status
+                  setSlugMessage("");
+                  setSlugRetryTrigger(prev => prev + 1);
+                }}
                 yearsExperience={yearsExperience}
                 setYearsExperience={setYearsExperience}
                 whatsapp={whatsapp}
                 setWhatsapp={setWhatsapp}
+                editorialPillar={editorialPillar}
+                setEditorialPillar={setEditorialPillar}
                 showLabels={true}
                 errors={formErrors}
                 onGenerateBio={handleGenerateBio}

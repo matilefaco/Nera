@@ -62,7 +62,7 @@ router.post("/public/track", async (req, res) => {
 });
 
 router.post("/generate-content", requireFirebaseAuth, async (req: AuthenticatedRequest, res: any) => {
-  const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle, bioContext } = req.body;
+  const { name, specialty, yearsExperience, serviceStyle, differentials, bioStyle, bioContext, editorialPillar } = req.body;
   logger.info("AI", "[BioAI] Entry /generate-content", { meta: { name, specialty } });
   
   // Simple rate limit check

@@ -87,12 +87,12 @@ export default function DirectoryPage() {
   }, [cityFilter, specialtyFilter, modeFilter, ratingFilter]);
 
   const seoTitle = cityFilter 
-    ? `Curadoria Nera em ${cityFilter} | Profissionais de Beleza`
-    : "Curadoria Nera | Profissionais Verificados de Beleza";
+    ? `Curadoria Nera em ${cityFilter} | Profissionais em Destaque`
+    : "Curadoria Nera | Profissionais em Destaque";
   
   const seoDescription = cityFilter
-    ? `Explore a rede de profissionais verificados da Nera em ${cityFilter}. Agende serviços com segurança, técnica e previsibilidade.`
-    : "Rede verificada de profissionais independentes de beleza e bem-estar. Agendamentos diretos com foco em técnica qualificada e segurança.";
+    ? `Explore a rede de profissionais em destaque da Nera em ${cityFilter}. Agende serviços com segurança, técnica e previsibilidade.`
+    : "Rede de profissionais em destaque de beleza e bem-estar. Agendamentos diretos com foco em técnica qualificada e segurança.";
 
   const canonicalUrl = `${window.location.origin}/profissionais${cityFilter ? `?cidade=${encodeURIComponent(cityFilter)}` : ''}`;
 
@@ -186,7 +186,7 @@ export default function DirectoryPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-12 md:py-16">
         <div className="mb-12 border-b border-brand-mist/40 pb-8">
-          <p className="text-brand-terracotta font-medium tracking-[0.2em] text-[10px] uppercase mb-3">PROFISSIONAIS VERIFICADAS</p>
+          <p className="text-brand-terracotta font-medium tracking-[0.2em] text-[10px] uppercase mb-3">PROFISSIONAIS EM DESTAQUE</p>
           <h1 className="text-[clamp(32px,5vw,42px)] font-serif text-brand-ink mb-3 leading-tight tracking-tight">Curadoria Nera</h1>
           <p className="text-brand-stone text-sm sm:text-base font-light max-w-2xl leading-relaxed">
             Uma seleção editorial de profissionais independentes que priorizam técnica, segurança e transparência.
@@ -245,7 +245,7 @@ export default function DirectoryPage() {
                     
                     {pro.isVerified && (
                       <div className="absolute top-4 left-4 bg-brand-terracotta text-white text-[8px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-lg flex items-center gap-1.5 backdrop-blur-sm bg-opacity-90">
-                        <Star size={8} fill="currentColor" /> Verificada
+                        <Star size={8} fill="currentColor" /> Destaque Nera
                       </div>
                     )}
 

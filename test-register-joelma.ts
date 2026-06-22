@@ -6,15 +6,15 @@ async function run() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        uid: "testuid123456",
-        name: "Test User",
-        email: "testuser123456@example.com",
+        uid: "testuid1",
+        name: "Joelma Soares Rolim",
+        email: "mamaifood23@gmail.com",
         plan: "free"
       })
     });
     console.log("STATUS:", res.status);
-    const text = await res.text();
-    console.log("BODY:", text);
+    const json = await res.json().catch(() => null);
+    console.log("BODY:", json);
   } catch(e) {
     console.error(e);
   }
