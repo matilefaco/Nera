@@ -1,3 +1,4 @@
+import "./instrument";
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App';
@@ -14,11 +15,6 @@ window.addEventListener('error', (event) => {
 
 window.addEventListener('unhandledrejection', (event) => {
   const reason = event.reason;
-  const msg = reason ? String(reason.message || reason) : '';
-  if (msg.includes('FIRESTORE') || msg.includes('INTERNAL ASSERTION FAILED') || msg.includes('Unexpected state')) {
-    event.preventDefault(); // suppress it locally
-    return;
-  }
   if (isDev) {
     console.error('[PROMISE_ERROR]', reason);
   }
