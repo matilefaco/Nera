@@ -296,7 +296,7 @@ export const FormIdentity = ({
                 </label>
               )}
               <p className="text-[10px] text-brand-ink/70 font-light ml-1 mb-2">
-                Suas clientes vão te chamar por aqui.
+                Informe um número para contato e notificações.
               </p>
               <input 
                 type="tel" 

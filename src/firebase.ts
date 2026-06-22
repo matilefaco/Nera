@@ -213,7 +213,92 @@ export function getClientKey(whatsapp: string, email: string, name: string) {
 }
 
 export async function updateClientSummaryInternal(transaction: any, appointment: Appointment, professionalId: string, isCreate: boolean = false, oldStatus: string = '', existingSnap?: any) {
-  // Stub implementation as the UI component still calls it during manual sync, but it doesn't need to do anything since the backend handles it now.
+  const clientKey = getClientKey(
+    appointment.clientWhatsapp || '',
+    appointment.clientEmail || '',
+    appointment.clientName || 'Cliente'
+  );
+  
+  if (!clientKey) return;
+  
+  const summaryId = `${professionalId}_${clientKey}`;
+  const summaryRef = doc(db, 'client_summaries', summaryId);
+  const summarySnap = existingSnap || await transaction.get(summaryRef);
+  
+  let summaryData;
+  if (!summarySnap.exists()) {
+    summaryData = {
+      professionalId,
+      clientKey,
+      clientName: appointment.clientName || 'Cliente',
+      clientPhone: appointment.clientWhatsapp || '',
+      clientEmail: appointment.clientEmail || '',
+      appointmentsCount: 0,
+      totalSpent: 0,
+      lastAppointmentDate: appointment.date,
+      lastAppointmentId: appointment.id,
+      lifetimeValue: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+  } else {
+    summaryData = summarySnap.data();
+    if (appointment.clientName && summaryData.clientName === 'Cliente') {
+      summaryData.clientName = appointment.clientName;
+    }
+  }
+
+  // Update logic for new confirmed/accepted appointments
+  if (isCreate || (oldStatus !== 'confirmed' && oldStatus !== 'accepted' && (appointment.status === 'confirmed' || appointment.status === 'accepted'))) {
+      summaryData.appointmentsCount = (summaryData.appointmentsCount || 0) + 1;
+      const amount = appointment.totalPrice ?? appointment.price ?? 0;
+      summaryData.totalSpent = (summaryData.totalSpent || 0) + Number(amount);
+      summaryData.lifetimeValue = summaryData.totalSpent;
+      
+      const newDateStr = appointment.date;
+      if (!summaryData.lastAppointmentDate || newDateStr > summaryData.lastAppointmentDate) {
+        summaryData.lastAppointmentDate = newDateStr;
+        summaryData.lastAppointmentId = appointment.id;
+      }
+  }
+  
+  summaryData.updatedAt = serverTimestamp();
+  
+  if (summaryData.clientName && typeof summaryData.clientName === 'string') {
+    summaryData.searchTokens = generateSearchTokens(summaryData.clientName);
+  }
+  
+  // Clean undefined values shallowly to preserve FieldValue like serverTimestamp()
+  Object.keys(summaryData).forEach(key => {
+    if (summaryData[key] === undefined) {
+      delete summaryData[key];
+    }
+  });
+
+  if (summarySnap.exists()) {
+    transaction.update(summaryRef, summaryData);
+  } else {
+    transaction.set(summaryRef, summaryData);
+  }
+}
+
+// Add this helper function somewhere above or outside
+function generateSearchTokens(name: string): string[] {
+  const tokens: string[] = [];
+  if (!name) return tokens;
+  
+  const cleanName = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const words = cleanName.split(/\s+/).filter(w => w.length > 0);
+  
+  for (const word of words) {
+    if (word.length >= 2) {
+      tokens.push(word.substring(0, 2));
+      if (word.length >= 3) tokens.push(word.substring(0, 3));
+      tokens.push(word);
+    }
+  }
+  
+  return Array.from(new Set(tokens));
 }
 
 export async function updateClientSummaryFromAppointment(appointment: Appointment) {
@@ -422,59 +507,40 @@ export async function respondToBookingRequest(appointmentId: string, decision: t
  * Creates a manual appointment with atomic lock.
  */
 export async function createManualAppointment(data: Partial<Appointment>) {
-  devLog(`[Manual Booking] Creating for ${data.date} ${data.time}`);
+  devLog(`[Manual Booking] Creating via backend for ${data.date} ${data.time}`);
   
   if (!data.professionalId || !data.date || !data.time) {
     throw new Error('Dados incompletos');
   }
 
   try {
-    await runTransaction(db, async (transaction) => {
-      const apptRef = doc(collection(db, 'appointments'));
-      const cleanTime = data.time.replace(':', '');
-      const lockId = `${data.professionalId}_${data.date}_${cleanTime}`;
-      const lockRef = doc(db, 'booking_locks', lockId);
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken) {
+      throw new Error("Sessão expirada. Por favor, acesse novamente.");
+    }
 
-      // Verify lock
-      const lockSnap = await transaction.get(lockRef);
-      const blockingStatuses = ['confirmed', 'accepted', 'completed'];
-
-      if (lockSnap.exists() && blockingStatuses.includes(lockSnap.data().status)) {
-        throw new Error('Este horário já está ocupado na agenda.');
-      }
-
-      // Create appointment
-      const updateData = {
-        ...data,
-        status: APPOINTMENT_STATUS.CONFIRMED,
-        confirmedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        lastChangeBy: 'professional'
-      };
-      
-      const safeData = sanitizeAppointment(updateData, false);
-      
-      transaction.set(apptRef, safeData);
-
-      // Create lock
-      transaction.set(lockRef, {
-        professionalId: data.professionalId,
-        date: data.date,
-        time: data.time,
-        appointmentId: apptRef.id,
-        serviceId: data.serviceId || 'manual',
-        status: APPOINTMENT_STATUS.CONFIRMED,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-
-      // Update Client Summary
-      const apptForSummary = { id: apptRef.id, ...safeData } as unknown as Appointment;
-      await updateClientSummaryInternal(transaction, apptForSummary, data.professionalId, true);
+    const response = await fetch('/api/manual', {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(data),
     });
 
-    devLog('[Manual Booking] Created successfully');
+    const bodyText = await response.text();
+    let result;
+    try {
+        result = JSON.parse(bodyText);
+    } catch {
+        throw new Error(`[Parse Error] HTTP ${response.status} - Body: ${bodyText.substring(0, 200)}`);
+    }
+
+    if (!response.ok) {
+        throw new Error(JSON.stringify(result));
+    }
+
+    devLog('[Manual Booking] Created successfully', result);
     return true;
   } catch (error: any) {
     if (isDev) console.error('[Manual Booking] Failed:', error);

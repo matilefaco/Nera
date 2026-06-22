@@ -247,6 +247,7 @@ export interface Appointment {
   serviceId: string;
   serviceName: string;
   additionalServices?: any[];
+  waitlistEntryId?: string;
   duration: number;
   price: number;
   travelFee?: number;
@@ -254,6 +255,8 @@ export interface Appointment {
   
   date: string; // YYYY-MM-DD
   time: string; // HH:mm
+  source?: string;
+  customerAddress?: any;
   
   locationType: 'studio' | 'home';
   locationDetail?: string; // neighborhood or address

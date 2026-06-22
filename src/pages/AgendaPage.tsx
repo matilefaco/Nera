@@ -55,9 +55,10 @@ import {
   Info,
   Share2,
   Search,
+  ChevronDown,
   Loader2,
 } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   formatCurrency,
   parseLocalDate,
@@ -151,6 +152,7 @@ export default function AgendaPage() {
     openUpgradeModal,
   } = useUpgradeTriggers();
   const { features, plan } = usePlanFeatures();
+  const navigate = useNavigate();
 
   const [view, setView] = useState<"month" | "week" | "day">(() => {
     const saved = localStorage.getItem("nera_agenda_view") as any;
@@ -161,6 +163,7 @@ export default function AgendaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dateFromUrl = searchParams.get("date");
   const appointmentIdFromUrl = searchParams.get("appointment");
+  const openManualFromUrl = searchParams.get("openManual") === "true";
 
   const [allAppointmentsStatus, setAllAppointmentsStatus] = useState<
     "loading" | "loaded" | "error" | "stalled"
@@ -238,6 +241,17 @@ export default function AgendaPage() {
     }
   }, [appointmentIdFromUrl, user]);
 
+  useEffect(() => {
+    if (openManualFromUrl) {
+      setIsManualModalOpen(true);
+      // Optional: remove query param after opening to avoid re-opening on refresh
+      setSearchParams(prev => {
+        prev.delete("openManual");
+        return prev;
+      }, { replace: true });
+    }
+  }, [openManualFromUrl, setSearchParams]);
+
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [openSlots, setOpenSlots] = useState<string[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
@@ -249,10 +263,50 @@ export default function AgendaPage() {
   const [manualPhone, setManualPhone] = useState("");
   const [manualService, setManualService] = useState("");
   const [manualPrice, setManualPrice] = useState("");
+  const [manualLocationType, setManualLocationType] = useState<"studio" | "home">("studio");
+  const [manualClientAddress, setManualClientAddress] = useState("");
   const [handledIds, setHandledIds] = useState<string[]>([]);
   const [manualDate, setManualDate] = useState(selectedDate);
   const [manualTime, setManualTime] = useState("");
   const [services, setServices] = useState<any[]>([]);
+  const [isServiceDropdownOpen, setIsServiceDropdownOpen] = useState(false);
+  const [serviceSearchTerm, setServiceSearchTerm] = useState("");
+
+  const groupedServices = React.useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    const lowerSearch = serviceSearchTerm.toLowerCase();
+    
+    services.forEach(s => {
+      if (serviceSearchTerm && !s.name.toLowerCase().includes(lowerSearch)) return;
+
+      const catRaw = s.serviceCategory || s.categoryData || s;
+      let catName = typeof s.serviceCategory === 'string' ? s.serviceCategory 
+                    : (catRaw.label || s.category || "Outros serviços");
+
+      if (!catName || typeof catName !== 'string') catName = "Outros serviços";
+
+      if (!groups[catName]) groups[catName] = [];
+      groups[catName].push(s);
+    });
+    return groups;
+  }, [services, serviceSearchTerm]);
+
+  useEffect(() => {
+    if (isManualModalOpen) {
+      setManualDate(selectedDate);
+      if (!manualService && services.length === 1) {
+        setManualService(services[0].id);
+        setManualPrice(services[0].price?.toString() || "");
+      } else if (!manualService) {
+        setManualPrice("");
+      }
+      
+      const hasHybrid = profile?.serviceMode === "hybrid";
+      if (!hasHybrid) {
+         setManualLocationType(profile?.serviceMode === "home" ? "home" : "studio");
+      }
+    }
+  }, [isManualModalOpen, services, manualService, profile, selectedDate]);
 
   // Reschedule State
   const [agendaView, setAgendaView] = useState<"details" | "reschedule">(
@@ -679,8 +733,19 @@ export default function AgendaPage() {
   };
 
   const handleCreateManual = async () => {
-    if (!user || !manualClient || !manualDate || !manualTime) {
-      notify.error("Preencha nome da cliente, data e horário.");
+    if (!user || !manualClient || !manualDate || !manualTime || !manualService) {
+      notify.error("Preencha cliente, serviço, data e horário.");
+      return;
+    }
+
+    if (manualLocationType === "home" && !manualClientAddress.trim()) {
+      notify.error("Informe o endereço da cliente.");
+      return;
+    }
+
+    const priceNum = Number(manualPrice);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      notify.error("Informe um valor válido.");
       return;
     }
 
@@ -693,19 +758,29 @@ export default function AgendaPage() {
     setIsCreating(true);
     try {
       const selectedSvc = services.find((s) => s.id === manualService);
+      if (!selectedSvc) {
+        notify.error("Serviço inválido selecionado.");
+        setIsCreating(false);
+        return;
+      }
+
       await createManualAppointment({
         professionalId: user.uid,
         clientName: manualClient.trim(),
         clientWhatsapp: cleanWhatsapp(manualPhone),
-        serviceId: manualService || "manual",
-        serviceName: selectedSvc?.name || manualService || "Atendimento Manual",
-        duration: Number(selectedSvc?.duration) || 60,
-        price: Number(manualPrice) || selectedSvc?.price || 0,
+        serviceId: selectedSvc.id,
+        serviceName: selectedSvc.name,
+        duration: Number(selectedSvc.duration) || 60,
+        price: priceNum,
         travelFee: 0,
-        totalPrice: Number(manualPrice) || selectedSvc?.price || 0,
+        totalPrice: priceNum,
         date: manualDate,
         time: manualTime,
-        locationType: "studio",
+        locationType: manualLocationType,
+        source: "manual",
+        ...(manualLocationType === "home" && manualClientAddress ? {
+          customerAddress: { street: manualClientAddress, number: "", neighborhood: "", city: "" }
+        } : {}),
         notes: "Agendamento criado manualmente",
       });
       notify.success(
@@ -716,9 +791,30 @@ export default function AgendaPage() {
       setManualService("");
       setManualPrice("");
       setManualTime("");
+      setManualClientAddress("");
       setIsManualModalOpen(false);
-    } catch {
-      notify.error("Não foi possível criar o agendamento.");
+    } catch (err: any) {
+      console.error("Manual Booking Error Detailed:", {
+        code: err.code,
+        message: err.message,
+        name: err.name,
+        stack: err.stack,
+        uid: user?.uid,
+        professionalId: user?.uid,
+        serviceId: manualService,
+        date: manualDate,
+        time: manualTime,
+        locationType: manualLocationType,
+        hasCustomerAddress: manualLocationType === "home" && !!manualClientAddress,
+      });
+
+      if (err.message?.includes("permiss") || err.message?.includes("Sessão expirada") || err.code === 'permission-denied') {
+        notify.error("Não foi possível salvar por uma regra de permissão. Verifique o login e tente novamente.");
+      } else if (err.message === "Este horário já está ocupado na agenda.") {
+        notify.error("Esse horário já está ocupado na sua agenda.");
+      } else {
+        notify.error(`Não foi possível criar o agendamento agora. Detalhes: ${err.message || 'Tente novamente.'}`);
+      }
     } finally {
       setIsCreating(false);
     }
@@ -1373,7 +1469,7 @@ export default function AgendaPage() {
                     className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors"
                   />
                   <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">
-                    Encaixe
+                    Novo Agendamento
                   </span>
                 </button>
                 <button
@@ -1392,23 +1488,6 @@ export default function AgendaPage() {
                   />
                   <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">
                     Espera
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    setManualTime("");
-                    setIsManualModalOpen(true);
-                    setIsFabOpen(false);
-                  }}
-                  className="w-full text-left px-5 py-4 min-h-[52px] hover:bg-black/5 active:bg-black/10 rounded-[20px] flex items-center gap-3 transition-colors group"
-                >
-                  <CalendarCheck2
-                    size={16}
-                    strokeWidth={1.5}
-                    className="text-brand-stone group-hover:text-brand-ink shrink-0 transition-colors"
-                  />
-                  <span className="text-[11px] font-bold text-brand-stone group-hover:text-brand-ink uppercase tracking-widest transition-colors">
-                    Reserva
                   </span>
                 </button>
               </motion.div>
@@ -1506,327 +1585,212 @@ export default function AgendaPage() {
                 </p>
 
                 <div className="space-y-5">
-                  <div>
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
-                      Cliente *
-                    </label>
-                    <input
-                      type="text"
-                      value={manualClient}
-                      onChange={(e) => setManualClient(e.target.value)}
-                      placeholder="Nome da cliente"
-                      className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
-                      WhatsApp (opcional)
-                    </label>
-                    <input
-                      type="tel"
-                      value={manualPhone}
-                      onChange={(e) => setManualPhone(e.target.value)}
-                      placeholder="(00) 00000-0000"
-                      className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
-                      Serviço
-                    </label>
-                    <select
-                      value={manualService}
-                      onChange={(e) => {
-                        const svc = services.find(
-                          (s) => s.id === e.target.value,
-                        );
-                        setManualService(e.target.value);
-                        if (svc) setManualPrice(svc.price.toString());
-                      }}
-                      className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all appearance-none"
-                    >
-                      <option value="">Selecione um serviço</option>
-                      {services.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({formatCurrency(s.price)})
-                        </option>
-                      ))}
-                      <option value="outro">Outro (Manual)</option>
-                    </select>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex-[2] min-w-0">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
-                        Data *
-                      </label>
-                      <input
-                        type="date"
-                        value={manualDate}
-                        onChange={(e) => setManualDate(e.target.value)}
-                        className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all min-w-0"
-                      />
+                  {services.length === 0 ? (
+                    <div className="p-6 bg-brand-linen/20 rounded-[28px] border border-dashed border-brand-mist/50 flex flex-col items-center text-center gap-4">
+                      <AlertCircle size={24} className="text-brand-stone/40" />
+                      <p className="text-xs text-brand-stone font-light px-4">
+                        Cadastre um serviço antes de criar um agendamento.
+                      </p>
+                      <button
+                        onClick={() => navigate("/services")}
+                        className="px-6 py-3 bg-brand-ink text-white rounded-xl text-[10px] font-bold uppercase tracking-widest mt-2"
+                      >
+                        Ir para Serviços
+                      </button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
-                        Horário *
-                      </label>
-                      <input
-                        type="time"
-                        value={manualTime}
-                        onChange={(e) => setManualTime(e.target.value)}
-                        className="w-full px-4 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all min-w-0"
-                      />
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                          Cliente *
+                        </label>
+                        <input
+                          type="text"
+                          value={manualClient}
+                          onChange={(e) => setManualClient(e.target.value)}
+                          placeholder="Nome da cliente"
+                          className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
-                      Valor (R$)
-                    </label>
-                    <input
-                      type="number"
-                      value={manualPrice}
-                      onChange={(e) => setManualPrice(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
-                    />
-                  </div>
+                      <div>
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                          WhatsApp da cliente (opcional)
+                        </label>
+                        <input
+                          type="tel"
+                          value={manualPhone}
+                          onChange={(e) => setManualPhone(e.target.value)}
+                          placeholder="(00) 00000-0000"
+                          className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                        />
+                      </div>
 
-                  {manualService && manualDate && (
-                    <div className="pt-2 space-y-5">
-                      {recommendedSlots.bestSlot ||
-                      recommendedSlots.otherSlots.length > 0 ? (
-                        <>
-                          {recommendedSlots.bestSlot && (
-                            <motion.div
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className={cn(
-                                "relative overflow-hidden p-5 rounded-[28px] border-2 transition-all",
-                                manualTime === recommendedSlots.bestSlot.time
-                                  ? "bg-brand-ink border-brand-ink text-white shadow-xl shadow-brand-ink/20"
-                                  : "bg-brand-white border-brand-mist/30",
-                              )}
+                      <div className="relative">
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                          Serviço *
+                        </label>
+                        {services.length === 1 ? (
+                          <div className="w-full px-5 py-4 bg-brand-mist/20 border border-brand-mist rounded-2xl text-sm text-brand-stone">
+                            {services[0].name}
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <button
+                              onClick={() => setIsServiceDropdownOpen(!isServiceDropdownOpen)}
+                              className="w-full text-left px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all flex justify-between items-center"
                             >
-                              <div className="flex justify-between items-start mb-4">
-                                <div className="flex items-center gap-2">
-                                  <div
-                                    className={cn(
-                                      "w-8 h-8 rounded-xl flex items-center justify-center",
-                                      manualTime ===
-                                        recommendedSlots.bestSlot.time
-                                        ? "bg-brand-parchment/20"
-                                        : "bg-brand-linen/40",
-                                    )}
-                                  >
-                                    <Sparkles
-                                      size={16}
-                                      className={
-                                        manualTime ===
-                                        recommendedSlots.bestSlot.time
-                                          ? "text-brand-terracotta"
-                                          : "text-brand-terracotta"
-                                      }
+                                <span className={manualService ? "text-brand-ink" : "text-brand-stone"}>
+                                  {manualService ? services.find(s => s.id === manualService)?.name : "Selecione um serviço"}
+                                </span>
+                                <ChevronDown size={16} className={`text-brand-stone transition-transform ${isServiceDropdownOpen ? "rotate-180" : ""}`} />
+                            </button>
+                            {isServiceDropdownOpen && (
+                              <div className="absolute z-10 w-full mt-2 bg-brand-white border border-brand-mist rounded-2xl shadow-xl max-h-[250px] overflow-y-auto no-scrollbar py-2">
+                                <div className="px-3 pb-2 sticky top-0 bg-brand-white z-10 pt-1">
+                                  <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-stone/60" />
+                                    <input 
+                                      type="text"
+                                      placeholder="Buscar serviço..."
+                                      value={serviceSearchTerm}
+                                      onChange={(e) => setServiceSearchTerm(e.target.value)}
+                                      className="w-full pl-9 pr-4 py-2 bg-brand-linen/30 border border-brand-mist/50 rounded-xl text-xs outline-none focus:border-brand-ink transition-colors"
                                     />
                                   </div>
-                                  <div>
-                                    <p
-                                      className={cn(
-                                        "text-[10px] font-bold uppercase tracking-[0.2em]",
-                                        manualTime ===
-                                          recommendedSlots.bestSlot.time
-                                          ? "text-brand-parchment"
-                                          : "text-brand-stone",
-                                      )}
-                                    >
-                                      Sugestão Nera
-                                    </p>
-                                    <h4 className="text-sm font-serif italic">
-                                      Melhor Encaixe
-                                    </h4>
-                                  </div>
                                 </div>
-                                {manualTime ===
-                                  recommendedSlots.bestSlot.time && (
-                                  <motion.span
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    className="bg-brand-terracotta text-white text-[8px] font-bold px-2 py-1 rounded-full uppercase tracking-widest"
-                                  >
-                                    Selecionado
-                                  </motion.span>
+                                {Object.entries(groupedServices).map(([catName, servs]) => (
+                                  <div key={catName} className="mb-2">
+                                    <div className="px-4 py-1.5 bg-brand-linen/40 text-[9px] font-bold uppercase tracking-widest text-brand-stone mt-1">
+                                      {catName}
+                                    </div>
+                                    <div className="flex flex-col">
+                                      {servs.map(s => (
+                                        <button
+                                          key={s.id}
+                                          onClick={() => {
+                                            setManualService(s.id);
+                                            setManualPrice(s.price?.toString() || "");
+                                            setIsServiceDropdownOpen(false);
+                                            setServiceSearchTerm("");
+                                          }}
+                                          className={`text-left px-4 py-3 hover:bg-brand-linen/30 flex justify-between items-center group transition-colors ${manualService === s.id ? "bg-brand-linen text-brand-ink" : "text-brand-stone hover:text-brand-ink"}`}
+                                        >
+                                          <span className={`text-sm ${manualService === s.id ? "font-medium" : ""}`}>{s.name}</span>
+                                          <span className="text-xs font-serif italic text-brand-stone group-hover:text-brand-terracotta">{formatCurrency(s.price)}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                                {Object.keys(groupedServices).length === 0 && (
+                                  <div className="px-4 py-6 text-center text-xs text-brand-stone italic">
+                                    Nenhum serviço encontrado.
+                                  </div>
                                 )}
                               </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
 
-                              <div className="flex items-center justify-between">
-                                <span
-                                  className={cn(
-                                    "text-3xl font-serif italic",
-                                    manualTime ===
-                                      recommendedSlots.bestSlot.time
-                                      ? "text-white"
-                                      : "text-brand-ink",
-                                  )}
-                                >
-                                  {recommendedSlots.bestSlot.time}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    setManualTime(
-                                      recommendedSlots.bestSlot!.time,
-                                    )
-                                  }
-                                  className={cn(
-                                    "px-6 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all",
-                                    manualTime ===
-                                      recommendedSlots.bestSlot.time
-                                      ? "bg-brand-parchment text-brand-ink"
-                                      : "bg-brand-ink text-white hover:bg-brand-stone",
-                                  )}
-                                >
-                                  {manualTime === recommendedSlots.bestSlot.time
-                                    ? "Horário Pronto"
-                                    : "Usar este horário"}
-                                </button>
-                              </div>
-
-                              {/* Background Decoration */}
-                              <Star className="absolute -bottom-2 -right-2 w-16 h-16 text-brand-terracotta/5 pointer-events-none" />
-                            </motion.div>
-                          )}
-
-                          {recommendedSlots.otherSlots.length > 0 && (
-                            <div className="px-1">
-                              <p className="text-[9px] font-bold uppercase tracking-widest text-brand-stone mb-3 flex items-center gap-2">
-                                Manter Agenda Cheia <ArrowRight size={10} />{" "}
-                                Outras opções
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {recommendedSlots.otherSlots.map((slot) => (
-                                  <button
-                                    key={slot.time}
-                                    onClick={() => setManualTime(slot.time)}
-                                    className={cn(
-                                      "px-4 py-3 rounded-2xl text-[11px] font-bold border transition-all",
-                                      manualTime === slot.time
-                                        ? "bg-brand-ink text-white border-brand-ink"
-                                        : "bg-brand-linen/30 text-brand-ink border-brand-mist/20 hover:border-brand-terracotta/40",
-                                    )}
-                                  >
-                                    {slot.time}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* --- INTELLIGENT FITS SECTION --- */}
-                          {(recommendedSlots.intelligentFits || []).filter(
-                            (f) =>
-                              f.type === "adjustment" ||
-                              (f.type === "direct" &&
-                                f.time !== recommendedSlots.bestSlot?.time),
-                          ).length > 0 && (
-                            <div className="pt-4 border-t border-brand-mist/20">
-                              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-stone mb-4 flex items-center gap-2">
-                                <Sparkles
-                                  size={12}
-                                  className="text-brand-terracotta"
-                                />{" "}
-                                Oportunidades de Encaixe
-                              </p>
-                              <div className="space-y-3">
-                                {(recommendedSlots.intelligentFits || [])
-                                  .filter(
-                                    (f) =>
-                                      f.type === "adjustment" ||
-                                      (f.type === "direct" &&
-                                        f.time !==
-                                          recommendedSlots.bestSlot?.time),
-                                  )
-                                  .map((fit, idx) => (
-                                    <button
-                                      key={idx}
-                                      onClick={() => handleApplyFit(fit)}
-                                      className={cn(
-                                        "w-full p-4 rounded-2xl border transition-all text-left flex flex-col gap-1",
-                                        manualTime === fit.time
-                                          ? "bg-brand-ink border-brand-ink text-white"
-                                          : "bg-brand-linen/20 border-brand-mist/30 hover:border-brand-terracotta/40",
-                                      )}
-                                    >
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-xs font-bold leading-none">
-                                          {fit.time}
-                                        </span>
-                                        {fit.type === "adjustment" ? (
-                                          <span
-                                            className={cn(
-                                              "text-[8px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold",
-                                              manualTime === fit.time
-                                                ? "bg-brand-terracotta text-white"
-                                                : "bg-brand-terracotta/10 text-brand-terracotta",
-                                            )}
-                                          >
-                                            Ajuste Inteligente
-                                          </span>
-                                        ) : (
-                                          <span
-                                            className={cn(
-                                              "text-[8px] px-2 py-0.5 rounded-full uppercase tracking-widest font-bold",
-                                              manualTime === fit.time
-                                                ? "bg-brand-parchment/20 text-brand-parchment"
-                                                : "bg-brand-linen/40 text-brand-stone",
-                                            )}
-                                          >
-                                            Encaixe Direto
-                                          </span>
-                                        )}
-                                      </div>
-                                      {fit.adjustment && (
-                                        <p
-                                          className={cn(
-                                            "text-[9px] font-light italic",
-                                            manualTime === fit.time
-                                              ? "text-brand-parchment/70"
-                                              : "text-brand-stone",
-                                          )}
-                                        >
-                                          Move {fit.adjustment.clientName} para{" "}
-                                          {fit.adjustment.newTime}
-                                        </p>
-                                      )}
-                                    </button>
-                                  ))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="p-6 bg-brand-linen/20 rounded-[28px] border border-dashed border-brand-mist/50 flex flex-col items-center text-center gap-2">
-                          <AlertCircle
-                            size={20}
-                            className="text-brand-stone/40"
+                      <div className="flex gap-4">
+                        <div className="flex-[2] min-w-0">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                            Data *
+                          </label>
+                          <input
+                            type="date"
+                            value={manualDate}
+                            onChange={(e) => setManualDate(e.target.value)}
+                            className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all min-w-0"
                           />
-                          <p className="text-[10px] text-brand-stone font-light px-4">
-                            Nenhum horário disponível para este serviço hoje.
-                            Tente outro dia ou ajuste seus horários.
-                          </p>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                            Horário *
+                          </label>
+                          <input
+                            type="time"
+                            value={manualTime}
+                            onChange={(e) => setManualTime(e.target.value)}
+                            className="w-full px-4 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all min-w-0"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                          Valor (R$) *
+                        </label>
+                        <input
+                          type="number"
+                          value={manualPrice}
+                          onChange={(e) => setManualPrice(e.target.value)}
+                          placeholder="0.00"
+                          className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                        />
+                      </div>
+
+                      {profile?.serviceMode === "hybrid" && (
+                        <div>
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                            Onde será o atendimento?
+                          </label>
+                          <div className="flex bg-brand-linen/40 p-1.5 rounded-2xl border border-brand-mist/50">
+                            <button
+                              onClick={() => setManualLocationType("studio")}
+                              className={`flex-1 py-3 px-4 rounded-xl text-xs font-medium transition-all ${
+                                manualLocationType === "studio"
+                                  ? "bg-white text-brand-ink shadow-sm pointer-events-none"
+                                  : "text-brand-stone hover:text-brand-ink hover:bg-white/50"
+                              }`}
+                            >
+                              No meu espaço
+                            </button>
+                            <button
+                              onClick={() => setManualLocationType("home")}
+                              className={`flex-1 py-3 px-4 rounded-xl text-xs font-medium transition-all ${
+                                manualLocationType === "home"
+                                  ? "bg-white text-brand-ink shadow-sm pointer-events-none"
+                                  : "text-brand-stone hover:text-brand-ink hover:bg-white/50"
+                              }`}
+                            >
+                              No endereço da cliente
+                            </button>
+                          </div>
                         </div>
                       )}
-                    </div>
-                  )}
 
-                  <button
-                    onClick={handleCreateManual}
-                    disabled={!manualClient || !manualTime || isCreating}
-                    className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isCreating ? "Criando..." : "Confirmar Agendamento"}
-                  </button>
+                      {manualLocationType === "home" && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone block mb-2">
+                            Endereço da Cliente (Apenas em domicílio) *
+                          </label>
+                          <input
+                            type="text"
+                            value={manualClientAddress}
+                            onChange={(e) => setManualClientAddress(e.target.value)}
+                            placeholder="Rua, Número, Bairro/Cidade"
+                            className="w-full px-5 py-4 bg-brand-parchment border border-brand-mist rounded-2xl text-sm outline-none focus:border-brand-ink transition-all"
+                          />
+                        </motion.div>
+                      )}
+
+                      <button
+                        onClick={handleCreateManual}
+                        disabled={!manualClient || !manualTime || !manualDate || !manualService || !manualPrice || isNaN(Number(manualPrice)) || Number(manualPrice) <= 0 || (manualLocationType === "home" && !manualClientAddress.trim()) || isCreating}
+                        className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        {isCreating ? "Criando..." : "Confirmar Agendamento"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </motion.div>
             </div>
@@ -2029,6 +1993,30 @@ export default function AgendaPage() {
                               )}
                           </div>
                         </div>
+
+                        {selectedAppointment.locationType && (
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
+                              <MapPin size={18} />
+                            </div>
+                            <div className="overflow-hidden">
+                              <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-brand-stone mb-0.5">
+                                Local
+                              </p>
+                              <p className="text-sm text-brand-ink truncate">
+                                {selectedAppointment.locationType === 'home' ? 'Atendimento em Domicílio' : 'Seu Espaço'}
+                              </p>
+                              {selectedAppointment.locationType === 'home' && selectedAppointment.customerAddress?.street && (
+                                <p className="text-[11px] text-brand-stone mt-0.5 truncate">
+                                  {selectedAppointment.customerAddress.street}
+                                  {selectedAppointment.customerAddress.number ? `, ${selectedAppointment.customerAddress.number}` : ''}
+                                  {selectedAppointment.customerAddress.neighborhood ? ` - ${selectedAppointment.customerAddress.neighborhood}` : ''}
+                                  {selectedAppointment.customerAddress.city ? ` (${selectedAppointment.customerAddress.city})` : ''}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {selectedAppointment.clientEmail && (
                           <div className="flex items-center gap-4">

@@ -145,7 +145,7 @@ service cloud.firestore {
       allow list: if (isSignedIn() && (resource.data.professionalId == request.auth.uid)) || isAdmin();
       
       // 2. Secured Create/Update: Only owner/admin. (Backend via Admin SDK bypasses this for public bookings)
-      allow create: if false; 
+      allow create: if (isSignedIn() && incoming().professionalId == request.auth.uid) || isAdmin();
       allow update: if (isSignedIn() && (existing().professionalId == request.auth.uid || isAdmin())) && isValidAppointment(incoming());
     }
 
@@ -203,7 +203,8 @@ service cloud.firestore {
     }
 
     match /booking_locks/{lockId} {
-      allow get, list: if (isSignedIn() && resource.data.professionalId == request.auth.uid) || isAdmin();
+      allow get: if isSignedIn() && (resource == null || resource.data.professionalId == request.auth.uid) || isAdmin();
+      allow list: if isSignedIn() && resource.data.professionalId == request.auth.uid || isAdmin();
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
       allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || (isSignedIn() && incoming().professionalId == request.auth.uid);
       allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
@@ -218,7 +219,8 @@ service cloud.firestore {
     }
 
     match /client_summaries/{summaryId} {
-      allow get, list: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.professionalId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.professionalId == request.auth.uid;
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
       allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || (isSignedIn() && incoming().professionalId == request.auth.uid);
       allow delete: if isAdmin();

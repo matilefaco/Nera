@@ -34,6 +34,7 @@ import {
   sendNewBookingRequestNotification,
   sendBookingConfirmedClientNotification,
 } from "../services/notificationService.js";
+import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
 import { PUBLIC_APP_URL, shouldSendEmail, markEmailSent } from "../utils.js";
 import { buildCancellationByProMessageForClient, buildBookingRejectedMessageForClient } from "../services/whatsappMessages.js";
 import { sendWhatsApp } from "../services/whatsappService.js";
@@ -752,6 +753,26 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       let quotaLockRef: admin.firestore.DocumentReference | null = null;
       let limitHit = false;
 
+      // Waitlist Entry Verification
+      let waitlistSnap = null;
+      if (appointmentData.waitlistEntryId) {
+        const waitlistRef = db.collection("waitlist").doc(appointmentData.waitlistEntryId);
+        waitlistSnap = await transaction.get(waitlistRef);
+        if (!waitlistSnap.exists) {
+          throw new Error("Convite não encontrado.");
+        }
+        const waitlistData = waitlistSnap.data();
+        if (waitlistData?.status !== "invited") {
+          throw new Error("Este convite já foi utilizado, expirado ou cancelado.");
+        }
+        if (waitlistData?.invitationExpiresAt) {
+          const expiresAt = new Date(waitlistData.invitationExpiresAt).getTime();
+          if (expiresAt <= Date.now()) {
+            throw new Error("Este convite já expirou. A vaga foi repassada para o próximo da lista.");
+          }
+        }
+      }
+
       if (!hasUnlimitedBookings) {
         const now = new Date();
         const currentYear = now.getUTCFullYear();
@@ -792,7 +813,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         let bookingCountOfMonth = 0;
         for (const doc of snapshot.docs) {
           const data = doc.data();
-          if (countingStatuses.includes(data.status)) {
+          if (countingStatuses.includes(data.status) && data.source !== "manual") {
             bookingCountOfMonth++;
           }
         }
@@ -973,8 +994,10 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
             lockData?.status === "pending" ||
             lockData?.status === "pending_confirmation" ||
             lockData?.status === "pending_conflict";
+          const isWaitlistLock = lockData?.status === "waitlist_lock";
+
           let isExpired = false;
-          if (isPending && lockData?.expiresAt) {
+          if ((isPending || isWaitlistLock) && lockData?.expiresAt) {
             if (typeof lockData.expiresAt.toMillis === "function") {
               isExpired = lockData.expiresAt.toMillis() <= Date.now();
             } else if (
@@ -990,6 +1013,13 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
             throw new Error(
               "SLOT_LOCKED:Este horário acabou de ser reservado. Escolha outro horário.",
             );
+          }
+          if (isWaitlistLock && !isExpired) {
+            if (!appointmentData.waitlistEntryId || appointmentData.waitlistEntryId !== lockData.waitlistEntryId) {
+              throw new Error(
+                "SLOT_WAITLIST:Este horário está temporariamente reservado para uma cliente da lista de espera.",
+              );
+            }
           }
         }
       }
@@ -1324,6 +1354,15 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         clientEmail: appointmentData.clientEmail,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
+
+      // Update Waitlist Entry if booked from waitlist
+      if (appointmentData.waitlistEntryId) {
+        const waitlistRef = db.collection("waitlist").doc(appointmentData.waitlistEntryId);
+        transaction.update(waitlistRef, {
+          status: "booked",
+          bookedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+      }
 
       // Update Client Summary
       await updateClientSummaryInternal(
@@ -2176,6 +2215,134 @@ router.get("/debug-slot-lock", debugOnly, async (req, res) => {
   }
 });
 
+// --- NEW: CREATE MANUAL APPOINTMENT ENDPOINT ---
+router.post(
+  "/manual",
+  requireFirebaseAuth,
+  async (req: AuthenticatedRequest, res: express.Response) => {
+    logger.info("BOOKING", "[MANUAL_BOOKING_ROUTE_HIT] Iniciando criação manual");
+    const db = getDb();
+    const uid = req.uid;
+    const appointmentData = req.body;
+
+
+    logger.info("BOOKING", `[MANUAL_BOOKING_PAYLOAD] Received data for professional: ${appointmentData?.professionalId}`);
+
+    if (!uid) {
+      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Sessão expirada ou sem auth UID");
+      return res.status(401).json({ error: "Sessão expirada.", step: "auth" });
+    }
+    
+    logger.info("BOOKING", `[MANUAL_BOOKING_AUTH_OK] Autenticado como ${uid}`);
+
+    if (appointmentData.professionalId !== uid) {
+      logger.error("BOOKING", `[MANUAL_BOOKING_ERROR] Auth incompatível. req.uid=${uid}, payload=${appointmentData.professionalId}`);
+      return res.status(403).json({ error: "Acesso negado.", step: "auth_match" });
+    }
+
+    if (
+      !appointmentData.date ||
+      !appointmentData.time ||
+      !appointmentData.serviceId
+    ) {
+      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Dados incompletos", appointmentData);
+      return res.status(400).json({ error: "Dados incompletos", step: "validation" });
+    }
+
+    const priceNum = Number(appointmentData.price);
+    if (isNaN(priceNum) || priceNum <= 0) {
+      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Valor inválido", { price: appointmentData.price });
+      return res.status(400).json({ error: "Informe um valor válido.", step: "validation_price" });
+    }
+
+    logger.info("BOOKING", `[MANUAL_BOOKING_SERVICE_FOUND] Preparando transação para ${appointmentData.date} ${appointmentData.time}`);
+
+    try {
+      const result = await db.runTransaction(async (transaction: any) => {
+        // 1. Lock check FIRST READ
+        const cleanTime = String(appointmentData.time).replace(":", "");
+        const lockId = `${uid}_${appointmentData.date}_${cleanTime}`;
+        const lockRef = db.collection("booking_locks").doc(lockId);
+        
+        logger.info("BOOKING", `[MANUAL_BOOKING_LOCK_CHECK] ID: ${lockId}`);
+        const lockSnap = await transaction.get(lockRef);
+        const blockingStatuses = ["confirmed", "accepted", "completed"];
+
+        if (lockSnap.exists && blockingStatuses.includes(lockSnap.data()?.status)) {
+             throw new Error("Este horário já está ocupado na agenda.");
+        }
+        
+        // 2. Client Summary SECOND READ (Must be before any set)
+        const clientKey = getClientKey(
+          appointmentData.clientWhatsapp,
+          appointmentData.clientEmail,
+          appointmentData.clientName,
+        );
+        const summaryId = `${uid}_${clientKey}`;
+        const summaryRef = db.collection("client_summaries").doc(summaryId);
+        const summarySnap = await transaction.get(summaryRef);
+
+
+        // 3. Insert into appointments (WRITES)
+        const appointmentId = db.collection("appointments").doc().id;
+        const apptRef = db.collection("appointments").doc(appointmentId);
+
+        const appointmentToSave = {
+          ...appointmentData,
+          id: appointmentId,
+          status: "confirmed",
+          source: "manual",
+          totalPrice: priceNum,
+          price: priceNum,
+          professionalId: uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        const safeAppointment = sanitizeAppointment(appointmentToSave, false);
+        transaction.set(apptRef, safeAppointment);
+        
+        logger.info("BOOKING", `[MANUAL_BOOKING_APPOINTMENT_CREATED] ID: ${appointmentId}`);
+
+        // 4. Set booking Lock (WRITES)
+        transaction.set(lockRef, {
+            professionalId: uid,
+            date: appointmentData.date,
+            time: appointmentData.time,
+            status: "confirmed",
+            appointmentId: appointmentId,
+            clientName: appointmentData.clientName || 'Cliente',
+            source: "manual",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // 5. Update Client Summary (WITH PRE-FETCHED READ)
+        await updateClientSummaryInternal(
+            transaction,
+            safeAppointment,
+            uid,
+            true,
+            "",
+            summarySnap
+        );
+        logger.info("BOOKING", `[MANUAL_BOOKING_CLIENT_SUMMARY_UPDATED] Executado.`);
+
+        return { success: true, appointmentId };
+      });
+      
+      logger.info("BOOKING", `[MANUAL_BOOKING_SUCCESS] ID do backend: ${result.appointmentId}`);
+      res.json(result);
+    } catch (err: any) {
+        logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Falha na transação", { message: err.message, stack: err.stack });
+        if (err.message === "Este horário já está ocupado na agenda.") {
+            return res.status(409).json({ error: err.message, step: "lock" });
+        }
+        res.status(500).json({ error: err.message, step: "transaction" });
+    }
+  }
+);
+
 // --- NEW: ATOMIC APPOINTMENT CONFIRMATION ENDPOINT ---
 router.post(
   "/appointments/:appointmentId/confirm",
@@ -2697,6 +2864,19 @@ router.post(
         return { success: true, appointmentId, updatedData };
       });
 
+      // Trigger waitlist after successful decline
+      if (result.success && result.updatedData) {
+        logger.info("WAITLIST", "[WAITLIST_TRIGGER_AFTER_PRO_CANCEL] Triggering waitlist on pending decline", { appointmentId, date: result.updatedData.date, time: result.updatedData.time });
+        triggerWaitlistCheckBackend(
+          db,
+          result.updatedData.professionalId,
+          result.updatedData.date,
+          result.updatedData.time
+        ).catch(err => {
+          logger.error("WAITLIST", "Error triggering waitlist check after decline", { error: err });
+        });
+      }
+
       // Notify client that professional declined
       if (
         result.success &&
@@ -2857,6 +3037,19 @@ router.post(
 
         return { success: true, appointmentId, updatedData };
       });
+
+      // Trigger waitlist after successful cancellation
+      if (result.success && result.updatedData) {
+        logger.info("WAITLIST", "[WAITLIST_TRIGGER_AFTER_PRO_CANCEL] Triggering waitlist on professional cancel", { appointmentId, date: result.updatedData.date, time: result.updatedData.time });
+        triggerWaitlistCheckBackend(
+          db,
+          result.updatedData.professionalId,
+          result.updatedData.date,
+          result.updatedData.time
+        ).catch(err => {
+          logger.error("WAITLIST", "Error triggering waitlist check after professional cancel", { error: err });
+        });
+      }
 
       // Notify client that professional cancelled
       if (
@@ -3584,6 +3777,19 @@ router.post(
         return { success: true, appointmentId, appointmentData: updatedData };
       });
 
+      // Trigger waitlist after successful cancellation
+      if (result.success && result.appointmentData) {
+        logger.info("WAITLIST", "[WAITLIST_TRIGGER_AFTER_CANCEL] Triggering waitlist on client cancel", { appointmentId: result.appointmentId, date: result.appointmentData.date, time: result.appointmentData.time });
+        triggerWaitlistCheckBackend(
+          db,
+          result.appointmentData.professionalId,
+          result.appointmentData.date,
+          result.appointmentData.time
+        ).catch(err => {
+          logger.error("WAITLIST", "Error triggering waitlist check after client cancel", { error: err });
+        });
+      }
+
       return res.json(result);
     } catch (err: any) {
       const status = err.status || 500;
@@ -4220,12 +4426,26 @@ async function triggerWaitlistCheckBackend(
         const snap = await t.get(ref);
         if (snap.data()?.status !== "waiting") return false;
 
+        const cleanTime = time.replace(":", "");
+        const lockId = `${professionalId}_${date}_${cleanTime}`;
+        const lockRef = db.collection("booking_locks").doc(lockId);
+
         t.update(ref, {
           status: "invited",
           invitationSentAt: admin.firestore.FieldValue.serverTimestamp(),
           invitationExpiresAt: expiresAt.toISOString(),
           assignedTime: time,
         });
+
+        t.set(lockRef, {
+          professionalId,
+          date,
+          time,
+          waitlistEntryId: entryId,
+          expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+          status: "waitlist_lock"
+        });
+
         return true;
       });
 
@@ -4574,6 +4794,79 @@ router.post(
       res.status(status).json({ error: err.message || "Erro interno" });
     }
   },
+);
+
+router.get(
+  "/cron/waitlist-sweeper",
+  requireCronSecret,
+  async (req: express.Request, res: express.Response) => {
+    const db = getDb();
+    try {
+      logger.info("CRON", "Starting waitlist sweeper");
+      const querySnap = await db
+        .collection("waitlist")
+        .where("status", "==", "invited")
+        .where("invitationExpiresAt", "<", new Date().toISOString())
+        .limit(50)
+        .get();
+
+      if (querySnap.empty) {
+        logger.info("WAITLIST", "[WAITLIST_QUEUE_EMPTY] No expired invites found.");
+        return res.json({ success: true, processed: 0 });
+      }
+
+      let processedCount = 0;
+
+      for (const doc of querySnap.docs) {
+        const entryId = doc.id;
+        const data = doc.data() as any;
+
+        const success = await db.runTransaction(async (t) => {
+          const ref = db.collection("waitlist").doc(entryId);
+          const snap = await t.get(ref);
+          if (snap.data()?.status !== "invited") return false;
+
+          // Mark as expired
+          t.update(ref, {
+            status: "expired"
+          });
+
+          // Look for lock
+          if (data.assignedTime) {
+            const cleanTime = data.assignedTime.replace(":", "");
+            const lockId = `${data.professionalId}_${data.requestedDate}_${cleanTime}`;
+            const lockRef = db.collection("booking_locks").doc(lockId);
+            const lockSnap = await t.get(lockRef);
+            if (lockSnap.exists && lockSnap.data()?.waitlistEntryId === entryId) {
+              t.delete(lockRef);
+              logger.info("WAITLIST", `[WAITLIST_LOCK_RELEASED] Lock released for expired waitlist invite ${entryId}`);
+            }
+          }
+          return true;
+        });
+
+        if (success) {
+          processedCount++;
+          logger.info("WAITLIST", `[WAITLIST_INVITE_EXPIRED] Waitlist invite expired for entry ${entryId}`);
+          logger.info("WAITLIST", "[WAITLIST_NEXT_INVITED] Triggering check for next person in line.");
+          
+          if (data.assignedTime) {
+            triggerWaitlistCheckBackend(
+              db,
+              data.professionalId,
+              data.requestedDate,
+              data.assignedTime
+            ).catch(e => logger.error("WAITLIST", "Error checking next person", { error: e }));
+          }
+        }
+      }
+
+      res.json({ success: true, processed: processedCount });
+    } catch (err: any) {
+      logger.error("CRON", "Waitlist sweeper error", { error: err });
+      res.status(500).json({ error: String(err) });
+    }
+  }
 );
 
 export default router;

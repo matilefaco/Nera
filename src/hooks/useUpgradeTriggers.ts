@@ -18,7 +18,8 @@ export function useUpgradeTriggers(appointments: Appointment[] = []) {
       return (
         d.getMonth() === now.getMonth() && 
         d.getFullYear() === now.getFullYear() &&
-        ['confirmed', 'completed', 'accepted'].includes(a.status)
+        ['confirmed', 'completed', 'accepted'].includes(a.status) &&
+        a.source !== 'manual'
       );
     });
     return currentMonthAppts.length;

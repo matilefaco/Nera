@@ -936,6 +936,7 @@ export default function BookingModal({
           time: selectedTime,
           couponId: appliedCoupon?.id,
           appliedCouponCode: appliedCoupon?.code,
+          waitlistEntryId: waitlistEntry?.id || undefined,
         });
         bookingId = result.bookingId;
         token = result.token;

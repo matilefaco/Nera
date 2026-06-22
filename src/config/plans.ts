@@ -29,7 +29,7 @@ export const PLANS: Plan[] = [
     tagline: 'Ideal para começar',
     features: [
       { text: 'Perfil digital premium (foto, bio e serviços)' },
-      { text: 'Até 15 agendamentos por mês' },
+      { text: 'Até 15 reservas online por mês' },
       { text: 'Aprovação manual (seu filtro)' },
       { text: 'Link direto para bio' }
     ],

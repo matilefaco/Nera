@@ -1208,7 +1208,7 @@ export default function Dashboard() {
                 <p className="text-[12px] text-brand-stone font-light hidden sm:block">
                   {plan === 'free' ? (
                     <>
-                      <strong className="font-medium text-brand-ink">{usageCount}</strong> de 15 agendamentos usados este mês
+                      <strong className="font-medium text-brand-ink">{usageCount}</strong> de 15 reservas online usadas este mês
                     </>
                   ) : (
                     <>
@@ -1519,28 +1519,26 @@ export default function Dashboard() {
                 <div className="absolute top-0 right-0 w-64 h-64 bg-brand-white rounded-full blur-[80px] opacity-70 -mr-20 -mt-20 pointer-events-none transition-opacity group-hover:opacity-100" />
                 <div className="relative z-10 max-w-lg">
                   <div className="w-14 h-14 bg-white border border-brand-mist/60 text-brand-ink rounded-2xl flex items-center justify-center mb-6 shadow-sm mx-auto">
-                    <Sparkles size={24} strokeWidth={1.5} className="text-brand-terracotta/80" />
+                    <Calendar size={24} strokeWidth={1.5} className="text-brand-terracotta/80" />
                   </div>
-                  <h4 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3 leading-tight italic">Sua vitrine está pronta.</h4>
+                  <h4 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3 leading-tight italic">Traga sua agenda para a Nera</h4>
                   <p className="text-[13px] text-brand-stone font-light mb-8 leading-relaxed max-w-sm mx-auto">
-                    Tudo pronto para começar seus atendimentos. Agora é hora de colocar sua página em circulação.
+                    Você já tem clientes marcados? Adicione seus próximos atendimentos para visualizar tudo em um só lugar.
                   </p>
                   
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <button 
-                      onClick={() => setIsShareModalOpen(true)} 
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <Link 
+                      to="/agenda?openManual=true"
                       className="w-full sm:w-auto px-10 py-4.5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-md flex items-center justify-center gap-2"
                     >
-                      <Share2 size={16} /> Compartilhar Link
-                    </button>
-                    <a 
-                      href={`/p/${profile?.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full sm:w-auto px-10 py-4.5 bg-brand-parchment border border-brand-mist text-brand-ink rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-2 shadow-sm"
+                      <Plus size={16} /> Adicionar primeiro agendamento
+                    </Link>
+                    <button 
+                      onClick={() => setIsShareModalOpen(true)}
+                      className="text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink transition-colors flex items-center gap-1"
                     >
-                      Ver minha vitrine
-                    </a>
+                      <Share2 size={12} /> Compartilhar página
+                    </button>
                   </div>
                 </div>
               </motion.div>
