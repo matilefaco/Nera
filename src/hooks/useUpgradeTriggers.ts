@@ -15,11 +15,15 @@ export function useUpgradeTriggers(appointments: Appointment[] = []) {
     const currentMonthAppts = appointments.filter(a => {
       const d = new Date(a.date + 'T12:00:00');
       const now = new Date();
+      const isPublic =
+        a.source === 'public' ||
+        (!a.source && (!!a.token || !!a.manageSlug || !!a.reservationCode || !!a.publicToken));
+
       return (
         d.getMonth() === now.getMonth() && 
         d.getFullYear() === now.getFullYear() &&
         ['confirmed', 'completed', 'accepted'].includes(a.status) &&
-        a.source !== 'manual'
+        isPublic
       );
     });
     return currentMonthAppts.length;

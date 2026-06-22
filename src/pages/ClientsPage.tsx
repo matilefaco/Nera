@@ -486,7 +486,9 @@ export default function ClientsPage() {
     if (clients.length === 0) return { threshold20: 0, avgTicket: 0 };
     
     const ltvs = clients.map(c => c.totalSpent).sort((a, b) => b - a);
-    const idx20 = Math.floor(ltvs.length * 0.2);
+    // Para top 20%, precisamos pegar o índice correspondente à quantidade (teto) e subtrair 1
+    // Ex: 5 clientes. top 20% = 1 cliente. Índice [0].
+    const idx20 = Math.max(0, Math.ceil(ltvs.length * 0.2) - 1);
     const threshold20 = ltvs[idx20] || 0;
     
     const totalLTV = ltvs.reduce((acc, val) => acc + val, 0);
@@ -503,18 +505,27 @@ export default function ClientsPage() {
       // Segmentation Logic
       let segment: any = 'new';
       
-      if (c.totalSpent >= segmentationThresholds.threshold20 || c.totalSpent >= (segmentationThresholds.avgTicket * 3)) {
+      const hasBaseForVip = clients.length >= 5;
+      
+      // Regras de segmentação baseadas na lógica de negócio refinada
+      if (hasBaseForVip && c.totalSpent > 0 && c.totalSpent >= segmentationThresholds.threshold20) {
+        // VIP: Pelo menos 5 clientes na base, e faturamento no top 20%. Sem rigidez cega de número de agendamentos.
         segment = 'vip';
-      } else if (daysSince > 60) {
-        segment = 'inactive';
-      } else if (daysSince >= 30) {
-        segment = 'at_risk';
-      } else if (c.confirmedAppointments >= 3) {
+      } else if (c.confirmedAppointments >= 2 && daysSince <= 60) {
+        // FREQUENTE: Recorrência real recente (2+ atendimentos, retorno em até 60 dias)
         segment = 'recurring';
-      } else if (c.confirmedAppointments > 1) {
-        segment = 'active';
-      } else {
+      } else if (c.confirmedAppointments >= 1 && daysSince > 120) {
+        // AUSENTE: Sem retorno há mais de 120 dias
+        // TODO: Num futuro próximo, este threshold deve ser dinâmico por especialidade (ex: Tranças = 90d, Sobrancelhas = 30d)
+        segment = 'inactive';
+      } else if (c.confirmedAppointments >= 1 && daysSince > 60) {
+        // ESFRIANDO: Histórico anterior, sem retorno num período moderado (entre 60 e 120 dias)
+        segment = 'at_risk';
+      } else if (c.confirmedAppointments === 1 && daysSince <= 60) {
+        // NOVA: Apenas 1 atendimento recente
         segment = 'new';
+      } else {
+        segment = 'active';
       }
 
       // We rely on confirmedAppointments for 'appts90' proxy in UI since we don't fetch all appts to filter precisely by 90 days.
@@ -661,13 +672,13 @@ export default function ClientsPage() {
             </div>
 
             {(() => {
-              const atRisk = clients.filter(c => c.confirmedAppointments >= 1 && getDaysSinceLastVisit(c.lastAppointmentDate) >= 30);
+              const atRisk = enrichedClients.filter(c => c.segment === 'at_risk' || c.segment === 'inactive');
               const potentialRev = atRisk.reduce((acc, curr) => acc + ((curr.totalSpent / curr.confirmedAppointments) || 0), 0);
-              const vip = clients.filter(c => c.confirmedAppointments >= 2);
-              const recent = clients.filter(c => c.confirmedAppointments >= 1 && getDaysSinceLastVisit(c.lastAppointmentDate) < 30);
+              const vip = enrichedClients.filter(c => c.segment === 'vip');
+              const recent = enrichedClients.filter(c => c.confirmedAppointments >= 1 && c.daysSince < 30);
               const topOpps = [...atRisk].sort((a,b) => b.totalSpent - a.totalSpent).slice(0, 3);
               
-              const hasEnoughData = clients.filter(c => c.confirmedAppointments >= 1).length >= 3;
+              const hasEnoughData = enrichedClients.filter(c => c.confirmedAppointments >= 1).length >= 3;
               
               if (!hasEnoughData) {
                 return (
@@ -918,27 +929,27 @@ export default function ClientsPage() {
                         <h4 className="font-serif text-lg md:text-xl text-brand-ink truncate">{client.clientName}</h4>
                         
                         {/* Intelligent Tags */}
-                        {client.segment === 'vip' && (
+                        {plan !== 'free' && client.segment === 'vip' && (
                           <div className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold flex items-center gap-1">
                             <Star size={8} className="fill-amber-600" /> VIP
                           </div>
                         )}
-                        {client.segment === 'recurring' && (
+                        {plan !== 'free' && client.segment === 'recurring' && (
                           <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 text-[8px] font-bold">
                             FREQUENTE
                           </div>
                         )}
-                        {client.segment === 'new' && (
+                        {plan !== 'free' && client.segment === 'new' && (
                           <div className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100 text-[8px] font-bold">
                             NOVA
                           </div>
                         )}
-                        {client.segment === 'at_risk' && (
+                        {plan !== 'free' && client.segment === 'at_risk' && (
                           <div className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold">
                             ESFRIANDO
                           </div>
                         )}
-                        {(client.segment === 'inactive' || getDaysSinceLastVisit(client.lastAppointmentDate) >= 30) && (
+                        {plan !== 'free' && client.segment === 'inactive' && (
                           <div className="bg-brand-linen/50 text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold flex items-center gap-1">
                             AUSENTE ({getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS)
                           </div>
@@ -952,7 +963,7 @@ export default function ClientsPage() {
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] md:text-[10px] text-brand-stone font-medium uppercase tracking-widest">
                         <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.confirmedAppointments} atendimentos</span>
                         <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} valor total</span>
-                        {client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
+                        {plan !== 'free' && client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
                         <span className="italic text-brand-stone/60 truncate max-w-[200px]">
                           último atendimento: {client.lastServiceName} ({new Date(client.lastAppointmentDate.length === 10 ? client.lastAppointmentDate + 'T12:00:00' : client.lastAppointmentDate).toLocaleDateString('pt-BR')})
                         </span>

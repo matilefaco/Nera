@@ -1524,6 +1524,8 @@ export default function Dashboard() {
                   <h4 className="text-2xl md:text-3xl font-serif text-brand-ink mb-3 leading-tight italic">Traga sua agenda para a Nera</h4>
                   <p className="text-[13px] text-brand-stone font-light mb-8 leading-relaxed max-w-sm mx-auto">
                     Você já tem clientes marcados? Adicione seus próximos atendimentos para visualizar tudo em um só lugar.
+                    <br/><br/>
+                    <span className="text-[11px] text-brand-stone/70">Você pode registrar seus atendimentos manuais sem consumir o limite de reservas online do plano gratuito.</span>
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

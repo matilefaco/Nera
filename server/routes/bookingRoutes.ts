@@ -680,6 +680,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 
     const finalData: any = {
       ...cleanedData,
+      source: "public",
       status: "pending",
       token: manageSlug,
       publicToken: manageSlug,
@@ -813,7 +814,10 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         let bookingCountOfMonth = 0;
         for (const doc of snapshot.docs) {
           const data = doc.data();
-          if (countingStatuses.includes(data.status) && data.source !== "manual") {
+          const isPublic =
+            data.source === 'public' ||
+            (!data.source && (!!data.token || !!data.manageSlug || !!data.reservationCode || !!data.publicToken));
+          if (countingStatuses.includes(data.status) && isPublic) {
             bookingCountOfMonth++;
           }
         }

@@ -24,7 +24,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <p className="plan-tagline">Para começar, sentir a diferença e nunca mais voltar atrás.</p>
           <ul className="plan-features">
             <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium com foto, bio e serviços</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Até 15 reservas online por mês</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Receba até 15 reservas online/mês pela sua página</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Notificações por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio simples de horários</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Lista de clientes</li>
