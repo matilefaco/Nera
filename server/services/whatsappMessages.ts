@@ -46,23 +46,50 @@ export function buildBookingConfirmedMessageForClient(data: {
   local: string,
   linkManage: string
 }): string {
-  let msg = `✨ Sua reserva foi confirmada!
+  let locationLabel = "No estúdio";
+  let addressText = "";
 
-Serviço: ${data.serviceName}
-Data: ${data.date}
-Horário: ${data.time}
-Profissional: ${data.professionalName}
+  if (data.local) {
+    const localLower = data.local.toLowerCase();
+    const isHome = localLower.includes("domicílio") || localLower.includes("home");
+    
+    if (isHome) {
+      locationLabel = "Em domicílio";
+      let cleanedAddress = data.local.replace(/em domicílio/i, "").replace(/home/i, "").replace(/^[\s:-]+/, "").trim();
+      if (cleanedAddress && cleanedAddress.toLowerCase() !== "estúdio" && cleanedAddress.toLowerCase() !== "estudio") {
+        addressText = `\n\nEndereço informado:\n${cleanedAddress}`;
+      }
+    } else {
+      locationLabel = "No estúdio";
+      let cleanedAddress = data.local.replace(/no estúdio/i, "").replace(/estúdio/i, "").replace(/estudio/i, "").replace(/^[\s:-]+/, "").trim();
+      if (cleanedAddress && cleanedAddress.toLowerCase() !== "estúdio" && cleanedAddress.toLowerCase() !== "estudio") {
+        addressText = `\n\nEndereço:\n${cleanedAddress}`;
+      }
+    }
+  }
 
-Se precisar alterar seu horário, você pode fazer isso por aqui:
-${data.linkManage}
+  const locationSection = `Local de atendimento:\n${locationLabel}${addressText}`;
+
+  let safeManageLink = data.linkManage;
+  if (safeManageLink && safeManageLink.includes("undefined/")) {
+    safeManageLink = safeManageLink.replace("undefined/", "https://usenera.com/");
+  } else if (!safeManageLink) {
+    safeManageLink = "https://usenera.com";
+  }
+
+  return `✨ Sua reserva foi confirmada!
+
+Serviço: ${data.serviceName || "Serviço"}
+Data: ${data.date || "Data a combinar"}
+Horário: ${data.time || "Horário a combinar"}
+Profissional: ${data.professionalName || "Profissional"}
+
+${locationSection}
+
+Se precisar alterar seu horário:
+${safeManageLink}
 
 Te esperamos no horário combinado 💛`;
-
-  if (data.local && data.local !== "Estúdio") {
-    msg += `\nLocal: ${data.local}`;
-  }
-  
-  return msg;
 }
 
 export function buildBookingRejectedMessageForClient(data: {
