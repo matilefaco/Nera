@@ -1,9 +1,16 @@
 process.env.NODE_ENV = "production";
 
+import * as Sentry from "@sentry/google-cloud-serverless";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  tracesSampleRate: 1.0,
+});
+
 const NVIDIA_API_KEY = defineSecret("NVIDIA_API_KEY");
+const SENTRY_DSN = defineSecret("SENTRY_DSN");
 
 /**
  * Universal backend entry point for Firebase Functions v2 / Cloud Run.
@@ -59,10 +66,11 @@ export const api = onRequest(
       "STRIPE_PRICE_ESSENCIAL",
       "STRIPE_PRICE_PRO",
       "STRIPE_PORTAL_CONFIGURATION_ID",
-      "CRON_SECRET"
+      "CRON_SECRET",
+      SENTRY_DSN
     ],
   },
-  async (req: any, res: any) => {
+  Sentry.wrapHttpFunction(async (req: any, res: any) => {
     const isProdEnv = process.env.GCLOUD_PROJECT && process.env.FUNCTIONS_EMULATOR !== "true";
     const isHostProd = req.hostname && req.hostname.includes("usenera.com");
 
@@ -93,7 +101,7 @@ export const api = onRequest(
       });
       res.status(500).send(`Internal Server Error during initialization: ${err.message}`);
     }
-  }
+  })
 );
 
 // NO app.listen() or server.listen() here.

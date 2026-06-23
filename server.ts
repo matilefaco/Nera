@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
+import * as Sentry from "@sentry/google-cloud-serverless";
 import { logger } from "./server/utils/logger.js";
 import { isNonPublicProfile } from "./server/utils/qualityFilter.js";
 import { formatSpecialtyLabel, getServiceLocationCopy } from "./src/lib/copy.js";
@@ -692,6 +693,7 @@ export async function createServerApp() {
   }
 
   // 8. Error Handler
+  Sentry.setupExpressErrorHandler(app);
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     logger.error("SERVER", "Critical Unhandled Error", { requestId: req.requestId, error: err });
     const isProd = process.env.NODE_ENV === "production";

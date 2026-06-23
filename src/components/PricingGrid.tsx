@@ -76,7 +76,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
 
         {/* PRO */}
         <div className="plan-card pro">
-          <div className="plan-badge">{currentPlan === 'pro' ? 'Seu plano atual' : 'Recomendado'}</div>
+          <div className="plan-badge">{currentPlan === 'pro' ? 'Seu plano atual' : 'PARA QUEM QUER CRESCER'}</div>
           <div className="plan-tier">Plano Pro</div>
           <div className="plan-price">R$&nbsp;89</div>
           <div className="plan-period">por mês · agenda, relacionamento e presença num só lugar</div>
@@ -85,7 +85,7 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
             <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial + Notificações WhatsApp</li>
             <li className="plan-feat highlight"><span className="feat-bullet"></span>Receba uma lista pronta de clientes para chamar de volta</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Saiba quanto dinheiro está parado em clientes que não retornaram</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Descubra as melhores ações para sua agenda crescer</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Transforme horários vazios em novas reservas</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Cupons, fidelidade e indicação para atrair mais clientes</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Relatórios mensais de performance</li>

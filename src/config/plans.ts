@@ -67,7 +67,7 @@ export const PLANS: Plan[] = [
       { text: 'Tudo do Essencial + Notificações WhatsApp', isHighlight: true },
       { text: 'Receba uma lista pronta de clientes para chamar de volta', isHighlight: true },
       { text: 'Saiba quanto dinheiro está parado em clientes que não retornaram' },
-      { text: 'Descubra as melhores ações para sua agenda crescer' },
+      { text: 'Transforme horários vazios em novas reservas' },
       { text: 'Lista de espera inteligente' },
       { text: 'Cupons, fidelidade e indicação para atrair mais clientes' },
       { text: 'Relatório mensal de performance em PDF' }
