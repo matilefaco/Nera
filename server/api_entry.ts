@@ -69,10 +69,7 @@ export const api = onRequest(
       "CRON_SECRET",
       SENTRY_DSN,
       "ZAPI_INSTANCE_ID",
-      "ZAPI_INSTANCE_TOKEN",
-      "ZAPI_TOKEN",
-      "ZAPI_CLIENT_TOKEN",
-      "ZAPI_BASE_URL"
+      "ZAPI_INSTANCE_TOKEN"
     ],
   },
   Sentry.wrapHttpFunction(async (req: any, res: any) => {
