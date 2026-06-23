@@ -10,7 +10,7 @@ import {
   buildBookingConfirmedMessageForClient
 } from "./whatsappMessages.js";
 import { sendWhatsApp } from "./whatsappService.js";
-import { logger, maskEmail } from "../utils/logger.js";
+import { logger, maskEmail, maskPhone } from "../utils/logger.js";
 
 // Types
 export interface BookingPendingClientPayload {

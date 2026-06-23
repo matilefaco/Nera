@@ -2,6 +2,9 @@ import { getDb } from "../firebaseAdmin.js";
 import { logger, maskPhone, maskUid } from "../utils/logger.js";
 import { PUBLIC_APP_URL } from "../utils.js";
 import admin from "firebase-admin";
+import { config } from "dotenv";
+
+config();
 
 interface WhatsAppMetadata {
   appointmentId?: string;

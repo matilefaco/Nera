@@ -67,7 +67,12 @@ export const api = onRequest(
       "STRIPE_PRICE_PRO",
       "STRIPE_PORTAL_CONFIGURATION_ID",
       "CRON_SECRET",
-      SENTRY_DSN
+      SENTRY_DSN,
+      "ZAPI_INSTANCE_ID",
+      "ZAPI_INSTANCE_TOKEN",
+      "ZAPI_TOKEN",
+      "ZAPI_CLIENT_TOKEN",
+      "ZAPI_BASE_URL"
     ],
   },
   Sentry.wrapHttpFunction(async (req: any, res: any) => {

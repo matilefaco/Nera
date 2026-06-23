@@ -113,6 +113,17 @@ router.get("/integrations", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/zapi-check", (req: Request, res: Response) => {
+  res.json({
+    hasInstanceId: !!process.env.ZAPI_INSTANCE_ID,
+    hasInstanceToken: !!process.env.ZAPI_INSTANCE_TOKEN,
+    hasZapiToken: !!process.env.ZAPI_TOKEN,
+    env: process.env.NODE_ENV,
+    isCloudRun: !!process.env.K_SERVICE,
+    isFirebaseFunctions: !!process.env.FUNCTION_TARGET
+  });
+});
+
 router.post("/log", express.json(), (req: express.Request, res: express.Response) => {
   logger.error("CRITICAL FRONTEND LOG", req.body);
   res.status(200).json({ ok: true });
