@@ -182,7 +182,9 @@ export const sendBookingConfirmedClientNotification = async (
           serviceName: apptData.serviceName,
           date: formattedDate,
           time: apptData.time,
-          professionalName: pro?.name || "Profissional"
+          professionalName: pro?.name || "Profissional",
+          local: apptData.locationDetail || apptData.neighborhood || 'Estúdio',
+          linkManage: `${baseUrl}/manage/${token || payload.appointmentId}`
         });
         await sendWhatsApp(db, apptData.clientWhatsapp, waMsg, {
           appointmentId: payload.appointmentId,

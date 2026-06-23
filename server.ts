@@ -279,7 +279,7 @@ export async function createServerApp() {
       }
 
       const prof = snapshot.docs[0].data() as any;
-      const imageUrl = prof.shareImage || prof.photoUrl || prof.avatar;
+      const imageUrl = prof.ogImageUrl || prof.avatar || prof.shareImage || prof.photoUrl;
 
       if (!imageUrl || typeof imageUrl !== "string" || !imageUrl.startsWith("http")) {
         return res.redirect(fallback);
@@ -380,7 +380,7 @@ export async function createServerApp() {
       if (slug === 'helena-prado') {
         title = "Helena Prado | Sobrancelhas e Harmonização do Olhar | Nera";
         description = "Especialista em design de sobrancelhas naturais. Com foco em harmonização facial, meu trabalho é realçar sua beleza autêntica.";
-        ogImage = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=400&auto=format&fit=crop";
+        ogImage = "https://i.imgur.com/gBdf3tO.png";
       } else if (!snapshot.empty) {
         const prof = snapshot.docs[0].data() as any;
         
@@ -404,8 +404,8 @@ export async function createServerApp() {
           description = escapeHtml(`${specialty} ${locationPart}Agende seu horário com praticidade na Nera.`);
         }
         
-        let imageUrl = prof.photoUrl || prof.avatar || prof.shareImage;
-        if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("http")) {
+      let imageUrl = prof.ogImageUrl || prof.avatar || prof.shareImage || prof.photoUrl;
+      if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("http")) {
            ogImage = escapeHtml(imageUrl);
         }
       }

@@ -2955,6 +2955,7 @@ router.post(
   async (req: AuthenticatedRequest, res: express.Response) => {
     const db = getDb();
     const { appointmentId } = req.params;
+    const { reason } = req.body;
     const uid = req.uid;
 
     try {
@@ -3092,7 +3093,8 @@ router.post(
             serviceName: result.updatedData.serviceName,
             date: formattedDate,
             time: result.updatedData.time,
-            professionalPageUrl: profileUrl
+            professionalPageUrl: profileUrl,
+            cancellationReason: reason
           });
 
           await sendWhatsApp(db, result.updatedData.clientWhatsapp, waMsg, {

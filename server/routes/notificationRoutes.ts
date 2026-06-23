@@ -122,8 +122,11 @@ import {
   buildBookingConfirmedMessageForClient,
   buildBookingRejectedMessageForClient,
   buildCancellationByProMessageForClient,
+  buildCancellationMessage,
+  buildWaitlistInviteMessage,
   buildRescheduledByProMessageForClient,
-  buildReminderMessage24h
+  buildReminderMessage24h,
+  buildReviewRequestMessage
 } from "../services/whatsappMessages.js";
 import { shouldSendEmail, markEmailSent, sendWhatsAppMeta, PUBLIC_APP_URL } from "../utils.js";
 import { sendProfessionalBookingRescheduledEmail } from '../emails/sendEmail.js';
@@ -624,11 +627,10 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
         if (clientWhatsapp) {
           const formattedDate = date.split('-').reverse().join('/');
           const msg = buildCancellationMessage({
-            clienteNome: clientName,
-            servicoNome: serviceName,
-            data: formattedDate,
-            horario: time,
-            motivoCancelamento: payload.reason
+            serviceName: serviceName,
+            date: formattedDate,
+            time: time,
+            professionalPageUrl: profileUrl || `${baseUrl}/p/${professionalSlug || ''}`
           });
           await sendWhatsApp(db, clientWhatsapp, msg, {
             appointmentId,
@@ -671,13 +673,12 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
       if (clientWhatsapp) {
         const formattedDate = date.split('-').reverse().join('/');
         const msg = buildBookingConfirmedMessageForClient({
-          clienteNome: clientName,
-          servicoNome: serviceName,
-          profissionalNome: proName,
-          data: formattedDate,
-          horario: time,
+          serviceName: serviceName,
+          professionalName: proName,
+          date: formattedDate,
+          time: time,
           local: payload.locationDetail || payload.neighborhood || 'Estúdio',
-          linkManage: `${baseUrl}/manage/${appointmentId}`
+          linkManage: `${baseUrl}/manage/${payload.manageSlug || appointmentId}`
         });
         
         await sendWhatsApp(db, clientWhatsapp, msg, {
@@ -778,7 +779,10 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
             date: newFormatted,
             time,
             serviceName,
-            professionalName: pro?.name || 'Sua Profissional'
+            professionalName: pro?.name || 'Sua Profissional',
+            oldDate: previousDate ? previousDate.split('-').reverse().join('/') : undefined,
+            oldTime: previousTime,
+            manageBookingUrl: `${baseUrl}/manage/${payload.manageSlug || appointmentId}`
           });
           await sendWhatsAppMeta(payload.clientWhatsapp, msg, {
             userId: professionalId,
@@ -802,23 +806,21 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
     }
 
     if (type === 'WAITLIST_INVITATION') {
-      const { clientWhatsapp, clientName, requestedDate, assignedTime, professionalName, serviceName, expiresInHours, bookingId } = payload;
+      const { clientWhatsapp, clientName, requestedDate, assignedTime, professionalName, serviceName, id, professionalSlug } = payload;
       
       if (clientWhatsapp) {
         const formattedDate = requestedDate.split('-').reverse().join('/');
         const msg = buildWaitlistInviteMessage({
-          clienteNome: clientName,
-          profissionalNome: professionalName,
-          data: formattedDate,
-          horario: assignedTime,
-          servicoNome: serviceName || 'serviço',
-          tempoExpira: expiresInHours || 2,
-          linkAgendar: `${baseUrl}/p/${payload.professionalSlug || 'perfil'}?waitlist_invite=true&booking_id=${bookingId}`
+          serviceName: serviceName || 'serviço',
+          date: formattedDate,
+          time: assignedTime,
+          professionalName: professionalName,
+          waitlistInviteUrl: `${baseUrl}/p/${professionalSlug || 'perfil'}?w=${id}`
         });
         
         await sendWhatsAppMeta(clientWhatsapp, msg, {
           userId: payload.professionalId, 
-          appointmentId: bookingId,
+          appointmentId: id,
           clientName,
           clientWhatsapp,
           type: 'waitlist_invitation'
@@ -934,7 +936,8 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
         const msg = buildReminderMessage24h({
           serviceName: appt.serviceName,
           time: appt.time,
-          professionalName: pro?.name || 'Profissional'
+          professionalName: pro?.name || 'Profissional',
+          manageBookingUrl: `${appUrl}/manage/${appt.manageSlug || apptId}`
         });
 
         const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {
@@ -969,6 +972,9 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
 });
 
 router.get('/cron/reminders2h', requireCronSecret, async (req, res) => {
+  // Desabilitado temporariamente por decisão de produto (evitar spam/mensagem invasiva)
+  return res.json({ success: true, sent: 0, message: "Lembrete 2h desabilitado temporariamente" });
+
   const db = getDb();
 
   try {

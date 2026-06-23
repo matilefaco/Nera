@@ -24,16 +24,27 @@ export function buildBookingConfirmedMessageForClient(data: {
   serviceName: string, 
   date: string, 
   time: string, 
-  professionalName: string 
+  professionalName: string,
+  local: string,
+  linkManage: string
 }): string {
-  return `✨ Sua reserva foi confirmada!
+  let msg = `✨ Sua reserva foi confirmada!
 
 Serviço: ${data.serviceName}
 Data: ${data.date}
 Horário: ${data.time}
 Profissional: ${data.professionalName}
 
-Te esperamos no horário combinado 💛`.trim();
+Se precisar alterar seu horário, você pode fazer isso por aqui:
+${data.linkManage}
+
+Te esperamos no horário combinado 💛`;
+
+  if (data.local && data.local !== "Estúdio") {
+    msg += `\nLocal: ${data.local}`;
+  }
+  
+  return msg;
 }
 
 export function buildBookingRejectedMessageForClient(data: {
@@ -43,14 +54,7 @@ export function buildBookingRejectedMessageForClient(data: {
   time: string,
   professionalPageUrl: string
 }): string {
-  return `Oi, ${data.clientName}. Sua solicitação de reserva não pôde ser confirmada desta vez.
-
-Serviço: ${data.serviceName}
-Data: ${data.date}
-Horário: ${data.time}
-
-Você pode escolher outro horário pela página da profissional:
-${data.professionalPageUrl}`.trim();
+  return `Oi, ${data.clientName}.\n\nInfelizmente sua solicitação de reserva não pôde ser confirmada desta vez.\n\nServiço: ${data.serviceName}\nData: ${data.date}\nHorário: ${data.time}\n\nVocê pode escolher outro horário por aqui:\n${data.professionalPageUrl}`.trim();
 }
 
 export function buildCancellationByProMessageForClient(data: { 
@@ -58,16 +62,55 @@ export function buildCancellationByProMessageForClient(data: {
   serviceName: string, 
   date: string, 
   time: string, 
-  professionalPageUrl: string 
+  professionalPageUrl: string,
+  cancellationReason?: string
 }): string {
-  return `Oi, ${data.clientName}. Sua reserva precisou ser cancelada pela profissional.
+  let msg = `Oi, ${data.clientName}.\n\nInfelizmente sua reserva precisou ser cancelada pela profissional.\n\nServiço: ${data.serviceName}\nData: ${data.date}\nHorário: ${data.time}\n`;
+  if (data.cancellationReason) {
+    msg += `\n${data.cancellationReason}\n\n`;
+  } else {
+    msg += `\n`;
+  }
+  msg += `Você pode escolher outro horário por aqui:\n${data.professionalPageUrl}`;
+  return msg.trim();
+}
+
+export function buildCancellationMessage(data: {
+  serviceName: string,
+  date: string,
+  time: string,
+  professionalPageUrl: string
+}): string {
+  return `Seu horário foi cancelado com sucesso.
 
 Serviço: ${data.serviceName}
 Data: ${data.date}
 Horário: ${data.time}
 
-Você pode escolher outro horário aqui:
+Se quiser agendar novamente, sua profissional continua disponível por aqui:
 ${data.professionalPageUrl}`.trim();
+}
+
+export function buildWaitlistInviteMessage(data: {
+  serviceName: string,
+  date: string,
+  time: string,
+  professionalName: string,
+  waitlistInviteUrl: string
+}): string {
+  return `Boa notícia ✨
+
+Abriu uma vaga para o horário que você queria.
+
+Serviço: ${data.serviceName}
+Data: ${data.date}
+Horário: ${data.time}
+Profissional: ${data.professionalName}
+
+Essa vaga fica reservada por alguns minutos.
+
+Confirme por aqui:
+${data.waitlistInviteUrl}`.trim();
 }
 
 export function buildRescheduledByProMessageForClient(data: {
@@ -75,31 +118,38 @@ export function buildRescheduledByProMessageForClient(data: {
   date: string,
   time: string,
   serviceName: string,
-  professionalName: string
+  professionalName: string,
+  oldDate?: string,
+  oldTime?: string,
+  manageBookingUrl: string
 }): string {
-  return `Oi, ${data.clientName}. Sua reserva foi reagendada.
+  let msg = `✨ Seu horário foi atualizado\n\nServiço: ${data.serviceName}\n\n`;
+  if (data.oldDate && data.oldTime) {
+    msg += `De:\n${data.oldDate} às ${data.oldTime}\n\nPara:\n${data.date} às ${data.time}\n\n`;
+  } else {
+    msg += `Novo horário:\n${data.date} às ${data.time}\n\n`;
+  }
 
-Novo horário:
-${data.date} às ${data.time}
-
-Serviço: ${data.serviceName}
-Profissional: ${data.professionalName}
-
-Confira os detalhes no seu e-mail.`.trim();
+  msg += `Profissional: ${data.professionalName}\n\nSe precisar fazer uma nova alteração:\n${data.manageBookingUrl}`;
+  return msg.trim();
 }
 
 export function buildReminderMessage24h(data: { 
   serviceName: string, 
   time: string, 
-  professionalName: string
+  professionalName: string,
+  manageBookingUrl: string
 }): string {
-  return `✨ Lembrete da sua reserva amanhã
+  return `✨ Passando para lembrar do seu atendimento amanhã
 
 Serviço: ${data.serviceName}
 Horário: ${data.time}
 Profissional: ${data.professionalName}
 
-Até lá 💛`.trim();
+Se precisar alterar seu horário:
+${data.manageBookingUrl}
+
+Até amanhã 💛`.trim();
 }
 
 export function buildReviewRequestMessage(data: { 

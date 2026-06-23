@@ -110,7 +110,7 @@ export default function PublicProfile() {
 function PublicProfileContent() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
-  const waitlistToken = searchParams.get("w");
+  const waitlistToken = searchParams.get("w") || (searchParams.get("waitlist_invite") === "true" ? searchParams.get("booking_id") : null);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [services, setServices] = useState<Service[]>([]);
