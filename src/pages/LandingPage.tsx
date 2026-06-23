@@ -177,7 +177,7 @@ export default function LandingPage() {
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
             </div>
             <h3 className="feat-title">Agenda inteligente</h3>
-            <p className="feat-desc">Sua cliente agenda pelo seu link, 24h por dia. Sem vai-e-vem, sem erro humano. Você define os horários, a nera faz o resto.</p>
+            <p className="feat-desc">Receba reservas online ou registre seus horários atuais manualmente. Você não perde nem o que já está na agenda de papel, nem o que vem da internet.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon">
@@ -198,14 +198,14 @@ export default function LandingPage() {
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
             <h3 className="feat-title">Relatório financeiro</h3>
-            <p className="feat-desc">Saiba exatamente quanto entrou, quanto escapou em faltas e para onde crescer. Sem planilha, sem susto no fim do mês.</p>
+            <p className="feat-desc">Descubra quanto você realmente está ganhando e pare de trabalhar sem entender o resultado no fim do mês.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon">
               <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
             </div>
             <h3 className="feat-title">Histórico de clientes</h3>
-            <p className="feat-desc">Quem atendeu, quando, o quê. Fidelize com contexto — e nunca mais esqueça quem é quem.</p>
+            <p className="feat-desc">Nunca mais esqueça quem atendeu, o que foi feito ou quanto gastou. Fidelize com informações reais guardadas para você.</p>
           </div>
           <div className="feat-card">
             <div className="feat-icon">
@@ -247,35 +247,35 @@ export default function LandingPage() {
       {/* VALUE PROOF */}
       <section id="proof">
         <div className="wrap">
-          <span className="label proof-eyebrow reveal">Presença que explica valor</span>
+          <span className="label proof-eyebrow reveal">Não precisa começar do zero</span>
           <h2 className="proof-h2 reveal">
-            O que sua cliente entende<br/>
-            <em>antes de te chamar.</em>
+            Já atende pelo<br/>
+            <em>WhatsApp?</em>
           </h2>
           <p className="proof-intro reveal">
-            Sua vitrine não é só bonita. Ela organiza a primeira impressão: mostra seu trabalho, explica seus serviços e transforma interesse em agendamento.
+            Você não precisa abandonar seu jeito atual de trabalhar. Centralize tudo na Nera e mantenha sua agenda, suas clientes e seu histórico financeiro organizados desde o primeiro dia.
           </p>
           <div className="proof-grid reveal">
             <div className="proof-card">
               <div className="proof-icon">
                 <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
               </div>
-              <h3 className="proof-title">Ela vê seu trabalho</h3>
-              <p className="proof-desc">Portfólio, especialidade e identidade visual em um link com cara de marca.</p>
+              <h3 className="proof-title">Registre horários já marcados</h3>
+              <p className="proof-desc">Continue atendendo normalmente. Adicione seus horários atuais e mantenha tudo organizado.</p>
             </div>
             <div className="proof-card">
               <div className="proof-icon">
                 <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
               </div>
-              <h3 className="proof-title">Ela entende como agendar</h3>
-              <p className="proof-desc">Serviços, horários e informações essenciais sem troca infinita de mensagens.</p>
+              <h3 className="proof-title">Construa seu histórico</h3>
+              <p className="proof-desc">Clientes, serviços e faturamento organizados desde o primeiro dia.</p>
             </div>
             <div className="proof-card">
               <div className="proof-icon">
                 <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
               </div>
-              <h3 className="proof-title">Ela chega mais segura</h3>
-              <p className="proof-desc">Tudo fica claro antes do atendimento — e você atende com menos ruído.</p>
+              <h3 className="proof-title">Cresça no seu ritmo</h3>
+              <p className="proof-desc">Quando novas clientes chegarem pela sua página, tudo já estará no mesmo lugar.</p>
             </div>
           </div>
         </div>

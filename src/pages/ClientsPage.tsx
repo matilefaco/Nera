@@ -886,15 +886,15 @@ export default function ClientsPage() {
                </div>
                <div>
                   <h3 className="text-sm font-bold text-brand-ink uppercase tracking-widest flex items-center gap-2 mb-1">
-                    Inteligência de Clientes Pro
+                    {plan === 'free' ? 'Inteligência e Segmentação' : 'Inteligência de Clientes'}
                     <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest bg-brand-mist/30 px-2 py-0.5 rounded-sm">
-                      Pro
+                      Premium
                     </span>
                   </h3>
                   <p className="text-xs text-brand-stone leading-relaxed">
                     {plan === 'free'
-                      ? "Descubra quem pode voltar, quem está sumindo e oportunidades de aumentar seu faturamento."
-                      : "Veja clientes em risco de não voltar, oportunidades de retorno e estimativas de receita recuperável."}
+                      ? "Organize e segmente sua carteira para descobrir quem são suas melhores clientes e quem você precisa chamar de volta."
+                      : "Receba uma lista pronta de clientes para chamar de volta e descubra onde existe faturamento parado."}
                   </p>
                </div>
             </div>

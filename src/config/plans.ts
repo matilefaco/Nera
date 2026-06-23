@@ -26,10 +26,11 @@ export const PLANS: Plan[] = [
     priceDescriptor: '/mês',
     subtitle: 'Plano gratuito para começar com teste sem risco.',
     trialDays: 0,
-    tagline: 'Ideal para começar',
+    tagline: 'Para começar, organizar sua agenda e sentir a diferença.',
     features: [
+      { text: 'Agendamentos manuais ilimitados', isHighlight: true },
       { text: 'Perfil digital premium (foto, bio e serviços)' },
-      { text: 'Receba até 15 reservas online/mês pela sua página' },
+      { text: 'Até 15 reservas online por mês' },
       { text: 'Aprovação manual (seu filtro)' },
       { text: 'Link direto para bio' }
     ],
@@ -42,13 +43,14 @@ export const PLANS: Plan[] = [
     priceDescriptor: '/mês',
     subtitle: 'Sua vitrine impecável e agenda sob controle.',
     trialDays: 15,
-    tagline: 'Presença e Controle',
+    tagline: 'Para quem já atende com frequência e quer entender melhor suas clientes.',
     features: [
-      { text: 'Agenda digital com agendamentos ilimitados' },
-      { text: 'Vitrine pública premium com seus serviços' },
-      { text: 'Experiência profissional por e-mail' },
+      { text: 'Agendamentos online ilimitados' },
+      { text: 'Saiba exatamente quem são suas melhores clientes', isHighlight: true },
+      { text: 'Entenda quem voltou, quem sumiu e quem mais compra', isHighlight: true },
+      { text: 'Nunca mais esqueça quem atendeu e o que fez' },
       { text: 'Confirmações e lembretes por e-mail' },
-      { text: 'Gestão de clientes e histórico de atendimentos' }
+      { text: 'Gestão organizada de clientes' }
     ],
     cta: 'Testar Essencial por 15 dias'
   },
@@ -60,15 +62,15 @@ export const PLANS: Plan[] = [
     subtitle: 'Recursos avançados para crescer e recuperar oportunidades.',
     trialDays: 0,
     popular: true,
-    tagline: 'Crescimento e Autoridade',
+    tagline: 'Para quem já está no ritmo e quer fazer clientes voltarem, preencher horários e crescer.',
     features: [
       { text: 'Tudo do Essencial + Notificações WhatsApp', isHighlight: true },
-      { text: 'Lista de espera para recuperar horários' },
-      { text: 'Cupons de desconto para fidelização' },
-      { text: 'Relatório mensal de performance em PDF' },
-      { text: 'Badge Pro na vitrine' },
-      { text: 'Link de indicação premiado' },
-      { text: 'Suporte prioritário' }
+      { text: 'Receba uma lista pronta de clientes para chamar de volta', isHighlight: true },
+      { text: 'Saiba quanto dinheiro está parado em clientes que não retornaram' },
+      { text: 'Descubra as melhores ações para sua agenda crescer' },
+      { text: 'Lista de espera inteligente' },
+      { text: 'Cupons, fidelidade e indicação para atrair mais clientes' },
+      { text: 'Relatório mensal de performance em PDF' }
     ],
     cta: 'Começar como Pro'
   }

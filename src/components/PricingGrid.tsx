@@ -21,14 +21,14 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <div className="plan-tier">Gratuito</div>
           <div className="plan-price">R$&nbsp;0</div>
           <div className="plan-period">para sempre</div>
-          <p className="plan-tagline">Para começar, sentir a diferença e nunca mais voltar atrás.</p>
+          <p className="plan-tagline">Para começar, organizar sua agenda e sentir a diferença.</p>
           <ul className="plan-features">
+            <li className="plan-feat highlight"><span className="feat-bullet"></span>Agendamentos manuais ilimitados</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Perfil digital premium com foto, bio e serviços</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Receba até 15 reservas online/mês pela sua página</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Até 15 reservas online por mês</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Notificações por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Bloqueio simples de horários</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Lista de clientes</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Link direto para bio</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Lista rápida de clientes</li>
           </ul>
           {isLanding ? (
             <Link to="/register" className="btn-plan outline">Criar conta grátis</Link>
@@ -46,17 +46,19 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
           <div className="plan-price">R$&nbsp;49</div>
           <div className="plan-period">por mês · cancele quando quiser</div>
           <p className="plan-tagline" style={{ borderBottomColor: 'rgba(255,255,255,0.08)', paddingBottom: '16px', marginBottom: '16px' }}>
-            Para quem já atende com frequência e quer parar de improvisar.
+            Para quem já atende com frequência e quer entender melhor suas clientes.
             <span style={{ display: 'block', marginTop: '6px', fontSize: '13px', opacity: 0.8, fontWeight: 400 }}>
               15 dias de teste grátis com cartão
             </span>
           </p>
           <ul className="plan-features">
-            <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos ilimitados</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Experiência profissional por e-mail</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Confirmações e lembretes automáticos por e-mail</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Agendamentos online ilimitados</li>
+            <li className="plan-feat highlight"><span className="feat-bullet"></span>Saiba exatamente quem são suas melhores clientes</li>
+            <li className="plan-feat highlight"><span className="feat-bullet"></span>Entenda quem voltou, quem sumiu e quem mais compra</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Nunca mais esqueça quem atendeu e o que fez</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Confirmações automáticas por e-mail</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Bloqueios recorrentes e avançados</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Filtros e exportação de clientes em CSV</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Exportação de clientes em CSV</li>
           </ul>
           {isLanding ? (
             <Link to="/register?plan=essencial" className="btn-plan white-solid">Ativar teste gratuito</Link>
@@ -74,19 +76,19 @@ export default function PricingGrid({ currentPlan, onUpgrade, onManageSubscripti
 
         {/* PRO */}
         <div className="plan-card pro">
-          <div className="plan-badge">{currentPlan === 'pro' ? 'Seu plano atual' : 'Para quem já está no ritmo e quer o melhor'}</div>
+          <div className="plan-badge">{currentPlan === 'pro' ? 'Seu plano atual' : 'Recomendado'}</div>
           <div className="plan-tier">Plano Pro</div>
           <div className="plan-price">R$&nbsp;89</div>
           <div className="plan-period">por mês · agenda, relacionamento e presença num só lugar</div>
-          <p className="plan-tagline">&nbsp;</p>
+          <p className="plan-tagline">Para quem já está no ritmo e quer fazer clientes voltarem, preencher horários e crescer.</p>
           <ul className="plan-features">
             <li className="plan-feat highlight"><span className="feat-bullet"></span>Tudo do Essencial + Notificações WhatsApp</li>
-            <li className="plan-feat highlight"><span className="feat-bullet"></span>CRM inteligente com oportunidades de retorno</li>
+            <li className="plan-feat highlight"><span className="feat-bullet"></span>Receba uma lista pronta de clientes para chamar de volta</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Saiba quanto dinheiro está parado em clientes que não retornaram</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Descubra as melhores ações para sua agenda crescer</li>
             <li className="plan-feat"><span className="feat-bullet"></span>Lista de espera inteligente</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Relatórios de performance</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Cupons de desconto e fidelidade</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Link de indicação premiado</li>
-            <li className="plan-feat"><span className="feat-bullet"></span>Suporte prioritário</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Cupons, fidelidade e indicação para atrair mais clientes</li>
+            <li className="plan-feat"><span className="feat-bullet"></span>Relatórios mensais de performance</li>
           </ul>
           {isLanding ? (
             <Link to="/register?plan=pro" className="btn-plan terra-solid">Começar como Pro</Link>
