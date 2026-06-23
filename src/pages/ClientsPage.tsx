@@ -162,6 +162,7 @@ export default function ClientsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [isMigrating, setIsMigrating] = useState(false);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
+  const [isIntelligenceExpanded, setIsIntelligenceExpanded] = useState(false);
 
 
 
@@ -663,104 +664,162 @@ export default function ClientsPage() {
           </div>
         </div>
 
-        {/* CRM Inteligente (Pro) - Only Full Dashboard Here */}
-        {isProPlan() && (
-          <div className="mb-10">
-            <div className="flex items-center gap-2 mb-4 px-2">
-              <Zap size={14} className="text-brand-terracotta" />
-              <h2 className="text-sm font-bold text-brand-ink uppercase tracking-widest">Inteligência de Clientes</h2>
-            </div>
-
-            {(() => {
-              const atRisk = enrichedClients.filter(c => c.segment === 'at_risk' || c.segment === 'inactive');
-              const potentialRev = atRisk.reduce((acc, curr) => acc + ((curr.totalSpent / curr.confirmedAppointments) || 0), 0);
-              const vip = enrichedClients.filter(c => c.segment === 'vip');
-              const recent = enrichedClients.filter(c => c.confirmedAppointments >= 1 && c.daysSince < 30);
-              const topOpps = [...atRisk].sort((a,b) => b.totalSpent - a.totalSpent).slice(0, 3);
-              
-              const hasEnoughData = enrichedClients.filter(c => c.confirmedAppointments >= 1).length >= 3;
-              
-              if (!hasEnoughData) {
-                return (
-                  <div className="rounded-[24px] border border-dashed border-brand-mist/80 bg-brand-white/50 p-10 text-center flex flex-col items-center justify-center">
-                    <div className="w-12 h-12 bg-brand-linen rounded-full flex items-center justify-center mb-4 text-brand-terracotta">
-                      <TrendingUp size={20} />
-                    </div>
-                    <p className="text-brand-ink font-bold mb-2">Construindo sua inteligência</p>
-                    <p className="text-brand-stone text-sm max-w-sm">
-                      Continue atendendo clientes pela Nera. Assim que houver histórico suficiente, seus insights de retorno aparecerão aqui.
-                    </p>
-                  </div>
-                );
-              }
-
+        {/* Inteligência de Clientes - Compact & Expandable */}
+        <div className="mb-8">
+          {isProPlan() ? (() => {
+            const atRisk = enrichedClients.filter(c => c.segment === 'at_risk' || c.segment === 'inactive');
+            const potentialRev = atRisk.reduce((acc, curr) => acc + ((curr.totalSpent / curr.confirmedAppointments) || 0), 0);
+            const vip = enrichedClients.filter(c => c.segment === 'vip');
+            const recent = enrichedClients.filter(c => c.confirmedAppointments >= 1 && c.daysSince < 30);
+            const topOpps = [...atRisk].sort((a,b) => b.totalSpent - a.totalSpent).slice(0, 3);
+            
+            const hasEnoughData = enrichedClients.filter(c => c.confirmedAppointments >= 1).length >= 3;
+            
+            if (!hasEnoughData) {
               return (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="col-span-1 md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="bg-[#FFF4F0]/60 p-5 rounded-[20px] border border-brand-terracotta/10 flex flex-col justify-between">
-                      <p className="text-[9px] font-bold text-brand-terracotta uppercase tracking-widest mb-3">Oportunidade de Retorno</p>
-                      <div>
-                        <p className="text-3xl font-serif text-brand-ink leading-none mb-1">{formatCurrency(potentialRev)}</p>
-                        <p className="text-[10px] text-brand-stone font-light">Até este valor pode ser recuperado se as {atRisk.length} clientes em risco voltarem.</p>
-                      </div>
+                <div className="p-4 rounded-[20px] border border-dashed border-brand-mist/80 bg-brand-white/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-brand-linen rounded-full hidden sm:flex items-center justify-center shrink-0">
+                       <TrendingUp size={16} className="text-brand-terracotta" />
                     </div>
-                    
-                    <div className="grid grid-rows-2 gap-4">
-                      <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between">
-                        <div>
-                          <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Clientes VIP</p>
-                          <p className="text-xl font-serif text-brand-ink leading-none">{vip.length}</p>
-                        </div>
-                        <div className="w-10 h-10 rounded-full bg-brand-ink/5 flex items-center justify-center">
-                          <Star size={16} className="text-brand-ink" />
-                        </div>
-                      </div>
-                      <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between">
-                        <div>
-                          <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Voltas Recentes</p>
-                          <p className="text-xl font-serif text-green-600 leading-none">{recent.length}</p>
-                        </div>
-                        <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
-                          <TrendingUp size={16} className="text-green-600" />
-                        </div>
-                      </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-brand-ink mb-1">Em breve você verá oportunidades de crescimento aqui</h3>
+                      <p className="text-xs text-brand-stone leading-relaxed">
+                        Continue registrando atendimentos pela Nera. Quando houver histórico suficiente, você começará a descobrir quais clientes podem voltar, onde existe faturamento parado e quais horários podem virar novas reservas.
+                      </p>
                     </div>
-                  </div>
-
-                  <div className="bg-brand-ink text-white p-5 rounded-[20px] flex flex-col">
-                    <p className="text-[9px] font-bold text-white/60 uppercase tracking-widest mb-4">Ações Sugeridas</p>
-                    {topOpps.length > 0 ? (
-                      <div className="flex flex-col gap-3 flex-1">
-                        {topOpps.map(opp => {
-                          const avgTicket = opp.totalSpent / Math.max(1, opp.confirmedAppointments);
-                          return (
-                            <div key={opp.id} className="bg-white/10 p-3 rounded-[12px] flex flex-col gap-1.5">
-                              <div className="flex justify-between items-center">
-                                <span className="text-sm font-bold truncate max-w-[120px]">{opp.clientName}</span>
-                                <span className="text-[10px] text-brand-terracotta font-bold">{formatCurrency(avgTicket)}</span>
-                              </div>
-                              <div className="flex justify-between items-end">
-                                <span className="text-[9px] text-white/50 leading-tight">Última vez há {getDaysSinceLastVisit(opp.lastAppointmentDate)} dias</span>
-                                <span className="text-[8px] uppercase tracking-widest text-white/80 bg-white/10 px-2 py-0.5 rounded border border-white/10">Chamar p/ retorno</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="flex-1 flex items-center justify-center text-center">
-                         <span className="text-sm font-light text-white/50">Você não tem clientes em risco no momento. Ótimo trabalho!</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
-            })()}
-          </div>
-        )}
+            }
+
+            return (
+              <div className="flex flex-col gap-4">
+                {/* Compact Card */}
+                <div 
+                  className="p-4 rounded-[20px] border border-brand-terracotta/20 bg-[#FFF4F0]/40 flex flex-col sm:flex-row items-center justify-between gap-4 cursor-pointer hover:bg-[#FFF4F0]/60 transition-colors shadow-sm"
+                  onClick={() => setIsIntelligenceExpanded(!isIntelligenceExpanded)}
+                >
+                  <div className="flex items-center gap-4">
+                     <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shrink-0 border border-brand-terracotta/10 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]">
+                        <Zap size={16} className="text-brand-terracotta" />
+                     </div>
+                     <div>
+                        <h3 className="text-sm font-bold text-brand-ink uppercase tracking-widest flex items-center gap-2 mb-1">
+                          Inteligência de Clientes
+                        </h3>
+                        <p className="text-xs text-brand-stone leading-relaxed">
+                          <span className="font-bold text-brand-terracotta">{atRisk.length} clientes</span> para chamar de volta • <span className="font-bold text-brand-terracotta">{formatCurrency(potentialRev)}</span> em faturamento parado
+                        </p>
+                     </div>
+                  </div>
+                  <button className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest px-4 py-2 bg-white rounded-full border border-brand-terracotta/20 hover:bg-brand-terracotta hover:text-white transition-colors shrink-0">
+                    {isIntelligenceExpanded ? 'Fechar análise' : 'Ver oportunidades'}
+                  </button>
+                </div>
+
+                {/* Expanded View */}
+                {isIntelligenceExpanded && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-hidden"
+                  >
+                    <div className="col-span-1 md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="bg-[#FFF4F0]/60 p-5 rounded-[20px] border border-brand-terracotta/10 flex flex-col justify-between">
+                        <p className="text-[9px] font-bold text-brand-terracotta uppercase tracking-widest mb-3">Faturamento Parado</p>
+                        <div>
+                          <p className="text-3xl font-serif text-brand-ink leading-none mb-1">{formatCurrency(potentialRev)}</p>
+                          <p className="text-[10px] text-brand-stone font-light">Até este valor pode ser recuperado se as {atRisk.length} clientes em risco voltarem.</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-rows-2 gap-4">
+                        <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between shadow-[0_2px_12px_-4px_rgba(0,0,0,0.02)]">
+                          <div>
+                            <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Clientes VIP</p>
+                            <p className="text-xl font-serif text-brand-ink leading-none">{vip.length}</p>
+                          </div>
+                          <div className="w-10 h-10 rounded-full bg-brand-ink/5 flex items-center justify-center">
+                            <Star size={16} className="text-brand-ink" />
+                          </div>
+                        </div>
+                        <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between shadow-[0_2px_12px_-4px_rgba(0,0,0,0.02)]">
+                          <div>
+                            <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Voltas Recentes</p>
+                            <p className="text-xl font-serif text-green-600 leading-none">{recent.length}</p>
+                          </div>
+                          <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
+                            <TrendingUp size={16} className="text-green-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-brand-ink text-white p-5 rounded-[20px] flex flex-col shadow-md">
+                      <p className="text-[9px] font-bold text-white/60 uppercase tracking-widest mb-4">Clientes para chamar de volta</p>
+                      {topOpps.length > 0 ? (
+                        <div className="flex flex-col gap-3 flex-1">
+                          {topOpps.map(opp => {
+                            const avgTicket = opp.totalSpent / Math.max(1, opp.confirmedAppointments);
+                            return (
+                              <div key={opp.id} className="bg-white/10 p-3 rounded-[12px] flex flex-col gap-1.5 border border-white/5 hover:bg-white/20 transition-colors">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm font-bold truncate max-w-[120px]">{opp.clientName}</span>
+                                  <span className="text-[10px] text-brand-terracotta font-bold">{formatCurrency(avgTicket)}</span>
+                                </div>
+                                <div className="flex justify-between items-end">
+                                  <span className="text-[9px] text-white/50 leading-tight">Última vez há {getDaysSinceLastVisit(opp.lastAppointmentDate)} dias</span>
+                                  <span className="text-[8px] uppercase tracking-widest text-brand-terracotta bg-brand-terracotta/10 px-2 py-0.5 rounded border border-brand-terracotta/20">Oportunidade</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center text-center">
+                           <span className="text-sm font-light text-white/50">Você não tem clientes em risco no momento. Ótimo trabalho!</span>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            );
+          })() : (
+            <div className="p-4 rounded-[20px] border border-brand-mist/60 bg-brand-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.02)]">
+              <div className="flex items-center gap-4">
+                 <div className="w-10 h-10 bg-brand-linen rounded-full hidden sm:flex items-center justify-center shrink-0">
+                    {plan === 'free' ? <Users size={16} className="text-brand-terracotta" /> : <Zap size={16} className="text-brand-terracotta" />}
+                 </div>
+                 <div>
+                    <h3 className="text-sm font-bold text-brand-ink uppercase tracking-widest flex items-center gap-2 mb-1">
+                      {plan === 'free' ? 'Organize sua lista de clientes' : 'Segmentação de Clientes'}
+                    </h3>
+                    <p className="text-xs text-brand-stone leading-relaxed">
+                      {plan === 'free'
+                        ? "Nos planos pagos, a Nera ajuda você a entender quem voltou, quem sumiu e quem mais movimenta seu faturamento."
+                        : "Veja quem são suas melhores clientes, quem voltou, quem sumiu e quem mais compra."}
+                    </p>
+                 </div>
+              </div>
+              {plan === 'free' ? (
+                <PremiumButton onClick={() => checkFeatureAccess('crm')} className="w-full sm:w-auto px-6 py-2.5 text-[10px] whitespace-nowrap shrink-0">
+                   Conhecer planos →
+                </PremiumButton>
+              ) : (
+                <button onClick={() => {
+                   document.getElementById('clients-filters-section')?.scrollIntoView({ behavior: 'smooth' });
+                }} className="w-full sm:w-auto px-6 py-2.5 text-[10px] font-bold text-brand-terracotta uppercase tracking-widest border border-brand-terracotta/20 rounded-full hover:bg-brand-terracotta/5 transition-colors shrink-0">
+                   Usar filtros →
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Search & Advanced Filters */}
-        <div className="space-y-6 mb-10">
+        <div id="clients-filters-section" className="space-y-6 mb-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-brand-mist" size={20} />
@@ -876,33 +935,6 @@ export default function ClientsPage() {
             </div>
           </div>
         </div>
-
-        {/* CRM Inteligente (Pro) - Compact Banner for Free/Essential */}
-        {!isProPlan() && (
-          <div className="mb-8 p-4 rounded-2xl border border-brand-mist/60 bg-brand-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.02)]">
-            <div className="flex items-center gap-4">
-               <div className="w-10 h-10 bg-brand-linen rounded-full hidden sm:flex items-center justify-center shrink-0">
-                  <Zap size={16} className="text-brand-terracotta" />
-               </div>
-               <div>
-                  <h3 className="text-sm font-bold text-brand-ink uppercase tracking-widest flex items-center gap-2 mb-1">
-                    {plan === 'free' ? 'Inteligência e Segmentação' : 'Inteligência de Clientes'}
-                    <span className="text-[8px] font-bold text-brand-stone uppercase tracking-widest bg-brand-mist/30 px-2 py-0.5 rounded-sm">
-                      Premium
-                    </span>
-                  </h3>
-                  <p className="text-xs text-brand-stone leading-relaxed">
-                    {plan === 'free'
-                      ? "Organize e segmente sua carteira para descobrir quem são suas melhores clientes e quem você precisa chamar de volta."
-                      : "Receba uma lista pronta de clientes para chamar de volta e descubra onde existe faturamento parado."}
-                  </p>
-               </div>
-            </div>
-            <PremiumButton onClick={() => checkFeatureAccess('crm')} className="w-full sm:w-auto px-6 py-2.5 text-[10px] whitespace-nowrap shrink-0">
-               {plan === 'free' ? "Conhecer Plano Pro →" : "Fazer Upgrade →"}
-            </PremiumButton>
-          </div>
-        )}
 
         {/* Clients List */}
         <div className="space-y-4">
