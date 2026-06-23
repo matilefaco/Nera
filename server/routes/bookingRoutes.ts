@@ -1406,9 +1406,11 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           const isHomeService =
             finalData.locationType === "home" ||
             finalData.locationType === "domicilio";
-          let locationDetail = "No Estúdio";
+          let locationDetail = "Estúdio";
           if (isHomeService) {
-            locationDetail = `${finalData.neighborhood || "Bairro omitido"}, ${proData?.city || "Cidade omitida"}`;
+            locationDetail = `Em domicílio - ${finalData.neighborhood || "Bairro omitido"}, ${proData?.city || "Cidade omitida"}`;
+          } else if (proData?.address && proData.address.trim() !== "") {
+            locationDetail = `Estúdio - ${proData.address}`;
           }
 
           const displayServiceName =

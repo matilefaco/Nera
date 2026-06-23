@@ -9,15 +9,33 @@ export function buildNewBookingMessageForPro(data: {
   local: string, 
   linkManage: string 
 }): string {
+  let locationLabel = "No estúdio";
+  if (data.local && data.local !== "Estúdio" && data.local.trim() !== "") {
+    if (data.local.toLowerCase().includes("domicílio") || data.local.toLowerCase().includes("home")) {
+      locationLabel = `Em domicílio\nEndereço: ${data.local.replace(/em domicílio/i, "").replace(/home/i, "").replace(/^[:-]\s*/, "").trim()}`;
+    } else {
+      locationLabel = `No estúdio\nEndereço: ${data.local.replace(/estúdio/i, "").replace(/estudio/i, "").replace(/^[:-]\s*/, "").trim()}`;
+    }
+  }
+
+  // Fallback if linkManage somehow contains "undefined"
+  let safeLinkManage = data.linkManage;
+  if (safeLinkManage && safeLinkManage.includes("undefined/")) {
+    safeLinkManage = safeLinkManage.replace("undefined/", "https://usenera.com/");
+  } else if (!safeLinkManage) {
+    safeLinkManage = "https://usenera.com/pedidos";
+  }
+
   return `Nova solicitação de agendamento na Nera ✨
 
 Cliente: ${data.clienteNome}
 Serviço: ${data.servicoNome}
 Data: ${data.data}
 Horário: ${data.horario}
+Local: ${locationLabel}
 
-Acesse o painel para confirmar ou recusar:
-${data.linkManage}`.trim();
+Acesse para confirmar ou recusar:
+${safeLinkManage}`.trim();
 }
 
 export function buildBookingConfirmedMessageForClient(data: { 

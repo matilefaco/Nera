@@ -282,6 +282,7 @@ export const sendNewBookingRequestNotification = async (
       }
       const activePlan = isExpired ? "free" : plan;
 
+      const startNotifyAt = Date.now();
       logger.info(
         "NOTIFICATION",
         "[PRO_NOTIFY_PROFESSIONAL_START]",
@@ -292,7 +293,8 @@ export const sendNewBookingRequestNotification = async (
           hasWhatsappToken: !!(process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN),
           hasProfessionalPhone: !!proPhone,
           planAllowsWhatsapp: activePlan === "pro" || activePlan === "essencial",
-          plan: activePlan
+          plan: activePlan,
+          createdAt: new Date(startNotifyAt).toISOString()
         }
       );
 
@@ -309,10 +311,12 @@ export const sendNewBookingRequestNotification = async (
           linkManage: `${baseUrl}/pedidos`,
         });
 
+        const attemptAtMs = Date.now();
         logger.info("NOTIFICATION", "[WHATSAPP_PROFESSIONAL_SEND_ATTEMPT]", {
             professionalId: payload.professionalId,
             appointmentId: payload.appointmentId,
-            maskedPhone: maskPhone(proPhone)
+            maskedPhone: maskPhone(proPhone),
+            attemptAt: new Date(attemptAtMs).toISOString()
         });
 
         try {
@@ -324,18 +328,35 @@ export const sendNewBookingRequestNotification = async (
             clientWhatsapp: payload.clientWhatsapp || "",
           });
           
+          const zapiResponseAtMs = Date.now();
+          const durationMs = zapiResponseAtMs - attemptAtMs;
+
           if (waResult.success) {
-            logger.info("NOTIFICATION", "[PRO_NOTIFY_PROFESSIONAL_SUCCESS] [WHATSAPP_PROFESSIONAL_SEND_SUCCESS]", { appointmentId: payload.appointmentId });
+            logger.info("NOTIFICATION", "[PRO_NOTIFY_PROFESSIONAL_SUCCESS] [WHATSAPP_PROFESSIONAL_SEND_SUCCESS]", { 
+              appointmentId: payload.appointmentId,
+              professionalId: payload.professionalId,
+              zapiResponseAt: new Date(zapiResponseAtMs).toISOString(),
+              durationMs,
+              zapiMessageId: waResult.logId || "unknown"
+            });
           } else {
             logger.error("NOTIFICATION", "[PRO_NOTIFY_PROFESSIONAL_ERROR] [WHATSAPP_PROFESSIONAL_SEND_ERROR]", { 
               appointmentId: payload.appointmentId,
-              error: waResult.error
+              professionalId: payload.professionalId,
+              error: waResult.error,
+              zapiResponseAt: new Date(zapiResponseAtMs).toISOString(),
+              durationMs
             });
           }
         } catch (waErr: any) {
+          const zapiResponseAtMs = Date.now();
+          const durationMs = zapiResponseAtMs - attemptAtMs;
           logger.error("NOTIFICATION", "[PRO_NOTIFY_PROFESSIONAL_ERROR] [WHATSAPP_PROFESSIONAL_SEND_ERROR]", { 
             appointmentId: payload.appointmentId,
-            error: waErr?.message || "Unknown error"
+            professionalId: payload.professionalId,
+            error: waErr?.message || "Unknown error",
+            zapiResponseAt: new Date(zapiResponseAtMs).toISOString(),
+            durationMs
           });
         }
       } else {
