@@ -9,15 +9,15 @@ export function buildNewBookingMessageForPro(data: {
   local: string, 
   linkManage: string 
 }): string {
-  return `✨ Nova reserva, ${data.profissionalNome}!
+  return `Nova solicitação de agendamento na Nera ✨
 
-📋 ${data.servicoNome}
-📅 ${data.data} às ${data.horario}
-👤 ${data.clienteNome}
-📱 ${data.clienteWhatsApp}
-📍 ${data.local}
+Cliente: ${data.clienteNome}
+Serviço: ${data.servicoNome}
+Data: ${data.data}
+Horário: ${data.horario}
 
-→ Confirme ou recuse em: ${data.linkManage}`.trim();
+Acesse o painel para confirmar ou recusar:
+${data.linkManage}`.trim();
 }
 
 export function buildBookingConfirmedMessageForClient(data: { 

@@ -208,13 +208,21 @@ export async function sendWhatsApp(
     }
     
     const plan = pro.plan || 'free';
+    
+    let isExpired = false;
     const expiresAt = pro.planExpiresAt;
-    const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+    if (expiresAt) {
+      if (typeof expiresAt.toMillis === "function") {
+        isExpired = expiresAt.toMillis() < Date.now();
+      } else {
+        isExpired = new Date(expiresAt).getTime() < Date.now();
+      }
+    }
     const activePlan = isExpired ? 'free' : plan;
 
-    // Se não for PRO nem tiver flag explícita, bloqueia o envio geral de WhatsApp
-    if (activePlan !== 'pro' && !pro.whatsappNotifications) {
-      logger.info("WHATSAPP", `Policy block: User is not PRO. WhatsApp blocked for type: ${metadata.type}`, {
+    // Se não for PRO/ESSENCIAL nem tiver flag explícita, bloqueia o envio geral de WhatsApp
+    if (activePlan !== 'pro' && activePlan !== 'essencial' && !pro.whatsappNotifications) {
+      logger.info("WHATSAPP", `Policy block: User is not PRO/ESSENCIAL. WhatsApp blocked for type: ${metadata.type}`, {
         userId: metadata.userId
       });
       return { success: true, skipped: 'requires_pro_plan' };

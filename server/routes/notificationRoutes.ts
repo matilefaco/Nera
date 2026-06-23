@@ -491,7 +491,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
       if (!userDoc.exists) throw new Error(`Professional ${professionalId} not found`);
       const pro = userDoc.data();
       const proEmail = pro?.email;
-      const proPhone = pro?.whatsapp;
+      const proPhone = pro?.whatsapp || pro?.phone;
 
       if (proEmail && await shouldSendEmail(appointmentId, eventKey)) {
         const cleanPhone = clientWhatsapp ? clientWhatsapp.replace(/\D/g, '') : '';
@@ -513,7 +513,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
       }
 
       if (proPhone) {
-        const formattedDate = date.split('-').reverse().join('/');
+        const formattedDate = date ? date.split('-').reverse().join('/') : '';
         const msg = buildNewBookingMessageForPro({
           profissionalNome: pro?.name || 'Profissional',
           servicoNome: serviceName,
@@ -522,7 +522,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
           clienteNome: clientName,
           clienteWhatsApp: payload.clientWhatsapp || 'Não informado',
           local: payload.locationDetail || payload.neighborhood || 'Estúdio',
-          linkManage: `${baseUrl}/pedidos?id=${appointmentId}&token=${token}`
+          linkManage: `${baseUrl}/pedidos`
         });
 
         await sendWhatsApp(db, proPhone, msg, {
