@@ -459,7 +459,7 @@ setBlockedSchedules(dayBlocked);
                     <div className="grid grid-cols-1 gap-3">
                       {professional.plan === 'pro' && (
                         <a 
-                          href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Acabei de fazer um pedido de reserva no valor de ${formatCurrency(appointment.totalPrice || appointment.price)} para o dia ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}. Código: ${appointment.reservationCode || '-'}. Pode me confirmar se está tudo ok?`)}
+                          href={buildWhatsappLink(professional.whatsapp, `Olá ${(professional.name || 'Profissional').split(' ')[0]}! Acabei de fazer um pedido de reserva no valor de ${formatCurrency(appointment.totalPrice || appointment.price)} para o dia ${(appointment.date || '').split('-').reverse().join('/')} às ${appointment.time}. Código: ${appointment.reservationCode || '-'}. Pode me confirmar se está tudo ok?`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2"
@@ -574,7 +574,7 @@ setBlockedSchedules(dayBlocked);
                 {/* ALWAYS VISIBLE UNTIL CANCELLED: Talk to Pro (Only for confirmed/completed) */}
                 {!isCancelled && !isPending && professional.plan === 'pro' && (
                   <a 
-                    href={buildWhatsappLink(professional.whatsapp, `Olá ${professional.name.split(' ')[0]}! Gostaria de falar sobre minha reserva do dia ${appointment.date.split('-').reverse().join('/')} às ${appointment.time}.`)}
+                    href={buildWhatsappLink(professional.whatsapp, `Olá ${(professional.name || 'Profissional').split(' ')[0]}! Gostaria de falar sobre minha reserva do dia ${(appointment.date || '').split('-').reverse().join('/')} às ${appointment.time}.`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-full py-5 bg-brand-linen text-brand-ink border border-brand-mist rounded-full text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-brand-mist transition-all flex items-center justify-center gap-2 mt-4"

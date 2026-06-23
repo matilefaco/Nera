@@ -1019,7 +1019,7 @@ export default function AgendaPage() {
       }
     });
 
-    return items.sort((a, b) => a.time.localeCompare(b.time));
+    return items.sort((a, b) => (a.time || "00:00").localeCompare(b.time || "00:00"));
   }, [displayedAppointments, blockedSchedules, openSlots]);
 
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -1331,7 +1331,7 @@ export default function AgendaPage() {
                       key={req.id}
                       className="px-3 py-1.5 bg-white border border-red-100 rounded-full text-[10px] font-medium text-brand-ink shadow-sm"
                     >
-                      {req.clientName.split(" ")[0]} · {req.time}
+                      {(req.clientName || "Cliente").split(" ")[0]} · {req.time}
                     </div>
                   ))}
                 </div>

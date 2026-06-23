@@ -1008,12 +1008,13 @@ export default function ClientsPage() {
                       const isInactive = getDaysSinceLastVisit(client.lastAppointmentDate) >= 30;
                       const hasPhone = !!client.clientPhone && client.clientPhone.length >= 10;
                       const profileUrl = profile?.slug ? `https://usenera.com/p/${profile.slug}` : 'https://usenera.com';
+                      const firstName = (client.clientName || 'Cliente').split(' ')[0];
                       const templates = [
-                        `Oi, ${client.clientName.split(' ')[0]} 🤎\nPassei aqui pra te avisar que minha agenda está aberta novamente ✨\nSe quiser reservar um horário, você pode agendar por aqui:\n${profileUrl}`,
-                        `Oi, ${client.clientName.split(' ')[0]} ✨\nFaz um tempinho desde o seu último atendimento e lembrei de você 🤎\nMinha agenda está disponível:\n${profileUrl}`,
-                        `Oi, ${client.clientName.split(' ')[0]} ✨\nAgenda aberta da semana. Se quiser escolher um horário com calma, deixei meu link aqui:\n${profileUrl}`
+                        `Oi, ${firstName} 🤎\nPassei aqui pra te avisar que minha agenda está aberta novamente ✨\nSe quiser reservar um horário, você pode agendar por aqui:\n${profileUrl}`,
+                        `Oi, ${firstName} ✨\nFaz um tempinho desde o seu último atendimento e lembrei de você 🤎\nMinha agenda está disponível:\n${profileUrl}`,
+                        `Oi, ${firstName} ✨\nAgenda aberta da semana. Se quiser escolher um horário com calma, deixei meu link aqui:\n${profileUrl}`
                       ];
-                      const msg = isInactive ? templates[client.clientName.length % templates.length] : `Oi, ${client.clientName.split(' ')[0]} ✨ tudo bem?`;
+                      const msg = isInactive ? templates[(client.clientName || 'Cliente').length % templates.length] : `Oi, ${firstName} ✨ tudo bem?`;
                       
                       return (
                         <a 
