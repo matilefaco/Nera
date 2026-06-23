@@ -511,18 +511,18 @@ export default function PendingRequestsPage() {
                       <div>
                         <div className="flex flex-wrap items-center gap-3 mb-1">
                           <h3 className="text-2xl md:text-3xl font-serif text-brand-ink">
-                            {request.clientName}
+                            {request.clientName || 'Cliente não informado'}
                           </h3>
                         </div>
                         <span className="text-[10px] text-brand-terracotta uppercase tracking-[0.2em] font-bold">
                           {request.additionalServices?.length > 0
                             ? [
-                                request.serviceName,
+                                request.serviceName || 'Serviço não informado',
                                 ...request.additionalServices.map(
                                   (s: any) => s.name,
                                 ),
                               ].join(", ")
-                            : request.serviceName}
+                            : request.serviceName || 'Serviço não informado'}
                         </span>
                       </div>
                       <div className="text-right flex flex-col items-end">
@@ -580,7 +580,7 @@ export default function PendingRequestsPage() {
                             Horário
                           </span>
                           <span className="text-[13px] font-bold text-brand-ink truncate">
-                            {request.time}
+                            {request.time || 'A combinar'}
                           </span>
                         </div>
                       </div>
@@ -599,7 +599,7 @@ export default function PendingRequestsPage() {
                         </span>
                         <span className="text-[12px] font-medium text-brand-ink truncate">
                           {request.locationType === "home"
-                            ? typeof request.address === "object"
+                            ? request.address && typeof request.address === "object"
                               ? `${request.address.street}, ${request.address.number}${request.address.neighborhood ? ` - ${request.address.neighborhood}` : ""}`
                               : request.address ||
                                 request.neighborhood ||
@@ -732,7 +732,7 @@ export default function PendingRequestsPage() {
                                 <a
                                   href={buildWhatsappLink(
                                     request.clientWhatsapp,
-                                    `Oi ${request.clientName}, seu horário para ${request.additionalServices?.length > 0 ? [request.serviceName, ...request.additionalServices.map((s:any) => s.name)].join(" e ") : request.serviceName} dia ${(request.date || "").split("-").reverse().join("/")} às ${request.time} foi confirmado 💛`,
+                                    `Oi ${request.clientName || 'Cliente não informado'}, seu horário para ${request.additionalServices?.length > 0 ? [request.serviceName, ...request.additionalServices.map((s:any) => s.name)].join(" e ") : request.serviceName || 'Serviço não informado'} dia ${(request.date || "").split("-").reverse().join("/")} às ${request.time || 'A combinar'} foi confirmado 💛`,
                                   )}
                                   target="_blank"
                                   rel="noopener noreferrer"
@@ -791,7 +791,7 @@ export default function PendingRequestsPage() {
                       Detalhes do Pedido
                     </span>
                     <h2 className="text-3xl md:text-5xl font-serif text-brand-ink leading-tight">
-                      {selectedRequest.clientName}
+                      {selectedRequest.clientName || 'Cliente não informado'}
                     </h2>
                   </div>
                   <button
@@ -812,8 +812,8 @@ export default function PendingRequestsPage() {
                       <div className="p-8 bg-brand-parchment/50 rounded-[32px] border border-brand-mist/40">
                         <p className="text-xl font-serif text-brand-ink mb-1">
                           {selectedRequest.additionalServices?.length > 0 
-                            ? [selectedRequest.serviceName, ...selectedRequest.additionalServices.map((s:any) => s.name)].join(" • ")
-                            : selectedRequest.serviceName}
+                            ? [selectedRequest.serviceName || 'Serviço não informado', ...selectedRequest.additionalServices.map((s:any) => s.name)].join(" • ")
+                            : selectedRequest.serviceName || 'Serviço não informado'}
                         </p>
                         <div className="flex items-center justify-between mt-6">
                           <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest bg-brand-white px-3 py-1 rounded-full border border-brand-mist/50">
@@ -865,7 +865,7 @@ export default function PendingRequestsPage() {
                           Horário Alvo
                         </p>
                         <p className="text-brand-ink font-serif text-xl truncate">
-                          {selectedRequest.time}
+                          {selectedRequest.time || 'A combinar'}
                         </p>
                       </div>
                     </div>
@@ -890,7 +890,7 @@ export default function PendingRequestsPage() {
                           </p>
                           <p className="text-[13px] text-brand-stone font-light leading-relaxed">
                             {selectedRequest.locationType === "home" ? (
-                              typeof selectedRequest.address === "object" ? (
+                              selectedRequest.address && typeof selectedRequest.address === "object" ? (
                                 <>
                                   {selectedRequest.address.street},{" "}
                                   {selectedRequest.address.number}

@@ -616,16 +616,16 @@ setBlockedSchedules(dayBlocked);
                     <div>
                       <span className="text-[9px] text-brand-stone uppercase tracking-widest font-bold block mb-1">Endereço do Atendimento</span>
                       <p className="text-xs text-brand-ink leading-relaxed font-medium">
-                        {typeof appointment.address === 'object' 
+                        {appointment.address && typeof appointment.address === 'object' 
                           ? `${appointment.address.street}, ${appointment.address.number}${appointment.address.complement ? ` - ${appointment.address.complement}` : ''}`
                           : appointment.address}
-                        {(typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood) && (
+                        {(appointment.address && typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood) && (
                           <span className="block mt-1 opacity-50 text-[10px]">
-                            {typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood}
-                            {typeof appointment.address === 'object' && appointment.address.city && `, ${appointment.address.city}`}
+                            {appointment.address && typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood}
+                            {appointment.address && typeof appointment.address === 'object' && appointment.address.city && `, ${appointment.address.city}`}
                           </span>
                         )}
-                        {typeof appointment.address === 'object' && appointment.address.reference && (
+                        {appointment.address && typeof appointment.address === 'object' && appointment.address.reference && (
                           <span className="block mt-2 text-[10px] text-brand-stone italic font-normal">
                              Ref: {appointment.address.reference}
                           </span>

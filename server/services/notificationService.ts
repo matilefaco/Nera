@@ -112,47 +112,44 @@ export const sendBookingConfirmedClientNotification = async (
       return { success: false, error: "Appointment not found" };
     const apptData = apptDoc.data() as any;
 
+    const proSnap = await db
+      .collection("users")
+      .doc(apptData.professionalId)
+      .get();
+    const pro = proSnap.exists ? (proSnap.data() as any) : null;
+
+    const waPhone = pro?.whatsapp ? pro.whatsapp.replace(/\D/g, "") : "";
+    const whatsappUrl = waPhone ? `https://wa.me/${waPhone}` : undefined;
+    const token =
+      apptData.manageSlug || apptData.token || apptData.manageToken;
+
+    const isStudio =
+      apptData.locationType === "studio" ||
+      apptData.locationType === "estudio" ||
+      !apptData.locationType;
+    const isHome =
+      apptData.locationType === "home" ||
+      apptData.locationType === "domicilio";
+
+    let addressData = undefined;
+    if (isStudio && pro?.studioAddress) {
+      addressData = {
+        street: pro.studioAddress.street,
+        number: pro.studioAddress.number,
+        complement: pro.studioAddress.complement,
+        neighborhood: pro.studioAddress.neighborhood,
+        city: pro.studioAddress.city,
+        state: pro.studioAddress.state,
+      };
+    }
+
     if (!apptData.clientEmail) {
       logger.warn(
         "NOTIFICATION",
         "Skipped confirmation email: client has no email",
         { appointmentId: payload.appointmentId },
       );
-      return { success: true, skipped: "no_email" };
-    }
-
-    if (await shouldSendEmail(payload.appointmentId, eventKey)) {
-      const proSnap = await db
-        .collection("users")
-        .doc(apptData.professionalId)
-        .get();
-      const pro = proSnap.exists ? (proSnap.data() as any) : null;
-
-      const waPhone = pro?.whatsapp ? pro.whatsapp.replace(/\D/g, "") : "";
-      const whatsappUrl = waPhone ? `https://wa.me/${waPhone}` : undefined;
-      const token =
-        apptData.manageSlug || apptData.token || apptData.manageToken;
-
-      const isStudio =
-        apptData.locationType === "studio" ||
-        apptData.locationType === "estudio" ||
-        !apptData.locationType;
-      const isHome =
-        apptData.locationType === "home" ||
-        apptData.locationType === "domicilio";
-
-      let addressData = undefined;
-      if (isStudio && pro?.studioAddress) {
-        addressData = {
-          street: pro.studioAddress.street,
-          number: pro.studioAddress.number,
-          complement: pro.studioAddress.complement,
-          neighborhood: pro.studioAddress.neighborhood,
-          city: pro.studioAddress.city,
-          state: pro.studioAddress.state,
-        };
-      }
-
+    } else if (await shouldSendEmail(payload.appointmentId, eventKey)) {
       const result = await sendBookingConfirmedEmail({
         clientName: apptData.clientName,
         serviceName: apptData.serviceName,
@@ -174,30 +171,54 @@ export const sendBookingConfirmedClientNotification = async (
       });
 
       if (result.success) await markEmailSent(payload.appointmentId, eventKey);
+    }
 
-      // Envia WhatsApp para a cliente
-      if (apptData.clientWhatsapp) {
-        const formattedDate = apptData.date.split('-').reverse().join('/');
-        const waMsg = buildBookingConfirmedMessageForClient({
-          serviceName: apptData.serviceName,
-          date: formattedDate,
-          time: apptData.time,
-          professionalName: pro?.name || "Profissional",
-          local: apptData.locationDetail || apptData.neighborhood || 'Estúdio',
-          linkManage: `${baseUrl}/manage/${token || payload.appointmentId}`
-        });
-        await sendWhatsApp(db, apptData.clientWhatsapp, waMsg, {
-          appointmentId: payload.appointmentId,
-          userId: apptData.professionalId,
-          type: 'booking_confirmed_client',
-          clientName: apptData.clientName,
-          clientWhatsapp: apptData.clientWhatsapp
-        });
+    // Envia WhatsApp para a cliente
+    if (apptData.clientWhatsapp) {
+      let fullAddressStr = "Estúdio";
+      if (isHome) {
+        if (apptData.address && typeof apptData.address === "object") {
+          const a = apptData.address;
+          const comp = a.complement ? `\n${a.complement}` : "";
+          const ref = a.reference ? `\nReferência: ${a.reference}` : "";
+          fullAddressStr = `Em domicílio - ${a.street || ""}, ${a.number || "S/N"}${comp}\n${a.neighborhood || ""}\n${a.city || ""} - ${a.state || ""}${ref}`.trim();
+        } else if (typeof apptData.address === "string") {
+          fullAddressStr = `Em domicílio - ${apptData.address}`;
+        } else {
+          fullAddressStr = `Em domicílio - ${apptData.neighborhood || "Bairro não informado"}`;
+        }
+      } else {
+        if (pro?.studioAddress) {
+          const a = pro.studioAddress;
+          const comp = a.complement ? `\n${a.complement}` : "";
+          const ref = a.reference ? `\nReferência: ${a.reference}` : "";
+          fullAddressStr = `Estúdio - ${a.street || ""}, ${a.number || "S/N"}${comp}\n${a.neighborhood || ""}\n${a.city || ""} - ${a.state || ""}${ref}`.trim();
+        } else if (pro?.address && typeof pro.address === "string") {
+          fullAddressStr = `Estúdio - ${pro.address}`;
+        } else {
+          fullAddressStr = `Estúdio`;
+        }
       }
 
-      return result;
+      const formattedDate = apptData.date.split('-').reverse().join('/');
+      const waMsg = buildBookingConfirmedMessageForClient({
+        serviceName: apptData.serviceName,
+        date: formattedDate,
+        time: apptData.time,
+        professionalName: pro?.name || "Profissional",
+        local: fullAddressStr,
+        linkManage: `${baseUrl}/manage/${token || payload.appointmentId}`
+      });
+      await sendWhatsApp(db, apptData.clientWhatsapp, waMsg, {
+        appointmentId: payload.appointmentId,
+        userId: apptData.professionalId,
+        type: 'booking_confirmed_client',
+        clientName: apptData.clientName,
+        clientWhatsapp: apptData.clientWhatsapp
+      });
     }
-    return { success: true, skipped: "duplicate" };
+
+    return { success: true };
   } catch (err: any) {
     logger.error("NOTIFICATION", "Failed to send BOOKING_CONFIRMED_CLIENT", {
       appointmentId: payload.appointmentId,

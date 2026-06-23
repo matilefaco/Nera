@@ -1914,7 +1914,7 @@ export default function Dashboard() {
                       </div>
                       <p className="text-brand-stone text-xs font-light leading-relaxed pl-7">
                         {selectedRequest.locationType === 'home' 
-                          ? (typeof selectedRequest.address === 'object' 
+                          ? (selectedRequest.address && typeof selectedRequest.address === 'object' 
                               ? `${selectedRequest.address.street}, ${selectedRequest.address.number}${selectedRequest.address.complement ? ` - ${selectedRequest.address.complement}` : ''} - ${selectedRequest.address.neighborhood}, ${selectedRequest.address.city}${selectedRequest.address.reference ? ` (Ref: ${selectedRequest.address.reference})` : ''}`
                               : (selectedRequest.address || selectedRequest.neighborhood || 'Endereço a combinar')) 
                           : profile?.studioAddress 
