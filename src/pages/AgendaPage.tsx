@@ -2258,7 +2258,7 @@ export default function AgendaPage() {
 
                         {isConfirmedLikeStatus(selectedAppointment.status) &&
                           (() => {
-                            const [h, m] = selectedAppointment.time
+                            const [h, m] = (selectedAppointment.time || "00:00")
                               .split(":")
                               .map(Number);
                             const apptDate = new Date(

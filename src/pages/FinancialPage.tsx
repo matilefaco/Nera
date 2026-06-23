@@ -115,7 +115,7 @@ export default function FinancialPage() {
         const docs = snapshot.docs.map((doc: any) => ({ id: doc.id, ...doc.data() } as Appointment));
         
         // Order in memory
-        docs.sort((a, b) => b.date.localeCompare(a.date));
+        docs.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
         
         financialAppointmentsCache.set(financialCacheKey, { data: docs, fetchedAt: Date.now() });
         setAppointments(docs);
@@ -216,9 +216,9 @@ export default function FinancialPage() {
       const headers = ['Data', 'Cliente', 'WhatsApp', 'Serviço', 'Preço', 'Taxa Deslocamento', 'Total', 'Status'];
       const rows = group.appointments.map(a => [
         a.date,
-        `"${a.clientName.replace(/"/g, '""')}"`,
+        `"${(a.clientName || 'Cliente').replace(/"/g, '""')}"`,
         a.clientWhatsapp,
-        `"${a.additionalServices?.length > 0 ? [a.serviceName, ...a.additionalServices.map((s:any) => s.name)].join(" e ").replace(/"/g, '""') : a.serviceName.replace(/"/g, '""')}"`,
+        `"${a.additionalServices?.length > 0 ? [(a.serviceName || 'Serviço'), ...a.additionalServices.map((s:any) => s.name)].join(" e ").replace(/"/g, '""') : (a.serviceName || 'Serviço').replace(/"/g, '""')}"`,
         a.price,
         a.travelFee || 0,
         a.totalPrice ?? a.finalPrice ?? ((a.price || 0) + (a.travelFee || 0)),

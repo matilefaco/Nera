@@ -257,11 +257,13 @@ export default function Dashboard() {
     const nowTime = `${nowHour}:${nowMin}`;
 
     const future = confirmed.filter(a => {
-      if (a.date > today) return true;
-      if (a.date === today && a.time >= nowTime && !isCompletedStatus(a.status)) return true;
+      if ((a.date || '') > today) return true;
+      if ((a.date || '') === today && (a.time || '') >= nowTime && !isCompletedStatus(a.status)) return true;
       return false;
     }).sort((a,b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      const dateA = a.date || '';
+      const dateB = b.date || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
       return safeLocaleCompare(a.time, b.time);
     });
 
@@ -623,7 +625,8 @@ export default function Dashboard() {
     // Query: Waitlist
     const qWaitlist = query(
       collection(db, 'waitlist'),
-      where('professionalId', '==', user.uid)
+      where('professionalId', '==', user.uid),
+      limit(100)
     );
 
     const unsubWaitlist = onSnapshot(qWaitlist, (snapshot) => {
@@ -631,8 +634,12 @@ export default function Dashboard() {
       try {
         const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as unknown as WaitlistEntry));
         const filteredDocs = docs.filter(doc => ['waiting', 'invited'].includes(doc.status));
-        // Sort manually to avoid requiring a composite index in Firestore
-        filteredDocs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        // Sort manually safely
+        filteredDocs.sort((a, b) => {
+          const timeA = (a as any).createdAt?.seconds ? (a as any).createdAt.seconds * 1000 : new Date(a.createdAt || 0).getTime();
+          const timeB = (b as any).createdAt?.seconds ? (b as any).createdAt.seconds * 1000 : new Date(b.createdAt || 0).getTime();
+          return timeB - timeA;
+        });
         setWaitlist(filteredDocs);
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);

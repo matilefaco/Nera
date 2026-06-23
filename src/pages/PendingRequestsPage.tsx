@@ -566,7 +566,7 @@ export default function PendingRequestsPage() {
                             Data
                           </span>
                           <span className="text-[13px] font-bold text-brand-ink truncate">
-                            {request.date.split("-").reverse().join("/")}
+                            {(request.date || "").split("-").reverse().join("/")}
                           </span>
                         </div>
                       </div>
@@ -732,7 +732,7 @@ export default function PendingRequestsPage() {
                                 <a
                                   href={buildWhatsappLink(
                                     request.clientWhatsapp,
-                                    `Oi ${request.clientName}, seu horário para ${request.additionalServices?.length > 0 ? [request.serviceName, ...request.additionalServices.map((s:any) => s.name)].join(" e ") : request.serviceName} dia ${request.date.split("-").reverse().join("/")} às ${request.time} foi confirmado 💛`,
+                                    `Oi ${request.clientName}, seu horário para ${request.additionalServices?.length > 0 ? [request.serviceName, ...request.additionalServices.map((s:any) => s.name)].join(" e ") : request.serviceName} dia ${(request.date || "").split("-").reverse().join("/")} às ${request.time} foi confirmado 💛`,
                                   )}
                                   target="_blank"
                                   rel="noopener noreferrer"
@@ -857,7 +857,7 @@ export default function PendingRequestsPage() {
                           Data Escolhida
                         </p>
                         <p className="text-brand-ink font-serif text-xl truncate">
-                          {selectedRequest.date.split("-").reverse().join("/")}
+                          {(selectedRequest.date || "").split("-").reverse().join("/")}
                         </p>
                       </div>
                       <div className="space-y-2 min-w-0">
