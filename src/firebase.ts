@@ -698,17 +698,36 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
         }
       }
 
-      // 2. Free old lock
+      // 2. Read old lock
       const cleanOldTime = data.time.replace(':', '');
       const oldLockId = `${professionalId}_${data.date}_${cleanOldTime}`;
       const oldLockRef = doc(db, 'booking_locks', oldLockId);
       const oldLockSnap = await transaction.get(oldLockRef);
+      
+      // 3. Read client summary
+      const clientKey = getClientKey(
+        data.clientWhatsapp || '',
+        data.clientEmail || '',
+        data.clientName || 'Cliente'
+      );
+      
+      let summarySnap: any = undefined;
+      if (clientKey) {
+        const summaryId = `${professionalId}_${clientKey}`;
+        const summaryRef = doc(db, 'client_summaries', summaryId);
+        summarySnap = await transaction.get(summaryRef);
+      }
+
+      // --- ALL READS DONE ---
+      // --- WRITES ---
+
+      // Free old lock
       if (oldLockSnap.exists() && oldLockSnap.data().appointmentId === appointmentId) {
         devLog(`[BOOKING LOCK] releasing old lock: ${oldLockId}`);
         transaction.delete(oldLockRef);
       }
 
-      // 3. Block new lock if already confirmed
+      // Block new lock if already confirmed
       if (blockingStatuses.includes(data.status)) {
         devLog(`[BOOKING LOCK] creating new lock (rescheduled): ${lockId}`);
         transaction.set(lockRef, {
@@ -723,7 +742,7 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
         });
       }
 
-      // 4. Update appointment
+      // Update appointment
       const updatePayload = {
         date: newDate,
         time: newTime,
@@ -741,7 +760,7 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
 
       // Update Client Summary
       const updatedAppt = { ...data, ...safeUpdate } as Appointment;
-      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status);
+      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status, summarySnap);
 
       return data;
     });
