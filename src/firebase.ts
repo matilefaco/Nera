@@ -38,9 +38,23 @@ const devLog = (...args: any[]) => isDev && console.log(...args);
 
 export async function notify(type: string, payload: any) {
   try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    try {
+      const user = auth.currentUser;
+      if (user) {
+        const token = await user.getIdToken();
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    } catch (tokenError) {
+      if (isDev) console.warn('[notify] Falha ao obter Firebase ID token', tokenError);
+    }
+
     const res = await fetch('/api/notify', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ type, payload })
     });
     if (!res.ok) {
