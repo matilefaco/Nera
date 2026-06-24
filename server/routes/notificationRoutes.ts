@@ -439,7 +439,7 @@ router.post("/push/subscribe", async (req, res) => {
   }
 });
 
-router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeature('whatsappNotifications'), async (req, res) => {
+router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res) => {
   const authReq = req as AuthenticatedRequest;
   const uid = authReq.uid;
 
@@ -724,8 +724,9 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
                       `Para: *${newFormatted} às ${time}*\n\n` +
                       `O horário antigo foi liberado automaticamente. Confira no Dashboard: \n${baseUrl}/dashboard`;
 
-          await sendWhatsAppMeta(proPhone, msg, {
+          await sendWhatsApp(db, proPhone, msg, {
             userId: professionalId,
+            appointmentId: appointmentId || payload.appointmentId || undefined,
             clientName,
             clientWhatsapp: payload.clientWhatsapp || '',
             type: 'booking_rescheduled_pro'
@@ -733,7 +734,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
         }
 
         if (pro?.email && rescheduledBy === 'client') {
-          const eventKeyPro = 'bookingRescheduledPro';
+          const eventKeyPro = `bookingRescheduledPro_${appointmentId || payload.appointmentId || 'unknown'}_${date || ''}_${time || ''}`;
           if (await shouldSendEmail(appointmentId, eventKeyPro)) {
             const oldFormatted = previousDate.split('-').reverse().join('/');
             const newFormatted = date.split('-').reverse().join('/');
@@ -753,7 +754,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
         }
 
         if (clientEmail) {
-          const eventKey = 'bookingRescheduledClient';
+          const eventKey = `bookingRescheduledClient_${appointmentId || payload.appointmentId || 'unknown'}_${date || ''}_${time || ''}`;
           if (await shouldSendEmail(appointmentId, eventKey)) {
             const result = await sendBookingRescheduledEmail({
               clientEmail, 
@@ -784,7 +785,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, checkPlanFeatur
             oldTime: previousTime,
             manageBookingUrl: `${baseUrl}/manage/${payload.manageSlug || appointmentId}`
           });
-          await sendWhatsAppMeta(payload.clientWhatsapp, msg, {
+          await sendWhatsApp(db, payload.clientWhatsapp, msg, {
             userId: professionalId,
             appointmentId,
             clientName,
