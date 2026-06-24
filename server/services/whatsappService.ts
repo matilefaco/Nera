@@ -23,8 +23,6 @@ interface WhatsAppLog {
   phone: string;
   clientName?: string;
   clientWhatsapp?: string;
-  message: string;
-  messagePreview?: string;
   messageType?: string;
   status: 'pending' | 'sent' | 'failed';
   error?: string;
@@ -152,11 +150,9 @@ export async function logWhatsAppMessage(
     const logRef = db.collection('whatsapp_logs').doc();
     const logData: any = {
       id: logRef.id,
-      phone: normalizedPhone,
+      phone: maskPhone(normalizedPhone),
       clientName: data.clientName || null,
-      clientWhatsapp: data.clientWhatsapp || normalizedPhone,
-      message: data.message,
-      messagePreview: data.message.substring(0, 100) + (data.message.length > 100 ? '...' : ''),
+      clientWhatsapp: data.clientWhatsapp ? maskPhone(data.clientWhatsapp) : maskPhone(normalizedPhone),
       messageType: data.type || 'generic',
       status: data.status,
       appointmentId: data.appointmentId || null,
@@ -185,7 +181,7 @@ export async function sendWhatsApp(
   const db = getDb();
 
   // ----- INÍCIO DA POLÍTICA WA GLOBAL -----
-  const clientTypes = [
+  const isMessageForClient = metadata.type && [
     'booking_confirmed_client',
     'booking_rejected',
     'booking_cancelled_client',
@@ -194,14 +190,19 @@ export async function sendWhatsApp(
     'waitlist_invitation',
     'review_request',
     'reminder_2h'
-  ];
+  ].includes(metadata.type);
 
-  const allowedClientTypes = [
+  const allowedClientTypesInAllPlans = [
     'booking_confirmed_client',
     'booking_rejected',
     'booking_cancelled_client',
-    'booking_rescheduled_client',
-    'reminder_24h'
+    'booking_rescheduled_client'
+  ];
+
+  const allowedClientTypesInProPlan = [
+    'reminder_24h',
+    'reminder_2h',
+    'waitlist_invitation'
   ];
 
   if (metadata.userId && metadata.userId !== 'admin') {
@@ -225,22 +226,42 @@ export async function sendWhatsApp(
     }
     const activePlan = isExpired ? 'free' : plan;
 
-    // Se não for PRO/ESSENCIAL nem tiver flag explícita, bloqueia o envio geral de WhatsApp
-    if (activePlan !== 'pro' && activePlan !== 'essencial' && !pro.whatsappNotifications) {
-      logger.info("WHATSAPP", `Policy block: User is not PRO/ESSENCIAL. WhatsApp blocked for type: ${metadata.type}`, {
-        userId: metadata.userId
-      });
-      return { success: true, skipped: 'requires_pro_plan' };
-    }
+    if (isMessageForClient) {
+      // Review requests are intentionally sent by email only to avoid spam-like WhatsApp experience.
+      if (metadata.type === 'review_request') {
+         logger.info("WHATSAPP", `Policy block: WhatsApp blocked for client for type: ${metadata.type} (Reviews are email only)`, {
+           userId: metadata.userId,
+           type: metadata.type
+         });
+         return { success: true, skipped: 'blocked_by_policy_review_email_only' };
+      }
 
-    // Se for mensagem destinada ao cliente, aplica filtro adicional de tipos permitidos
-    if (metadata.type && clientTypes.includes(metadata.type)) {
-      if (!allowedClientTypes.includes(metadata.type)) {
+      const allowedInAll = metadata.type && allowedClientTypesInAllPlans.includes(metadata.type);
+      const allowedInPro = metadata.type && allowedClientTypesInProPlan.includes(metadata.type);
+
+      if (!allowedInAll && !allowedInPro) {
         logger.info("WHATSAPP", `Policy block: WhatsApp blocked for client for type: ${metadata.type}`, {
           userId: metadata.userId,
           type: metadata.type
         });
         return { success: true, skipped: 'blocked_by_policy' };
+      }
+
+      if (allowedInPro && activePlan !== 'pro' && !pro.whatsappNotifications) {
+        logger.info("WHATSAPP", `Policy block: User is not PRO. WhatsApp blocked for client type: ${metadata.type}`, {
+          userId: metadata.userId,
+          type: metadata.type
+        });
+        return { success: true, skipped: 'requires_pro_plan' };
+      }
+    } else {
+      // Professional messages
+      if (activePlan !== 'pro' && !pro.whatsappNotifications) {
+        logger.info("WHATSAPP", `Policy block: User is not PRO. WhatsApp blocked for professional type: ${metadata.type}`, {
+          userId: metadata.userId,
+          type: metadata.type
+        });
+        return { success: true, skipped: 'requires_pro_plan' };
       }
     }
   }

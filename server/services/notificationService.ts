@@ -313,13 +313,13 @@ export const sendNewBookingRequestNotification = async (
           source: process.env.NODE_ENV === "production" ? "production" : "dev",
           hasWhatsappToken: !!(process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN),
           hasProfessionalPhone: !!proPhone,
-          planAllowsWhatsapp: activePlan === "pro" || activePlan === "essencial",
+          planAllowsWhatsapp: activePlan === "pro",
           plan: activePlan,
           createdAt: new Date(startNotifyAt).toISOString()
         }
       );
 
-      if (activePlan === "pro" || activePlan === "essencial") {
+      if (activePlan === "pro") {
         const formattedDate = payload.date ? payload.date.split("-").reverse().join("/") : "";
         const msg = buildNewBookingMessageForPro({
           profissionalNome: pro?.name || "Profissional",

@@ -1079,24 +1079,8 @@ router.get('/cron/review-requests', requireCronSecret, async (req, res) => {
           createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        let sent = false;
-        if (activePlan === 'pro') {
-          const proName = appt.professionalName || 'sua profissional';
-          const msg = buildReviewRequestMessage({
-            clienteNome: appt.clientName,
-            profissionalNome: proName,
-            servicoNome: appt.serviceName,
-            linkReview: reviewUrl
-          });
-          const result = await sendWhatsApp(db, clientPhone, msg, {
-            appointmentId: apptId,
-            userId: appt.professionalId,
-            type: 'review_request',
-            clientName: appt.clientName,
-            clientWhatsapp: clientPhone
-          });
-          sent = result.success;
-        }
+        // Review requests are intentionally sent by email only to avoid spam-like WhatsApp experience.
+        let sent = false; // Kept for compatibility with later logic
 
         if (appt.clientEmail) {
           const eventKey = 'reviewRequestClient';
@@ -1113,7 +1097,10 @@ router.get('/cron/review-requests', requireCronSecret, async (req, res) => {
               bookingId: apptId,
               reviewUrl
             });
-            if (result.success) await markEmailSent(apptId, eventKey);
+            if (result.success) {
+              await markEmailSent(apptId, eventKey);
+              sent = true;
+            }
           }
         }
 

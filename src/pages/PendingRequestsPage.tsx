@@ -720,13 +720,13 @@ export default function PendingRequestsPage() {
                                 />
                               </div>
                               <h4 className="text-[13px] font-bold text-brand-ink uppercase tracking-widest mb-2 leading-relaxed">
-                                Cliente já foi avisada por e-mail ✨
+                                Cliente já foi avisada por e-mail e WhatsApp ✨
                               </h4>
                               <p className="text-[11px] text-brand-stone mb-2 max-w-[220px]">
-                                A Nera enviou automaticamente a confirmação da reserva.
+                                A confirmação foi enviada para a cliente por WhatsApp.
                               </p>
                               <p className="text-[10px] text-brand-stone/70 mb-8 max-w-[220px]">
-                                Você também pode enviar uma mensagem pelo WhatsApp, se quiser dar um toque mais pessoal.
+                                Use o botão abaixo apenas se quiser enviar alguma observação adicional ou uma mensagem mais pessoal.
                               </p>
                               <div className="flex flex-col w-full gap-3">
                                 <a
