@@ -114,10 +114,13 @@ router.get("/integrations", async (req: Request, res: Response) => {
 });
 
 router.get("/zapi-check", (req: Request, res: Response) => {
+  const zapiToken = process.env.ZAPI_CLIENT_TOKEN;
   res.json({
     hasInstanceId: !!process.env.ZAPI_INSTANCE_ID,
     hasInstanceToken: !!process.env.ZAPI_INSTANCE_TOKEN,
-    hasZapiToken: !!process.env.ZAPI_TOKEN,
+    hasZapiToken: !!zapiToken,
+    zapiTokenKeyExists: Object.keys(process.env).includes("ZAPI_CLIENT_TOKEN"),
+    zapiTokenLength: zapiToken ? zapiToken.length : 0,
     env: process.env.NODE_ENV,
     isCloudRun: !!process.env.K_SERVICE,
     isFirebaseFunctions: !!process.env.FUNCTION_TARGET

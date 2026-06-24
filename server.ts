@@ -46,8 +46,10 @@ function isAllowedOrigin(origin?: string): boolean {
 export async function createServerApp() {
   // slug check deploy sync - forced redeploy
   // 1. Initial configuration (Move heavy logic here)
-  const { config } = await import("dotenv");
-  config();
+  if (process.env.NODE_ENV !== "production" && !process.env.FUNCTION_TARGET && !process.env.K_SERVICE) {
+    const { config } = await import("dotenv");
+    config();
+  }
 
   const firebaseAdmin = await import("./server/firebaseAdmin.js");
   const { requestIdMiddleware } = await import("./server/middleware/requestId.js");

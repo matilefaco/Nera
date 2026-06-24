@@ -4,7 +4,9 @@ import { PUBLIC_APP_URL } from "../utils.js";
 import admin from "firebase-admin";
 import { config } from "dotenv";
 
-config();
+if (process.env.NODE_ENV !== "production" && !process.env.FUNCTION_TARGET && !process.env.K_SERVICE) {
+  config();
+}
 
 interface WhatsAppMetadata {
   appointmentId?: string;
