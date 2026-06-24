@@ -13,7 +13,6 @@ if (process.env.K_SERVICE || process.env.FUNCTION_TARGET) {
 
 const NVIDIA_API_KEY = defineSecret("NVIDIA_API_KEY");
 const SENTRY_DSN = defineSecret("SENTRY_DSN");
-const ZAPI_CLIENT_TOKEN = defineSecret("ZAPI_CLIENT_TOKEN");
 
 /**
  * Universal backend entry point for Firebase Functions v2 / Cloud Run.
@@ -73,7 +72,7 @@ export const api = onRequest(
       SENTRY_DSN,
       "ZAPI_INSTANCE_ID",
       "ZAPI_INSTANCE_TOKEN",
-      ZAPI_CLIENT_TOKEN
+      "ZAPI_CLIENT_TOKEN"
     ],
   },
   Sentry.wrapHttpFunction(async (req: any, res: any) => {
