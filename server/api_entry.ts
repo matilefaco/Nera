@@ -4,10 +4,12 @@ import * as Sentry from "@sentry/google-cloud-serverless";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  tracesSampleRate: 1.0,
-});
+if (process.env.K_SERVICE || process.env.FUNCTION_TARGET) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 1.0,
+  });
+}
 
 const NVIDIA_API_KEY = defineSecret("NVIDIA_API_KEY");
 const SENTRY_DSN = defineSecret("SENTRY_DSN");
