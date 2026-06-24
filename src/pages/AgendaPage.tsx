@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { useAuth } from "../AuthContext";
 import {
   db,
+  auth,
   handleBookingError,
   createManualAppointment,
   updateAppointmentStatus,
@@ -712,6 +713,9 @@ export default function AgendaPage() {
     }
     setIsReschedulingLoading(true);
     try {
+      // Ensure Firebase Auth is fully initialized/hydrated before calling the transaction
+      await auth.authStateReady();
+      
       await rescheduleBookingByProfessional(
         selectedAppointment.id,
         user.uid,
@@ -722,10 +726,22 @@ export default function AgendaPage() {
       setAgendaView("details");
       setIsDetailsOpen(false);
     } catch (err: any) {
+      console.error("[RESCHEDULE ERROR DETAILED]", {
+        code: err.code,
+        message: err.message,
+        name: err.name,
+        stack: err.stack,
+        uid: user?.uid,
+        email: user?.email,
+        professionalId: user?.uid,
+        appointmentId: selectedAppointment?.id,
+        status: selectedAppointment?.status
+      });
+
       if (err.message === "Horário indisponível") {
         notify.error("Este horário acabou de ser preenchido. Escolha outro.");
       } else {
-        notify.error("Não foi possível remarcar o atendimento.");
+        notify.error(`Não foi possível remarcar: ${err.message}`);
       }
     } finally {
       setIsReschedulingLoading(false);
@@ -2213,30 +2229,41 @@ export default function AgendaPage() {
                           Copiar Link da Cliente
                         </button>
 
-                        {isConfirmedLikeStatus(selectedAppointment.status) && (
-                          <>
-                            <button
-                              onClick={() => {
-                                setAgendaView("reschedule");
-                              }}
-                              className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen hover:text-brand-ink rounded-xl transition-all border border-brand-mist/60 flex items-center justify-center gap-2 mt-2"
-                            >
-                              Remarcar Atendimento
-                            </button>
-                            <PremiumButton
-                              variant="primary"
-                              className="w-full py-3 mt-4 text-[13px]"
-                              onClick={() =>
-                                handleComplete(selectedAppointment)
-                              }
-                              disabled={loading === selectedAppointment.id}
-                            >
-                              {loading === selectedAppointment.id
-                                ? "Finalizando..."
-                                : "Finalizar Atendimento"}
-                            </PremiumButton>
-                          </>
-                        )}
+                        {(() => {
+                          const isActiveOperationalAppointment =
+                            isConfirmedLikeStatus(selectedAppointment.status) ||
+                            selectedAppointment.status === "pending_confirmation";
+
+                          return (
+                            <>
+                              {isActiveOperationalAppointment && (
+                                <button
+                                  onClick={() => {
+                                    setAgendaView("reschedule");
+                                  }}
+                                  className="w-full py-3 text-[10px] font-bold uppercase tracking-widest text-brand-stone hover:bg-brand-linen hover:text-brand-ink rounded-xl transition-all border border-brand-mist/60 flex items-center justify-center gap-2 mt-2"
+                                >
+                                  Remarcar Atendimento
+                                </button>
+                              )}
+                              
+                              {isConfirmedLikeStatus(selectedAppointment.status) && (
+                                <PremiumButton
+                                  variant="primary"
+                                  className="w-full py-3 mt-4 text-[13px]"
+                                  onClick={() =>
+                                    handleComplete(selectedAppointment)
+                                  }
+                                  disabled={loading === selectedAppointment.id}
+                                >
+                                  {loading === selectedAppointment.id
+                                    ? "Finalizando..."
+                                    : "Finalizar Atendimento"}
+                                </PremiumButton>
+                              )}
+                            </>
+                          );
+                        })()}
 
                         {!isCompletedStatus(selectedAppointment.status) && (
                           <button

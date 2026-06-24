@@ -618,7 +618,7 @@ setBlockedSchedules(dayBlocked);
                       <p className="text-xs text-brand-ink leading-relaxed font-medium">
                         {appointment.address && typeof appointment.address === 'object' 
                           ? `${appointment.address.street}, ${appointment.address.number}${appointment.address.complement ? ` - ${appointment.address.complement}` : ''}`
-                          : appointment.address}
+                          : String(appointment.address || '')}
                         {(appointment.address && typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood) && (
                           <span className="block mt-1 opacity-50 text-[10px]">
                             {appointment.address && typeof appointment.address === 'object' ? appointment.address.neighborhood : appointment.neighborhood}

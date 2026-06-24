@@ -785,13 +785,14 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
             oldTime: previousTime,
             manageBookingUrl: `${baseUrl}/manage/${payload.manageSlug || appointmentId}`
           });
-          await sendWhatsApp(db, payload.clientWhatsapp, msg, {
+          const result = await sendWhatsApp(db, payload.clientWhatsapp, msg, {
             userId: professionalId,
             appointmentId,
             clientName,
             clientWhatsapp: payload.clientWhatsapp,
             type: 'booking_rescheduled_client'
           });
+          if (!result.success) logger.error("WHATSAPP", "Failed to send reschedule WhatsApp", { result });
         }
         
         // Update Google Calendar Event

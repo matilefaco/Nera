@@ -45,7 +45,7 @@ service cloud.firestore {
 
     function isValidAppointment(data) {
       return data.professionalId is string &&
-             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired'];
+             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired', 'pending_confirmation'];
     }
 
     function isValidBlockedSchedule(data) {
@@ -141,12 +141,12 @@ service cloud.firestore {
     // Appointment Rules - SECURED
     match /appointments/{appointmentId} {
       // 1. Secured Read: Only professional owner or admin.
-      allow get: if (isSignedIn() && (resource.data.professionalId == request.auth.uid)) || isAdmin();
-      allow list: if (isSignedIn() && (resource.data.professionalId == request.auth.uid)) || isAdmin();
+      allow get: if (isSignedIn() && (resource.data.get('professionalId', '') == request.auth.uid)) || isAdmin();
+      allow list: if (isSignedIn() && (resource.data.get('professionalId', '') == request.auth.uid)) || isAdmin();
       
       // 2. Secured Create/Update: Only owner/admin. (Backend via Admin SDK bypasses this for public bookings)
       allow create: if (isSignedIn() && incoming().professionalId == request.auth.uid) || isAdmin();
-      allow update: if (isSignedIn() && (existing().professionalId == request.auth.uid || isAdmin())) && isValidAppointment(incoming());
+      allow update: if (isSignedIn() && (existing().get('professionalId', '') == request.auth.uid || isAdmin())) && isValidAppointment(incoming());
     }
 
     match /blocked_slots/{slotId} {
@@ -198,16 +198,18 @@ service cloud.firestore {
     }
 
     match /waitlist_stats/{statsId} {
-      allow get, list: if (isSignedIn() && (resource.data.professionalId == request.auth.uid)) || isAdmin();
-      allow write: if (isSignedIn() && (incoming().professionalId == request.auth.uid || existing().professionalId == request.auth.uid)) || isAdmin();
+      allow get, list: if (isSignedIn() && (resource.data.get('professionalId', '') == request.auth.uid)) || isAdmin();
+      allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
+      allow update: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) || isAdmin();
+      allow delete: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) || isAdmin();
     }
 
     match /booking_locks/{lockId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.professionalId == request.auth.uid) || isAdmin();
-      allow list: if isSignedIn() && resource.data.professionalId == request.auth.uid || isAdmin();
+      allow get: if isSignedIn() && (resource == null || resource.data.get('professionalId', '') == request.auth.uid) || isAdmin();
+      allow list: if isSignedIn() && resource.data.get('professionalId', '') == request.auth.uid || isAdmin();
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
-      allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || (isSignedIn() && incoming().professionalId == request.auth.uid);
-      allow delete: if (isSignedIn() && existing().professionalId == request.auth.uid) || isAdmin();
+      allow update: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) || isAdmin();
+      allow delete: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) || isAdmin();
     }
 
     match /coupons/{couponId} {
@@ -219,10 +221,10 @@ service cloud.firestore {
     }
 
     match /client_summaries/{summaryId} {
-      allow get: if isSignedIn() && (resource == null || resource.data.professionalId == request.auth.uid);
-      allow list: if isSignedIn() && resource.data.professionalId == request.auth.uid;
+      allow get: if isSignedIn() && (resource == null || resource.data.get('professionalId', '') == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.get('professionalId', '') == request.auth.uid;
       allow create: if isSignedIn() && incoming().professionalId == request.auth.uid;
-      allow update: if (isSignedIn() && existing().professionalId == request.auth.uid) || (isSignedIn() && incoming().professionalId == request.auth.uid);
+      allow update: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid);
       allow delete: if isAdmin();
     }
 

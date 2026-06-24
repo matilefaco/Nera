@@ -46,12 +46,17 @@ export function getFriendlyErrorMessage(
 
   // 2. Auth / Sessão / Permissões
   if (
-    str.includes('permission-denied') ||
-    str.includes('missing or insufficient permissions') ||
-    str.includes('not authorized') ||
     code === 'auth/requires-recent-login'
   ) {
     return "Sessão expirada. Por favor, acesse novamente.";
+  }
+
+  if (
+    str.includes('permission-denied') ||
+    str.includes('missing or insufficient permissions') ||
+    str.includes('not authorized')
+  ) {
+    return `Acesso negado ou erro de permissão: ${message}`;
   }
 
   if (code === 'EMAIL_ALREADY_EXISTS' || str.includes('email_already_exists') || code === 'auth/email-already-in-use' || str.includes('email-already-in-use')) {

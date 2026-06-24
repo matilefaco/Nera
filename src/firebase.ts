@@ -58,9 +58,13 @@ export async function notify(type: string, payload: any) {
       body: JSON.stringify({ type, payload })
     });
     if (!res.ok) {
-        throw new Error(`Notification failed with status: ${res.status}`);
+        const errText = await res.text().catch(() => '');
+        console.error(`[notify] API failed with status ${res.status}:`, errText);
+        throw new Error(`Notification failed with status: ${res.status}. Body: ${errText}`);
     }
-    return await res.json();
+    const jsonRes = await res.json();
+    console.log(`[notify] Success for type ${type}:`, jsonRes);
+    return jsonRes;
   } catch (error) {
     if (isDev) console.error(`[NOTIFY ERROR] Failed to send ${type}:`, error);
     throw error;
@@ -257,6 +261,7 @@ export async function updateClientSummaryInternal(transaction: any, appointment:
     };
   } else {
     summaryData = summarySnap.data();
+    summaryData.professionalId = professionalId; // Fix: ensure professionalId is always present for Firestore rules
     if (appointment.clientName && summaryData.clientName === 'Cliente') {
       summaryData.clientName = appointment.clientName;
     }
@@ -686,9 +691,10 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
 }
 
 export async function rescheduleBookingByProfessional(appointmentId: string, professionalId: string, newDate: string, newTime: string) {
-  devLog(`[Professional] Rescheduling ${appointmentId} to ${newDate} ${newTime}`);
+  console.log(`[Professional] Rescheduling ${appointmentId} to ${newDate} ${newTime}`);
   try {
     const data = await runTransaction(db, async (transaction) => {
+      console.log(`[TX] starting transaction for ${appointmentId}`);
       const apptRef = doc(db, 'appointments', appointmentId);
       const apptDoc = await transaction.get(apptRef);
       if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
@@ -703,11 +709,11 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
       const lockRef = doc(db, 'booking_locks', lockId);
       const lockSnap = await transaction.get(lockRef);
       
-      const blockingStatuses = ['confirmed', 'accepted', 'completed'];
+      const blockingStatuses = ['confirmed', 'accepted', 'pending_confirmation', 'completed'];
 
       if (lockSnap.exists() && blockingStatuses.includes(lockSnap.data().status)) {
         if (lockSnap.data().appointmentId !== appointmentId) {
-          if (isDev) console.error(`[BOOKING LOCK] reschedule conflict at ${lockId}`);
+          console.error(`[BOOKING LOCK] reschedule conflict at ${lockId}`);
           throw new Error('Horário indisponível');
         }
       }
@@ -718,32 +724,18 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
       const oldLockRef = doc(db, 'booking_locks', oldLockId);
       const oldLockSnap = await transaction.get(oldLockRef);
       
-      // 3. Read client summary
-      const clientKey = getClientKey(
-        data.clientWhatsapp || '',
-        data.clientEmail || '',
-        data.clientName || 'Cliente'
-      );
-      
-      let summarySnap: any = undefined;
-      if (clientKey) {
-        const summaryId = `${professionalId}_${clientKey}`;
-        const summaryRef = doc(db, 'client_summaries', summaryId);
-        summarySnap = await transaction.get(summaryRef);
-      }
-
       // --- ALL READS DONE ---
       // --- WRITES ---
 
       // Free old lock
       if (oldLockSnap.exists() && oldLockSnap.data().appointmentId === appointmentId) {
-        devLog(`[BOOKING LOCK] releasing old lock: ${oldLockId}`);
+        console.log(`[TX] deleting old lock: ${oldLockId}`);
         transaction.delete(oldLockRef);
       }
 
       // Block new lock if already confirmed
       if (blockingStatuses.includes(data.status)) {
-        devLog(`[BOOKING LOCK] creating new lock (rescheduled): ${lockId}`);
+        console.log(`[TX] setting new lock: ${lockId}`);
         transaction.set(lockRef, {
           professionalId: professionalId,
           date: newDate,
@@ -757,6 +749,7 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
       }
 
       // Update appointment
+      console.log(`[TX] updating appointment: ${appointmentId}`);
       const updatePayload = {
         date: newDate,
         time: newTime,
@@ -772,10 +765,7 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
 
       transaction.update(apptRef, safeUpdate);
 
-      // Update Client Summary
-      const updatedAppt = { ...data, ...safeUpdate } as Appointment;
-      await updateClientSummaryInternal(transaction, updatedAppt, professionalId, false, data.status, summarySnap);
-
+      console.log(`[TX] finished all transaction commands`);
       return data;
     });
 
@@ -783,6 +773,7 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
     notify('BOOKING_RESCHEDULED', { 
       id: appointmentId, 
       appointmentId,
+      professionalId,
       ...data, 
       previousDate: data.date, 
       previousTime: data.time, 

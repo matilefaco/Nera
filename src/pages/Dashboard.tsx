@@ -1916,7 +1916,7 @@ export default function Dashboard() {
                         {selectedRequest.locationType === 'home' 
                           ? (selectedRequest.address && typeof selectedRequest.address === 'object' 
                               ? `${selectedRequest.address.street}, ${selectedRequest.address.number}${selectedRequest.address.complement ? ` - ${selectedRequest.address.complement}` : ''} - ${selectedRequest.address.neighborhood}, ${selectedRequest.address.city}${selectedRequest.address.reference ? ` (Ref: ${selectedRequest.address.reference})` : ''}`
-                              : (selectedRequest.address || selectedRequest.neighborhood || 'Endereço a combinar')) 
+                              : (String(selectedRequest.address) || selectedRequest.neighborhood || 'Endereço a combinar')) 
                           : profile?.studioAddress 
                             ? `${profile.studioAddress.street}, ${profile.studioAddress.number}${profile.studioAddress.complement ? ` - ${profile.studioAddress.complement}` : ''}, ${profile.studioAddress.neighborhood} - ${profile.studioAddress.city}`
                             : 'Atendimento no seu endereço cadastrado'}

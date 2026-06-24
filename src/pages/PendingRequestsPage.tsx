@@ -601,9 +601,7 @@ export default function PendingRequestsPage() {
                           {request.locationType === "home"
                             ? request.address && typeof request.address === "object"
                               ? `${request.address.street}, ${request.address.number}${request.address.neighborhood ? ` - ${request.address.neighborhood}` : ""}`
-                              : request.address ||
-                                request.neighborhood ||
-                                "Endereço não informado"
+                              : String(request.address || request.neighborhood || "Endereço não informado")
                             : profile?.studioAddress
                               ? `${profile.studioAddress.street}, ${profile.studioAddress.number} - ${profile.studioAddress.neighborhood}`
                               : "No estúdio"}

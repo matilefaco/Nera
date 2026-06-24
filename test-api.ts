@@ -1,22 +1,13 @@
-import fetch from "node-fetch";
+import { initFirebase, getDb } from './server/firebaseAdmin.js';
 
-async function run() {
+async function test() {
+  await initFirebase();
+  const db = getDb();
   try {
-    const res = await fetch("http://localhost:3000/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        uid: "testuid123456",
-        name: "Test User",
-        email: "testuser123456@example.com",
-        plan: "free"
-      })
-    });
-    console.log("STATUS:", res.status);
-    const text = await res.text();
-    console.log("BODY:", text);
-  } catch(e) {
-    console.error(e);
+    const doc = await db.collection('users').doc(undefined as any).get();
+    console.log("Success:", doc.exists);
+  } catch (err) {
+    console.error("Error:", err);
   }
 }
-run();
+test().catch(console.error);
