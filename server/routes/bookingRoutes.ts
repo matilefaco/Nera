@@ -5133,23 +5133,138 @@ router.post(
         const apptDoc = await transaction.get(apptRef);
         if (!apptDoc.exists) throw { status: 404, message: "Agendamento não encontrado" };
         const data: any = apptDoc.data();
+        
         if (data.professionalId !== uid) throw { status: 403, message: "Operação não permitida" };
         
-        const finalStatuses = ["cancelled", "cancelled_by_client", "cancelled_by_professional", "completed", "concluido", "expired", "no_show", "no_show_client", "no_show_professional", "rejected", "declined"];
-        if (finalStatuses.includes(data.status)) throw { status: 400, message: "Esta reserva não pode ser reagendada." };
+        const blockRescheduleStatuses = ["cancelled", "cancelled_by_client", "cancelled_by_professional", "completed", "concluido", "expired", "no_show", "no_show_client", "no_show_professional", "rejected", "declined"];
+        if (blockRescheduleStatuses.includes(data.status)) throw { status: 400, message: "Esta reserva não pode ser reagendada." };
         
         const activeStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted"];
         if (!activeStatuses.includes(data.status)) throw { status: 400, message: "Esta reserva não pode ser reagendada." };
 
-        // For the purpose of this task, I will call the logic already existing in the bookingRoutes that was used for other rescheduling.
-        // I will assume this logic is available and can be called. 
-        // Re-implementing the whole logic is too risky and complex for this context.
-        return { success: true, updatedData: data };
+        const duration = Number(data.duration || data.serviceDuration || 60);
+        
+        const apptDayOfWeek = new Date(newDate + "T12:00:00").getDay();
+        const apptStartMin = timeToMinutes(newTime);
+        const apptEndMin = apptStartMin + duration;
+
+        const proSnap = await transaction.get(db.collection("users").doc(uid));
+        const proData = proSnap.data() as any;
+
+        if (proData.workingHours) {
+          if (Array.isArray(proData.workingHours.workingDays) && proData.workingHours.workingDays.length > 0 && !proData.workingHours.workingDays.includes(apptDayOfWeek)) {
+             throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+          if (proData.workingHours.startTime && proData.workingHours.endTime) {
+            const whStart = timeToMinutes(proData.workingHours.startTime);
+            const whEnd = timeToMinutes(proData.workingHours.endTime);
+            if (apptStartMin < whStart || apptEndMin > whEnd) {
+              throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+            }
+          }
+        }
+
+        const blockedSnap = await transaction.get(db.collection("blocked_schedules").where("professionalId", "==", uid));
+        for (const bDoc of blockedSnap.docs) {
+          const b = bDoc.data();
+          const isFixed = b.date === newDate;
+          const isRecurring = b.isRecurring && Array.isArray(b.recurringDays) && b.recurringDays.includes(apptDayOfWeek);
+          if (isFixed || isRecurring) {
+            if (b.full_day || b.allDay) throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+            const bStart = timeToMinutes(b.startTime);
+            const bEnd = timeToMinutes(b.endTime);
+            if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+        }
+
+        const existingApptsSnap = await transaction.get(db.collection("appointments").where("professionalId", "==", uid).where("date", "==", newDate));
+        const overlapBlockingStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted", "completed", "concluido"];
+        for (const doc of existingApptsSnap.docs) {
+           if (doc.id === appointmentId) continue;
+           const existing = doc.data();
+           if (overlapBlockingStatuses.includes(existing.status)) {
+             const existingStart = timeToMinutes(existing.time);
+             const existingDuration = Number(existing.duration || existing.serviceDuration || 60);
+             const existingEnd = existingStart + existingDuration;
+             if (intervalsOverlap(apptStartMin, apptEndMin, existingStart, existingEnd)) {
+               if (["pending", "pending_confirmation"].includes(existing.status)) {
+                 const existingLockId = getBookingLockId(existing);
+                 if (existingLockId) {
+                   const existingLockSnap = await transaction.get(db.collection("booking_locks").doc(existingLockId));
+                   if (existingLockSnap.exists) {
+                     const eld = existingLockSnap.data();
+                     if (eld?.expiresAt && ((typeof eld.expiresAt.toMillis === "function" && eld.expiresAt.toMillis() <= Date.now()) || new Date(eld.expiresAt).getTime() <= Date.now())) continue;
+                   } else continue;
+                 }
+               }
+               throw { status: 400, message: "Este horário acabou de ser preenchido. Escolha outro." };
+             }
+           }
+        }
+
+        const oldLockId = getBookingLockId(data);
+        let oldLockRef = oldLockId ? db.collection("booking_locks").doc(oldLockId) : null;
+        let oldLockSnap = oldLockRef ? await transaction.get(oldLockRef) : null;
+
+        const simulatedNewData = { ...data, date: newDate, time: newTime };
+        const newLockId = getBookingLockId(simulatedNewData);
+        let newLockRef = newLockId ? db.collection("booking_locks").doc(newLockId) : null;
+
+        if (newLockId) {
+          const newLockSnap = await transaction.get(newLockRef!);
+          if (newLockSnap.exists && overlapBlockingStatuses.includes(newLockSnap.data()?.status)) {
+            if (newLockSnap.data()?.appointmentId !== appointmentId) throw { status: 400, message: "Este horário acabou de ser preenchido. Escolha outro." };
+          }
+        }
+
+        if (oldLockRef && oldLockId !== newLockId) {
+            if (oldLockSnap && oldLockSnap.exists && oldLockSnap.data()?.appointmentId === appointmentId) transaction.delete(oldLockRef);
+        }
+        if (newLockRef && overlapBlockingStatuses.includes(data.status)) {
+            transaction.set(newLockRef, {
+                professionalId: data.professionalId,
+                date: newDate,
+                time: newTime,
+                appointmentId: appointmentId,
+                serviceId: data.serviceId || "unknown",
+                status: data.status,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+        }
+
+        const updatePayload: any = {
+          date: newDate,
+          time: newTime,
+          previousDate: data.date,
+          previousTime: data.time,
+          rescheduledAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          lastChangeBy: "professional",
+          changeMessage: `Profissional reagendou de ${data.date.split("-").reverse().join("/")} para ${newDate.split("-").reverse().join("/")}`,
+          timeline: admin.firestore.FieldValue.arrayUnion({
+            type: "booking_rescheduled_professional",
+            createdAt: new Date().toISOString(),
+            actor: "professional",
+            label: `Profissional reagendou de ${data.date.split("-").reverse().join("/")} para ${newDate.split("-").reverse().join("/")}`,
+          }),
+        };
+
+        const safeUpdate = sanitizeAppointment(updatePayload, true);
+        transaction.update(apptRef, safeUpdate);
+
+        return { success: true, updatedData: { ...data, ...safeUpdate, id: appointmentId } };
       });
-      res.json({ success: true, updatedData: result.updatedData });
-    } catch (error: any) {
-      if (error.status) res.status(error.status).json({ error: error.message });
-      else res.status(500).json({ error: "Erro ao reagendar" });
+
+      postRescheduleActions(result.updatedData.id, result.updatedData.previousDate, result.updatedData.previousTime, result.updatedData, "professional");
+
+      return res.json({ success: true, updatedData: result.updatedData });
+    } catch (err: any) {
+      if (err.status) res.status(err.status).json({ error: err.message });
+      else {
+        logger.error("BOOKING", "Professional reschedule error", { error: err });
+        res.status(500).json({ error: "Erro ao reagendar" });
+      }
     }
   }
 );
