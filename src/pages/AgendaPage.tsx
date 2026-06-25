@@ -400,12 +400,15 @@ export default function AgendaPage() {
     if (!user) return;
     const q = query(
       collection(db, "services"),
-      where("professionalId", "==", user.uid),
-      where("active", "==", true),
+      where("professionalId", "==", user.uid)
     );
     getDocs(q)
       .then((snap) => {
-        setServices(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        setServices(
+          snap.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .filter((s: any) => s.active !== false)
+        );
       })
       .catch((err) => {
         if (isDev) console.error("[AgendaPage] Failed to fetch services:", err);

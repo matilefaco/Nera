@@ -28,6 +28,8 @@ export default function ServicesPage() {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isToggleActiveModalOpen, setIsToggleActiveModalOpen] = useState(false);
+  const [serviceToToggle, setServiceToToggle] = useState<any | null>(null);
   const [serviceToDelete, setServiceToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
@@ -40,6 +42,7 @@ export default function ServicesPage() {
   const [serviceCategory, setServiceCategory] = useState<string>('');
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
   const [badge, setBadge] = useState<string>('');
+  const [isActive, setIsActive] = useState<boolean>(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCustomDuration, setShowCustomDuration] = useState(false);
   const [durationError, setDurationError] = useState(false);
@@ -141,7 +144,6 @@ export default function ServicesPage() {
       try {
         const rawServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Service[];
         const filtered = rawServices.filter(s => 
-            s.active !== false &&
             s.name?.trim() &&
             Number(s.price) > 0
           ).map((s) => {
@@ -332,7 +334,7 @@ export default function ServicesPage() {
            slug: finalCatSlug
         },
         badge: badge === 'Nenhum' ? '' : badge,
-        active: true,
+        active: isActive,
         updatedAt: new Date().toISOString()
       };
 
@@ -405,6 +407,36 @@ export default function ServicesPage() {
     }
   };
 
+  const confirmToggleActive = (service: any) => {
+    if (service.active === false) {
+      // Direct resume
+      handleToggleActive(service, true);
+    } else {
+      // Ask confirmation to pause
+      setServiceToToggle(service);
+      setIsToggleActiveModalOpen(true);
+    }
+  };
+
+  const handleToggleActive = async (service: any, newStatus: boolean) => {
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, 'services', service.id), { active: newStatus });
+      if (newStatus) {
+        notify.success('Serviço reativado na vitrine.');
+      } else {
+        notify.success('Serviço pausado. Ele não aparecerá para novas reservas.');
+        setIsToggleActiveModalOpen(false);
+        setServiceToToggle(null);
+      }
+    } catch (error) {
+      if (isDev) console.error('[ServicesToggleActive] Error:', error);
+      notify.error('Não foi possível atualizar o serviço.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const confirmDelete = (id: string) => {
     setServiceToDelete(id);
     setIsDeleteModalOpen(true);
@@ -426,6 +458,7 @@ export default function ServicesPage() {
     const currentBadge = service.badge;
     const allowedBadges = ['Mais procurado', 'Novo', 'Promoção', 'Exclusivo', 'Pacote'];
     setBadge(allowedBadges.includes(currentBadge || '') ? currentBadge : '');
+    setIsActive(service.active !== false);
     
     setShowCustomDuration(![30, 45, 60, 90, 120, 150, 180].includes(Number(service.duration)));
     setIsModalOpen(true);
@@ -441,6 +474,7 @@ export default function ServicesPage() {
     setCategory('');
     setServiceCategory('');
     setBadge('');
+    setIsActive(true);
     setShowCustomDuration(false);
   };
 
@@ -523,21 +557,40 @@ export default function ServicesPage() {
                 layout 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-brand-white p-6 sm:p-8 rounded-[32px] border border-brand-mist shadow-sm group relative overflow-hidden flex flex-col justify-between"
+                className={cn(
+                  "bg-brand-white p-6 sm:p-8 rounded-[32px] border border-brand-mist shadow-sm group relative overflow-hidden flex flex-col justify-between",
+                  service.active === false ? "opacity-75" : ""
+                )}
               >
                 <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 bg-brand-linen/50 rounded-full -mr-12 -mt-12 sm:-mr-16 sm:-mt-16 transition-transform group-hover:scale-110" />
                 
                 <div className="flex justify-between items-start mb-6 sm:mb-8 relative z-10 gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0 pr-2">
-                    {service.serviceCategory && (
-                      <span className="text-[9px] uppercase tracking-widest font-bold text-brand-ink bg-brand-parchment/60 border border-brand-mist/50 px-2.5 py-1 rounded-[6px] inline-block mb-3 shadow-sm">
-                        {service.serviceCategory}
-                      </span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2 mb-3">
+                      {service.serviceCategory && (
+                        <span className="text-[9px] uppercase tracking-widest font-bold text-brand-ink bg-brand-parchment/60 border border-brand-mist/50 px-2.5 py-1 rounded-[6px] shadow-sm">
+                          {service.serviceCategory}
+                        </span>
+                      )}
+                      {service.active === false && (
+                        <span className="text-[9px] uppercase tracking-widest font-bold text-brand-stone bg-brand-linen border border-brand-mist/50 px-2.5 py-1 rounded-[6px] shadow-sm flex items-center gap-1">
+                          Pausado
+                        </span>
+                      )}
+                    </div>
                     <h3 className="text-lg sm:text-xl font-serif text-brand-ink mb-1.5 sm:mb-2 group-hover:text-brand-terracotta transition-colors leading-snug">{service.name}</h3>
                     <p className="text-brand-stone text-xs sm:text-sm font-light leading-relaxed line-clamp-2">{service.description || 'Consulte detalhes no dia do atendimento.'}</p>
+                    {service.active === false && (
+                      <p className="text-[10px] text-brand-stone mt-2 italic font-light">Fora da vitrine</p>
+                    )}
                   </div>
                   <div className="flex flex-col sm:flex-row gap-1 shrink-0 bg-white/80 backdrop-blur-sm p-1 rounded-2xl border border-brand-mist/30" title={isFiltered ? "Para reorganizar, volte para Todos." : undefined}>
+                    <button onClick={() => confirmToggleActive(service)} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all flex items-center justify-center whitespace-nowrap">
+                      <span className="text-[9px] uppercase tracking-widest font-bold mr-1 hidden sm:inline-block">
+                        {service.active === false ? 'Reativar' : 'Pausar'}
+                      </span>
+                    </button>
+                    <div className="w-px h-6 bg-brand-mist mx-1 self-center hidden sm:block" />
                     <button onClick={() => handleReorder(realIndex, 'up')} disabled={isFiltered || realIndex === 0} className="p-2 hover:bg-brand-parchment rounded-xl text-brand-stone/60 hover:text-brand-ink transition-all disabled:opacity-30">
                       <ArrowUp size={16} className="sm:w-[18px] sm:h-[18px]" />
                     </button>
@@ -608,6 +661,47 @@ export default function ServicesPage() {
                     onClick={() => setIsDeleteModalOpen(false)}
                     disabled={loading}
                     className="w-full bg-brand-parchment text-brand-stone py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all border border-brand-mist"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isToggleActiveModalOpen && serviceToToggle && (
+            <div className="fixed inset-0 bg-brand-ink/60 backdrop-blur-sm z-[60] flex items-center justify-center p-6">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }} 
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-brand-white w-full max-w-sm rounded-[40px] p-10 shadow-2xl text-center border border-brand-mist"
+              >
+                <div className="w-16 h-16 bg-brand-linen text-brand-stone rounded-2xl flex items-center justify-center mx-auto mb-6 border border-brand-mist">
+                  <List size={32} />
+                </div>
+                <h3 className="text-2xl font-serif font-normal mb-2 text-brand-ink">Pausar este serviço?</h3>
+                <p className="text-brand-stone text-sm mb-8 font-light">
+                  Ele ficará salvo no seu painel, mas não aparecerá na sua vitrine para novas reservas.
+                </p>
+                
+                <div className="flex flex-col gap-4">
+                  <button 
+                    onClick={() => handleToggleActive(serviceToToggle, false)}
+                    disabled={loading}
+                    className="w-full bg-brand-ink text-brand-white py-5 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-espresso transition-all disabled:opacity-50"
+                  >
+                    {loading ? 'Pausando...' : 'Pausar serviço'}
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsToggleActiveModalOpen(false);
+                      setServiceToToggle(null);
+                    }}
+                    disabled={loading}
+                    className="w-full bg-brand-parchment text-brand-stone py-5 rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-brand-mist transition-all disabled:opacity-50"
                   >
                     Cancelar
                   </button>
@@ -811,6 +905,41 @@ export default function ServicesPage() {
                       </div>
                     </div>
                   </div>
+
+                  {editingId && (
+                    <div className="space-y-4 pt-4 border-t border-brand-mist/50">
+                      <div className="flex flex-col gap-1.5 ml-1">
+                        <label className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">Disponibilidade na vitrine</label>
+                        <span className="text-[10px] text-brand-stone/70">Quando pausado, este serviço fica salvo no seu painel, mas não aparece para novas reservas.</span>
+                      </div>
+                      <div className="flex bg-brand-parchment p-1.5 rounded-2xl border border-brand-mist/50">
+                        <button
+                          type="button"
+                          onClick={() => setIsActive(true)}
+                          className={cn(
+                            "flex-1 py-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all",
+                            isActive
+                              ? "bg-brand-white text-brand-ink shadow-sm"
+                              : "text-brand-stone hover:text-brand-ink hover:bg-brand-white/50"
+                          )}
+                        >
+                          Serviço ativo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsActive(false)}
+                          className={cn(
+                            "flex-1 py-3 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all",
+                            !isActive
+                              ? "bg-brand-white text-brand-ink shadow-sm"
+                              : "text-brand-stone hover:text-brand-ink hover:bg-brand-white/50"
+                          )}
+                        >
+                          Serviço pausado
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="bg-brand-linen p-5 sm:p-6 rounded-2xl flex gap-4 items-start border border-brand-mist">
                     <Info size={18} className="text-brand-terracotta shrink-0 mt-0.5" />

@@ -122,7 +122,7 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
       const slugRef = db.collection("slugs").doc(slug);
       const userRef = db.collection("users").doc(uid);
       const conflictingUserQuery = db.collection("users").where("slug", "==", slug).limit(2);
-      const servicesQuery = db.collection("services").where("professionalId", "==", uid).where("active", "==", true);
+      const servicesQuery = db.collection("services").where("professionalId", "==", uid);
 
       const [slugDoc, userSnap, conflictingUserSnap, existingServicesSnap] = await Promise.all([
         transaction.get(slugRef),
@@ -635,7 +635,6 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
     const [servicesSnap, reviewsSnap, statsSnap, apptsSnap, portfolioSnap] = await Promise.all([
       db.collection("services")
         .where("professionalId", "==", uid)
-        .where("active", "==", true)
         .get(),
       db.collection("reviews")
         .where("professionalId", "==", uid)
@@ -676,7 +675,9 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
       roundedBookings = totalCompleted;
     }
 
-    const sanitizedServices = servicesSnap.docs.map(doc => {
+    const sanitizedServices = servicesSnap.docs
+      .filter(doc => doc.data().active !== false)
+      .map(doc => {
       const d = doc.data();
       return {
         id: doc.id,
