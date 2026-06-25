@@ -345,12 +345,15 @@ export default function FinancialPage() {
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Recebido
                       </p>
-                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-2xl xs:text-3xl sm:text-4xl md:text-5xl xl:text-[56px] font-serif text-brand-ink tracking-tight leading-none whitespace-nowrap tabular-nums">
+                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-2xl xs:text-3xl sm:text-4xl md:text-5xl xl:text-[56px] font-serif text-brand-ink tracking-tight leading-none whitespace-nowrap tabular-nums mb-1 md:mb-2">
                         <span className="text-[0.45em] font-sans text-brand-stone/60 tracking-wider font-medium uppercase shrink-0">R$</span>
                         <span>
                           {formatCurrency(currentMonthData.current?.revenue || 0).replace(/^[^\d-]+/, '')}
                         </span>
                       </div>
+                      <p className="text-[9px] md:text-[10px] text-brand-stone/70 font-light max-w-[200px] leading-relaxed">
+                        Valor já realizado neste mês.
+                      </p>
                     </div>
                     
                     <div className="hidden lg:block h-20 w-px bg-brand-mist/60" />
@@ -358,7 +361,7 @@ export default function FinancialPage() {
                     
                     <div className="flex-1 flex flex-col justify-end min-w-0">
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
-                        Previsto
+                        Receita confirmada
                       </p>
                       <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-lg xs:text-xl sm:text-2xl md:text-3xl xl:text-4xl font-serif text-brand-ink/80 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
                         <span className="text-[0.5em] font-sans text-brand-stone/50 tracking-wider font-medium uppercase shrink-0">R$</span>
@@ -367,7 +370,7 @@ export default function FinancialPage() {
                         </span>
                       </div>
                       <p className="text-[9px] md:text-[10px] text-brand-stone/70 font-light max-w-[200px] leading-relaxed">
-                        Clientes já confirmadas para os próximos dias.
+                        Clientes confirmadas para os próximos dias.
                       </p>
                     </div>
 
@@ -376,7 +379,7 @@ export default function FinancialPage() {
 
                     <div className="flex-1 flex flex-col justify-end min-w-0">
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
-                        Aguardando
+                        Aguardando confirmação
                       </p>
                       <div className="flex items-baseline gap-1 max-w-full text-base xs:text-lg sm:text-xl md:text-2xl xl:text-3xl font-serif text-brand-ink/60 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
                         <span className="text-[0.5em] font-sans text-brand-stone/50 tracking-wider font-medium uppercase shrink-0">R$</span>
@@ -385,7 +388,7 @@ export default function FinancialPage() {
                         </span>
                       </div>
                       <p className="text-[9px] md:text-[10px] text-brand-stone/70 font-light max-w-[200px] leading-relaxed">
-                        Solicitações pendentes de resposta.
+                        Se essas clientes confirmarem, esse valor entra na previsão.
                       </p>
                     </div>
                   </div>
@@ -410,7 +413,7 @@ export default function FinancialPage() {
                       {formatCurrency(currentMonthData.current?.ticketAverage || 0).replace(/^[^\d-]+/, '')}
                     </span>
                   </div>
-                  <p className="text-[10px] text-brand-stone italic font-light">Com base neste mês</p>
+                  <p className="text-[10px] text-brand-stone italic font-light">Média por atendimento neste mês.</p>
                 </motion.div>
 
                 <motion.div 
@@ -427,7 +430,7 @@ export default function FinancialPage() {
                   <p className="text-3xl md:text-[40px] font-serif text-brand-ink tracking-tight mb-1.5 md:mb-2">
                     {currentMonthData.current?.appointmentsCount || 0}
                   </p>
-                  <p className="text-[10px] text-brand-stone italic font-light">Realizados neste mês</p>
+                  <p className="text-[10px] text-brand-stone italic font-light">Realizados neste mês.</p>
                 </motion.div>
               </div>
             </div>
@@ -437,7 +440,7 @@ export default function FinancialPage() {
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
                   <h3 className="text-xl md:text-2xl font-serif text-brand-ink mb-2">Receita por serviço</h3>
-                  <p className="text-sm md:text-base text-brand-stone font-light">Veja quais serviços mais movimentam seu mês.</p>
+                  <p className="text-sm md:text-base text-brand-stone font-light">Veja quais serviços mais movimentaram seu mês.</p>
                 </div>
               </div>
 
@@ -515,12 +518,12 @@ export default function FinancialPage() {
                         </div>
                         
                         <div className="hidden sm:block min-w-[120px]">
-                          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Previsto</span>
+                          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Receita confirmada</span>
                           <span className="text-base font-medium text-brand-ink/80 block whitespace-nowrap tabular-nums">{formatCurrency(group.plannedRevenue)}</span>
                         </div>
                         
                         <div className="hidden xl:block min-w-[140px]">
-                          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Aguardando</span>
+                          <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-brand-stone block mb-1">Aguardando confirmação</span>
                           <span className="text-base font-medium text-brand-stone block whitespace-nowrap tabular-nums">{formatCurrency(group.pendingRevenue)}</span>
                         </div>
                         
@@ -615,7 +618,7 @@ export default function FinancialPage() {
                                           "bg-brand-linen text-brand-stone"
                                         )}>
                                           {isCompletedStatus(appt.status) ? 'Recebido' : 
-                                           isConfirmedLikeStatus(appt.status) ? 'Previsto' : 
+                                           isConfirmedLikeStatus(appt.status) ? 'Receita confirmada' : 
                                            isPendingStatus(appt.status) ? 'Aguardando confirmação' : 
                                            isCancelledStatus(appt.status) ? 'Cancelado' : appt.status}
                                         </span>
