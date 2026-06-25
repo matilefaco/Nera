@@ -1331,6 +1331,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 
       // Create Booking Lock
       if (lockRef) {
+        const pendingLockExpiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
         transaction.set(lockRef, {
           professionalId: finalData.professionalId,
           date: finalData.date,
@@ -1338,6 +1339,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           appointmentId: apptRef.id,
           serviceId: finalData.serviceId || "unknown",
           status: "pending",
+          expiresAt: pendingLockExpiresAt,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
