@@ -894,8 +894,24 @@ export async function triggerWaitlistCheck(professionalId: string, date: string,
 /**
  * Manually invites a person from the waitlist
  */
-export async function inviteFromWaitlist(entryId: string, time: string) {
+export async function inviteFromWaitlist(entryId: string, time: string, professionalId: string, date: string) {
   const expiresAt = new Date(Date.now() + 15 * 60000); // 15 mins
+  
+  // Create lock document ID consistent with backend
+  const cleanTime = time.replace(":", "");
+  const lockId = `${professionalId}_${date}_${cleanTime}`;
+  
+  // Set the lock first
+  await setDoc(doc(db, 'booking_locks', lockId), {
+    professionalId,
+    date,
+    time,
+    waitlistEntryId: entryId,
+    expiresAt: expiresAt,
+    status: 'waitlist_lock'
+  });
+
+  // Then update waitlist
   await updateDoc(doc(db, 'waitlist', entryId), {
     status: 'invited',
     invitationSentAt: serverTimestamp(),

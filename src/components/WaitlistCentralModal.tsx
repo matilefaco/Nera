@@ -6,7 +6,7 @@ import {
   ArrowUpRight, AlertCircle, Info, Phone,
   CheckCircle2, Send
 } from 'lucide-react';
-import { db, inviteFromWaitlist } from '../firebase';
+import { db, inviteFromWaitlist, getUserProfile } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { notify } from '../lib/notify';
 import { cn, buildWhatsappLink, formatLocalDate } from '../lib/utils';
@@ -71,13 +71,39 @@ setLoading(false);
       return;
     }
     try {
-      await inviteFromWaitlist(entry.id, targetTime);
-      notify.success(`Convite enviado para ${entry.clientName}!`);
+      const profile = await getUserProfile(professionalId);
+      await inviteFromWaitlist(entry.id, targetTime, entry.professionalId, entry.requestedDate);
       
-      const formattedServiceName = entry.additionalServices?.length > 0 ? [entry.serviceName, ...entry.additionalServices.map((s:any) => s.name)].join(" e ") : entry.serviceName;
-      const msg = `Oi ${entry.clientName}! 🌟 Vimos que você está na nossa lista de espera. Acabou de surgir uma vaga para ${formattedServiceName} dia ${formatLocalDate(entry.requestedDate, { day: 'numeric', month: 'numeric' })} às ${targetTime}. Tem interesse?`;
+      const PUBLIC_APP_URL = window.location.origin;
+      const professionalSlug = profile?.slug || profile?.uid || professionalId;
+      const waitlistInviteUrl = `${PUBLIC_APP_URL}/p/${professionalSlug}?w=${entry.id}`;
+      
+      const msg = `Boa notícia!\n\nAcabou de surgir um horário para o serviço que você queria.\n\nEssa vaga ficará reservada para você por 15 minutos.\n\nClique abaixo para confirmar:\n${waitlistInviteUrl}`;
+      
+      // Trigger backend notification (email + automated whatsapp if configured)
+      fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "WAITLIST_INVITATION",
+          payload: {
+            clientWhatsapp: entry.clientWhatsapp,
+            clientEmail: entry.clientEmail,
+            clientName: entry.clientName,
+            requestedDate: entry.requestedDate,
+            assignedTime: targetTime,
+            professionalName: profile?.name || "Profissional",
+            serviceName: entry.serviceName,
+            id: entry.id,
+            professionalSlug: professionalSlug
+          }
+        })
+      }).catch(console.error);
+
+      // Open WhatsApp as a fallback for professionals without automated WhatsApp
       window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
       
+      notify.success(`Convite enviado para ${entry.clientName}!`);
       onClose();
     } catch {
       notify.error('Erro ao enviar convite.');

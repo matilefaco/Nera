@@ -897,17 +897,39 @@ export default function Dashboard() {
     setProcessingId(entry.id);
     try {
       const time = entry.preferredTime || '15:00'; 
-      await inviteFromWaitlist(entry.id, time);
+      await inviteFromWaitlist(entry.id, time, entry.professionalId, entry.requestedDate);
       
+      const PUBLIC_APP_URL = window.location.origin;
+      const professionalSlug = profile?.slug || profile?.uid;
       const msg = generateWaitlistInviteMessage(
         entry.clientName,
         entry.requestedDate,
         time,
-        profile?.slug || '',
+        professionalSlug || '',
         entry.id,
         profile?.name
       );
       
+      // Trigger backend notification (email + automated whatsapp if configured)
+      fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "WAITLIST_INVITATION",
+          payload: {
+            clientWhatsapp: entry.clientWhatsapp,
+            clientEmail: entry.clientEmail,
+            clientName: entry.clientName,
+            requestedDate: entry.requestedDate,
+            assignedTime: time,
+            professionalName: profile?.name || "Profissional",
+            serviceName: entry.serviceName,
+            id: entry.id,
+            professionalSlug: professionalSlug
+          }
+        })
+      }).catch(console.error);
+
       window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');
       notify.success('Convite enviado!');
     } catch (e) {

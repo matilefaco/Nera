@@ -23,6 +23,7 @@ import {
   CircleSlash,
   ChevronLeft,
   ChevronRight,
+  Car,
 } from "lucide-react";
 import {
   collection,
@@ -208,8 +209,23 @@ export default function BookingModal({
           setSelectedTime(waitlistEntry.assignedTime);
         setClientName(waitlistEntry.clientName);
         setClientPhone(waitlistEntry.clientWhatsapp);
+        if (waitlistEntry.clientEmail) setClientEmail(waitlistEntry.clientEmail);
         setShowRestoreDraft(false);
-        setStep(3); // Changed from 4 to 3 to allow review before confirming
+
+        // Calculate if we need step 2 for missing data
+        let nextStep = 3;
+        if (!waitlistEntry.clientEmail) nextStep = 2; // Needs email
+        
+        // Ensure we determine booking mode
+        const smode = profile?.serviceMode || "studio";
+        if (smode === "hybrid") {
+           nextStep = 2; // User must explicitly choose home or studio
+        } else {
+           setBookingMode(smode === "home" ? "home" : "studio");
+           if (smode === "home") nextStep = 2; // Needs address
+        }
+        
+        setStep(nextStep);
       } else if (!selectedService) {
         // Only reset if we don't have a selection already (to avoid flickering if re-rendering)
         setSelectedService(null);
@@ -827,10 +843,14 @@ export default function BookingModal({
     let isAddressValid = true;
 
     if (isHomeService) {
+      const isCustomAreaValid = profile?.serviceAreaType === 'custom' && profile.serviceAreas && profile.serviceAreas.length > 0 
+        ? (selectedArea && addressNeighborhood !== 'other')
+        : (addressNeighborhood.trim() || selectedArea?.name);
+
       isAddressValid = !!(
         addressStreet.trim() &&
         addressNumber.trim() &&
-        (addressNeighborhood.trim() || selectedArea?.name) &&
+        isCustomAreaValid &&
         (addressCity.trim() || profile?.city)
       );
     }
@@ -951,11 +971,7 @@ export default function BookingModal({
       // Post-booking notifications (BOOKING_PENDING_CLIENT and NEW_BOOKING_REQUEST)
       // are now handled safely and securely by the backend inside the
       // /api/public/create-booking endpoint.
-
-      // If booking from waitlist, mark it as booked
-      if (waitlistEntry?.id && profile.professionalId !== "demo-helena-prado") {
-        await markWaitlistAsBooked(waitlistEntry.id);
-      }
+      // Waitlist entry is also securely updated by the backend.
 
       localStorage.removeItem("booking_draft");
       setTimeout(() => {
@@ -1670,6 +1686,64 @@ export default function BookingModal({
                       </div>
                     )}
 
+                    {isHomeService && (
+                      <div className="bg-brand-mist/20 border border-brand-mist/60 rounded-[20px] p-5">
+                        <div className="flex items-start gap-3">
+                          <Car size={16} className="text-brand-ink mt-0.5 shrink-0" />
+                          <div className="space-y-3 w-full">
+                            
+                            {/* Travel Fee Notice */}
+                            {profile.travelFeeMode === 'fixed' && Number(profile.fixedTravelFee) > 0 ? (
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium text-brand-ink">
+                                  Atendimento em domicílio
+                                </p>
+                                <p className="text-xs text-brand-stone leading-relaxed">
+                                  Esta profissional cobra uma taxa de deslocamento de <strong className="font-semibold text-brand-ink">{formatCurrency(profile.fixedTravelFee)}</strong>. Esse valor será somado ao total do atendimento.
+                                </p>
+                              </div>
+                            ) : profile.travelFeeMode !== 'fixed' && profile.serviceAreas?.some((a: any) => a.fee > 0) ? (
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium text-brand-ink">
+                                  Atendimento em domicílio
+                                </p>
+                                <p className="text-xs text-brand-stone leading-relaxed">
+                                  Esta profissional cobra uma taxa de deslocamento que varia de acordo com o bairro.
+                                </p>
+                              </div>
+                            ) : (
+                               <p className="text-sm font-medium text-brand-ink">
+                                 Atendimento em domicílio
+                               </p>
+                            )}
+
+                            {/* Service Area Notice */}
+                            {profile.serviceAreaType === 'city_wide' ? (
+                              <p className="text-xs text-brand-stone font-medium">
+                                Atendimento disponível em toda a cidade.
+                              </p>
+                            ) : profile.serviceAreas && profile.serviceAreas.length > 0 ? (
+                              <div className="space-y-2">
+                                <p className="text-xs text-brand-stone">
+                                  Atendimento disponível apenas nestes bairros:
+                                </p>
+                                <ul className="text-xs text-brand-stone font-medium grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 list-disc pl-4">
+                                  {profile.serviceAreas.slice(0, 6).map((area: any) => (
+                                    <li key={area.name}>{area.name} {profile.travelFeeMode !== 'fixed' && area.fee > 0 ? `(${formatCurrency(area.fee)})` : ''}</li>
+                                  ))}
+                                  {profile.serviceAreas.length > 6 && (
+                                    <li className="text-brand-stone/60 list-none -ml-4 pl-0 mt-1 italic">
+                                      e mais {profile.serviceAreas.length - 6} bairros...
+                                    </li>
+                                  )}
+                                </ul>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-4 mb-8">
                       <div className="space-y-1.5">
                         <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-1">
@@ -1773,11 +1847,23 @@ export default function BookingModal({
 
                       {isHomeService && (
                         <div className="space-y-6 pt-4 mt-4 border-t border-brand-mist/30">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Home size={14} className="text-brand-terracotta" />
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
-                              Endereço do Atendimento
-                            </span>
+                          <div className="flex flex-col gap-1 mb-4">
+                            <div className="flex items-center gap-2">
+                              <Home size={14} className="text-brand-terracotta" />
+                              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-ink">
+                                Endereço do Atendimento
+                              </span>
+                            </div>
+                            {profile.travelFeeMode === 'fixed' && Number(profile.fixedTravelFee) > 0 && (
+                              <p className="text-[10px] text-brand-stone font-medium ml-6">
+                                ✓ Taxa de deslocamento: {formatCurrency(profile.fixedTravelFee)}
+                              </p>
+                            )}
+                            {profile.travelFeeMode !== 'fixed' && getTravelFee() > 0 && (
+                              <p className="text-[10px] text-brand-stone font-medium ml-6">
+                                ✓ Taxa de deslocamento: {formatCurrency(getTravelFee())}
+                              </p>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-4 gap-4">
@@ -1846,37 +1932,67 @@ export default function BookingModal({
                               </label>
                               {profile?.serviceAreas &&
                               profile.serviceAreas.length > 0 &&
-                              profile.travelFeeMode !== "fixed" ? (
-                                <select
-                                  value={selectedArea?.name || ""}
-                                  onChange={(e) => {
-                                    const area = profile.serviceAreas?.find(
-                                      (a) => a.name === e.target.value,
-                                    );
-                                    if (area) {
-                                      setSelectedArea(area);
-                                      setAddressNeighborhood(area.name);
-                                    } else {
-                                      setSelectedArea(null);
-                                      setAddressNeighborhood("");
-                                    }
-                                  }}
-                                  className={cn(
-                                    "w-full px-4 py-3 bg-brand-parchment border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all appearance-none",
-                                    !selectedArea && bookingAttempted
-                                      ? "border-brand-terracotta"
-                                      : "border-brand-mist",
-                                  )}
-                                >
-                                  <option value="">
-                                    Selecione sua região...
-                                  </option>
-                                  {profile.serviceAreas.map((area) => (
-                                    <option key={area.name} value={area.name}>
-                                      {area.name}
+                              profile.serviceAreaType === "custom" ? (
+                                <div className="space-y-3">
+                                  <select
+                                    value={addressNeighborhood === "other" ? "other" : selectedArea?.name || ""}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      if (val === "other") {
+                                        setSelectedArea(null);
+                                        setAddressNeighborhood("other");
+                                      } else {
+                                        const area = profile.serviceAreas?.find(
+                                          (a) => a.name === val,
+                                        );
+                                        if (area) {
+                                          setSelectedArea(area);
+                                          setAddressNeighborhood(area.name);
+                                        } else {
+                                          setSelectedArea(null);
+                                          setAddressNeighborhood("");
+                                        }
+                                      }
+                                    }}
+                                    className={cn(
+                                      "w-full px-4 py-3 bg-brand-parchment border rounded-xl text-xs outline-none focus:ring-1 focus:ring-brand-ink transition-all appearance-none",
+                                      (!selectedArea && addressNeighborhood !== "other" && bookingAttempted)
+                                        ? "border-brand-terracotta"
+                                        : "border-brand-mist",
+                                    )}
+                                  >
+                                    <option value="">
+                                      Selecione sua região...
                                     </option>
-                                  ))}
-                                </select>
+                                    {profile.serviceAreas.map((area) => (
+                                      <option key={area.name} value={area.name}>
+                                        {area.name}
+                                      </option>
+                                    ))}
+                                    <option value="other">Outro bairro (não listado)</option>
+                                  </select>
+
+                                  {addressNeighborhood === "other" && (
+                                    <div className="bg-brand-mist/20 border border-brand-mist p-4 rounded-xl">
+                                      <p className="text-[11px] font-medium text-brand-terracotta mb-2">
+                                        Infelizmente esta profissional ainda não atende esse bairro.
+                                      </p>
+                                      <p className="text-[10px] text-brand-stone mb-1">
+                                        Ela atende os seguintes bairros:
+                                      </p>
+                                      <ul className="text-[10px] text-brand-stone/80 list-disc pl-4 grid grid-cols-1 sm:grid-cols-2 gap-x-2">
+                                        {profile.serviceAreas.slice(0, 6).map((area: any) => (
+                                          <li key={area.name}>{area.name}</li>
+                                        ))}
+                                        {profile.serviceAreas.length > 6 && (
+                                          <li className="list-none -ml-4 pl-0 italic opacity-70">
+                                            e mais {profile.serviceAreas.length - 6}...
+                                          </li>
+                                        )}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
                               ) : (
                                 <input
                                   type="text"
@@ -1958,7 +2074,8 @@ export default function BookingModal({
                           !clientName ||
                           !clientPhone ||
                           !clientEmail ||
-                          (isHomeService && (!addressStreet || !addressNumber))
+                          !bookingMode ||
+                          (isHomeService && (!addressStreet || !addressNumber || (profile.serviceAreaType === 'custom' && profile.serviceAreas && profile.serviceAreas.length > 0 && (!selectedArea || addressNeighborhood === 'other'))))
                         }
                         onClick={() => setStep(3)}
                       >
@@ -1990,6 +2107,19 @@ export default function BookingModal({
                   </div>
 
                   <div className="bg-brand-ink text-brand-white rounded-[32px] p-5 md:p-6 mb-6 shadow-xl relative overflow-hidden group">
+                    {waitlistEntry && (
+                      <div className="bg-brand-terracotta/20 border border-brand-terracotta/30 rounded-2xl p-4 mb-5 flex items-start gap-3">
+                        <Sparkles size={18} className="text-brand-terracotta shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-brand-linen font-medium mb-1">
+                            Seu horário ficou reservado por alguns minutos.
+                          </p>
+                          <p className="text-[10px] text-brand-linen/70 font-light">
+                            Aproveite antes que a vaga seja liberada novamente para o público.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-col relative z-10">
                       <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-terracotta mb-3">
                         Resumo
@@ -2041,7 +2171,10 @@ export default function BookingModal({
                                 </span>
                               </div>
                               <div className="flex justify-between md:justify-end gap-6 text-xs text-brand-linen/70">
-                                <span>Deslocamento</span>
+                                <div className="flex flex-col text-left md:text-right">
+                                  <span>Taxa de deslocamento</span>
+                                  <span className="text-[9px] opacity-70">Referente ao atendimento em domicílio</span>
+                                </div>
                                 <span>{formatCurrency(getTravelFee())}</span>
                               </div>
                             </div>
@@ -2265,7 +2398,8 @@ export default function BookingModal({
                     (!clientName ||
                       !clientPhone ||
                       !clientEmail ||
-                      (isHomeService && (!addressStreet || !addressNumber))))
+                      !bookingMode ||
+                      (isHomeService && (!addressStreet || !addressNumber || (profile.serviceAreaType === 'custom' && profile.serviceAreas && profile.serviceAreas.length > 0 && (!selectedArea || addressNeighborhood === 'other'))))))
                 }
                 loading={step === 3 && bookingLoading}
                 onClick={() => {
@@ -2276,7 +2410,7 @@ export default function BookingModal({
               >
                 {step === 1 && "Continuar para Dados"}
                 {step === 2 && "Revisar Agendamento"}
-                {step === 3 && "Confirmar Agora"}
+                {step === 3 && "Confirmar Agendamento"}
                 <ArrowRight size={18} className="ml-1" />
               </PremiumButton>
             </div>
@@ -2301,13 +2435,10 @@ export default function BookingModal({
                 <Check size={48} />
               </motion.div>
               <h2 className="text-3xl md:text-4xl font-serif text-brand-ink mb-3 leading-tight">
-                Sua reserva foi registrada
+                Seu atendimento foi confirmado com sucesso.
               </h2>
               <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
-                {
-                  getBookingNotificationCopy(profile.plan, !!profile.whatsapp)
-                    .notification
-                }
+                {waitlistEntry ? "Tudo pronto! Seu horário está confirmado na agenda da profissional." : getBookingNotificationCopy(profile.plan, !!profile.whatsapp).notification}
                 <span className="block mt-2 text-[10px] text-brand-stone italic">
                   Verifique sua caixa de entrada e spam ✨
                 </span>

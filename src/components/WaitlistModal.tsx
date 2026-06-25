@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { addToWaitlist } from '../firebase';
 import { UserProfile, Service, WaitlistEntry } from '../types';
-import { cn, formatDateKey, getTodayLocale, formatLocalDate } from '../lib/utils';
+import { cn, formatDateKey, getTodayLocale, formatLocalDate, cleanWhatsapp, isValidWhatsapp, formatWhatsappDisplay } from '../lib/utils';
 import PremiumButton from './PremiumButton';
 import { notify } from '../lib/notify';
 
@@ -32,6 +32,7 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
     preferredTime: '',
     clientName: '',
     clientWhatsapp: '',
+    clientEmail: '',
     serviceId: initialService?.id || services[0]?.id || '',
     serviceName: initialService?.name || services[0]?.name || ''
   });
@@ -52,8 +53,19 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
   ];
 
   const handleJoin = async () => {
-    if (!formData.clientName || !formData.clientWhatsapp) {
-      notify.error('Preencha seu nome e WhatsApp.');
+    if (!formData.clientName) {
+      notify.error('Preencha seu nome para entrar na lista.');
+      return;
+    }
+
+    if (!formData.clientWhatsapp) {
+      notify.error('Informe seu WhatsApp para avisarmos quando abrir uma vaga.');
+      return;
+    }
+
+    const cleanedPhone = cleanWhatsapp(formData.clientWhatsapp);
+    if (!isValidWhatsapp(cleanedPhone) && cleanedPhone.length < 10) {
+      notify.error('Confira o número do WhatsApp.');
       return;
     }
     
@@ -62,6 +74,7 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
       await addToWaitlist({
         professionalId: profile.uid,
         ...formData,
+        clientWhatsapp: cleanedPhone,
         status: 'waiting'
       });
       setStep('success');
@@ -108,7 +121,7 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
                 <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-brand-ink">Lista Prioritária</span>
               </div>
               <h3 className="text-3xl font-serif text-brand-ink mb-2">Lista de Espera</h3>
-              <p className="text-sm text-brand-stone font-light mb-10">Quando surgir uma desistência, você será a primeira a saber.</p>
+              <p className="text-sm text-brand-stone font-light mb-10">Quando abrir uma vaga, a profissional poderá avisar você.</p>
 
               <div className="space-y-4 mb-10">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-brand-stone ml-2">Qual dia você prefere?</p>
@@ -209,7 +222,13 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
               </button>
 
               <h3 className="text-3xl font-serif text-brand-ink mb-2">Seus Contatos</h3>
-              <p className="text-sm text-brand-stone font-light mb-10">Como devemos te avisar quando a vaga abrir?</p>
+              <p className="text-sm text-brand-stone font-light mb-8">Como devemos te avisar quando a vaga abrir?</p>
+
+              <div className="bg-brand-mist/20 border border-brand-mist rounded-2xl p-4 mb-8">
+                <p className="text-xs text-brand-stone font-medium text-center">
+                  Isso ainda não é uma reserva. Você será avisada caso surja um horário disponível.
+                </p>
+              </div>
 
               <div className="space-y-6 mb-10">
                 <div className="space-y-2">
@@ -223,12 +242,22 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">WhatsApp</label>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">WhatsApp *</label>
                   <input 
                     type="tel"
                     value={formData.clientWhatsapp}
-                    onChange={(e) => setFormData({...formData, clientWhatsapp: e.target.value})}
+                    onChange={(e) => setFormData({...formData, clientWhatsapp: formatWhatsappDisplay(e.target.value)})}
                     placeholder="(00) 00000-0000"
+                    className="w-full p-5 bg-brand-parchment rounded-2xl border border-brand-mist outline-none focus:border-brand-ink"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-brand-stone ml-2">E-mail (opcional)</label>
+                  <input 
+                    type="email"
+                    value={formData.clientEmail}
+                    onChange={(e) => setFormData({...formData, clientEmail: e.target.value})}
+                    placeholder="seu@email.com"
                     className="w-full p-5 bg-brand-parchment rounded-2xl border border-brand-mist outline-none focus:border-brand-ink"
                   />
                 </div>
@@ -251,6 +280,7 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
                 variant="terracotta" 
                 className="w-full py-6" 
                 loading={loading}
+                disabled={!formData.clientName.trim() || !formData.clientWhatsapp.trim() || formData.clientWhatsapp.trim().length < 14}
                 onClick={handleJoin}
               >
                 Entrar na Lista
@@ -264,10 +294,9 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
                 <Check size={40} className="text-brand-terracotta" />
               </div>
               <h3 className="text-3xl font-serif text-brand-ink mb-4">Você está na lista!</h3>
-              <p className="text-brand-stone font-light italic leading-relaxed mb-10 max-w-xs mx-auto">
-                Fique atenta ao seu WhatsApp. Se um horário abrir para <br/> 
-                <strong>{formatLocalDate(formData.requestedDate, { day: '2-digit', month: 'long' })}</strong>, <br/>
-                enviaremos um convite prioritário para você.
+              <p className="text-brand-stone font-light leading-relaxed mb-10 max-w-sm mx-auto text-center">
+                Isso ainda não é uma reserva.<br/>
+                A profissional poderá entrar em contato via WhatsApp caso algum horário fique disponível para <strong className="font-bold">{formatLocalDate(formData.requestedDate, { day: '2-digit', month: 'long' })}</strong>.
               </p>
               <PremiumButton variant="ink" className="w-full py-5" onClick={onClose}>
                 Entendido

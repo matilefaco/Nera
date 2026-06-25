@@ -264,11 +264,7 @@ export function generateWaitlistInviteMessage(
   const dateFormatted = isToday ? 'hoje' : formatLocalDate(date, { day: 'numeric', month: 'long' });
   const baseUrl = window.location.origin;
 
-  return `Olá, ${firstName}! ✨ Notícia especial: uma vaga acabou de abrir na agenda de ${proName} para ${dateFormatted}, às ${time}.
-
-Como você está na nossa lista prioritária, reservamos este horário exclusivamente para você pelos próximos 15 minutos. 
-
-Deseja aproveitar? Garanta sua reserva aqui: ${baseUrl}/p/${slug}?w=${entryId}`;
+  return `Boa notícia!\n\nAcabou de surgir um horário para o serviço que você queria.\n\nEssa vaga ficará reservada para você por 15 minutos.\n\nClique abaixo para confirmar:\n${baseUrl}/p/${slug}?w=${entryId}`;
 }
 
 /**

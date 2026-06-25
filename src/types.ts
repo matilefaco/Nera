@@ -328,6 +328,7 @@ export interface WaitlistEntry {
   professionalId: string;
   clientName: string;
   clientWhatsapp: string;
+  clientEmail?: string;
   requestedDate: string; // YYYY-MM-DD
   serviceId: string;
   serviceName: string;

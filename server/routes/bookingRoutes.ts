@@ -686,7 +686,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
     const finalData: any = {
       ...cleanedData,
       source: "public",
-      status: "pending",
+      status: appointmentData.waitlistEntryId ? "confirmed" : "pending",
       token: manageSlug,
       publicToken: manageSlug,
       manageToken: manageSlug,
@@ -1371,6 +1371,11 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           status: "booked",
           bookedAt: admin.firestore.FieldValue.serverTimestamp()
         });
+        
+        const cleanTime = appointmentData.time.replace(":", "");
+        const lockId = `${appointmentData.professionalId}_${appointmentData.date}_${cleanTime}`;
+        const lockRef = db.collection("booking_locks").doc(lockId);
+        transaction.delete(lockRef);
       }
 
       // Update Client Summary
@@ -1427,49 +1432,77 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
               : finalData.serviceName;
 
           // Executa os envios em paralelo para não atrasar a resposta
-          await Promise.allSettled([
-            sendBookingPendingClientNotification(
-              {
-                clientEmail: appointmentData.clientEmail,
-                clientName: appointmentData.clientName,
-                professionalName: proData?.name || "Profissional",
-                professionalWhatsapp: proData?.whatsapp || "",
-                serviceName: displayServiceName,
-                date: finalData.date,
-                time: finalData.time,
-                price: `R$ ${(finalData.price || 0).toFixed(2).replace(".", ",")}`,
-                travelFee: finalData.travelFee,
-                totalPrice: finalData.finalPrice,
-                reservationCode,
-                manageUrl: buildPublicBookingUrl(manageSlug),
-                appointmentId: apptRef.id,
-                paymentMethods: paymentMethodsArr,
-              },
-              baseUrl,
-            ),
-            sendNewBookingRequestNotification(
-              {
-                professionalId: appointmentData.professionalId,
-                clientName: appointmentData.clientName,
-                serviceName: displayServiceName,
-                date: finalData.date,
-                time: finalData.time,
-                totalPrice: finalData.finalPrice,
-                travelFee: finalData.travelFee,
-                price: finalData.price,
-                appointmentId: apptRef.id,
-                token: manageSlug,
-                paymentMethods: paymentMethodsArr,
-                locationDetail: locationDetail,
-                clientWhatsapp:
-                  appointmentData.clientWhatsapp ||
-                  appointmentData.clientPhone ||
-                  "",
-                clientEmail: appointmentData.clientEmail,
-              },
-              baseUrl,
-            )
-          ]);
+          if (appointmentData.waitlistEntryId) {
+             try {
+                const apptDoc = await db.collection("appointments").doc(apptRef.id).get();
+                if (apptDoc.exists && apptDoc.data()?.status === "confirmed") {
+                   createGoogleCalendarEvent({ id: apptRef.id, ...apptDoc.data() }, appointmentData.professionalId);
+                }
+             } catch (e: any) {
+                logger.error("CALENDAR", "Failed to create Google Calendar event for waitlist booking", { error: e.message });
+             }
+
+             await Promise.allSettled([
+                sendBookingConfirmedClientNotification({ appointmentId: apptRef.id }, baseUrl),
+                fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    type: "WAITLIST_ACCEPTED_PROFESSIONAL",
+                    payload: {
+                      professionalId: appointmentData.professionalId,
+                      clientName: appointmentData.clientName,
+                      date: finalData.date,
+                      time: finalData.time,
+                    },
+                  }),
+                }).catch((e) => logger.error("NOTIFICATION", "Failed to send WAITLIST_ACCEPTED_PROFESSIONAL", { error: e }))
+             ]);
+          } else {
+            await Promise.allSettled([
+              sendBookingPendingClientNotification(
+                {
+                  clientEmail: appointmentData.clientEmail,
+                  clientName: appointmentData.clientName,
+                  professionalName: proData?.name || "Profissional",
+                  professionalWhatsapp: proData?.whatsapp || "",
+                  serviceName: displayServiceName,
+                  date: finalData.date,
+                  time: finalData.time,
+                  price: `R$ ${(finalData.price || 0).toFixed(2).replace(".", ",")}`,
+                  travelFee: finalData.travelFee,
+                  totalPrice: finalData.finalPrice,
+                  reservationCode,
+                  manageUrl: buildPublicBookingUrl(manageSlug),
+                  appointmentId: apptRef.id,
+                  paymentMethods: paymentMethodsArr,
+                },
+                baseUrl,
+              ),
+              sendNewBookingRequestNotification(
+                {
+                  professionalId: appointmentData.professionalId,
+                  clientName: appointmentData.clientName,
+                  serviceName: displayServiceName,
+                  date: finalData.date,
+                  time: finalData.time,
+                  totalPrice: finalData.finalPrice,
+                  travelFee: finalData.travelFee,
+                  price: finalData.price,
+                  appointmentId: apptRef.id,
+                  token: manageSlug,
+                  paymentMethods: paymentMethodsArr,
+                  locationDetail: locationDetail,
+                  clientWhatsapp:
+                    appointmentData.clientWhatsapp ||
+                    appointmentData.clientPhone ||
+                    "",
+                  clientEmail: appointmentData.clientEmail,
+                },
+                baseUrl,
+              )
+            ]);
+          }
         } catch (err: any) {
           logger.error(
             "NOTIFICATION",

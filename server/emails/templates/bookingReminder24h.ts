@@ -31,10 +31,11 @@ export function buildBookingReminder24hEmail(data: BookingReminderData): string 
 
   const bodyHtml = `
     <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 20px;">
-      Olá, ${firstName}. Um aviso carinhoso: seu horário com <strong>${professionalName}</strong> é amanhã.
+      Olá, ${firstName}. Seu atendimento está chegando.
     </p>
     <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
-      Guarde um tempinho na sua agenda e cuide-se com calma.
+      Confirme sua presença pelo botão abaixo.<br/><br/>
+      Você também pode usar o mesmo link para remarcar ou cancelar, se precisar.
     </p>
     
     ${buildEmailCard([

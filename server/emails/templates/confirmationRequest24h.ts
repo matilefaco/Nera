@@ -16,25 +16,23 @@ export function buildConfirmationRequest24hEmail(data: ConfirmationRequest24hDat
 
   const bodyHtml = `
     <p style="font-family: ${FONTS.sans}; font-size: 16px; color: ${COLORS.ink}; margin-bottom: 20px; font-weight: 500;">
-      Olá, ${clientName}.
+      Olá, ${clientName}. Seu atendimento está chegando.
     </p>
     <p style="font-family: ${FONTS.sans}; font-size: 15px; color: ${COLORS.stone}; margin-bottom: 30px; line-height: 1.6;">
-      Seu horário com <strong>${professionalName}</strong> é amanhã. Confirme sua presença para garantirmos o seu momento.
+      Confirme sua presença pelo botão abaixo.
     </p>
 
     ${buildEmailCard([
       { label: 'Serviço', value: serviceName },
+      { label: 'Profissional', value: professionalName },
       { label: 'Data', value: formattedDate },
       { label: 'Horário', value: time }
     ])}
 
     <div style="margin-top: 40px; text-align: center; padding-top: 20px; border-top: 1px solid ${COLORS.mist};">
       <p style="font-family: ${FONTS.sans}; font-size: 13px; color: ${COLORS.stone}; line-height: 1.6; margin-bottom: 12px;">
-        Se houver imprevistos, você pode reagendar seu horário:
+        Você também pode usar o mesmo link para remarcar ou cancelar, se precisar.
       </p>
-      <a href="${rescheduleUrl}" style="color: ${COLORS.stone}; font-family: ${FONTS.sans}; font-size: 13px; text-decoration: underline; font-weight: bold;">
-        Preciso remarcar
-      </a>
     </div>
   `;
 

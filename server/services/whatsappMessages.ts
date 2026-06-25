@@ -143,18 +143,15 @@ export function buildWaitlistInviteMessage(data: {
   professionalName: string,
   waitlistInviteUrl: string
 }): string {
-  return `Boa notícia ✨
+  return `Boa notícia!
 
-Abriu uma vaga para o horário que você queria.
+Acabou de surgir um horário para o serviço que você desejava.
 
-Serviço: ${data.serviceName}
-Data: ${data.date}
-Horário: ${data.time}
-Profissional: ${data.professionalName}
+Esse horário ficará reservado por alguns minutos.
 
-Essa vaga fica reservada por alguns minutos.
+Deseja confirmar?
 
-Confirme por aqui:
+Acesse o link para confirmar:
 ${data.waitlistInviteUrl}`.trim();
 }
 
@@ -191,8 +188,10 @@ Serviço: ${data.serviceName}
 Horário: ${data.time}
 Profissional: ${data.professionalName}
 
-Se precisar alterar seu horário:
+Confirme sua presença pelo link abaixo:
 ${data.manageBookingUrl}
+
+Se precisar remarcar ou cancelar, você também pode fazer por esse mesmo link.
 
 Até amanhã 💛`.trim();
 }

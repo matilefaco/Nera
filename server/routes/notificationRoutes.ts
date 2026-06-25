@@ -7,6 +7,7 @@ import { PUBLIC_APP_URL, buildPublicBookingUrl } from "../utils.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { 
   sendProfessionalNewBookingEmail,
+  sendWaitlistInviteEmail,
   sendBookingPendingEmail,
   sendBookingConfirmedEmail,
   sendBookingCancelledEmail,
@@ -808,17 +809,51 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
       return res.json({ success: true });
     }
 
+    if (type === 'WAITLIST_ACCEPTED_PROFESSIONAL') {
+      const { professionalId, clientName, date, time } = payload;
+      const proRef = db.collection('users').doc(professionalId);
+      const proSnap = await proRef.get();
+      
+      if (proSnap.exists) {
+        const proData = proSnap.data();
+        if (proData?.whatsapp) {
+          const formattedDate = date.split('-').reverse().join('/');
+          const msg = `Ótima notícia!\n\n${clientName} aceitou o horário liberado para ${formattedDate} às ${time}.\n\nO agendamento já foi confirmado e entrou automaticamente na sua agenda.`;
+          
+          await sendWhatsAppMeta(proData.whatsapp, msg, {
+            userId: professionalId,
+            type: 'waitlist_accepted_professional'
+          });
+        }
+      }
+      return res.json({ success: true });
+    }
+
     if (type === 'WAITLIST_INVITATION') {
-      const { clientWhatsapp, clientName, requestedDate, assignedTime, professionalName, serviceName, id, professionalSlug } = payload;
+      const { clientWhatsapp, clientEmail, clientName, requestedDate, assignedTime, professionalName, serviceName, id, professionalSlug } = payload;
+      const formattedDate = requestedDate.split('-').reverse().join('/');
+      const waitlistInviteUrl = `${baseUrl}/p/${professionalSlug || 'perfil'}?w=${id}`;
+
+      if (clientEmail) {
+        await sendWaitlistInviteEmail({
+          clientName,
+          clientEmail,
+          professionalName,
+          date: formattedDate,
+          time: assignedTime,
+          serviceName: serviceName || 'Serviço',
+          bookingUrl: waitlistInviteUrl,
+          expiresInHours: 0.25, // 15 mins default
+        }).catch((e) => logger.error("EMAIL", "Failed to send waitlist email", { error: e }));
+      }
       
       if (clientWhatsapp) {
-        const formattedDate = requestedDate.split('-').reverse().join('/');
         const msg = buildWaitlistInviteMessage({
           serviceName: serviceName || 'serviço',
           date: formattedDate,
           time: assignedTime,
           professionalName: professionalName,
-          waitlistInviteUrl: `${baseUrl}/p/${professionalSlug || 'perfil'}?w=${id}`
+          waitlistInviteUrl
         });
         
         await sendWhatsAppMeta(clientWhatsapp, msg, {

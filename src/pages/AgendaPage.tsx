@@ -269,6 +269,7 @@ export default function AgendaPage() {
   const [manualPrice, setManualPrice] = useState("");
   const [manualLocationType, setManualLocationType] = useState<"studio" | "home">("studio");
   const [manualClientAddress, setManualClientAddress] = useState("");
+  const [manualWaitlistEntryId, setManualWaitlistEntryId] = useState<string | null>(null);
   const [handledIds, setHandledIds] = useState<string[]>([]);
   const [manualDate, setManualDate] = useState(selectedDate);
   const [manualTime, setManualTime] = useState("");
@@ -800,6 +801,7 @@ export default function AgendaPage() {
         time: manualTime,
         locationType: manualLocationType,
         source: "manual",
+        waitlistEntryId: manualWaitlistEntryId || undefined,
         ...(manualLocationType === "home" && manualClientAddress ? {
           customerAddress: { street: manualClientAddress, number: "", neighborhood: "", city: "" }
         } : {}),
@@ -814,6 +816,7 @@ export default function AgendaPage() {
       setManualPrice("");
       setManualTime("");
       setManualClientAddress("");
+      setManualWaitlistEntryId(null);
       setIsManualModalOpen(false);
     } catch (err: any) {
       console.error("Manual Booking Error Detailed:", {
@@ -1627,6 +1630,7 @@ export default function AgendaPage() {
           targetDate={selectedDate}
           targetTime={manualTime || undefined}
           onFit={(entry) => {
+            setManualWaitlistEntryId(entry.id);
             setManualClient(entry.clientName);
             setManualPhone(entry.clientWhatsapp);
             setManualService(entry.serviceId);
