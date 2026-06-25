@@ -24,7 +24,7 @@ import { buildDailyDigestEmail } from './templates/dailyDigest.js';
 import { buildReviewMilestoneEmail } from './templates/reviewMilestone.js';
 import { buildRescheduleRequestedEmail } from './templates/rescheduleRequested.js';
 import { logger, maskEmail, maskToken } from '../utils/logger.js';
-import { PUBLIC_APP_URL } from '../utils.js';
+import { PUBLIC_APP_URL, buildPublicBookingUrl } from '../utils.js';
 
 // Lazy initialization of Resend client
 let _resendClient: Resend | null = null;
@@ -282,8 +282,8 @@ export async function sendBookingConfirmedEmail(data: BookingEmailData) {
   }
 
   const formattedDate = formatDateSafely(data.date);
-  const calendarUrl = data.manageUrl || `${APP_URL}/manage/${bookingId}`;
-  const manageUrl = data.manageUrl || `${APP_URL}/manage/${bookingId}`;
+  const calendarUrl = data.manageUrl || buildPublicBookingUrl(bookingId);
+  const manageUrl = data.manageUrl || buildPublicBookingUrl(bookingId);
 
   const html = buildBookingConfirmedEmail({
     ...data,
@@ -518,10 +518,10 @@ export async function sendBookingReminder24hEmail(data: any) {
     clientName: clientName || 'Cliente',
     professionalName: professionalName || 'Sua profissional',
     duration: data.duration || 60,
-    confirmUrl: manageUrl || `${APP_URL}/manage/${appointmentId}`,
+    confirmUrl: manageUrl || buildPublicBookingUrl(appointmentId),
     formattedDate,
     whatsappUrl: whatsappUrl || '#',
-    manageUrl: manageUrl || `${APP_URL}/manage/${appointmentId}`
+    manageUrl: manageUrl || buildPublicBookingUrl(appointmentId)
   });
 
   try {
@@ -566,10 +566,10 @@ export async function sendBookingRescheduledEmail(data: any) {
     clientName: clientName || 'Cliente',
     professionalName: professionalName || 'Sua profissional',
     rescheduledBy: rescheduledBy || 'professional',
-    cancelUrl: cancelUrl || `${APP_URL}/manage/${appointmentId}/cancel`,
+    cancelUrl: cancelUrl || `${buildPublicBookingUrl(appointmentId)}?action=cancel`,
     oldDate: oldDateFormatted,
     newDate: newDateFormatted,
-    manageUrl: manageUrl || `${APP_URL}/manage/${appointmentId}`
+    manageUrl: manageUrl || buildPublicBookingUrl(appointmentId)
   });
 
   try {

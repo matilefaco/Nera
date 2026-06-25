@@ -1,5 +1,5 @@
 import { getDb } from "../firebaseAdmin.js";
-import { shouldSendEmail, markEmailSent } from "../utils.js";
+import { shouldSendEmail, markEmailSent, PUBLIC_APP_URL, buildPublicBookingUrl } from "../utils.js";
 import {
   sendBookingPendingEmail,
   sendProfessionalNewBookingEmail,
@@ -165,7 +165,7 @@ export const sendBookingConfirmedClientNotification = async (
         token: token,
         prepInstructions: apptData.prepInstructions,
         whatsappUrl,
-        manageUrl: token ? `${baseUrl}/r/${token}` : undefined,
+        manageUrl: token ? buildPublicBookingUrl(token) : undefined,
         address: addressData,
         locationType: apptData.locationType,
       });
@@ -207,7 +207,7 @@ export const sendBookingConfirmedClientNotification = async (
         time: apptData.time,
         professionalName: pro?.name || "Profissional",
         local: fullAddressStr,
-        linkManage: `${baseUrl}/manage/${token || payload.appointmentId}`
+        linkManage: buildPublicBookingUrl(token || payload.appointmentId)
       });
       await sendWhatsApp(db, apptData.clientWhatsapp, waMsg, {
         appointmentId: payload.appointmentId,

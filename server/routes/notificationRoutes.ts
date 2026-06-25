@@ -3,6 +3,7 @@ import { randomBytes } from "crypto";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskPhone, maskToken, maskUid } from "../utils/logger.js";
+import { PUBLIC_APP_URL, buildPublicBookingUrl } from "../utils.js";
 import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import { 
   sendProfessionalNewBookingEmail,
@@ -678,7 +679,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
           date: formattedDate,
           time: time,
           local: payload.locationDetail || payload.neighborhood || 'Estúdio',
-          linkManage: `${baseUrl}/manage/${payload.manageSlug || appointmentId}`
+          linkManage: buildPublicBookingUrl(payload.manageSlug || appointmentId)
         });
         
         await sendWhatsApp(db, clientWhatsapp, msg, {
@@ -783,7 +784,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
             professionalName: pro?.name || 'Sua Profissional',
             oldDate: previousDate ? previousDate.split('-').reverse().join('/') : undefined,
             oldTime: previousTime,
-            manageBookingUrl: `${baseUrl}/manage/${payload.manageSlug || appointmentId}`
+            manageBookingUrl: buildPublicBookingUrl(payload.manageSlug || appointmentId)
           });
           const result = await sendWhatsApp(db, payload.clientWhatsapp, msg, {
             userId: professionalId,
@@ -905,9 +906,9 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
             serviceName: appt.serviceName,
             date: appt.date,
             time: appt.time,
-            confirmUrl: `${appUrl}/manage/${apptId}?action=confirm-presence`,
-            rescheduleUrl: `${appUrl}/manage/${apptId}?action=reschedule`,
-            cancelUrl: `${appUrl}/manage/${apptId}?action=cancel`,
+            confirmUrl: `${buildPublicBookingUrl(apptId)}?action=confirm-presence`,
+            rescheduleUrl: `${buildPublicBookingUrl(apptId)}?action=reschedule`,
+            cancelUrl: `${buildPublicBookingUrl(apptId)}?action=cancel`,
             appointmentId: apptId
           });
           
@@ -939,7 +940,7 @@ router.get('/cron/reminders24h', requireCronSecret, async (req, res) => {
           serviceName: appt.serviceName,
           time: appt.time,
           professionalName: pro?.name || 'Profissional',
-          manageBookingUrl: `${appUrl}/manage/${appt.manageSlug || apptId}`
+          manageBookingUrl: buildPublicBookingUrl(appt.manageSlug || apptId)
         });
 
         const result = await sendWhatsApp(db, appt.clientWhatsapp, msg, {

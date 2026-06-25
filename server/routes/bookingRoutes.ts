@@ -35,7 +35,7 @@ import {
   sendBookingConfirmedClientNotification,
 } from "../services/notificationService.js";
 import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
-import { PUBLIC_APP_URL, shouldSendEmail, markEmailSent } from "../utils.js";
+import { PUBLIC_APP_URL, shouldSendEmail, markEmailSent, buildPublicBookingUrl } from "../utils.js";
 import { buildCancellationByProMessageForClient, buildBookingRejectedMessageForClient } from "../services/whatsappMessages.js";
 import { sendWhatsApp } from "../services/whatsappService.js";
 
@@ -1436,7 +1436,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
                 travelFee: finalData.travelFee,
                 totalPrice: finalData.finalPrice,
                 reservationCode,
-                manageUrl: `${baseUrl}/r/${manageSlug}`,
+                manageUrl: buildPublicBookingUrl(manageSlug),
                 appointmentId: apptRef.id,
                 paymentMethods: paymentMethodsArr,
               },

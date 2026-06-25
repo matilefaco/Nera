@@ -350,8 +350,16 @@ setBlockedSchedules(dayBlocked);
 
   const isCancelled = isCancelledStatus(appointment.status);
   const isCompleted = appointment.status === 'completed'; // Existent explicit check
-  const isPending = isPendingStatus(appointment.status);
-  const isConfirmed = isRevenueStatus(appointment.status) && !isCompleted;
+  
+  // Pending request from the client's point of view
+  const isInitialPending = appointment.status === 'pending' || (appointment.status as string) === 'pending_conflict';
+  
+  // Professional confirmed it (so from client view it's "Confirmed" schedule), 
+  // but we are just pending their attendance confirmation
+  const isPendingConfirmation = (appointment.status as string) === 'pending_confirmation';
+
+  // For UI, if it's pending_confirmation we treat it as confirmed so it shows the confirmed banner
+  const isConfirmed = isRevenueStatus(appointment.status) || isPendingConfirmation;
   const isPast = new Date(appointment.date) < new Date(getTodayLocale());
 
   const handleCalendarAdd = () => {
@@ -435,7 +443,7 @@ setBlockedSchedules(dayBlocked);
                     </div>
                   )}
                   
-                  {isPending && (
+                  {isInitialPending && (
                     <div className="p-5 bg-brand-linen/40 rounded-3xl border border-brand-mist/50 mt-2 text-left">
                       <p className="text-sm text-brand-ink font-serif mb-2">Seu pedido foi enviado com sucesso e está aguardando confirmação da profissional.</p>
                       <p className="text-xs text-brand-stone font-light leading-relaxed">
@@ -444,7 +452,16 @@ setBlockedSchedules(dayBlocked);
                     </div>
                   )}
 
-                  {isConfirmed && !isPast && (
+                  {isPendingConfirmation && (
+                    <div className="p-5 bg-brand-white/60 rounded-3xl border border-brand-mist/40 mt-2 text-left">
+                      <p className="text-sm text-brand-ink font-serif mb-2">Confirme sua presença.</p>
+                      <p className="text-xs text-brand-stone font-light leading-relaxed">
+                        Seu horário está confirmado. A profissional aguarda apenas sua confirmação de presença no botão abaixo.
+                      </p>
+                    </div>
+                  )}
+
+                  {(isConfirmed && !isPendingConfirmation) && !isPast && (
                     <div className="p-5 bg-brand-white/60 rounded-3xl border border-brand-mist/40 mt-2 text-left">
                       <p className="text-sm text-brand-ink font-serif mb-2">Seu horário está garantido.</p>
                       <p className="text-xs text-brand-stone font-light leading-relaxed">
@@ -454,7 +471,7 @@ setBlockedSchedules(dayBlocked);
                   )}
                 </div>
 
-                {isPending && (
+                {isInitialPending && (
                   <div className="space-y-4 w-full mt-4">
                     <div className="grid grid-cols-1 gap-3">
                       {professional.plan === 'pro' && (
@@ -495,7 +512,7 @@ setBlockedSchedules(dayBlocked);
                     )}
 
                     {/* Presence Confirmation (Featured if applicable) */}
-                    {isConfirmed && !appointment.clientConfirmedAt && (
+                    {isPendingConfirmation && (
                       <button 
                         onClick={handleConfirmPresence}
                         disabled={actionLoading}
@@ -506,7 +523,7 @@ setBlockedSchedules(dayBlocked);
                     )}
 
                     {/* Manage Actions */}
-                    {!isPending && (
+                    {!isInitialPending && (
                       <div className="grid grid-cols-2 gap-4 pt-2">
                         <button 
                           onClick={handleEnterReschedule}
@@ -572,7 +589,7 @@ setBlockedSchedules(dayBlocked);
                 )}
 
                 {/* ALWAYS VISIBLE UNTIL CANCELLED: Talk to Pro (Only for confirmed/completed) */}
-                {!isCancelled && !isPending && professional.plan === 'pro' && (
+                {!isCancelled && !isInitialPending && professional.plan === 'pro' && (
                   <a 
                     href={buildWhatsappLink(professional.whatsapp, `Olá ${(professional.name || 'Profissional').split(' ')[0]}! Gostaria de falar sobre minha reserva do dia ${(appointment.date || '').split('-').reverse().join('/')} às ${appointment.time}.`)}
                     target="_blank"

@@ -5,6 +5,15 @@ import { logger } from "./utils/logger.js";
 
 export const PUBLIC_APP_URL = (process.env.APP_URL || "https://usenera.com").replace(/\/+$/, "");
 
+/**
+ * Centralized helper for generating the public booking tracking URL.
+ * NEVER use "/manage/" manually. Always use this function.
+ */
+export function buildPublicBookingUrl(token: string): string {
+  if (!token) return PUBLIC_APP_URL;
+  return `${PUBLIC_APP_URL}/r/${token}`;
+}
+
 // Helper to format Brazilian phone numbers for WhatsApp Cloud API
 export function formatBRNumber(phone: string): string {
   return normalizePhone(phone);
