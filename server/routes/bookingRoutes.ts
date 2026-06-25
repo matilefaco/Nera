@@ -2426,35 +2426,23 @@ router.post(
           throw { status: 400, message: "Dados da reserva inválidos." };
         }
 
-        const terminalStatuses = [
-          "completed",
-          "concluido",
-          "cancelled",
-          "cancelled_by_client",
-          "cancelled_by_professional",
-          "expired",
-          "no_show",
-          "no_show_client",
-          "no_show_professional",
-          "rejected",
-          "declined",
-        ];
-
-        if (terminalStatuses.includes(data.status)) {
-          throw { status: 400, message: `Esta reserva não pode mais ser confirmada. Status atual: ${data.status}` };
-        }
-
-        if (data.status === "confirmed" || data.status === "accepted") {
-          return { success: true, appointmentId, status: data.status, alreadyConfirmed: true };
-        }
-
-        // Permission check using Auth UID, completely disregarding payload professionalId for authorization
+        // Permission check using Auth UID
         if (data.professionalId !== uid) {
           logger.warn("BOOKING", "Confirm permission denied");
           throw {
             status: 403,
             message: "Você não tem permissão para confirmar esta reserva.",
           };
+        }
+
+        const confirmableStatuses = ["pending", "pending_confirmation", "pending_conflict"];
+
+        if (data.status === "confirmed" || data.status === "accepted") {
+          return { success: true, appointmentId, status: data.status, alreadyConfirmed: true };
+        }
+
+        if (!confirmableStatuses.includes(data.status)) {
+          throw { status: 400, message: `Esta reserva não pode mais ser confirmada. Status atual: ${data.status}` };
         }
 
         // Extract date and time with fallbacks
@@ -3870,18 +3858,12 @@ router.post(
         const data: any = apptDoc.data();
 
         if (
-          [
-            "cancelled",
-            "cancelled_by_client",
-            "cancelled_by_professional",
-            "completed",
-            "concluido",
-            "expired",
-            "no_show",
-            "no_show_client",
-            "no_show_professional",
-            "rejected",
-            "declined",
+          ![
+            "pending",
+            "pending_confirmation",
+            "pending_conflict",
+            "confirmed",
+            "accepted",
           ].includes(data.status)
         ) {
           throw { status: 400, message: `Esta reserva não pode mais ser cancelada. Status atual: ${data.status}` };
