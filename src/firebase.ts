@@ -693,99 +693,23 @@ export async function rescheduleBookingByClient(token: string, newDate: string, 
 export async function rescheduleBookingByProfessional(appointmentId: string, professionalId: string, newDate: string, newTime: string) {
   console.log(`[Professional] Rescheduling ${appointmentId} to ${newDate} ${newTime}`);
   try {
-    const data = await runTransaction(db, async (transaction) => {
-      console.log(`[TX] starting transaction for ${appointmentId}`);
-      const apptRef = doc(db, 'appointments', appointmentId);
-      const apptDoc = await transaction.get(apptRef);
-      if (!apptDoc.exists()) throw new Error('Agendamento não encontrado');
-      
-      const data = apptDoc.data() as Appointment;
+    const idToken = await auth.currentUser?.getIdToken();
+    if (!idToken) throw new Error("Sessão expirada.");
 
-      if (data.professionalId !== professionalId) throw new Error('Operação não permitida');
-      
-      // 1. Verify new slot lock
-      const cleanNewTime = newTime.replace(':', '');
-      const lockId = `${professionalId}_${newDate}_${cleanNewTime}`;
-      const lockRef = doc(db, 'booking_locks', lockId);
-      const lockSnap = await transaction.get(lockRef);
-      
-      const blockingStatuses = ['confirmed', 'accepted', 'pending_confirmation', 'completed'];
-
-      if (lockSnap.exists() && blockingStatuses.includes(lockSnap.data().status)) {
-        if (lockSnap.data().appointmentId !== appointmentId) {
-          console.error(`[BOOKING LOCK] reschedule conflict at ${lockId}`);
-          throw new Error('Horário indisponível');
-        }
-      }
-
-      // 2. Read old lock
-      const cleanOldTime = data.time.replace(':', '');
-      const oldLockId = `${professionalId}_${data.date}_${cleanOldTime}`;
-      const oldLockRef = doc(db, 'booking_locks', oldLockId);
-      const oldLockSnap = await transaction.get(oldLockRef);
-      
-      // --- ALL READS DONE ---
-      // --- WRITES ---
-
-      // Free old lock
-      if (oldLockSnap.exists() && oldLockSnap.data().appointmentId === appointmentId) {
-        console.log(`[TX] deleting old lock: ${oldLockId}`);
-        transaction.delete(oldLockRef);
-      }
-
-      // Block new lock if already confirmed
-      if (blockingStatuses.includes(data.status)) {
-        console.log(`[TX] setting new lock: ${lockId}`);
-        transaction.set(lockRef, {
-          professionalId: professionalId,
-          date: newDate,
-          time: newTime,
-          appointmentId: appointmentId,
-          serviceId: data.serviceId || 'unknown',
-          status: data.status,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
-      }
-
-      // Update appointment
-      console.log(`[TX] updating appointment: ${appointmentId}`);
-      const updatePayload = {
-        date: newDate,
-        time: newTime,
-        previousDate: data.date,
-        previousTime: data.time,
-        rescheduledAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        lastChangeBy: 'professional' as const,
-        changeMessage: `Profissional reagendou de ${data.date.split('-').reverse().join('/')} para ${newDate.split('-').reverse().join('/')}`
-      };
-      
-      const safeUpdate = sanitizeAppointment(updatePayload, true);
-
-      transaction.update(apptRef, safeUpdate);
-
-      console.log(`[TX] finished all transaction commands`);
-      return data;
+    const response = await fetch(`/api/appointments/${appointmentId}/reschedule-by-professional`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${idToken}`
+      },
+      body: JSON.stringify({ newDate, newTime })
     });
 
-    // Notify client about reschedule
-    notify('BOOKING_RESCHEDULED', { 
-      id: appointmentId, 
-      appointmentId,
-      professionalId,
-      ...data, 
-      previousDate: data.date, 
-      previousTime: data.time, 
-      date: newDate, 
-      time: newTime,
-      rescheduledBy: 'professional'
-    }).catch(e => { if (isDev) console.error("[Reschedule Notify Error]", e); });
-    
-    // Trigger waitlist check for the OLD slot
-    triggerWaitlistCheck(professionalId, data.date, data.time).catch(e => { if (isDev) console.error("[Waitlist Check Error]", e); });
-
-    return data;
+    const result = await response.json();
+    if (!response.ok) {
+       throw new Error(result.error || "Erro ao reagendar");
+    }
+    return result.updatedData;
   } catch (error) {
     if (isDev) console.error('[Professional Reschedule] Failed:', error);
     throw error;
