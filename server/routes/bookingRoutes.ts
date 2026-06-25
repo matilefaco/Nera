@@ -2595,6 +2595,14 @@ router.post(
         return { success: true, appointmentId, lockId, status: "confirmed" };
       });
 
+      if (result.alreadyConfirmed) {
+        return res.json({
+          success: true,
+          appointmentId,
+          alreadyConfirmed: true,
+        });
+      }
+
       // Create Google Calendar event and send notification
       // Await safely to avoid serverless container freezing
       await Promise.allSettled([
