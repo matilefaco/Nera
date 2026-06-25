@@ -5127,9 +5127,15 @@ router.post(
       return res.status(400).json({ error: "Data e horário são obrigatórios." });
     }
     
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate) || isNaN(Date.parse(newDate))) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
       return res.status(400).json({ error: "Data inválida." });
     }
+    const [year, month, day] = newDate.split("-").map(Number);
+    const dateObj = new Date(`${newDate}T12:00:00`);
+    if (dateObj.getFullYear() !== year || dateObj.getMonth() + 1 !== month || dateObj.getDate() !== day) {
+      return res.status(400).json({ error: "Data inválida." });
+    }
+
     if (!/^\d{2}:\d{2}$/.test(newTime)) {
       return res.status(400).json({ error: "Horário inválido." });
     }
@@ -5137,6 +5143,9 @@ router.post(
     if (h < 0 || h > 23 || m < 0 || m > 59) {
       return res.status(400).json({ error: "Horário inválido." });
     }
+
+    const safeNewDate = newDate;
+    const safeNewTime = newTime;
 
     try {
       const result = await db.runTransaction(async (transaction) => {
@@ -5153,10 +5162,14 @@ router.post(
         const activeStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted"];
         if (!activeStatuses.includes(data.status)) throw { status: 400, message: "Esta reserva não pode ser reagendada." };
 
+        const clientKey = getClientKey(data.clientWhatsapp, data.clientEmail, data.clientName);
+        const summaryId = `${uid}_${clientKey}`;
+        const summarySnap = await transaction.get(db.collection("client_summaries").doc(summaryId));
+
         const duration = Number(data.duration || data.serviceDuration || 60);
         
-        const apptDayOfWeek = new Date(newDate + "T12:00:00").getDay();
-        const apptStartMin = timeToMinutes(newTime);
+        const apptDayOfWeek = new Date(safeNewDate + "T12:00:00").getDay();
+        const apptStartMin = timeToMinutes(safeNewTime);
         const apptEndMin = apptStartMin + duration;
 
         const proSnap = await transaction.get(db.collection("users").doc(uid));
@@ -5178,7 +5191,7 @@ router.post(
         const blockedSnap = await transaction.get(db.collection("blocked_schedules").where("professionalId", "==", uid));
         for (const bDoc of blockedSnap.docs) {
           const b = bDoc.data();
-          const isFixed = b.date === newDate;
+          const isFixed = b.date === safeNewDate;
           const isRecurring = b.isRecurring && Array.isArray(b.recurringDays) && b.recurringDays.includes(apptDayOfWeek);
           if (isFixed || isRecurring) {
             if (b.full_day || b.allDay) throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
@@ -5188,7 +5201,7 @@ router.post(
           }
         }
 
-        const existingApptsSnap = await transaction.get(db.collection("appointments").where("professionalId", "==", uid).where("date", "==", newDate));
+        const existingApptsSnap = await transaction.get(db.collection("appointments").where("professionalId", "==", uid).where("date", "==", safeNewDate));
         const overlapBlockingStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted", "completed", "concluido"];
         for (const doc of existingApptsSnap.docs) {
            if (doc.id === appointmentId) continue;
@@ -5217,7 +5230,7 @@ router.post(
         let oldLockRef = oldLockId ? db.collection("booking_locks").doc(oldLockId) : null;
         let oldLockSnap = oldLockRef ? await transaction.get(oldLockRef) : null;
 
-        const simulatedNewData = { ...data, date: newDate, time: newTime };
+        const simulatedNewData = { ...data, date: safeNewDate, time: safeNewTime };
         const newLockId = getBookingLockId(simulatedNewData);
         let newLockRef = newLockId ? db.collection("booking_locks").doc(newLockId) : null;
 
@@ -5234,8 +5247,8 @@ router.post(
         if (newLockRef && overlapBlockingStatuses.includes(data.status)) {
             const lockData: any = {
                 professionalId: data.professionalId,
-                date: newDate,
-                time: newTime,
+                date: safeNewDate,
+                time: safeNewTime,
                 appointmentId: appointmentId,
                 serviceId: data.serviceId || "unknown",
                 status: data.status,
@@ -5249,25 +5262,25 @@ router.post(
         }
 
         const updatePayload: any = {
-          date: newDate,
-          time: newTime,
+          date: safeNewDate,
+          time: safeNewTime,
           previousDate: data.date,
           previousTime: data.time,
           rescheduledAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
           lastChangeBy: "professional",
-          changeMessage: `Profissional reagendou de ${data.date.split("-").reverse().join("/")} para ${newDate.split("-").reverse().join("/")}`,
+          changeMessage: `Profissional reagendou de ${data.date.split("-").reverse().join("/")} para ${safeNewDate.split("-").reverse().join("/")}`,
           timeline: admin.firestore.FieldValue.arrayUnion({
             type: "booking_rescheduled_professional",
             createdAt: new Date().toISOString(),
             actor: "professional",
-            label: `Profissional reagendou de ${data.date.split("-").reverse().join("/")} para ${newDate.split("-").reverse().join("/")}`,
+            label: `Profissional reagendou de ${data.date.split("-").reverse().join("/")} para ${safeNewDate.split("-").reverse().join("/")}`,
           }),
         };
 
         const safeUpdate = sanitizeAppointment(updatePayload, true);
         
-        await updateClientSummaryInternal(transaction, { ...data, ...safeUpdate }, uid, false, data.status);
+        await updateClientSummaryInternal(transaction, { ...data, ...safeUpdate }, uid, false, data.status, summarySnap);
 
         transaction.update(apptRef, safeUpdate);
 
