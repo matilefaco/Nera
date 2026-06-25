@@ -5126,6 +5126,17 @@ router.post(
     if (!newDate || !newTime) {
       return res.status(400).json({ error: "Data e horário são obrigatórios." });
     }
+    
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate) || isNaN(Date.parse(newDate))) {
+      return res.status(400).json({ error: "Data inválida." });
+    }
+    if (!/^\d{2}:\d{2}$/.test(newTime)) {
+      return res.status(400).json({ error: "Horário inválido." });
+    }
+    const [h, m] = newTime.split(":").map(Number);
+    if (h < 0 || h > 23 || m < 0 || m > 59) {
+      return res.status(400).json({ error: "Horário inválido." });
+    }
 
     try {
       const result = await db.runTransaction(async (transaction) => {
@@ -5221,7 +5232,7 @@ router.post(
             if (oldLockSnap && oldLockSnap.exists && oldLockSnap.data()?.appointmentId === appointmentId) transaction.delete(oldLockRef);
         }
         if (newLockRef && overlapBlockingStatuses.includes(data.status)) {
-            transaction.set(newLockRef, {
+            const lockData: any = {
                 professionalId: data.professionalId,
                 date: newDate,
                 time: newTime,
@@ -5230,7 +5241,11 @@ router.post(
                 status: data.status,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+            };
+            if (["pending", "pending_confirmation", "pending_conflict"].includes(data.status)) {
+                lockData.expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+            }
+            transaction.set(newLockRef, lockData);
         }
 
         const updatePayload: any = {
@@ -5251,6 +5266,9 @@ router.post(
         };
 
         const safeUpdate = sanitizeAppointment(updatePayload, true);
+        
+        await updateClientSummaryInternal(transaction, { ...data, ...safeUpdate }, uid, false, data.status);
+
         transaction.update(apptRef, safeUpdate);
 
         return { success: true, updatedData: { ...data, ...safeUpdate, id: appointmentId } };
