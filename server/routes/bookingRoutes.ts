@@ -2372,15 +2372,11 @@ router.post(
         const blockedSchedulesSnap = await transaction.get(db.collection("blocked_schedules").where("professionalId", "==", uid));
         blockedSchedulesSnap.forEach((bSnap) => {
           const b = bSnap.data();
-          const isRecurring = b.isRecurring;
-          const blockedDate = b.date;
-
-          let applies = false;
-          if (isRecurring) {
-            if (b.dayOfWeek === apptDayOfWeek) applies = true;
-          } else if (blockedDate === apptDateStr) {
-            applies = true;
-          }
+          const isRecurring = b.isRecurring === true;
+          const isFixed = b.date === apptDateStr;
+          const recurringDays = Array.isArray(b.recurringDays) ? b.recurringDays : [];
+          const isRecurringToday = isRecurring && recurringDays.includes(apptDayOfWeek);
+          const applies = isFixed || isRecurringToday;
 
           if (applies) {
             if (b.full_day || b.allDay) {
