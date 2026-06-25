@@ -2356,12 +2356,13 @@ router.post(
         // 4. WORKING HOURS
         const proSnap = await transaction.get(db.collection("users").doc(uid));
         const proData = proSnap.data() || {};
-        if (proData.workingDays && !proData.workingDays.includes(apptDayOfWeek)) {
+        const workingHours = proData.workingHours || {};
+        if (workingHours.workingDays && !workingHours.workingDays.includes(apptDayOfWeek)) {
           throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
         }
-        if (proData.workingHours) {
-          const start = timeToMinutes(proData.workingHours.startTime);
-          const end = timeToMinutes(proData.workingHours.endTime);
+        if (workingHours.startTime && workingHours.endTime) {
+          const start = timeToMinutes(workingHours.startTime);
+          const end = timeToMinutes(workingHours.endTime);
           if (apptStartMin < start || apptEndMin > end) {
             throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
           }
@@ -2371,13 +2372,25 @@ router.post(
         const blockedSchedulesSnap = await transaction.get(db.collection("blocked_schedules").where("professionalId", "==", uid));
         blockedSchedulesSnap.forEach((bSnap) => {
           const b = bSnap.data();
-          if (b.full_day || b.allDay) {
-            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          const isRecurring = b.isRecurring;
+          const blockedDate = b.date;
+
+          let applies = false;
+          if (isRecurring) {
+            if (b.dayOfWeek === apptDayOfWeek) applies = true;
+          } else if (blockedDate === apptDateStr) {
+            applies = true;
           }
-          const bStart = timeToMinutes(b.startTime);
-          const bEnd = timeToMinutes(b.endTime);
-          if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) {
-            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+
+          if (applies) {
+            if (b.full_day || b.allDay) {
+              throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+            }
+            const bStart = timeToMinutes(b.startTime);
+            const bEnd = timeToMinutes(b.endTime);
+            if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) {
+              throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+            }
           }
         });
 
@@ -2413,9 +2426,6 @@ router.post(
           source: "manual",
           totalPrice: priceNum,
           price: priceNum,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        };
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
