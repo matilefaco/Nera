@@ -2335,19 +2335,87 @@ router.post(
         const summaryRef = db.collection("client_summaries").doc(summaryId);
         const summarySnap = await transaction.get(summaryRef);
 
+        // 3. SERVICE VALIDATION & OWNER CHECK
+        const serviceRef = db.collection("services").doc(appointmentData.serviceId);
+        const serviceSnap = await transaction.get(serviceRef);
+        if (!serviceSnap.exists) {
+          throw { status: 400, message: "Serviço não encontrado." };
+        }
+        const service = serviceSnap.data()!;
+        if (normalizeId(service.professionalId) !== normalizeId(uid)) {
+          throw { status: 400, message: "Serviço inválido para este profissional." };
+        }
 
-        // 3. Insert into appointments (WRITES)
+        const serviceDuration = Number(service.duration) || Number(appointmentData.duration) || 60;
+        const serviceName = service.name || appointmentData.serviceName || "Serviço";
+        const apptDateStr = appointmentData.date;
+        const apptStartMin = timeToMinutes(appointmentData.time);
+        const apptEndMin = apptStartMin + serviceDuration;
+        const apptDayOfWeek = new Date(apptDateStr + "T12:00:00").getDay();
+
+        // 4. WORKING HOURS
+        const proSnap = await transaction.get(db.collection("users").doc(uid));
+        const proData = proSnap.data() || {};
+        if (proData.workingDays && !proData.workingDays.includes(apptDayOfWeek)) {
+          throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+        }
+        if (proData.workingHours) {
+          const start = timeToMinutes(proData.workingHours.startTime);
+          const end = timeToMinutes(proData.workingHours.endTime);
+          if (apptStartMin < start || apptEndMin > end) {
+            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+        }
+
+        // 5. BLOCKED SCHEDULES
+        const blockedSchedulesSnap = await transaction.get(db.collection("blocked_schedules").where("professionalId", "==", uid));
+        blockedSchedulesSnap.forEach((bSnap) => {
+          const b = bSnap.data();
+          if (b.full_day || b.allDay) {
+            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+          const bStart = timeToMinutes(b.startTime);
+          const bEnd = timeToMinutes(b.endTime);
+          if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) {
+            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+        });
+
+        // 6. OVERLAPPING APPOINTMENTS
+        const apptSnap = await transaction.get(db.collection("appointments").where("professionalId", "==", uid).where("date", "==", appointmentData.date));
+        const activeStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted", "completed", "concluido"];
+        apptSnap.forEach((aSnap) => {
+          const existing = aSnap.data();
+          if (activeStatuses.includes(existing.status)) {
+            const existingStart = timeToMinutes(existing.time);
+            const existingDuration = Number(existing.duration) || Number(existing.serviceDuration) || 60;
+            const existingEnd = existingStart + existingDuration;
+            if (intervalsOverlap(apptStartMin, apptEndMin, existingStart, existingEnd)) {
+              throw { status: 409, message: "Este horário já está ocupado na agenda." };
+            }
+          }
+        });
+
+        // 7. Insert into appointments (WRITES)
         const appointmentId = db.collection("appointments").doc().id;
         const apptRef = db.collection("appointments").doc(appointmentId);
-
+        
+        // Final object construction based on validated data
         const appointmentToSave = {
           ...appointmentData,
           id: appointmentId,
+          duration: serviceDuration,
+          serviceDuration: serviceDuration,
+          serviceName: serviceName,
+          serviceId: serviceSnap.id,
+          professionalId: uid,
           status: "confirmed",
           source: "manual",
           totalPrice: priceNum,
           price: priceNum,
-          professionalId: uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
@@ -2362,6 +2430,9 @@ router.post(
             professionalId: uid,
             date: appointmentData.date,
             time: appointmentData.time,
+            serviceId: serviceSnap.id,
+            duration: serviceDuration,
+            serviceName: serviceName,
             status: "confirmed",
             appointmentId: appointmentId,
             clientName: appointmentData.clientName || 'Cliente',
