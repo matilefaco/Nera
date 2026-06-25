@@ -45,7 +45,7 @@ service cloud.firestore {
 
     function isValidAppointment(data) {
       return data.professionalId is string &&
-             data.status in ['pending', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'expired', 'pending_confirmation'];
+             data.status in ['pending', 'pending_confirmation', 'pending_conflict', 'confirmed', 'accepted', 'cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'completed', 'concluido', 'expired', 'no_show', 'no_show_client', 'no_show_professional', 'rejected', 'declined'];
     }
 
     function isValidBlockedSchedule(data) {

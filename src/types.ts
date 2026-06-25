@@ -264,7 +264,7 @@ export interface Appointment {
   /** @deprecated Use object structure for address instead of plain string. Use parseAddress helper. */
   address?: AddressData | string;
   
-  status: 'pending' | 'accepted' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'cancelled_by_professional' | 'completed' | 'expired' | 'no_show';
+  status: 'pending' | 'pending_confirmation' | 'pending_conflict' | 'accepted' | 'confirmed' | 'cancelled' | 'cancelled_by_client' | 'cancelled_by_professional' | 'completed' | 'concluido' | 'expired' | 'no_show' | 'no_show_client' | 'no_show_professional' | 'rejected' | 'declined';
   attendanceStatus?: 'confirmed' | 'reschedule_requested';
   notes?: string;
   

@@ -99,14 +99,14 @@ export default function LandingPage() {
           <span className="marquee-item">Lembretes automáticos <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Visão financeira clara <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Para profissionais de beleza <span className="marquee-sep">·</span></span>
-          <span className="marquee-item">Anti no-show <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Reduz faltas <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Feita no Brasil <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Agenda 24h <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Menos vai-e-vem no WhatsApp <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Lembretes automáticos <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Visão financeira clara <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Para profissionais de beleza <span className="marquee-sep">·</span></span>
-          <span className="marquee-item">Anti no-show <span className="marquee-sep">·</span></span>
+          <span className="marquee-item">Reduz faltas <span className="marquee-sep">·</span></span>
           <span className="marquee-item">Feita no Brasil <span className="marquee-sep">·</span></span>
         </div>
       </div>

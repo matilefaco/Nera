@@ -25,6 +25,7 @@ import {
   getDocs,
   getDoc,
   limit,
+  arrayUnion,
 } from "firebase/firestore";
 import {
   Calendar,
@@ -58,6 +59,7 @@ import {
   Search,
   ChevronDown,
   Loader2,
+  UserX,
 } from "lucide-react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -207,6 +209,7 @@ export default function AgendaPage() {
 
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isNoShowConfirmOpen, setIsNoShowConfirmOpen] = useState(false);
   const [showNavTip, setShowNavTip] = useState(() => {
     return localStorage.getItem("nera_agenda_nav_tip_dismissed") !== "true";
   });
@@ -1439,6 +1442,93 @@ export default function AgendaPage() {
           profile={profile}
         />
 
+        <AnimatePresence>
+          {isNoShowConfirmOpen && selectedAppointment && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-brand-ink/40 backdrop-blur-sm z-[250] flex items-center justify-center p-4"
+              onClick={() => setIsNoShowConfirmOpen(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.95, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand-terracotta to-amber-500 opacity-50" />
+                
+                <div className="w-12 h-12 bg-amber-50 rounded-2xl flex items-center justify-center text-amber-600 mb-5">
+                  <UserX size={24} />
+                </div>
+                
+                <h3 className="text-xl font-serif text-brand-ink mb-3">
+                  Confirmar falta da cliente
+                </h3>
+                
+                <p className="text-sm text-brand-stone font-light leading-relaxed mb-8">
+                  A cliente realmente não compareceu ao atendimento?
+                  <br /><br />
+                  Essa informação ficará registrada no histórico da cliente e poderá ser utilizada futuramente para ajudar você a acompanhar clientes com faltas recorrentes.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setIsNoShowConfirmOpen(false)}
+                    className="flex-1 py-3.5 text-[11px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink bg-brand-linen hover:bg-brand-mist rounded-2xl transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setIsNoShowConfirmOpen(false);
+                      setIsDetailsOpen(false);
+                      setLoading(selectedAppointment.id);
+                      try {
+                        const token = await auth.currentUser?.getIdToken();
+                        if (!token) throw new Error("Usuário não autenticado.");
+
+                        const response = await fetch(`/api/appointments/${selectedAppointment.id}/no-show`, {
+                          method: 'POST',
+                          headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                          }
+                        });
+
+                        if (!response.ok) {
+                          const errorData = await response.json();
+                          throw new Error(errorData.error || "Erro ao marcar falta.");
+                        }
+
+                        setAllAppointments((prev) =>
+                          prev.filter(
+                            (a) =>
+                              a.id !== selectedAppointment.id,
+                          ),
+                        );
+                        notify.success(
+                          "Falta registrada com sucesso.",
+                        );
+                      } catch (err: any) {
+                        console.error("Erro ao marcar falta:", err);
+                        notify.error(`Erro ao marcar falta: ${err?.message || "Desconhecido"}`);
+                      } finally {
+                        setLoading(null);
+                      }
+                    }}
+                    className="flex-1 py-3.5 text-[11px] font-bold uppercase tracking-widest text-white bg-amber-600 hover:bg-amber-700 rounded-2xl transition-colors shadow-sm"
+                  >
+                    Sim, ela faltou
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* 6. BOTÃO FLUTUANTE FIXO (FAB) */}
         <div className="fixed bottom-[calc(92px+env(safe-area-inset-bottom))] right-5 z-[100] md:bottom-12 md:right-12">
           <AnimatePresence>
@@ -1883,7 +1973,9 @@ export default function AgendaPage() {
                                 ? "Aguardando Cliente"
                                 : isCompletedStatus(selectedAppointment.status)
                                   ? "Concluído"
-                                  : selectedAppointment.status}
+                                  : ["no_show", "no_show_client", "no_show_professional"].includes(selectedAppointment.status)
+                                    ? "Cliente faltou"
+                                    : selectedAppointment.status}
                         </span>
                         {selectedAppointment.clientConfirmed24h && (
                           <span className="bg-brand-ink text-white px-2.5 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest flex items-center gap-1 leading-none">
@@ -2234,6 +2326,18 @@ export default function AgendaPage() {
                             isConfirmedLikeStatus(selectedAppointment.status) ||
                             selectedAppointment.status === "pending_confirmation";
 
+                          const [h, m] = (selectedAppointment.time || "00:00")
+                            .split(":")
+                            .map(Number);
+                          const apptDate = new Date(
+                            selectedAppointment.date + "T00:00:00",
+                          );
+                          const apptTime = new Date(apptDate);
+                          apptTime.setHours(h, m, 0, 0);
+                          const isPastOrOngoing = apptTime <= new Date();
+
+                          const canComplete = isActiveOperationalAppointment && isPastOrOngoing;
+
                           return (
                             <>
                               {isActiveOperationalAppointment && (
@@ -2247,7 +2351,7 @@ export default function AgendaPage() {
                                 </button>
                               )}
                               
-                              {isConfirmedLikeStatus(selectedAppointment.status) && (
+                              {canComplete && (
                                 <PremiumButton
                                   variant="primary"
                                   className="w-full py-3 mt-4 text-[13px]"
@@ -2261,95 +2365,36 @@ export default function AgendaPage() {
                                     : "Finalizar Atendimento"}
                                 </PremiumButton>
                               )}
+                              
+                              {!isCompletedStatus(selectedAppointment.status) && (
+                                <button
+                                  onClick={() => {
+                                    handleRespond(
+                                      selectedAppointment.id,
+                                      "cancelled_by_professional",
+                                      selectedAppointment,
+                                    );
+                                    setIsDetailsOpen(false);
+                                  }}
+                                  className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-brand-rose/70 hover:text-brand-rose hover:bg-brand-rose/5 rounded-xl transition-all mt-1"
+                                >
+                                  {selectedAppointment.status === "pending"
+                                    ? "Recusar Pedido"
+                                    : "Cancelar Atendimento"}
+                                </button>
+                              )}
+
+                              {isActiveOperationalAppointment && isPastOrOngoing && (
+                                <button
+                                  onClick={() => setIsNoShowConfirmOpen(true)}
+                                  className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-amber-600/80 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all border border-amber-100/50 mt-1"
+                                >
+                                  Marcar como faltou
+                                </button>
+                              )}
                             </>
                           );
                         })()}
-
-                        {!isCompletedStatus(selectedAppointment.status) && (
-                          <button
-                            onClick={() => {
-                              handleRespond(
-                                selectedAppointment.id,
-                                "cancelled_by_professional",
-                                selectedAppointment,
-                              );
-                              setIsDetailsOpen(false);
-                            }}
-                            className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-brand-rose/70 hover:text-brand-rose hover:bg-brand-rose/5 rounded-xl transition-all mt-1"
-                          >
-                            {selectedAppointment.status === "pending"
-                              ? "Recusar Pedido"
-                              : "Cancelar Atendimento"}
-                          </button>
-                        )}
-
-                        {isConfirmedLikeStatus(selectedAppointment.status) &&
-                          (() => {
-                            const [h, m] = (selectedAppointment.time || "00:00")
-                              .split(":")
-                              .map(Number);
-                            const apptDate = new Date(
-                              selectedAppointment.date + "T00:00:00",
-                            );
-                            const apptTime = new Date(apptDate);
-                            apptTime.setHours(h, m, 0, 0);
-                            const isPast = apptTime < new Date();
-
-                            return (
-                              isPast && (
-                                <button
-                                  onClick={async () => {
-                                    setLoading(selectedAppointment.id);
-                                    try {
-                                      const { arrayUnion } =
-                                        await import("firebase/firestore");
-                                      const updatePayload = {
-                                        noShow: true,
-                                        status: "no_show_client" as const,
-                                        updatedAt: serverTimestamp(),
-                                        timeline: arrayUnion({
-                                          type: "no_show_client",
-                                          createdAt: new Date().toISOString(),
-                                          actor: "professional",
-                                          label:
-                                            "Atendimento marcado como No-Show Cliente",
-                                        }),
-                                      };
-                                      const safeUpdate = sanitizeAppointment(
-                                        updatePayload,
-                                        true,
-                                      );
-                                      await updateDoc(
-                                        doc(
-                                          db,
-                                          "appointments",
-                                          selectedAppointment.id,
-                                        ),
-                                        safeUpdate,
-                                      );
-                                      setAllAppointments((prev) =>
-                                        prev.filter(
-                                          (a) =>
-                                            a.id !== selectedAppointment.id,
-                                        ),
-                                      );
-                                      notify.success(
-                                        "Cliente marcado como No-Show. Isso ficará registrado no histórico.",
-                                      );
-                                      setIsDetailsOpen(false);
-                                    } catch (err) {
-                                      notify.error("Erro ao marcar no-show.");
-                                    } finally {
-                                      setLoading(null);
-                                    }
-                                  }}
-                                  className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-amber-600/80 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all border border-amber-100/50 mt-1"
-                                >
-                                  Marcar Faltou (No-Show)
-                                </button>
-                              )
-                            );
-                          })()}
                       </div>
                     </div>
                   </motion.div>

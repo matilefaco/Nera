@@ -622,8 +622,13 @@ async function updateClientSummaryInternal(
     }
   }
 
-  if (appointment.noShow) {
+  const wasNoShow = oldStatus === "no_show_client" || oldStatus === "no_show_professional" || oldStatus === "no_show";
+  const isNowNoShow = status === "no_show_client" || status === "no_show_professional" || status === "no_show";
+
+  if (isNowNoShow && !wasNoShow) {
     summary.noShowCount += 1;
+  } else if (!isNowNoShow && wasNoShow) {
+    summary.noShowCount = Math.max(0, summary.noShowCount - 1);
   }
 
   if (
@@ -2593,6 +2598,92 @@ router.post(
 
 // --- NEW: COMPLETE APPOINTMENT ENDPOINT ---
 router.post(
+  "/appointments/:appointmentId/no-show",
+  requireFirebaseAuth,
+  async (req: AuthenticatedRequest, res: express.Response) => {
+    const db = getDb();
+    const { appointmentId } = req.params;
+    const uid = req.uid;
+
+    try {
+      const result = await db.runTransaction(async (transaction) => {
+        const apptRef = db.collection("appointments").doc(appointmentId);
+        const apptDoc = await transaction.get(apptRef);
+
+        if (!apptDoc.exists) {
+          throw { status: 404, message: "Agenda não encontrada." };
+        }
+
+        const data = apptDoc.data()!;
+
+        if (data.professionalId !== uid) {
+          throw { status: 403, message: "Você não tem permissão." };
+        }
+
+        if (
+          data.status !== "confirmed" &&
+          data.status !== "accepted" &&
+          data.status !== "pending_confirmation"
+        ) {
+          throw {
+            status: 400,
+            message: `Apenas atendimentos confirmados/aceitos/pendentes de confirmação podem ser marcados como no-show. Status: ${data.status}`,
+          };
+        }
+
+        const clientKey = getClientKey(
+          data.clientWhatsapp,
+          data.clientEmail,
+          data.clientName,
+        );
+        const summaryId = `${data.professionalId}_${clientKey}`;
+        const summaryRef = db.collection("client_summaries").doc(summaryId);
+        const summarySnap = await transaction.get(summaryRef);
+
+        const updatePayload: any = {
+          noShow: true,
+          status: "no_show_client",
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          timeline: admin.firestore.FieldValue.arrayUnion({
+            type: "no_show_client",
+            createdAt: new Date().toISOString(),
+            actor: "professional",
+            label: "Cliente não compareceu ao atendimento.",
+          }),
+        };
+
+        const safeUpdate = sanitizeAppointment(updatePayload, true);
+
+        transaction.update(apptRef, safeUpdate);
+
+        const updatedData = { ...data, ...safeUpdate };
+        await updateClientSummaryInternal(
+          transaction,
+          updatedData,
+          data.professionalId,
+          false,
+          data.status,
+          summarySnap,
+        );
+
+        return {
+          success: true,
+          appointmentId,
+          status: "no_show_client",
+          updatedData,
+        };
+      });
+
+      res.status(200).json(result);
+    } catch (err: any) {
+      logger.error("BOOKING", "Erro ao marcar no-show", { error: err.message, appointmentId });
+      const status = err.status || 500;
+      res.status(status).json({ error: err.message || "Erro interno" });
+    }
+  },
+);
+
+router.post(
   "/appointments/:appointmentId/complete",
   requireFirebaseAuth,
   async (req: AuthenticatedRequest, res: express.Response) => {
@@ -2626,10 +2717,14 @@ router.post(
           };
         }
 
-        if (data.status !== "confirmed" && data.status !== "accepted") {
+        if (
+          data.status !== "confirmed" &&
+          data.status !== "accepted" &&
+          data.status !== "pending_confirmation"
+        ) {
           throw {
             status: 400,
-            message: `Apenas atendimentos confirmados/aceitos podem ser concluídos. Status: ${data.status}`,
+            message: `Apenas atendimentos confirmados/aceitos/pendentes de confirmação podem ser concluídos. Status: ${data.status}`,
           };
         }
 
@@ -3931,6 +4026,8 @@ router.post(
           "completed",
           "concluido",
           "no_show",
+          "no_show_client",
+          "no_show_professional",
         ];
         if (blockRescheduleStatuses.includes(data.status)) {
           throw {

@@ -234,9 +234,29 @@ export default function DayView({
                       
                       <div className="flex-1 min-w-0 pr-6 sm:pr-8">
                         <div className="flex items-center justify-between gap-2 overflow-hidden mb-0.5 sm:mb-1">
-                          <p className="text-[14px] sm:text-[15px] font-bold truncate tracking-tight pr-1">
-                            {sanitizeDisplayName(app.clientName, 'Reserva')}
-                          </p>
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <p className="text-[14px] sm:text-[15px] font-bold truncate tracking-tight pr-1">
+                              {sanitizeDisplayName(app.clientName, 'Reserva')}
+                            </p>
+                            {(app.clientConfirmed24h || app.attendanceStatus === 'confirmed') ? (
+                              <span className={cn(
+                                "px-2 py-[2px] rounded-full text-[10px] font-medium flex items-center gap-1 shrink-0 shadow-sm",
+                                isConfirmedOrCompleted 
+                                  ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20" 
+                                  : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              )}>
+                                <Check size={10} strokeWidth={3} />
+                                Presença confirmada
+                              </span>
+                            ) : isPendingStatus(app.status) && (
+                              <span className={cn(
+                                "px-2 py-[2px] rounded-full text-[10px] font-medium shrink-0 shadow-sm",
+                                "bg-amber-50 text-amber-700 border border-amber-200"
+                              )}>
+                                {app.status === 'pending_confirmation' ? 'Aguardando cliente' : 'Aguardando você'}
+                              </span>
+                            )}
+                          </div>
                           <p className={cn(
                             "text-[10px] sm:text-[11px] font-mono shrink-0 font-medium",
                             isConfirmedOrCompleted ? "text-white/60" : "text-brand-stone"
@@ -255,7 +275,7 @@ export default function DayView({
                       </div>
 
                       {isPendingStatus(app.status) && (
-                        <div className="absolute top-1/2 -translate-y-1/2 right-3 sm:right-4 text-red-500">
+                        <div className="absolute top-1/2 -translate-y-1/2 right-3 sm:right-4 text-amber-500/80">
                           <AlertCircle size={16} />
                         </div>
                       )}
