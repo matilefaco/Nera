@@ -1,21 +1,39 @@
 import { useAuth } from '../AuthContext';
 import { PlanFeatures } from '../types';
 import { PLAN_CONFIGS, PlanType } from '../constants/plans';
+import { isCaptureMode } from '../constants/captureMode';
+import { isDemoEmail } from '../constants/demoAccounts';
 
 export function usePlanFeatures() {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   
-  const rawPlan = (profile?.plan || 'free').toLowerCase() as PlanType;
-  const signupPlan = profile?.signupPlan as PlanType | undefined;
-  const expiresAt = profile?.planExpiresAt;
-  const subStatus = profile?.stripeSubscriptionStatus;
+  const isCapture = isCaptureMode();
+
+  const isLocalDevelopmentEnvironment = 
+    typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || 
+     window.location.hostname === '127.0.0.1' || 
+     import.meta.env.DEV);
+
+  const canUseCapturePro =
+    isCapture &&
+    (
+      isDemoEmail(user?.email) ||
+      (profile?.isDemo === true && profile?.demoProfile === "studio-aurora") ||
+      isLocalDevelopmentEnvironment
+    );
+
+  const rawPlan = canUseCapturePro ? 'pro' : ((profile?.plan || 'free').toLowerCase() as PlanType);
+  const signupPlan = canUseCapturePro ? 'pro' : (profile?.signupPlan as PlanType | undefined);
+  const expiresAt = canUseCapturePro ? null : profile?.planExpiresAt;
+  const subStatus = canUseCapturePro ? 'active' : profile?.stripeSubscriptionStatus;
   
   // 1. Hard block if account is being deleted
   let isExpired = false;
   
-  if (profile?.accountStatus === 'scheduled_for_deletion' || profile?.accountStatus === 'deleted') {
+  if (!canUseCapturePro && (profile?.accountStatus === 'scheduled_for_deletion' || profile?.accountStatus === 'deleted')) {
     isExpired = true;
-  } else if (rawPlan !== 'free') {
+  } else if (!canUseCapturePro && rawPlan !== 'free') {
     // 2. Strict subscription verification
     const timeIsExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
     
@@ -36,13 +54,13 @@ export function usePlanFeatures() {
   }
   
   // Effective plan handles fallbacks securely
-  const activePlan: PlanType = isExpired ? 'free' : (PLAN_CONFIGS[rawPlan] ? rawPlan : 'free');
+  const activePlan: PlanType = canUseCapturePro ? 'pro' : (isExpired ? 'free' : (PLAN_CONFIGS[rawPlan] ? rawPlan : 'free'));
 
   const config = PLAN_CONFIGS[activePlan];
   const features: PlanFeatures = config.features;
 
-  const isPremium = () => activePlan !== 'free';
-  const isProPlan = () => activePlan === 'pro';
+  const isPremium = () => canUseCapturePro || activePlan !== 'free';
+  const isProPlan = () => canUseCapturePro || activePlan === 'pro';
 
   return {
     features,

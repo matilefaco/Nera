@@ -613,6 +613,7 @@ export default function ClientsPage() {
           <div className="flex flex-col md:flex-row gap-4">
             {clients.length > 0 && (
               <button 
+                data-capture-hide="true"
                 onClick={() => {
                   if (plan === 'free') {
                     checkFeatureAccess('exportCsv');

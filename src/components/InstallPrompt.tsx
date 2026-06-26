@@ -79,10 +79,11 @@ export default function InstallPrompt() {
   return (
     <AnimatePresence>
       <motion.div
+        data-capture-hide="true"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
-        className="fixed bottom-24 left-6 right-6 z-50 md:left-auto md:right-12 md:w-80"
+        className="install-prompt fixed bottom-24 left-6 right-6 z-50 md:left-auto md:right-12 md:w-80"
       >
         <div 
           onClick={handleInstallClick}

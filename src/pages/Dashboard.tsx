@@ -1223,7 +1223,7 @@ export default function Dashboard() {
                 Olá, {safeString(profile?.name).split(' ')[0]} ✨
               </h1>
               <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <Link to="/planos" className={cn(
+                <Link data-capture-hide="true" to="/planos" className={cn(
                   "text-[9px] uppercase tracking-[0.2em] font-bold px-2 py-0.5 rounded flex items-center hover:opacity-80 transition-opacity",
                   plan === 'pro' || plan === 'essencial' 
                     ? "text-brand-ink bg-brand-linen border border-brand-mist/50" 
@@ -1234,11 +1234,11 @@ export default function Dashboard() {
                   {plan === 'free' && 'Plano Gratuito'}
                 </Link>
                 {plan === 'free' && (
-                  <Link to="/planos" className="text-[10px] text-brand-terracotta hover:text-brand-sienna transition-colors font-medium relative top-[-1px]">
+                  <Link data-capture-hide="true" to="/planos" className="text-[10px] text-brand-terracotta hover:text-brand-sienna transition-colors font-medium relative top-[-1px]">
                     Upgrade
                   </Link>
                 )}
-                <span className="text-brand-mist text-[10px] hidden sm:inline">|</span>
+                <span data-capture-hide="true" className="text-brand-mist text-[10px] hidden sm:inline">|</span>
                 <p className="text-[12px] text-brand-stone font-light hidden sm:block">
                   {plan === 'free' ? (
                     <>

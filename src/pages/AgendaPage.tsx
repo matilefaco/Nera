@@ -1169,6 +1169,7 @@ export default function AgendaPage() {
 
             <div className="flex items-center gap-2">
               <button
+                data-capture-hide="true"
                 onClick={() => user && exportAppointmentsCsv(user.uid)}
                 className="hidden md:flex px-4 py-3 min-h-[44px] bg-brand-white border border-brand-mist/50 rounded-xl text-[9px] font-bold uppercase tracking-widest text-brand-stone hover:text-brand-ink hover:bg-brand-parchment transition-all shadow-sm items-center justify-center mr-2"
                 title="Exportar meus agendamentos (últimos 12 meses)"
