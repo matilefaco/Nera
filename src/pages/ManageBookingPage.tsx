@@ -288,7 +288,7 @@ setBlockedSchedules(dayBlocked);
     }
 
     if (!safeManageToken) {
-      notify.error('Não foi possível validar o link de remarcação. Abra novamente pelo link recebido por e-mail.');
+      notify.error('Não foi possível validar o link de remarcação. Abra novamente pelo link recebido de agendamento.');
       return;
     }
     if (!selectedDate || !selectedTime) return;

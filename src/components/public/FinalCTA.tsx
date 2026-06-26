@@ -65,8 +65,8 @@ export const FinalCTA = ({ onBookingClick, completedBookings, profile }: FinalCT
               </>
             ) : (
               <>
-                <Mail size={14} />
-                Confirmação por e-mail
+                <Clock size={14} />
+                Atualizações automáticas
               </>
             )}
           </div>

@@ -195,13 +195,13 @@ export const getBookingNotificationCopy = (plan: string = 'free', hasWhatsApp: b
   const isEssencial = plan === 'essencial';
   
   const data = {
-    notification: "Você receberá a confirmação e atualizações do agendamento por e-mail.",
+    notification: "Você receberá a confirmação e as atualizações do seu agendamento automaticamente.",
     professional: "Seu horário foi protegido e está aguardando confirmação da profissional."
   };
 
   if (isPro) {
     if (hasWhatsApp) {
-      data.notification = "Você receberá a confirmação e atualizações do agendamento por e-mail e WhatsApp.";
+      data.notification = "Você receberá a confirmação e as atualizações do seu agendamento automaticamente.";
     }
     data.professional = "Seu horário permanece protegido enquanto a profissional confirma os detalhes.";
     return data;

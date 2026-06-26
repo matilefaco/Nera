@@ -1819,9 +1819,9 @@ export default function BookingModal({
                             </p>
                           )}
                           <p className="text-[9px] text-brand-stone/70 font-medium ml-2 mt-2 leading-relaxed italic">
-                            Usaremos seu e-mail para enviar confirmações,
+                            Seus dados de contato serão utilizados para enviar confirmações,
                             atualizações da reserva e informações importantes
-                            sobre seu atendimento.
+                            sobre seu atendimento de forma automática.
                           </p>
                         </div>
 
@@ -2440,7 +2440,7 @@ export default function BookingModal({
               <p className="body-text text-brand-stone mb-10 max-w-xs mx-auto">
                 {waitlistEntry ? "Tudo pronto! Seu horário está confirmado na agenda da profissional." : getBookingNotificationCopy(profile.plan, !!profile.whatsapp).notification}
                 <span className="block mt-2 text-[10px] text-brand-stone italic">
-                  Verifique sua caixa de entrada e spam ✨
+                  Acompanhe as atualizações do seu agendamento automaticamente. ✨
                 </span>
               </p>
               {allSelectedServices.length > 0 && (

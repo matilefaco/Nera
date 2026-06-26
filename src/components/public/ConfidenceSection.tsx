@@ -20,7 +20,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
         ? "Agendamento organizado, confirmação clara e atendimento com hora marcada."
         : profile.plan === 'pro' && profile.whatsapp 
         ? "Atendimento rápido direto no WhatsApp, sem complicação"
-        : "Sistema de reservas prático com notificação por e-mail",
+        : "Sistema de reservas prático com atualizações automáticas",
       show: true
     },
     {
