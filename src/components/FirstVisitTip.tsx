@@ -80,7 +80,7 @@ export const FirstVisitTip = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 10 }}
           className={cn(
-            "z-[9999] bg-brand-ink text-white p-6 rounded-[32px] shadow-2xl border border-white/10",
+            "first-visit-tip z-[9999] bg-brand-ink text-white p-6 rounded-[32px] shadow-2xl border border-white/10",
             targetId ? "fixed w-72 -translate-x-1/2" : "fixed top-12 left-1/2 -translate-x-1/2 md:w-[480px] w-[calc(100%-32px)]",
             position === 'top' && "-translate-y-full",
             position === 'left' && "-translate-x-full -translate-y-1/2",

@@ -7,6 +7,7 @@ import { useAuth } from '../AuthContext';
 import { notify } from '../lib/notify';
 import { Mail, RefreshCw, LogOut, CheckCircle2, ArrowRight, Sparkles } from 'lucide-react';
 import Logo from '../components/Logo';
+import { isDemoEmail } from '../constants/demoAccounts';
 
 export default function VerifyEmailPage() {
   const { user, profile, loading: authLoading, isAuthReady } = useAuth();
@@ -22,7 +23,7 @@ export default function VerifyEmailPage() {
       if (!user) {
         navigate('/login');
       } else {
-        const isDemoUser = profile?.isDemo === true && profile?.demoProfile === 'studio-aurora';
+        const isDemoUser = (profile?.isDemo === true && profile?.demoProfile === 'studio-aurora') || isDemoEmail(user?.email);
         if (user.emailVerified || isDemoUser) {
           navigate('/dashboard');
         }

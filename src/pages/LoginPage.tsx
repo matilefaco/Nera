@@ -8,6 +8,7 @@ import { useAuth } from '../AuthContext';
 import { notify } from '../lib/notify';
 import { getHumanError } from '../lib/utils';
 import Logo from '../components/Logo';
+import { isDemoEmail } from '../constants/demoAccounts';
 
 export default function LoginPage() {
   const { user: currentUser } = useAuth();
@@ -82,18 +83,22 @@ export default function LoginPage() {
       // Check if user is a demo profile to bypass verification
       let isDemoUser = false;
       if (user) {
-        try {
-          const { getDoc, doc } = await import('firebase/firestore');
-          const { db } = await import('../firebase');
-          const profileDoc = await getDoc(doc(db, 'users', user.uid));
-          if (profileDoc.exists()) {
-            const data = profileDoc.data();
-            if (data?.isDemo === true && data?.demoProfile === 'studio-aurora') {
-              isDemoUser = true;
+        if (isDemoEmail(user.email)) {
+          isDemoUser = true;
+        } else {
+          try {
+            const { getDoc, doc } = await import('firebase/firestore');
+            const { db } = await import('../firebase');
+            const profileDoc = await getDoc(doc(db, 'users', user.uid));
+            if (profileDoc.exists()) {
+              const data = profileDoc.data();
+              if (data?.isDemo === true && data?.demoProfile === 'studio-aurora') {
+                isDemoUser = true;
+              }
             }
+          } catch (err) {
+            console.error('[LoginPage] Error checking demo status:', err);
           }
-        } catch (err) {
-          console.error('[LoginPage] Error checking demo status:', err);
         }
       }
       

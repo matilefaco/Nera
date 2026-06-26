@@ -9,6 +9,8 @@ import {
 import { Toaster } from 'sonner';
 import { HelmetProvider } from 'react-helmet-async';
 import { AuthProvider, useAuth } from './AuthContext';
+import { isDemoEmail } from './constants/demoAccounts';
+import { useCaptureMode } from './constants/captureMode';
 import { PendingAppointmentsProvider } from './contexts/PendingAppointmentsContext';
 import { AppErrorBoundary } from './components/AppErrorBoundary';
 import AppLoadingScreen from './components/AppLoadingScreen';
@@ -84,7 +86,7 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
   // Verification Check
   const isPasswordProvider = user.providerData.some(p => p.providerId === 'password');
-  const isDemoUser = profile?.isDemo === true && profile?.demoProfile === 'studio-aurora';
+  const isDemoUser = (profile?.isDemo === true && profile?.demoProfile === 'studio-aurora') || isDemoEmail(user?.email);
   if (isPasswordProvider && !user.emailVerified && !isDemoUser && location.pathname !== '/verificar-email') {
     return <Navigate to="/verificar-email" />;
   }
@@ -132,6 +134,11 @@ const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+function CaptureModeLoader() {
+  useCaptureMode();
+  return null;
+}
+
 export default function App() {
   return (
     // @ts-ignore
@@ -140,6 +147,7 @@ export default function App() {
         <PendingAppointmentsProvider>
           <Router>
             <RouteLogger />
+            <CaptureModeLoader />
             <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
               <AppErrorBoundary>
                 <React.Suspense fallback={<AppLoadingScreen />}>

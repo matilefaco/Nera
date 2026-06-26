@@ -2383,7 +2383,7 @@ export default function OnboardingPage() {
       {/* Debug Overlay - Only visible during development/debugging if showDebugHUD is true */}
       {process.env.NODE_ENV === "development" &&
         (window as any).showDebugHUD && (
-          <div className="fixed bottom-4 right-4 bg-brand-ink/90 text-brand-white p-4 rounded-2xl text-[8px] font-mono z-[100] border border-brand-mist/20 pointer-events-none opacity-50">
+          <div data-capture-hide="true" className="fixed bottom-4 right-4 bg-brand-ink/90 text-brand-white p-4 rounded-2xl text-[8px] font-mono z-[100] border border-brand-mist/20 pointer-events-none opacity-50">
             <p>STEP: {step}</p>
             <p>FINALIZING: {isFinalizing ? "YES" : "NO"}</p>
             <p>LOADING: {loading ? "YES" : "NO"}</p>

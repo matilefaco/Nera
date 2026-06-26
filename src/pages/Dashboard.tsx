@@ -1812,6 +1812,7 @@ export default function Dashboard() {
             {/* Notificações Banner (Compact Strip) */}
             {isSupported && !isSubscribed && !pushBannerDismissed && !isNewAccount && pendingCount === 0 && alerts.length === 0 && (
               <motion.div
+                data-capture-hide="true"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-[#FCFBF9] border border-brand-mist/50 p-5 rounded-[24px] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden"
@@ -2246,7 +2247,7 @@ export default function Dashboard() {
 
       {/* 9. PRIMEIRA EXPERIÊNCIA / HINT (Se não houver bloqueios ativos) */}
       {!blockTipDismissed && (!isSupported || isSubscribed || pushBannerDismissed || isNewAccount) && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
+        <div data-capture-hide="true" className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-48px)] max-w-sm md:bottom-12">
           <motion.div 
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}

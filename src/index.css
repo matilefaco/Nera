@@ -125,3 +125,24 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-brand-ink/5 rounded-full hover:bg-brand-ink/10 transition-colors;
 }
+
+/* Capture Mode Support (hiding toasts, debug indicators, temporary prompts/overlays, banners, etc.) */
+body.capture-mode [data-sonner-toaster],
+body.capture-mode .sonner-toast,
+body.capture-mode .toast,
+body.capture-mode [data-capture-hide="true"],
+body.capture-mode .debug-overlay,
+body.capture-mode .dev-hud,
+body.capture-mode .debug-hud,
+body.capture-mode .first-visit-tip,
+body.capture-mode [data-testid="dev-indicator"],
+body.capture-mode .install-prompt,
+body.capture-mode .push-banner,
+body.capture-mode .temp-banner,
+body.capture-mode .temporary-alert {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+

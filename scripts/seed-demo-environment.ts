@@ -209,8 +209,8 @@ async function seed() {
       isSafeLocation: true
     },
     paymentMethods: ["pix", "credit_card", "debit_card", "cash"],
-    avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80",
-    photoUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80",
+    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=300&q=80",
+    photoUrl: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80",
     dismissedTips: {
       blockTip: true,
       tip_coupons: true,
@@ -315,7 +315,7 @@ async function seed() {
     },
     {
       id: "portfolio_2",
-      url: "https://images.unsplash.com/photo-1632345031435-8797b2d58045?auto=format&fit=crop&w=600&q=80",
+      url: "https://i.pinimg.com/736x/25/f8/96/25f89663a6c71f5903d1b88d7454f9e3.jpg",
       category: "Especialidades",
       categoryId: "especialidades",
       categoryLabel: "Especialidades",
