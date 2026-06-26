@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import { UserProfile } from './types';
 
 interface AuthContextType {
@@ -88,7 +88,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           
           let isFirstSnapshot = true;
 
-          // Use onSnapshot for real-time updates
+          // Attempt an immediate getDoc fetch for ultra-fast, robust initial state
+          getDoc(docRef).then((docSnap) => {
+            if (isFirstSnapshot) {
+              devLog('[AuthContext] Initial getDoc profile fetched. Exists:', docSnap.exists());
+              if (docSnap.exists()) {
+                const data = docSnap.data() as UserProfile;
+                setProfile({ ...data, uid: docSnap.id });
+              } else {
+                setProfile(null);
+              }
+              setLoading(false);
+              clearTimeout(safetyTimeout);
+            }
+          }).catch((err) => {
+            if (isDev) console.error("[AuthContext] Error on initial getDoc profile fetch:", err);
+          });
+
+          // Use onSnapshot for real-time updates in the background
           unsubscribeProfile = onSnapshot(docRef, (docSnap) => {
             try {
               devLog('[AuthContext] Profile snapshot received. Exists:', docSnap.exists());

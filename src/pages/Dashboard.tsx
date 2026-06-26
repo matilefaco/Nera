@@ -220,36 +220,40 @@ export default function Dashboard() {
   const [selectedRequest, setSelectedRequest] = useState<Appointment | null>(null);
 
   const displayedPending = useMemo(() => {
-    return pendingRequests.filter(req => !optimisticUpdates[req.id]);
+    return pendingRequests.filter(req => req && req.id && !optimisticUpdates[req.id]);
   }, [pendingRequests, optimisticUpdates]);
   const pendingCount = displayedPending.length;
 
   const displayedConfirmedToday = useMemo(() => {
     const today = getTodayLocale();
-    const confirmed = [...confirmedToday];
+    const confirmed = [...confirmedToday].filter(Boolean);
     
     // Add pending requests that were optimistically confirmed today
     pendingRequests.forEach(req => {
-      if (optimisticUpdates[req.id] === 'confirmed' && req.date === today && !confirmed.find(c => c.id === req.id)) {
+      if (req && req.id && optimisticUpdates[req.id] === 'confirmed' && req.date === today && !confirmed.find(c => c && c.id === req.id)) {
         confirmed.push({ ...req, status: 'confirmed' });
       }
     });
     
     // Remove if optimistically cancelled
-    return confirmed.filter(req => optimisticUpdates[req.id] !== 'cancelled_by_professional').sort((a,b) => safeLocaleCompare(a.time, b.time));
+    return confirmed.filter(req => req && req.id && optimisticUpdates[req.id] !== 'cancelled_by_professional').sort((a,b) => safeLocaleCompare(a ? a.time : '', b ? b.time : ''));
   }, [confirmedToday, pendingRequests, optimisticUpdates]);
 
   const nextUpcomingAppointment = useMemo(() => {
     const today = getTodayLocale();
     
     const allAppsMap = new Map<string, Appointment>();
-    appointments.forEach(a => allAppsMap.set(a.id, a));
-    confirmedToday.forEach(a => allAppsMap.set(a.id, a));
+    appointments.forEach(a => {
+      if (a && a.id) allAppsMap.set(a.id, a);
+    });
+    confirmedToday.forEach(a => {
+      if (a && a.id) allAppsMap.set(a.id, a);
+    });
     
     const allAppointments = Array.from(allAppsMap.values());
     
     const confirmed = allAppointments.filter(a => 
-      a.status === 'confirmed' || a.status === 'accepted' || a.status === 'completed'
+      a && (a.status === 'confirmed' || a.status === 'accepted' || a.status === 'completed')
     );
     const now = new Date();
     const nowHour = now.getHours().toString().padStart(2, '0');
@@ -257,14 +261,15 @@ export default function Dashboard() {
     const nowTime = `${nowHour}:${nowMin}`;
 
     const future = confirmed.filter(a => {
+      if (!a) return false;
       if ((a.date || '') > today) return true;
       if ((a.date || '') === today && (a.time || '') >= nowTime && !isCompletedStatus(a.status)) return true;
       return false;
     }).sort((a,b) => {
-      const dateA = a.date || '';
-      const dateB = b.date || '';
+      const dateA = a ? (a.date || '') : '';
+      const dateB = b ? (b.date || '') : '';
       if (dateA !== dateB) return dateA.localeCompare(dateB);
-      return safeLocaleCompare(a.time, b.time);
+      return safeLocaleCompare(a ? a.time : '', b ? b.time : '');
     });
 
     return future[0] || null;
@@ -1667,7 +1672,7 @@ export default function Dashboard() {
                       <div className="flex-1">
                         <p className="text-[11px] font-bold text-red-900 leading-tight">Cancelamento de última hora!</p>
                         <p className="text-[10px] text-red-700 font-light mt-1">
-                          {alert.clientName} cancelou {alert.additionalServices?.length > 0 ? [alert.serviceName, ...alert.additionalServices.map((s:any) => s.name)].join(" e ") : alert.serviceName} às {alert.scheduledTime}. 
+                          {alert.clientName} cancelou {alert.additionalServices?.length > 0 ? [alert.serviceName, ...alert.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" e ") : alert.serviceName} às {alert.scheduledTime}. 
                           <span className="font-bold ml-1">Faltavam apenas {alert.hoursUntil}h.</span>
                         </p>
                       </div>
@@ -1752,7 +1757,7 @@ export default function Dashboard() {
                             </div>
                             <p className="text-[11px] text-brand-stone font-light truncate leading-tight pr-2 mt-0.5">
                               {appt.additionalServices?.length > 0 
-                                ? [appt.serviceName, ...appt.additionalServices.map((s:any) => s.name)].join(" • ") 
+                                ? [appt.serviceName, ...appt.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" • ") 
                                 : appt.serviceName}
                             </p>
                           </div>
@@ -1891,7 +1896,7 @@ export default function Dashboard() {
                       <p className="text-[10px] text-brand-stone uppercase tracking-widest">Serviço<span className="none">{selectedRequest.additionalServices?.length ? 's' : ''}</span></p>
                       <p className="text-brand-ink font-medium">
                         {selectedRequest.additionalServices?.length > 0 
-                          ? [selectedRequest.serviceName, ...selectedRequest.additionalServices.map((s:any) => s.name)].join(" • ")
+                          ? [selectedRequest.serviceName, ...selectedRequest.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" • ")
                           : selectedRequest.serviceName}
                       </p>
                     </div>
@@ -1937,10 +1942,10 @@ export default function Dashboard() {
                       <p className="text-brand-stone text-xs font-light leading-relaxed pl-7">
                         {selectedRequest.locationType === 'home' 
                           ? (selectedRequest.address && typeof selectedRequest.address === 'object' 
-                              ? `${selectedRequest.address.street}, ${selectedRequest.address.number}${selectedRequest.address.complement ? ` - ${selectedRequest.address.complement}` : ''} - ${selectedRequest.address.neighborhood}, ${selectedRequest.address.city}${selectedRequest.address.reference ? ` (Ref: ${selectedRequest.address.reference})` : ''}`
-                              : (String(selectedRequest.address) || selectedRequest.neighborhood || 'Endereço a combinar')) 
+                              ? `${selectedRequest.address.street || ''}, ${selectedRequest.address.number || ''}${selectedRequest.address.complement ? ` - ${selectedRequest.address.complement}` : ''} - ${selectedRequest.address.neighborhood || ''}, ${selectedRequest.address.city || ''}${selectedRequest.address.reference ? ` (Ref: ${selectedRequest.address.reference})` : ''}`
+                              : (String(selectedRequest.address || '') || selectedRequest.neighborhood || 'Endereço a combinar')) 
                           : profile?.studioAddress 
-                            ? `${profile.studioAddress.street}, ${profile.studioAddress.number}${profile.studioAddress.complement ? ` - ${profile.studioAddress.complement}` : ''}, ${profile.studioAddress.neighborhood} - ${profile.studioAddress.city}`
+                            ? `${profile.studioAddress.street || ''}, ${profile.studioAddress.number || ''}${profile.studioAddress.complement ? ` - ${profile.studioAddress.complement}` : ''}, ${profile.studioAddress.neighborhood || ''} - ${profile.studioAddress.city || ''}`
                             : 'Atendimento no seu endereço cadastrado'}
                       </p>
                       {selectedRequest.locationDetail && (

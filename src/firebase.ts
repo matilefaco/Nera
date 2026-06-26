@@ -123,33 +123,82 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 }
 
 export const sanitizeAppointment = (data: any, isUpdate = false): any => {
+  if (!data) return {};
   const sanitized = { ...data };
 
+  // 1. Trim strings if present
+  Object.keys(sanitized).forEach((key) => {
+    if (typeof sanitized[key] === "string") {
+      sanitized[key] = sanitized[key].trim();
+    }
+  });
+
+  // 2. Validate/Normalize Client Name
   if (!isUpdate || sanitized.clientName !== undefined) {
-    sanitized.clientName = typeof sanitized.clientName === 'string' && sanitized.clientName.trim() !== '' 
-      ? sanitized.clientName.trim() 
-      : 'Cliente';
+    sanitized.clientName =
+      typeof sanitized.clientName === "string" && sanitized.clientName !== ""
+        ? sanitized.clientName
+        : "Cliente";
   }
 
+  // 3. Normalize Price
   if (!isUpdate || sanitized.price !== undefined) {
-    sanitized.price = Number(sanitized.price) || 0;
+    sanitized.price = sanitized.price !== undefined && sanitized.price !== null ? Number(sanitized.price) : 0;
+    if (isNaN(sanitized.price)) sanitized.price = 0;
   }
 
+  // 4. Normalize Status
   if (!isUpdate || sanitized.status !== undefined) {
     sanitized.status = normalizeAppointmentStatus(sanitized.status);
   }
 
+  // 5. Require professionalId on create
   if (!isUpdate && !sanitized.professionalId) {
-    throw new Error('professionalId é obrigatório');
+    throw new Error("professionalId é obrigatório");
   }
 
+  // 6. Set timestamp if missing on create
   if (!isUpdate && !sanitized.createdAt) {
     sanitized.createdAt = serverTimestamp();
   }
 
-  Object.keys(sanitized).forEach(key => {
-    if (sanitized[key] === undefined) {
+  // 7. Define mandatory keys that should not be deleted on create
+  const mandatoryFields = [
+    "professionalId",
+    "date",
+    "time",
+    "serviceId",
+    "serviceName",
+    "clientName",
+    "status",
+    "createdAt"
+  ];
+
+  // 8. Clean null, undefined and empty fields properly
+  Object.keys(sanitized).forEach((key) => {
+    const value = sanitized[key];
+
+    // Always remove undefined
+    if (value === undefined) {
       delete sanitized[key];
+      return;
+    }
+
+    const isMandatory = mandatoryFields.includes(key);
+
+    if (!isMandatory) {
+      // Remove null and empty optional fields (but preserve false and 0)
+      if (value === null || value === "") {
+        delete sanitized[key];
+        return;
+      }
+    } else {
+      // For mandatory fields on creation, ensure they are not null or empty
+      if (!isUpdate) {
+        if (value === null || value === "") {
+          throw new Error(`O campo obrigatório '${key}' não pode ser nulo ou vazio.`);
+        }
+      }
     }
   });
 

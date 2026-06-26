@@ -97,7 +97,7 @@ export const ActivationChecklist = ({
     
     // Fast path: if appointments from props already contains a valid booking
     const hasActiveProp = appointments.some(app => 
-      app.status && 
+      app && app.status && 
       !['cancelled', 'cancelled_by_client', 'cancelled_by_professional', 'expired', 'no_show', 'rejected', 'declined'].includes(app.status)
     );
     if (hasActiveProp) {

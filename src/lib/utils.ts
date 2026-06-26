@@ -93,6 +93,7 @@ export function parseLocalDate(dateStr: string): Date {
  * Formats a "YYYY-MM-DD" string into a localized Portuguese string without timezone shift.
  */
 export function formatLocalDate(dateStr: string, options: Intl.DateTimeFormatOptions): string {
+  if (!dateStr || typeof dateStr !== 'string') return '';
   const date = parseLocalDate(dateStr);
   return date.toLocaleDateString('pt-BR', options);
 }

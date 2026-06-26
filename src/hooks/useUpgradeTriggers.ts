@@ -13,6 +13,7 @@ export function useUpgradeTriggers(appointments: Appointment[] = []) {
 
   const usageCount = useMemo(() => {
     const currentMonthAppts = appointments.filter(a => {
+      if (!a || !a.date) return false;
       const d = new Date(a.date + 'T12:00:00');
       const now = new Date();
       const isPublic =

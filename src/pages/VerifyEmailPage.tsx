@@ -9,7 +9,7 @@ import { Mail, RefreshCw, LogOut, CheckCircle2, ArrowRight, Sparkles } from 'luc
 import Logo from '../components/Logo';
 
 export default function VerifyEmailPage() {
-  const { user, isAuthReady } = useAuth();
+  const { user, profile, loading: authLoading, isAuthReady } = useAuth();
   const [searchParams] = useSearchParams();
   const isVerifiedSuccess = searchParams.get('verified') === '1';
 
@@ -18,14 +18,17 @@ export default function VerifyEmailPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthReady) {
+    if (isAuthReady && !authLoading) {
       if (!user) {
         navigate('/login');
-      } else if (user.emailVerified) {
-        navigate('/dashboard');
+      } else {
+        const isDemoUser = profile?.isDemo === true && profile?.demoProfile === 'studio-aurora';
+        if (user.emailVerified || isDemoUser) {
+          navigate('/dashboard');
+        }
       }
     }
-  }, [user, isAuthReady, navigate]);
+  }, [user, profile, authLoading, isAuthReady, navigate]);
 
   const handleReload = async () => {
     if (!user) return;

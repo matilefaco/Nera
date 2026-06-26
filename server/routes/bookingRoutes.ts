@@ -502,20 +502,31 @@ function getBookingLockId(appointment: any): string | null {
 }
 
 const sanitizeAppointment = (data: any, isUpdate = false): any => {
+  if (!data) return {};
   const sanitized = { ...data };
 
+  // 1. Trim strings if present
+  Object.keys(sanitized).forEach((key) => {
+    if (typeof sanitized[key] === "string") {
+      sanitized[key] = sanitized[key].trim();
+    }
+  });
+
+  // 2. Validate/Normalize Client Name
   if (!isUpdate || sanitized.clientName !== undefined) {
     sanitized.clientName =
-      typeof sanitized.clientName === "string" &&
-      sanitized.clientName.trim() !== ""
-        ? sanitized.clientName.trim()
+      typeof sanitized.clientName === "string" && sanitized.clientName !== ""
+        ? sanitized.clientName
         : "Cliente";
   }
 
+  // 3. Normalize Price
   if (!isUpdate || sanitized.price !== undefined) {
-    sanitized.price = Number(sanitized.price) || 0;
+    sanitized.price = sanitized.price !== undefined && sanitized.price !== null ? Number(sanitized.price) : 0;
+    if (isNaN(sanitized.price)) sanitized.price = 0;
   }
 
+  // 4. Normalize Status
   if (!isUpdate || sanitized.status !== undefined) {
     const validStatuses = [
       "pending",
@@ -540,17 +551,53 @@ const sanitizeAppointment = (data: any, isUpdate = false): any => {
     }
   }
 
+  // 5. Require professionalId on create
   if (!isUpdate && !sanitized.professionalId) {
     throw new Error("professionalId é obrigatório");
   }
 
+  // 6. Set timestamp if missing on create
   if (!isUpdate && !sanitized.createdAt) {
     sanitized.createdAt = admin.firestore.FieldValue.serverTimestamp();
   }
 
+  // 7. Define mandatory keys that should not be deleted on create
+  const mandatoryFields = [
+    "professionalId",
+    "date",
+    "time",
+    "serviceId",
+    "serviceName",
+    "clientName",
+    "status",
+    "createdAt"
+  ];
+
+  // 8. Clean null, undefined and empty fields properly
   Object.keys(sanitized).forEach((key) => {
-    if (sanitized[key] === undefined) {
+    const value = sanitized[key];
+
+    // Always remove undefined
+    if (value === undefined) {
       delete sanitized[key];
+      return;
+    }
+
+    const isMandatory = mandatoryFields.includes(key);
+
+    if (!isMandatory) {
+      // Remove null and empty optional fields (but preserve false and 0)
+      if (value === null || value === "") {
+        delete sanitized[key];
+        return;
+      }
+    } else {
+      // For mandatory fields on creation, ensure they are not null or empty
+      if (!isUpdate) {
+        if (value === null || value === "") {
+          throw new Error(`O campo obrigatório '${key}' não pode ser nulo ou vazio.`);
+        }
+      }
     }
   });
 
@@ -2268,6 +2315,28 @@ router.get("/debug-slot-lock", debugOnly, async (req, res) => {
   }
 });
 
+const cleanDeep = (obj: any): any => {
+  if (obj === null || obj === undefined) return undefined;
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanDeep(item)).filter(item => item !== undefined && item !== null);
+  }
+  if (typeof obj === "object") {
+    const cleaned: any = {};
+    Object.keys(obj).forEach((key) => {
+      const val = cleanDeep(obj[key]);
+      if (val !== undefined && val !== null && val !== "") {
+        cleaned[key] = val;
+      }
+    });
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+  if (typeof obj === "string") {
+    const trimmed = obj.trim();
+    return trimmed !== "" ? trimmed : undefined;
+  }
+  return obj;
+};
+
 // --- NEW: CREATE MANUAL APPOINTMENT ENDPOINT ---
 router.post(
   "/manual",
@@ -2276,8 +2345,7 @@ router.post(
     logger.info("BOOKING", "[MANUAL_BOOKING_ROUTE_HIT] Iniciando criação manual");
     const db = getDb();
     const uid = req.uid;
-    const appointmentData = req.body;
-
+    const appointmentData = req.body || {};
 
     logger.info("BOOKING", `[MANUAL_BOOKING_PAYLOAD] Received data for professional: ${appointmentData?.professionalId}`);
 
@@ -2293,19 +2361,45 @@ router.post(
       return res.status(403).json({ error: "Acesso negado.", step: "auth_match" });
     }
 
-    if (
-      !appointmentData.date ||
-      !appointmentData.time ||
-      !appointmentData.serviceId
-    ) {
-      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Dados incompletos", appointmentData);
-      return res.status(400).json({ error: "Dados incompletos", step: "validation" });
+    // Explicit and rigorous validations
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!appointmentData.date || !dateRegex.test(appointmentData.date)) {
+      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Data inválida", { date: appointmentData.date });
+      return res.status(400).json({
+        error: "Data inválida ou ausente. O formato correto é AAAA-MM-DD.",
+        step: "validation_date"
+      });
+    }
+
+    const timeRegex = /^\d{2}:\d{2}$/;
+    if (!appointmentData.time || !timeRegex.test(appointmentData.time)) {
+      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Horário inválido", { time: appointmentData.time });
+      return res.status(400).json({
+        error: "Horário inválido ou ausente. O formato correto é HH:MM.",
+        step: "validation_time"
+      });
+    }
+
+    if (!appointmentData.serviceId || typeof appointmentData.serviceId !== "string" || appointmentData.serviceId.trim() === "") {
+      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Serviço ausente");
+      return res.status(400).json({
+        error: "O serviço é obrigatório.",
+        step: "validation_service"
+      });
+    }
+
+    if (!appointmentData.clientName || typeof appointmentData.clientName !== "string" || appointmentData.clientName.trim() === "") {
+      logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Nome do cliente ausente");
+      return res.status(400).json({
+        error: "O nome do cliente é obrigatório.",
+        step: "validation_client_name"
+      });
     }
 
     const priceNum = Number(appointmentData.price);
-    if (isNaN(priceNum) || priceNum <= 0) {
+    if (isNaN(priceNum) || priceNum < 0) {
       logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Valor inválido", { price: appointmentData.price });
-      return res.status(400).json({ error: "Informe um valor válido.", step: "validation_price" });
+      return res.status(400).json({ error: "Informe um valor numérico válido maior ou igual a zero.", step: "validation_price" });
     }
 
     logger.info("BOOKING", `[MANUAL_BOOKING_SERVICE_FOUND] Preparando transação para ${appointmentData.date} ${appointmentData.time}`);
@@ -2409,22 +2503,44 @@ router.post(
         const appointmentId = db.collection("appointments").doc().id;
         const apptRef = db.collection("appointments").doc(appointmentId);
         
-        // Final object construction based on validated data
-        const appointmentToSave = {
-          ...appointmentData,
+        // Final object construction based on validated data (EXPLICIT, NO SPREAD of req.body!)
+        const appointmentToSave: any = {
           id: appointmentId,
+          professionalId: uid,
+          professionalName: typeof appointmentData.professionalName === "string" ? appointmentData.professionalName.trim() : "",
+          professionalWhatsapp: typeof appointmentData.professionalWhatsapp === "string" ? appointmentData.professionalWhatsapp.trim() : "",
+          clientName: String(appointmentData.clientName).trim(),
+          clientWhatsapp: typeof appointmentData.clientWhatsapp === "string" ? appointmentData.clientWhatsapp.trim() : "",
+          clientEmail: typeof appointmentData.clientEmail === "string" ? appointmentData.clientEmail.trim() : "",
+          clientMessage: typeof appointmentData.clientMessage === "string" ? appointmentData.clientMessage.trim() : "",
+          serviceId: serviceSnap.id,
+          serviceName: serviceName,
           duration: serviceDuration,
           serviceDuration: serviceDuration,
-          serviceName: serviceName,
-          serviceId: serviceSnap.id,
-          professionalId: uid,
-          status: "confirmed",
-          source: "manual",
-          totalPrice: priceNum,
           price: priceNum,
+          totalPrice: priceNum,
+          finalPrice: priceNum,
+          originalPrice: priceNum,
+          date: appointmentData.date,
+          time: appointmentData.time,
+          source: "manual",
+          status: "confirmed",
+          locationType: appointmentData.locationType === "home" ? "home" : "studio",
+          notes: typeof appointmentData.notes === "string" ? appointmentData.notes.trim() : "Agendamento criado manualmente",
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
+
+        if (appointmentData.waitlistEntryId) {
+          appointmentToSave.waitlistEntryId = String(appointmentData.waitlistEntryId).trim();
+        }
+
+        if (appointmentData.customerAddress && typeof appointmentData.customerAddress === "object") {
+          const cleanedAddr = cleanDeep(appointmentData.customerAddress);
+          if (cleanedAddr) {
+            appointmentToSave.customerAddress = cleanedAddr;
+          }
+        }
 
         const safeAppointment = sanitizeAppointment(appointmentToSave, false);
         transaction.set(apptRef, safeAppointment);
@@ -2441,7 +2557,7 @@ router.post(
             serviceName: serviceName,
             status: "confirmed",
             appointmentId: appointmentId,
-            clientName: appointmentData.clientName || 'Cliente',
+            clientName: String(appointmentData.clientName).trim(),
             source: "manual",
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             updatedAt: admin.firestore.FieldValue.serverTimestamp()

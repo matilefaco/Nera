@@ -79,8 +79,26 @@ export default function LoginPage() {
       await Promise.race([authPromise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
       const user = auth.currentUser;
       
+      // Check if user is a demo profile to bypass verification
+      let isDemoUser = false;
+      if (user) {
+        try {
+          const { getDoc, doc } = await import('firebase/firestore');
+          const { db } = await import('../firebase');
+          const profileDoc = await getDoc(doc(db, 'users', user.uid));
+          if (profileDoc.exists()) {
+            const data = profileDoc.data();
+            if (data?.isDemo === true && data?.demoProfile === 'studio-aurora') {
+              isDemoUser = true;
+            }
+          }
+        } catch (err) {
+          console.error('[LoginPage] Error checking demo status:', err);
+        }
+      }
+      
       // If user is not verified and logged in with password, redirect to verification
-      if (user && !user.emailVerified && user.providerData.some(p => p.providerId === 'password')) {
+      if (user && !user.emailVerified && !isDemoUser && user.providerData.some(p => p.providerId === 'password')) {
         notify.info('Sua conta ainda não foi verificada. Verifique seu e-mail.');
         navigate('/verificar-email');
         setLoading(false);

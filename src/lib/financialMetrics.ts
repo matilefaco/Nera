@@ -50,6 +50,7 @@ export function calculateFinancialMetrics(
   const servicesMap: Record<string, { count: number; revenue: number }> = {};
 
   appointments.forEach((app) => {
+    if (!app) return;
     // Determine monetary value
     const val =
       app.finalPrice ??
@@ -80,7 +81,7 @@ export function calculateFinancialMetrics(
     // Revenue by service logic: only for valid financially
     if (isCompleted || isConfirmed) {
       const sName = app.additionalServices?.length > 0 
-        ? [app.serviceName, ...app.additionalServices.map(s => s.name)].join(" + ")
+        ? [app.serviceName, ...app.additionalServices.filter(Boolean).map(s => s?.name || "")].join(" + ")
         : (app.serviceName || "-");
       if (!servicesMap[sName]) servicesMap[sName] = { count: 0, revenue: 0 };
       servicesMap[sName].count++;
@@ -123,7 +124,7 @@ export function filterAppointmentsByCurrentMonth(
   const currentYear = refDate.getFullYear();
 
   return appointments.filter((app) => {
-    if (!app.date) return false;
+    if (!app || !app.date) return false;
     // ensure parsing doesn't shift timezone bounds
     const dObj = new Date(app.date + "T12:00:00");
     return (
@@ -142,7 +143,7 @@ export function filterAppointmentsByDateRange(
   endStr: string,
 ): Appointment[] {
   return appointments.filter((app) => {
-    if (!app.date) return false;
+    if (!app || !app.date) return false;
     return app.date >= startStr && app.date <= endStr;
   });
 }

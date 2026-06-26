@@ -84,7 +84,8 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 
   // Verification Check
   const isPasswordProvider = user.providerData.some(p => p.providerId === 'password');
-  if (isPasswordProvider && !user.emailVerified && location.pathname !== '/verificar-email') {
+  const isDemoUser = profile?.isDemo === true && profile?.demoProfile === 'studio-aurora';
+  if (isPasswordProvider && !user.emailVerified && !isDemoUser && location.pathname !== '/verificar-email') {
     return <Navigate to="/verificar-email" />;
   }
 

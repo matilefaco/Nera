@@ -88,6 +88,8 @@ export interface UserProfile {
   professionalId: string; // Sanitized public ID
   /** @deprecated Use professionalId */
   uid?: string;
+  isDemo?: boolean;
+  demoProfile?: string;
   name: string;
   email: string;
   whatsapp: string;

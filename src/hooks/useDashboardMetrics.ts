@@ -36,6 +36,7 @@ export function useDashboardMetrics(
 
     for (let i = 0; i < analyticsEvents.length; i++) {
         const e = analyticsEvents[i];
+        if (!e) continue;
         if (!e.timestamp || typeof e.timestamp.toDate !== 'function') continue;
         const eDate = e.timestamp.toDate();
         
@@ -76,6 +77,7 @@ export function useDashboardMetrics(
 
     for (let i = 0; i < appointments.length; i++) {
         const app = appointments[i];
+        if (!app) continue;
         if (!app.date || typeof app.date !== 'string' || app.date.indexOf('-') === -1) continue;
         
         const isRevenue = isRevenueStatus(app.status);
