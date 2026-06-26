@@ -20,7 +20,7 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
   if (!availability || availability.length === 0) return null;
 
   return (
-    <section className="py-12 md:py-20 px-4 sm:px-6 bg-brand-linen/20">
+    <section data-marketing-section="agenda" className="py-12 md:py-20 px-4 sm:px-6 bg-brand-linen/20">
       <div className="max-w-7xl mx-auto w-full">
         <div className="text-center mb-8 md:mb-12 space-y-4">
           <motion.span 

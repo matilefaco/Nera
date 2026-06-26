@@ -36,7 +36,7 @@ export const ConfidenceSection = ({ profile, stats }: ConfidenceSectionProps) =>
   ].filter(b => b.show);
 
   return (
-    <section className="py-16 md:py-24 px-4 sm:px-6 bg-brand-white relative overflow-hidden">
+    <section data-marketing-section="confidence" className="py-16 md:py-24 px-4 sm:px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-10 md:mb-16">
           <span className="label-text text-[var(--theme-accent,var(--color-brand-terracotta))]/60 mb-4 block">Experiência e Qualidade</span>

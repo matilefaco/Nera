@@ -20,7 +20,7 @@ export function PaymentMethods({ className, professionalName, paymentMethods, ac
   const hasCreditCard = normalizedMethods.includes('credit_card');
 
   return (
-    <section className={`py-8 md:py-12 px-6 bg-brand-white border-y border-brand-mist/20 ${className}`}>
+    <section data-marketing-section="payments" className={`py-8 md:py-12 px-6 bg-brand-white border-y border-brand-mist/20 ${className}`}>
       <div className="max-w-4xl mx-auto flex flex-col items-center gap-6 md:gap-8">
         <div className="text-center space-y-1">
           <h3 className="text-[13px] font-bold uppercase tracking-[0.3em] text-brand-ink">Pagamento aceito</h3>

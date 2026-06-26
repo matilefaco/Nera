@@ -25,7 +25,7 @@ export function ExpertIntro({ profile, stats, customBio, customTitle }: ExpertIn
   const resolvedTitle = customTitle || (editorialPillar ? defaultTitles[editorialPillar] : <>Técnica e <em className="italic">Precisão</em></>);
 
   return (
-    <section className="py-16 md:py-24 px-4 sm:px-6 bg-brand-white relative overflow-hidden">
+    <section data-marketing-section="about" className="py-16 md:py-24 px-4 sm:px-6 bg-brand-white relative overflow-hidden">
       <div className="max-w-4xl mx-auto">
         <div className="flex flex-col items-center text-center space-y-8 md:space-y-10">
           {/* Text Content */}

@@ -60,7 +60,7 @@ export const ReviewsSection = ({ reviews, stats }: ReviewsSectionProps) => {
     : [];
 
   return (
-    <section className="py-20 md:py-32 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+    <section data-marketing-section="reviews" className="py-20 md:py-32 px-4 sm:px-6 max-w-7xl mx-auto w-full">
       <div className="flex flex-col lg:flex-row lg:items-center gap-10 md:gap-16 mb-16 md:mb-24">
         <div className="flex items-baseline gap-4">
           <span className="font-serif text-[clamp(60px,15vw,80px)] leading-none text-brand-ink">
