@@ -155,6 +155,15 @@ export default function App() {
                   <Routes>
                   {/* ... routes ... */}
                   <Route path="/" element={<LandingPage />} />
+                  <Route path="/para-nail-designers" element={<LandingPageVariant nichePath="para-nail-designers" />} />
+                  <Route path="/para-sobrancelhistas" element={<LandingPageVariant nichePath="para-sobrancelhistas" />} />
+                  <Route path="/para-esteticistas" element={<LandingPageVariant nichePath="para-esteticistas" />} />
+                  <Route path="/para-cabeleireiras" element={<LandingPageVariant nichePath="para-cabeleireiras" />} />
+                  <Route path="/para-lash-designers" element={<LandingPageVariant nichePath="para-lash-designers" />} />
+                  <Route path="/para-maquiadoras" element={<LandingPageVariant nichePath="para-maquiadoras" />} />
+                  <Route path="/para-podologas" element={<LandingPageVariant nichePath="para-podologas" />} />
+                  <Route path="/para-depiladoras" element={<LandingPageVariant nichePath="para-depiladoras" />} />
+                  <Route path="/para-massagistas" element={<LandingPageVariant nichePath="para-massagistas" />} />
                   <Route path="/para-:nichePath" element={<LandingPageVariant />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />

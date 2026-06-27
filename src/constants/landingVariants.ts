@@ -230,5 +230,280 @@ export const landingVariants: Record<string, LandingVariant> = {
       }
     ],
     forWhoDesc: 'Cabeleireiras, coloristas, especialistas em megahair, terapeutas capilares e proprietárias de salões ou estúdios de beleza.'
+  },
+  'para-lash-designers': {
+    path: '/para-lash-designers',
+    niche: 'Lash Designer',
+    title: 'Nera | Agenda online para Lash Designers',
+    description: 'Agenda online, vitrine digital, lembretes de manutenção e gestão para lash designers e especialistas em extensão de cílios.',
+    headline: 'Seu estúdio de cílios organizado e com agenda cheia',
+    subheadline: 'Uma presença profissional completa para Lash Designers. Agendamento online 24h, lembrete de manutenção recorrente e fidelização ativa de clientes.',
+    problems: [
+      {
+        num: '01',
+        text: 'Você passa horas respondendo dúvidas pós-procedimento e negociando horários no WhatsApp.'
+      },
+      {
+        num: '02',
+        text: 'Clientes que perdem o prazo ideal de manutenção dos cílios, afetando a durabilidade e o seu faturamento.'
+      },
+      {
+        num: '03',
+        text: 'Faltas de última hora (no-shows) em procedimentos longos que deixam buracos caros na sua grade do dia.'
+      }
+    ],
+    benefits: [
+      {
+        title: 'Agendamento online 24h',
+        desc: 'Sua cliente reserva o horário ideal pelo celular e você recebe a confirmação sem precisar interromper seus atendimentos.',
+        icon: 'calendar'
+      },
+      {
+        title: 'Retorno programado',
+        desc: 'Configure notificações automáticas para lembrar suas clientes da hora certa de fazer a manutenção dos cílios.',
+        icon: 'bell'
+      },
+      {
+        title: 'Vitrine de cílios premium',
+        desc: 'Destaque fotos das suas extensões e lash lift em uma galeria organizada e de alta resolução que atrai novas clientes.',
+        icon: 'shop'
+      },
+      {
+        title: 'Histórico de mapping',
+        desc: 'Guarde anotações completas de curvatura, espessura, técnica e mapeamento de cílios (mapping) usado para cada cliente.',
+        icon: 'chart'
+      },
+      {
+        title: 'Filtro de inatividade',
+        desc: 'Identifique clientes que estão há mais de 30 dias sem agendar e mande uma mensagem de reativação com apenas um clique.',
+        icon: 'users'
+      },
+      {
+        title: 'Incentivo à indicação',
+        desc: 'Crie cupons de indicação e fidelidade para transformar suas clientes atuais no seu canal de marketing mais eficiente.',
+        icon: 'gift'
+      }
+    ],
+    forWhoDesc: 'Lash designers, especialistas em extensão de cílios, lash lifting, estúdios de olhar e profissionais autônomas do segmento.'
+  },
+  'para-maquiadoras': {
+    path: '/para-maquiadoras',
+    niche: 'Maquiadora',
+    title: 'Nera | Agenda online para Maquiadoras',
+    description: 'Agenda online, vitrine digital, lembretes e gestão de clientes para maquiadoras de eventos, noivas, formandas e profissionais da beleza.',
+    headline: 'Organize sua agenda de beleza para eventos e casamentos',
+    subheadline: 'Deixe de perder tempo com agendamentos manuais. Ofereça um link de reservas premium para suas clientes de maquiagem social, noivas e eventos.',
+    problems: [
+      {
+        num: '01',
+        text: 'Sobrecarga insana de mensagens no WhatsApp em datas concorridas de casamentos, formaturas e feriados.'
+      },
+      {
+        num: '02',
+        text: 'Falta de controle profissional nos agendamentos de prévia de noivas e madrinhas, gerando confusões de horários.'
+      },
+      {
+        num: '03',
+        text: 'Clientes que faltam ou desmarcam em cima da hora, deixando você sem tempo para preencher uma vaga muito disputada.'
+      }
+    ],
+    benefits: [
+      {
+        title: 'Agenda de eventos inteligente',
+        desc: 'Configure disponibilidades específicas para finais de semana e feriados para receber agendamentos sem atritos.',
+        icon: 'calendar'
+      },
+      {
+        title: 'Confirmação e lembretes',
+        desc: 'Envie confirmações e lembretes automáticos por WhatsApp ou e-mail para reduzir as ausências a praticamente zero.',
+        icon: 'bell'
+      },
+      {
+        title: 'Portfólio de maquiagem premium',
+        desc: 'Mostre seu portfólio de noivas, maquiagens sociais e artísticas em uma vitrine virtual focada em conversão.',
+        icon: 'shop'
+      },
+      {
+        title: 'Controle de faturamento',
+        desc: 'Monitore os pagamentos de sinal de reserva para garantir seu faturamento mesmo em casos de cancelamento.',
+        icon: 'chart'
+      },
+      {
+        title: 'Ficha de preferências',
+        desc: 'Registre tipos de pele, alergias e tons de produtos preferidos de cada cliente para um atendimento personalizado e seguro.',
+        icon: 'users'
+      },
+      {
+        title: 'Cupons de pacotes',
+        desc: 'Crie cupons especiais para noivas, madrinhas e grupos de formandas para atrair agendamentos múltiplos de uma só vez.',
+        icon: 'gift'
+      }
+    ],
+    forWhoDesc: 'Maquiadoras profissionais, especialistas em maquiagem para noivas e madrinhas, estúdios de maquiagem social e maquiadoras autônomas.'
+  },
+  'para-podologas': {
+    path: '/para-podologas',
+    niche: 'Podóloga',
+    title: 'Nera | Agenda online para Podólogas',
+    description: 'Agenda online, prontuário, lembretes de retorno e gestão para podólogas e clínicas de podologia organizarem seus atendimentos clínicos.',
+    headline: 'Gestão inteligente e agendamento prático para Podólogas',
+    subheadline: 'Simplifique o controle de retornos de tratamento, organize o histórico clínico de cada paciente e ofereça agendamento online intuitivo.',
+    problems: [
+      {
+        num: '01',
+        text: 'Tratamentos clínicos interrompidos ou atrasados porque os pacientes se esquecem da data correta de retorno.'
+      },
+      {
+        num: '02',
+        text: 'Perda de tempo valioso ligando ou mandando lembretes de acompanhamento manualmente todos os dias.'
+      },
+      {
+        num: '03',
+        text: 'Histórico de tratamentos e anamnese guardados de forma desorganizada em fichas físicas difíceis de consultar.'
+      }
+    ],
+    benefits: [
+      {
+        title: 'Agendamento clínico',
+        desc: 'Permita que seus pacientes agendem de forma rápida os procedimentos de rotina, liberando seu tempo para os atendimentos.',
+        icon: 'calendar'
+      },
+      {
+        title: 'Retorno programado',
+        desc: 'Lembretes automáticos avisam o paciente no prazo exato do tratamento de órteses ou profilaxia.',
+        icon: 'bell'
+      },
+      {
+        title: 'Vitrine de atendimento',
+        desc: 'Apresente seus tratamentos, procedimentos clínicos, preços e depoimentos de forma séria e profissional.',
+        icon: 'shop'
+      },
+      {
+        title: 'Ficha clínica digital',
+        desc: 'Acompanhe a evolução de cada tratamento com anotações fáceis sobre cada sessão e queixas principais.',
+        icon: 'chart'
+      },
+      {
+        title: 'Acompanhamento de saúde',
+        desc: 'Mantenha um canal ativo com seus pacientes, garantindo um acompanhamento periódico preventivo.',
+        icon: 'users'
+      },
+      {
+        title: 'Fidelização contínua',
+        desc: 'Desenvolva campanhas de cuidados contínuos para pés saudáveis, mantendo sua agenda sempre preenchida de forma previsível.',
+        icon: 'gift'
+      }
+    ],
+    forWhoDesc: 'Podólogas clínicas, especialistas em pé diabético, tratamento de órteses, podopediatria, gerontopodologia e clínicas de podologia.'
+  },
+  'para-depiladoras': {
+    path: '/para-depiladoras',
+    niche: 'Depiladora',
+    title: 'Nera | Agenda online para Depiladoras',
+    description: 'Agenda online, vitrine digital, lembretes e gestão de clientes para depiladoras profissionais e estúdios de depilação.',
+    headline: 'Mantenha sua agenda de depilação sempre cheia e previsível',
+    subheadline: 'Automatize lembretes de retorno no prazo exato do crescimento dos pelos, reduza as faltas de última hora e profissionalize seu estúdio.',
+    problems: [
+      {
+        num: '01',
+        text: 'Clientes que agendam apenas em cima da hora, gerando picos excessivos no fim de semana e dias ociosos no início da semana.'
+      },
+      {
+        num: '02',
+        text: 'Perda do ciclo de depilação da cliente porque ela esquece de agendar após o intervalo recomendado de 20 a 30 dias.'
+      },
+      {
+        num: '03',
+        text: 'Faltas e desmarcações sem aviso prévio que impedem o encaixe de outras clientes aguardando vaga.'
+      }
+    ],
+    benefits: [
+      {
+        title: 'Agendamento autônomo',
+        desc: 'Sua agenda aberta online para as clientes reservarem seus próprios horários no momento que desejarem.',
+        icon: 'calendar'
+      },
+      {
+        title: 'Lembrete do ciclo de pelos',
+        desc: 'Envie avisos amigáveis e automáticos no WhatsApp no período exato em que a cliente precisa voltar para a próxima sessão.',
+        icon: 'bell'
+      },
+      {
+        title: 'Vitrine e menus claros',
+        desc: 'Exponha seus serviços por áreas corporais de forma transparente, permitindo que a cliente escolha exatamente o que precisa.',
+        icon: 'shop'
+      },
+      {
+        title: 'Registro de métodos e ceras',
+        desc: 'Anote ceras favoritas (ceras frias, quentes, ceras de mel), sensibilidades e áreas de cada cliente para atendimentos seguros.',
+        icon: 'chart'
+      },
+      {
+        title: 'Reativação rápida',
+        desc: 'Monitore clientes inativas do mês e convide-as de forma direta para manter o ciclo de depilação em dia.',
+        icon: 'users'
+      },
+      {
+        title: 'Pacotes promocionais',
+        desc: 'Crie cupons especiais para combos de áreas corporais e estimule suas clientes a realizarem mais serviços em uma mesma sessão.',
+        icon: 'gift'
+      }
+    ],
+    forWhoDesc: 'Depiladoras profissionais, especialistas em depilação com cera, depilação egípcia (linha), fotodepilação e clínicas de depilação corporativa.'
+  },
+  'para-massagistas': {
+    path: '/para-massagistas',
+    niche: 'Massagista',
+    title: 'Nera | Agenda online para Massagistas',
+    description: 'Agenda online, controle de pacotes corporais, lembretes e gestão para massoterapeutas, massagistas e terapeutas corporais.',
+    headline: 'Mais tranquilidade na sua gestão de massoterapia',
+    subheadline: 'Ofereça uma experiência relaxante desde o agendamento. Automatize reservas, controle pacotes corporais e elimine as faltas com a Nera.',
+    problems: [
+      {
+        num: '01',
+        text: 'Interrupções constantes durante massagens e terapias relaxantes para atender chamadas ou responder WhatsApp de agendamento.'
+      },
+      {
+        num: '02',
+        text: 'Controle de sessões restantes de pacotes em planilhas manuais ou anotações em papel que frequentemente se perdem.'
+      },
+      {
+        num: '03',
+        text: 'No-shows ou cancelamentos repentinos de sessões longas que desestruturam financeiramente a sua semana.'
+      }
+    ],
+    benefits: [
+      {
+        title: 'Reserva 100% autônoma',
+        desc: 'Suas clientes reservam as massagens diretamente pelo link, sem interromper seus momentos de terapia e concentração.',
+        icon: 'calendar'
+      },
+      {
+        title: 'Confirmação e lembretes',
+        desc: 'Envie notificações corteses e automatizadas de confirmação para evitar esquecimentos e garantir a presença.',
+        icon: 'bell'
+      },
+      {
+        title: 'Vitrine de terapias',
+        desc: 'Apresente suas modalidades de massagem (relaxante, modeladora, drenagem lymphatic) com preços e detalhes elegantes.',
+        icon: 'shop'
+      },
+      {
+        title: 'Controle de pacotes corporais',
+        desc: 'Registre e debite sessões de pacotes com facilidade, dando total clareza do saldo de sessões para você e sua cliente.',
+        icon: 'chart'
+      },
+      {
+        title: 'Ficha de anamnese',
+        desc: 'Anote dores recorrentes, restrições médicas, alergias a óleos e preferências de intensidade de massagem de cada cliente.',
+        icon: 'users'
+      },
+      {
+        title: 'Cupons de menor movimento',
+        desc: 'Atraia agendamentos em horários ociosos com cupons de desconto estratégicos, estabilizando seu faturamento.',
+        icon: 'gift'
+      }
+    ],
+    forWhoDesc: 'Massoterapeutas, massagistas profissionais, terapeutas corporais, especialistas em drenagem linfática, quiropraxia e estúdios de relaxamento.'
   }
 };

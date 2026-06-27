@@ -107,6 +107,75 @@ export default function PublicProfile() {
   );
 }
 
+const getNicheLinkInfo = (specialty: string = "") => {
+  const s = specialty.toLowerCase().trim();
+  
+  // 1. Lash Designers
+  if (s.includes("lash") || s.includes("cílios") || s.includes("cilios") || s.includes("extensão de cílios") || s.includes("extensao de cilios") || s.includes("lash lift")) {
+    return {
+      path: "/para-lash-designers",
+      name: "Lash Designers"
+    };
+  }
+  // 2. Maquiadoras
+  if (s.includes("maquiadora") || s.includes("maquiagem") || s.includes("makeup") || s.includes("make-up") || s.includes("visagista")) {
+    return {
+      path: "/para-maquiadoras",
+      name: "Maquiadoras"
+    };
+  }
+  // 3. Podólogas
+  if (s.includes("podóloga") || s.includes("podologia") || s.includes("podologa")) {
+    return {
+      path: "/para-podologas",
+      name: "Podólogas"
+    };
+  }
+  // 4. Depiladoras
+  if (s.includes("depiladora") || s.includes("depilação") || s.includes("depilacao")) {
+    return {
+      path: "/para-depiladoras",
+      name: "Depiladoras"
+    };
+  }
+  // 5. Massagistas
+  if (s.includes("massoterapeuta") || s.includes("massagem") || s.includes("massagista") || s.includes("massoterapia") || s.includes("drenagem")) {
+    return {
+      path: "/para-massagistas",
+      name: "Massagistas"
+    };
+  }
+  // 6. Nail Designers
+  if (s.includes("nail") || s.includes("unha") || s.includes("manicure") || s.includes("pedicure") || s.includes("alongamento")) {
+    return {
+      path: "/para-nail-designers",
+      name: "Nail Designers"
+    };
+  }
+  // 7. Sobrancelhistas
+  if (s.includes("sobrancelha") || s.includes("micropigmentadora") || s.includes("micropigmentação") || s.includes("micropigmentacao") || s.includes("design de sobrancelhas")) {
+    return {
+      path: "/para-sobrancelhistas",
+      name: "Sobrancelhistas"
+    };
+  }
+  // 8. Esteticistas
+  if (s.includes("esteticista") || s.includes("estética") || s.includes("estetica") || s.includes("limpeza de pele")) {
+    return {
+      path: "/para-esteticistas",
+      name: "Esteticistas"
+    };
+  }
+  // 9. Cabeleireiras
+  if (s.includes("cabeleireira") || s.includes("cabelo") || s.includes("hair") || s.includes("colorista") || s.includes("terapeuta capilar")) {
+    return {
+      path: "/para-cabeleireiras",
+      name: "Cabeleireiras"
+    };
+  }
+  return null;
+};
+
 function PublicProfileContent() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
@@ -150,6 +219,9 @@ function PublicProfileContent() {
 
   const profilePlan = (profile?.plan || "free") as PlanType;
   const features = PLAN_CONFIGS[profilePlan]?.features;
+  const nicheInfo = profile && profile.indexable !== false && profile.published !== false && !profile.slug?.includes("test") && !profile.slug?.includes("demo") && !profile.name?.toLowerCase().includes("teste") && !profile.name?.toLowerCase().includes("demonstrativo")
+    ? getNicheLinkInfo(profile.specialty || profile.professionalIdentity?.mainSpecialty)
+    : null;
 
   const { hero: heroBio, about: aboutBio } = React.useMemo(() => {
     return { hero: "", about: profile?.bio || "" };
@@ -1026,6 +1098,17 @@ function PublicProfileContent() {
               Seja uma Profissional
             </Link>
           </div>
+
+          {nicheInfo && (
+            <div className="my-1 animate-fade-in">
+              <Link
+                to={nicheInfo.path}
+                className="text-[11px] text-brand-stone/80 hover:text-brand-terracotta transition-colors font-medium underline underline-offset-4 decoration-brand-mist/60 hover:decoration-brand-terracotta"
+              >
+                Conheça a solução utilizada por profissionais de {nicheInfo.name}
+              </Link>
+            </div>
+          )}
 
           <div className="flex gap-5">
             {profile.instagram && (

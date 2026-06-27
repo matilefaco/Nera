@@ -7,6 +7,7 @@ import { logger } from "./server/utils/logger.js";
 import { isNonPublicProfile } from "./server/utils/qualityFilter.js";
 import { formatSpecialtyLabel, getServiceLocationCopy } from "./src/lib/copy.js";
 import { landingVariants } from "./src/constants/landingVariants.js";
+import { isSanitizedContent } from "./src/lib/validation.js";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -225,7 +226,12 @@ export async function createServerApp() {
       "/para-nail-designers",
       "/para-sobrancelhistas",
       "/para-esteticistas",
-      "/para-cabeleireiras"
+      "/para-cabeleireiras",
+      "/para-lash-designers",
+      "/para-maquiadoras",
+      "/para-podologas",
+      "/para-depiladoras",
+      "/para-massagistas"
     ];
 
     let professionalSlugs: string[] = [];
@@ -282,7 +288,7 @@ export async function createServerApp() {
       if (!db) return res.status(500).send("Database not initialized");
 
       const snapshot = await db.collection("users").where("slug", "==", slug).limit(1).get();
-      const fallback = "https://usenera.com/og-default.jpg";
+      const fallback = "https://usenera.com/og-default.png";
 
       if (snapshot.empty) {
         return res.redirect(fallback);
@@ -323,7 +329,7 @@ export async function createServerApp() {
       }
     } catch (err) {
       logger.error("SSR", "OG Proxy error", { error: err, meta: { slugWithExt: req.params.slugWithExt } });
-      return res.redirect("https://usenera.com/og-default.jpg");
+      return res.redirect("https://usenera.com/og-default.png");
     }
   });
 
@@ -414,10 +420,7 @@ export async function createServerApp() {
           description = escapeHtml(`${specialty} ${locationPart}Agende seu horário com praticidade na Nera.`);
         }
         
-      let imageUrl = prof.ogImageUrl || prof.avatar || prof.shareImage || prof.photoUrl;
-      if (imageUrl && typeof imageUrl === "string" && imageUrl.startsWith("http")) {
-           ogImage = escapeHtml(imageUrl);
-        }
+        ogImage = `https://usenera.com/og/p/${slug}.png`;
       }
 
       // Automatically determine indexability (P1 Test profiles check)
@@ -431,6 +434,212 @@ export async function createServerApp() {
         if (isNonPublicProfile(prof)) {
           isIndexable = false;
         }
+      }
+
+      // Generate Structured Data (JSON-LD) for ProfessionalService
+      let structuredDataMarkup = "";
+      let structuredData: any = null;
+
+      if (slug === 'helena-prado') {
+        structuredData = {
+          "@context": "https://schema.org",
+          "@type": "ProfessionalService",
+          "@id": `${pageUrl}#professional`,
+          "url": pageUrl,
+          "name": "Helena Prado",
+          "description": description,
+          "image": [ogImage],
+          "knowsAbout": "Sobrancelhas e Harmonização do Olhar",
+          "address": {
+            "@type": "PostalAddress",
+            "addressLocality": "São Paulo",
+            "addressRegion": "SP",
+            "addressCountry": "BR"
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": 128,
+            "bestRating": "5",
+            "worstRating": "1"
+          },
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Serviços oferecidos por Helena Prado",
+            "itemListElement": [
+              {
+                "@type": "Service",
+                "name": "Design de Sobrancelhas",
+                "description": "Design personalizado respeitando suas linhas naturais.",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "85.00",
+                  "priceCurrency": "BRL"
+                }
+              },
+              {
+                "@type": "Service",
+                "name": "Harmonização do Olhar",
+                "description": "Procedimento completo para realçar e iluminar o olhar.",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "150.00",
+                  "priceCurrency": "BRL"
+                }
+              }
+            ]
+          }
+        };
+      } else if (!snapshot.empty) {
+        const prof = snapshot.docs[0].data() as any;
+        const specialtyLabel = formatSpecialtyLabel(prof.specialty) || "Profissional de Beleza";
+
+        // Build address
+        const address: any = {
+          "@type": "PostalAddress",
+          "addressCountry": "BR"
+        };
+
+        let city = "";
+        let state = "";
+        let streetAddress = "";
+
+        if (prof.studioAddress && typeof prof.studioAddress === "object") {
+          if (prof.studioAddress.city && typeof prof.studioAddress.city === "string") {
+            city = prof.studioAddress.city.trim();
+          }
+          if (prof.studioAddress.state && typeof prof.studioAddress.state === "string") {
+            state = prof.studioAddress.state.trim();
+          }
+          if (prof.studioAddress.privacyMode === "public_full") {
+            const street = (prof.studioAddress.street || "").toString().trim();
+            const number = (prof.studioAddress.number || "").toString().trim();
+            if (street || number) {
+              streetAddress = `${street}${street && number ? ", " : ""}${number}`.trim();
+            }
+          }
+        } else {
+          if (prof.city && typeof prof.city === "string") {
+            city = prof.city.trim();
+          }
+          if (prof.state && typeof prof.state === "string") {
+            state = prof.state.trim();
+          }
+        }
+
+        if (city) address.addressLocality = city;
+        if (state) address.addressRegion = state;
+        if (streetAddress) address.streetAddress = streetAddress;
+
+        // Build images list
+        const imageList: string[] = [ogImage];
+        if (prof.avatar && typeof prof.avatar === "string" && prof.avatar.startsWith("http")) {
+          imageList.push(prof.avatar);
+        }
+        if (Array.isArray(prof.portfolio)) {
+          prof.portfolio.forEach((item: any) => {
+            if (item && item.url && typeof item.url === "string" && item.url.startsWith("http")) {
+              imageList.push(item.url);
+            }
+          });
+        }
+        const uniqueImages = Array.from(new Set(imageList));
+        const finalImages = uniqueImages.length > 0 ? uniqueImages : [ogImage];
+
+        // Build social sameAs
+        const sameAs: string[] = [];
+        if (prof.instagram) {
+          const handle = prof.instagram.replace("@", "").trim();
+          if (handle) {
+            sameAs.push(`https://instagram.com/${handle}`);
+          }
+        }
+        if (prof.facebook) sameAs.push(prof.facebook);
+        if (prof.pinterest) sameAs.push(prof.pinterest);
+
+        // Build services offer catalog
+        const servicesArray = Array.isArray(prof.services) ? prof.services : [];
+        const validServices = servicesArray.filter((s: any) => s && s.name && isSanitizedContent(s.name));
+        let hasOfferCatalog: any = undefined;
+        if (validServices.length > 0) {
+          hasOfferCatalog = {
+            "@type": "OfferCatalog",
+            "name": `Serviços oferecidos por ${prof.name}`,
+            "itemListElement": validServices.map((service: any) => {
+              const serviceObj: any = {
+                "@type": "Service",
+                "name": service.name,
+                "description": service.description ? service.description : `Serviço de ${service.name} oferecido por ${prof.name}`
+              };
+              if (typeof service.price === "number" && service.price > 0) {
+                serviceObj.offers = {
+                  "@type": "Offer",
+                  "price": service.price.toFixed(2),
+                  "priceCurrency": "BRL"
+                };
+              }
+              return serviceObj;
+            })
+          };
+        }
+
+        // Build aggregate rating
+        const reviewsArray = Array.isArray(prof.reviews) ? prof.reviews : [];
+        const validReviews = reviewsArray.filter((r: any) => r && isSanitizedContent(r.comment));
+        let aggregateRating: any = undefined;
+
+        let ratingValue: number | null = null;
+        let reviewCount = 0;
+
+        if (prof.stats && typeof prof.stats.averageRating === "number" && prof.stats.averageRating > 0) {
+          ratingValue = prof.stats.averageRating;
+          reviewCount = typeof prof.stats.totalReviews === "number" ? prof.stats.totalReviews : validReviews.length;
+        } else if (validReviews.length > 0) {
+          const sum = validReviews.reduce((acc: number, r: any) => acc + (typeof r.rating === "number" ? r.rating : 5), 0);
+          ratingValue = parseFloat((sum / validReviews.length).toFixed(2));
+          reviewCount = validReviews.length;
+        }
+
+        if (reviewCount > 0 && ratingValue !== null && ratingValue > 0) {
+          aggregateRating = {
+            "@type": "AggregateRating",
+            "ratingValue": ratingValue.toFixed(2),
+            "reviewCount": reviewCount,
+            "bestRating": "5",
+            "worstRating": "1"
+          };
+        }
+
+        // Combine into main ProfessionalService JSON-LD
+        structuredData = {
+          "@context": "https://schema.org",
+          "@type": "ProfessionalService",
+          "@id": `${pageUrl}#professional`,
+          "url": pageUrl,
+          "name": prof.name,
+          "description": description,
+          "image": finalImages,
+          "address": address,
+          "knowsAbout": specialtyLabel
+        };
+
+        if (sameAs.length > 0) {
+          structuredData.sameAs = sameAs;
+        }
+        if (aggregateRating) {
+          structuredData.aggregateRating = aggregateRating;
+        }
+        if (hasOfferCatalog) {
+          structuredData.hasOfferCatalog = hasOfferCatalog;
+        }
+      }
+
+      if (structuredData) {
+        structuredDataMarkup = `
+        <script type="application/ld+json">
+          ${JSON.stringify(structuredData)}
+        </script>
+        `;
       }
 
       const metaTags = `
@@ -450,6 +659,7 @@ export async function createServerApp() {
         <meta name="twitter:title" content="${title}" />
         <meta name="twitter:description" content="${description}" />
         <meta name="twitter:image" content="${ogImage}" />
+        ${structuredDataMarkup}
       `;
 
       if (html.includes("</head>")) {
@@ -768,7 +978,8 @@ export async function createServerApp() {
   app.get("/para-:nichePath", async (req, res, next) => {
     try {
       const { nichePath } = req.params;
-      const variant = landingVariants[nichePath];
+      const key = nichePath.startsWith("para-") ? nichePath : `para-${nichePath}`;
+      const variant = landingVariants[key];
       if (!variant) {
         return next();
       }
@@ -782,7 +993,7 @@ export async function createServerApp() {
       let html = getCachedIndexHtml(indexPath);
       const title = variant.title;
       const description = variant.description;
-      const pageUrl = `https://usenera.com/para-${nichePath}`;
+      const pageUrl = `https://usenera.com/${key}`;
       const ogImage = "https://usenera.com/og-default.png";
 
       const faqs = [
