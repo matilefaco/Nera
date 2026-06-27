@@ -606,10 +606,10 @@ export default function LandingPageVariant({ nichePath: propNichePath }: Landing
             <div className="footer-col-title">Soluções</div>
             <div className="footer-links">
               <Link to="/para-nail-designers" className="footer-link">Nail Designers</Link>
+              <Link to="/para-lash-designers" className="footer-link">Lash Designers</Link>
               <Link to="/para-sobrancelhistas" className="footer-link">Sobrancelhistas</Link>
               <Link to="/para-esteticistas" className="footer-link">Esteticistas</Link>
               <Link to="/para-cabeleireiras" className="footer-link">Cabeleireiras</Link>
-              <Link to="/para-lash-designers" className="footer-link">Lash Designers</Link>
               <Link to="/para-maquiadoras" className="footer-link">Maquiadoras</Link>
               <Link to="/para-podologas" className="footer-link">Podólogas</Link>
               <Link to="/para-depiladoras" className="footer-link">Depiladoras</Link>
