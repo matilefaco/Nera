@@ -354,6 +354,45 @@ export default function Dashboard() {
   const [unconfirmedTomorrow, setUnconfirmedTomorrow] = useState<Appointment[]>([]);
   const [waitlistMode, setWaitlistMode] = useState<'auto' | 'manual'>('manual');
   const [blockedSchedules, setBlockedSchedules] = useState<BlockedSchedule[]>([]);
+
+  const todayAgendaItems = useMemo(() => {
+    const items: (Appointment & { isBlock?: boolean; sortTime: string })[] = [];
+    
+    displayedConfirmedToday.forEach(appt => {
+      if (appt) {
+        items.push({
+          ...appt,
+          isBlock: false,
+          sortTime: appt.time || ''
+        });
+      }
+    });
+    
+    blockedSchedules.forEach(block => {
+      if (block) {
+        items.push({
+          id: block.id || '',
+          clientName: block.reason || "Horário Bloqueado",
+          serviceName: block.endTime ? `Bloqueio: ${block.startTime} às ${block.endTime}` : "Bloqueio de horário",
+          time: block.startTime || '',
+          isBlock: true,
+          sortTime: block.startTime || '',
+          status: 'blocked',
+          clientWhatsapp: '',
+          date: getTodayLocale(),
+          professionalId: block.professionalId || '',
+          originalPrice: 0,
+          finalPrice: 0,
+          price: 0,
+          services: [],
+          createdAt: ''
+        } as any);
+      }
+    });
+    
+    return items.sort((a, b) => (a.sortTime || '').localeCompare(b.sortTime || ''));
+  }, [displayedConfirmedToday, blockedSchedules]);
+
   const [referralLink, setReferralLink] = useState('');
   const [analyticsEvents, setAnalyticsEvents] = useState<AnalyticsEvent[]>([]);
   const [totalClientsCountFromSummaries, setTotalClientsCountFromSummaries] = useState<number | null>(null);
@@ -1579,8 +1618,8 @@ export default function Dashboard() {
                 </div>
               </motion.div>
             ) : (
-              <div className="bg-[#FCFBF9] p-6 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-5">
-                <div className="flex flex-col w-full md:w-auto">
+              <div className="bg-[#FCFBF9] p-6 rounded-[32px] border border-brand-mist/40 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col w-full md:flex-1">
                   {(agendaHojeStatus === 'loading' || agendaHojeStatus === 'stalled') && displayedConfirmedToday.length === 0 ? (
                     <>
                       <div className="mb-4 pb-4 border-b border-brand-mist/40 mt-1">
@@ -1592,14 +1631,20 @@ export default function Dashboard() {
                         </div>
                         <div className="h-3 bg-brand-mist/40 rounded w-1/3 mt-3"></div>
                       </div>
-                      <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar mt-1">
-                        <div className="flex-none animate-pulse">
-                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/40 mb-1.5">Faturamento Hoje</p>
-                          <div className="h-6 bg-brand-mist/60 rounded w-20"></div>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-4 w-full">
+                        <div className="flex-1 bg-brand-linen/10 rounded-2xl p-4 border border-brand-mist/40 flex items-center justify-between gap-4 animate-pulse">
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/40 mb-1">Faturamento Hoje</p>
+                            <div className="h-6 bg-brand-mist/40 rounded w-20 mt-1.5"></div>
+                          </div>
+                          <div className="w-9 h-9 rounded-full bg-brand-linen/50 shrink-0" />
                         </div>
-                        <div className="flex-none animate-pulse">
-                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/40 mb-1.5">Agendamentos</p>
-                          <div className="h-6 bg-brand-mist/60 rounded w-10"></div>
+                        <div className="flex-1 bg-brand-linen/10 rounded-2xl p-4 border border-brand-mist/40 flex items-center justify-between gap-4 animate-pulse">
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/40 mb-1">Agendamentos Hoje</p>
+                            <div className="h-6 bg-brand-mist/40 rounded w-12 mt-1.5"></div>
+                          </div>
+                          <div className="w-9 h-9 rounded-full bg-brand-white shrink-0 border border-brand-mist/20" />
                         </div>
                       </div>
                     </>
@@ -1631,15 +1676,24 @@ export default function Dashboard() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-6 md:gap-8 overflow-x-auto hide-scrollbar mt-1">
-                        <div className="flex-none">
-                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Faturamento Hoje</p>
-                          <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{formatCurrency(displayedDailyRevenue)}</p>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-2 w-full">
+                        <div className="flex-1 bg-brand-linen/10 rounded-2xl p-4 border border-brand-mist/40 flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/80 mb-1">Faturamento Hoje</p>
+                            <p className="text-2xl md:text-3xl font-serif text-brand-ink tracking-tight leading-none">{formatCurrency(displayedDailyRevenue)}</p>
+                          </div>
+                          <div className="w-9 h-9 rounded-full bg-brand-linen flex items-center justify-center text-brand-terracotta shrink-0 shadow-sm">
+                            <TrendingUp size={16} strokeWidth={2} />
+                          </div>
                         </div>
-                        <div className="w-px h-8 bg-brand-mist/40 shrink-0" />
-                        <div className="flex-none">
-                          <p className="text-[9px] font-medium uppercase tracking-[0.2em] text-brand-stone/60 mb-1.5">Agendamentos</p>
-                          <p className="text-[22px] md:text-2xl leading-none font-serif text-brand-ink tracking-tight">{displayedConfirmedToday.length}</p>
+                        <div className="flex-1 bg-brand-linen/10 rounded-2xl p-4 border border-brand-mist/40 flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-brand-stone/80 mb-1">Agendamentos Hoje</p>
+                            <p className="text-2xl md:text-3xl font-serif text-brand-ink tracking-tight leading-none">{displayedConfirmedToday.length}</p>
+                          </div>
+                          <div className="w-9 h-9 rounded-full bg-brand-white border border-brand-mist/60 flex items-center justify-center text-brand-stone shrink-0 shadow-sm">
+                            <Calendar size={16} strokeWidth={2} />
+                          </div>
                         </div>
                       </div>
                     </>
@@ -1729,33 +1783,43 @@ export default function Dashboard() {
             )}
 
             {/* Timeline de Hoje */}
-            {!(isNewAccount && displayedConfirmedToday.length === 0) && (
+            {!(isNewAccount && todayAgendaItems.length === 0) && (
               <section className="space-y-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-[10px] font-bold text-brand-stone uppercase tracking-[0.3em]">Agenda de Hoje</h3>
                 </div>
 
-                {displayedConfirmedToday.length > 0 ? (
+                {todayAgendaItems.length > 0 ? (
                   <div className="space-y-4">
-                    {displayedConfirmedToday.map((appt) => (
+                    {todayAgendaItems.map((appt) => (
                       <div 
-                        key={appt.id} 
+                        key={appt.id || `block-${appt.time}`} 
                         className={cn(
-                          "bg-[#FCFBF9] px-5 py-4 md:px-6 md:py-5 rounded-[24px] border border-brand-mist/60 shadow-sm flex items-center justify-between transition-colors opacity-90",
-                          isCompletedStatus(appt.status) && "bg-transparent border-dashed shadow-none opacity-60"
+                          "bg-[#FCFBF9] px-5 py-4 md:px-6 md:py-5 rounded-[24px] border border-brand-mist/60 shadow-sm flex items-center justify-between transition-all duration-200",
+                          appt.isBlock ? "border-l-4 border-l-brand-stone/40 bg-brand-linen/10" : "border-l-4 border-l-brand-terracotta/40",
+                          isCompletedStatus(appt.status) && "border-l-4 border-l-brand-stone/30 bg-[#FCFBF9]/50 shadow-none opacity-75"
                         )}
                       >
                         <div className="flex items-center gap-4 md:gap-5 w-full">
                           <div className="text-center min-w-[48px] shrink-0">
-                            <p className={cn("text-[17px] font-serif font-bold leading-none", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.time}</p>
+                            <p className={cn("text-[17px] font-serif font-bold leading-none", (isCompletedStatus(appt.status) || appt.isBlock) ? "text-brand-stone font-medium" : "text-brand-ink")}>{appt.time}</p>
                           </div>
                           <div className="h-8 w-px bg-brand-mist/40 shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone" : "text-brand-ink")}>{appt.clientName}</h4>
-                              {isCompletedStatus(appt.status) && <CheckCircle2 size={12} className="text-brand-stone shrink-0" />}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className={cn("text-[13px] font-bold truncate", isCompletedStatus(appt.status) ? "text-brand-stone font-medium" : "text-brand-ink")}>{appt.clientName}</h4>
+                              {isCompletedStatus(appt.status) && (
+                                <span className="px-2 py-0.5 bg-brand-linen text-brand-stone border border-brand-mist/50 text-[8px] font-bold rounded-full uppercase tracking-widest flex items-center gap-1.5 shrink-0">
+                                  <CheckCircle2 size={8} /> Concluído
+                                </span>
+                              )}
+                              {appt.isBlock && (
+                                <span className="px-2 py-0.5 bg-brand-stone/10 text-brand-stone border border-brand-stone/20 text-[8px] font-bold rounded-full uppercase tracking-widest flex items-center gap-1.5 shrink-0">
+                                  <Lock size={8} /> Bloqueio
+                                </span>
+                              )}
                             </div>
-                            <p className="text-[11px] text-brand-stone font-light truncate leading-tight pr-2 mt-0.5">
+                            <p className={cn("text-[11px] font-light truncate leading-tight pr-2 mt-0.5", appt.isBlock ? "text-brand-stone/70 italic" : "text-brand-stone")}>
                               {appt.additionalServices?.length > 0 
                                 ? [appt.serviceName, ...appt.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" • ") 
                                 : appt.serviceName}
@@ -1764,7 +1828,7 @@ export default function Dashboard() {
                         </div>
                         
                         <div className="flex items-center gap-1.5 shrink-0 pl-2">
-                          {isConfirmedLikeStatus(appt.status) && isPastTime(appt.time) && (
+                          {isConfirmedLikeStatus(appt.status) && isPastTime(appt.time) && !appt.isBlock && (
                             <button
                               onClick={() => handleComplete(appt)}
                               disabled={processingId === appt.id}

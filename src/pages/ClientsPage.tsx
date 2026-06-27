@@ -133,6 +133,12 @@ interface ClientsCacheEntry {
   fetchedAt: number;
 }
 
+interface EnrichedClient extends Omit<ClientSummary, 'segment'> {
+  segment: 'vip' | 'recurring' | 'new' | 'at_risk' | 'inactive' | 'active';
+  appts90: number;
+  daysSince: number;
+}
+
 const CLIENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 const clientsPageCache = new Map<string, ClientsCacheEntry>();
 
@@ -163,6 +169,12 @@ export default function ClientsPage() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const [isIntelligenceExpanded, setIsIntelligenceExpanded] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(10);
+
+  // Reset progressive loading when filters or search change
+  useEffect(() => {
+    setVisibleCount(10);
+  }, [searchTerm, filterService, filterStatus]);
 
 
 
@@ -499,7 +511,7 @@ export default function ClientsPage() {
     return { threshold20, avgTicket };
   }, [clients]);
 
-  const enrichedClients = useMemo(() => {
+  const enrichedClients = useMemo<EnrichedClient[]>(() => {
     return clients.map(c => {
       const daysSince = c.lastAppointmentDate ? getDaysSinceLastVisit(c.lastAppointmentDate) : 999;
       
@@ -532,7 +544,7 @@ export default function ClientsPage() {
       // We rely on confirmedAppointments for 'appts90' proxy in UI since we don't fetch all appts to filter precisely by 90 days.
       const appts90 = c.confirmedAppointments;
 
-      return { ...c, segment, appts90, daysSince };
+      return { ...c, segment, appts90, daysSince } as EnrichedClient;
     });
   }, [clients, segmentationThresholds]);
 
@@ -558,17 +570,44 @@ export default function ClientsPage() {
         return matchSearch && matchService && matchStatus;
       })
       .sort((a, b) => {
-        // Sort priority: Segment (VIP first), then LTV
-        const segmentWeight = { vip: 0, recurring: 1, active: 2, new: 3, at_risk: 4, inactive: 5 };
-        const weightA = segmentWeight[a.segment as keyof typeof segmentWeight] ?? 10;
-        const weightB = segmentWeight[b.segment as keyof typeof segmentWeight] ?? 10;
-        
-        if (weightA !== weightB) return weightA - weightB;
-        return (b.totalSpent || 0) - (a.totalSpent || 0);
+        const nameA = a.clientName || '';
+        const nameB = b.clientName || '';
+        return nameA.localeCompare(nameB, 'pt-BR', { sensitivity: 'base' });
       });
   }, [enrichedClients, searchTerm, filterService, filterStatus]);
 
-  const visibleClients = filteredClients;
+  const visibleClients = useMemo(() => {
+    return filteredClients.slice(0, visibleCount);
+  }, [filteredClients, visibleCount]);
+
+  const groupedClients = useMemo(() => {
+    const groups: { [key: string]: EnrichedClient[] } = {};
+    visibleClients.forEach(client => {
+      const name = client.clientName || 'Cliente';
+      const firstLetter = name[0]
+        ? name[0].toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        : 'A';
+      if (!groups[firstLetter]) {
+        groups[firstLetter] = [];
+      }
+      groups[firstLetter].push(client);
+    });
+    return groups;
+  }, [visibleClients]);
+
+  const sortedGroupKeys = useMemo(() => {
+    return Object.keys(groupedClients).sort();
+  }, [groupedClients]);
+
+  const handleLoadMore = useCallback(() => {
+    const hasMoreInLocal = filteredClients.length > visibleCount;
+    if (hasMoreInLocal) {
+      setVisibleCount(prev => prev + 10);
+    } else if (hasMore) {
+      fetchClients(true);
+      setVisibleCount(prev => prev + 10);
+    }
+  }, [filteredClients.length, visibleCount, hasMore, fetchClients]);
 
       if ((clientsStatus === 'loading' || clientsStatus === 'stalled') && clients.length === 0) {
         return (
@@ -833,31 +872,23 @@ export default function ClientsPage() {
               />
             </div>
             
-            {(filterService || filterStatus !== 'all' || searchTerm || hasMore) ? (
-              <div className="flex items-center justify-between px-2">
-                <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
-                  Exibindo {visibleClients.length} de {filteredClients.length} clientes
-                </span>
-                {(filterService || filterStatus !== 'all' || searchTerm) && (
-                  <button 
-                    onClick={() => {
-                      setFilterService(null);
-                      setFilterStatus('all');
-                      setSearchTerm('');
-                    }}
-                    className="flex items-center gap-1 text-[10px] font-bold text-brand-terracotta uppercase tracking-widest hover:underline ml-4"
-                  >
-                    <X size={12} /> Limpar filtros
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center justify-between px-2">
-                <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
-                  {filteredClients.length} clientes
-                </span>
-              </div>
-            )}
+            <div className="flex items-center justify-between px-2 w-full md:w-auto">
+              <span className="text-[10px] font-bold text-brand-stone uppercase tracking-widest">
+                Mostrando {Math.min(visibleCount, filteredClients.length)} de {filteredClients.length} clientes
+              </span>
+              {(filterService || filterStatus !== 'all' || searchTerm) && (
+                <button 
+                  onClick={() => {
+                    setFilterService(null);
+                    setFilterStatus('all');
+                    setSearchTerm('');
+                  }}
+                  className="flex items-center gap-1 text-[10px] font-bold text-brand-terracotta uppercase tracking-widest hover:underline ml-4"
+                >
+                  <X size={12} /> Limpar filtros
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-6">
@@ -938,133 +969,146 @@ export default function ClientsPage() {
         </div>
 
         {/* Clients List */}
-        <div className="space-y-4">
+        <div className="space-y-8">
           {filteredClients.length > 0 ? (
             <>
-              {visibleClients.map((client, idx) => (
-                <motion.div 
-                  key={client.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(idx * 0.02, 0.5) }}
-                  className="bg-brand-white p-5 md:p-6 rounded-[32px] border border-brand-mist flex flex-col gap-4 hover:border-brand-stone transition-all shadow-sm group"
-                >
-                  <div className="flex items-center justify-between w-full">
-                  <div 
-                    className="flex items-center gap-4 md:gap-6 overflow-hidden cursor-pointer flex-1"
-                    onClick={() => setExpandedClientId(expandedClientId === client.id ? null : client.id)}
-                  >
-                    <div className="flex-shrink-0 w-14 h-14 rounded-[20px] bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-mist">
-                      <span className="font-serif text-xl">{client.clientName?.[0] || 'C'}</span>
-                    </div>
-                    <div className="overflow-hidden">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h4 className="font-serif text-lg md:text-xl text-brand-ink truncate">{client.clientName}</h4>
-                        
-                        {/* Intelligent Tags */}
-                        {plan !== 'free' && client.segment === 'vip' && (
-                          <div className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold flex items-center gap-1">
-                            <Star size={8} className="fill-amber-600" /> VIP
-                          </div>
-                        )}
-                        {plan !== 'free' && client.segment === 'recurring' && (
-                          <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 text-[8px] font-bold">
-                            FREQUENTE
-                          </div>
-                        )}
-                        {plan !== 'free' && client.segment === 'new' && (
-                          <div className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100 text-[8px] font-bold">
-                            NOVA
-                          </div>
-                        )}
-                        {plan !== 'free' && client.segment === 'at_risk' && (
-                          <div className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold">
-                            ESFRIANDO
-                          </div>
-                        )}
-                        {plan !== 'free' && client.segment === 'inactive' && (
-                          <div className="bg-brand-linen/50 text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold flex items-center gap-1">
-                            AUSENTE ({getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS)
-                          </div>
-                        )}
-                        {client.noShowCount > 0 && (
-                          <div className="bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100 text-[8px] font-bold flex items-center gap-1">
-                            <AlertCircle size={8} /> {client.noShowCount} FALTAS
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] md:text-[10px] text-brand-stone font-medium uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.confirmedAppointments} atendimentos</span>
-                        <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} valor total</span>
-                        {plan !== 'free' && client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
-                        <span className="italic text-brand-stone/60 truncate max-w-[200px]">
-                          último atendimento: {client.lastServiceName} ({new Date(client.lastAppointmentDate.length === 10 ? client.lastAppointmentDate + 'T12:00:00' : client.lastAppointmentDate).toLocaleDateString('pt-BR')})
-                        </span>
-                      </div>
-                    </div>
+              {sortedGroupKeys.map((letter) => (
+                <div key={letter} className="space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-4 pt-4 first:pt-0">
+                    <span className="font-serif text-2xl text-brand-stone/60 font-light select-none">{letter}</span>
+                    <div className="h-[1px] flex-1 bg-brand-mist/40" />
                   </div>
-                  
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    {(() => {
-                      const isInactive = getDaysSinceLastVisit(client.lastAppointmentDate) >= 30;
-                      const hasPhone = !!client.clientPhone && client.clientPhone.length >= 10;
-                      const profileUrl = profile?.slug ? `https://usenera.com/p/${profile.slug}` : 'https://usenera.com';
-                      const firstName = (client.clientName || 'Cliente').split(' ')[0];
-                      const templates = [
-                        `Oi, ${firstName} 🤎\nPassei aqui pra te avisar que minha agenda está aberta novamente ✨\nSe quiser reservar um horário, você pode agendar por aqui:\n${profileUrl}`,
-                        `Oi, ${firstName} ✨\nFaz um tempinho desde o seu último atendimento e lembrei de você 🤎\nMinha agenda está disponível:\n${profileUrl}`,
-                        `Oi, ${firstName} ✨\nAgenda aberta da semana. Se quiser escolher um horário com calma, deixei meu link aqui:\n${profileUrl}`
-                      ];
-                      const msg = isInactive ? templates[(client.clientName || 'Cliente').length % templates.length] : `Oi, ${firstName} ✨ tudo bem?`;
-                      
+                  <div className="space-y-4">
+                    {groupedClients[letter].map((client) => {
+                      const flatIndex = visibleClients.findIndex(c => c.id === client.id);
                       return (
-                        <a 
-                          href={hasPhone ? buildWhatsappLink(client.clientPhone, msg) : '#'}
-                          target={hasPhone ? "_blank" : undefined}
-                          rel={hasPhone ? "noopener noreferrer" : undefined}
-                          className={cn(
-                            "p-3 md:p-4 rounded-2xl transition-all border flex items-center gap-2",
-                            !hasPhone ? "opacity-50 cursor-not-allowed text-brand-stone bg-brand-linen border-brand-mist" :
-                            isInactive 
-                              ? "bg-brand-terracotta text-white border-brand-terracotta shadow-md hover:bg-brand-sienna hover:scale-105"
-                              : "text-brand-ink hover:bg-brand-linen border-transparent hover:border-brand-mist"
-                          )}
-                          title={!hasPhone ? "Cliente sem telefone cadastrado" : isInactive ? "Reativar cliente via WhatsApp" : "Enviar mensagem no WhatsApp"}
-                          onClick={(e) => {
-                            if (!hasPhone) e.preventDefault();
-                          }}
+                        <motion.div 
+                          key={client.id}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: Math.min(flatIndex * 0.02, 0.5) }}
+                          className="bg-brand-white p-5 md:p-6 rounded-[32px] border border-brand-mist flex flex-col gap-4 hover:border-brand-stone transition-all shadow-sm group"
                         >
-                          <MessageCircle size={20} />
-                          {isInactive && (
-                            <span className="text-[8px] font-bold uppercase tracking-widest hidden md:inline">Chamar cliente</span>
-                          )}
-                        </a>
-                      );
-                    })()}
-                  </div>
-                  </div>
+                          <div className="flex items-center justify-between w-full">
+                            <div 
+                              className="flex items-center gap-4 md:gap-6 overflow-hidden cursor-pointer flex-1"
+                              onClick={() => setExpandedClientId(expandedClientId === client.id ? null : client.id)}
+                            >
+                              <div className="flex-shrink-0 w-14 h-14 rounded-[20px] bg-brand-linen flex items-center justify-center text-brand-terracotta border border-brand-mist">
+                                <span className="font-serif text-xl">{client.clientName?.[0] || 'C'}</span>
+                              </div>
+                              <div className="overflow-hidden">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h4 className="font-serif text-lg md:text-xl text-brand-ink truncate">{client.clientName}</h4>
+                                  
+                                  {/* Intelligent Tags */}
+                                  {plan !== 'free' && client.segment === 'vip' && (
+                                    <div className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold flex items-center gap-1">
+                                      <Star size={8} className="fill-amber-600" /> VIP
+                                    </div>
+                                  )}
+                                  {plan !== 'free' && client.segment === 'recurring' && (
+                                    <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 text-[8px] font-bold">
+                                      FREQUENTE
+                                    </div>
+                                  )}
+                                  {plan !== 'free' && client.segment === 'new' && (
+                                    <div className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100 text-[8px] font-bold">
+                                      NOVA
+                                    </div>
+                                  )}
+                                  {plan !== 'free' && client.segment === 'at_risk' && (
+                                    <div className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold">
+                                      ESFRIANDO
+                                    </div>
+                                  )}
+                                  {plan !== 'free' && client.segment === 'inactive' && (
+                                    <div className="bg-brand-linen/50 text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold flex items-center gap-1">
+                                      AUSENTE ({getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS)
+                                    </div>
+                                  )}
+                                  {client.noShowCount > 0 && (
+                                    <div className="bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100 text-[8px] font-bold flex items-center gap-1">
+                                      <AlertCircle size={8} /> {client.noShowCount} FALTAS
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] md:text-[10px] text-brand-stone font-medium uppercase tracking-widest">
+                                  <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.confirmedAppointments} atendimentos</span>
+                                  <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} valor total</span>
+                                  {plan !== 'free' && client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
+                                  <span className="italic text-brand-stone/60 truncate max-w-[200px]">
+                                    último atendimento: {client.lastServiceName} ({new Date(client.lastAppointmentDate.length === 10 ? client.lastAppointmentDate + 'T12:00:00' : client.lastAppointmentDate).toLocaleDateString('pt-BR')})
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {(() => {
+                                const isInactive = getDaysSinceLastVisit(client.lastAppointmentDate) >= 30;
+                                const hasPhone = !!client.clientPhone && client.clientPhone.length >= 10;
+                                const profileUrl = profile?.slug ? `https://usenera.com/p/${profile.slug}` : 'https://usenera.com';
+                                const firstName = (client.clientName || 'Cliente').split(' ')[0];
+                                const templates = [
+                                  `Oi, ${firstName} 🤎\nPassei aqui pra te avisar que minha agenda está aberta novamente ✨\nSe quiser reservar um horário, você pode agendar por aqui:\n${profileUrl}`,
+                                  `Oi, ${firstName} ✨\nFaz um tempinho desde o seu último atendimento e lembrei de você 🤎\nMinha agenda está disponível:\n${profileUrl}`,
+                                  `Oi, ${firstName} ✨\nAgenda aberta da semana. Se quiser escolher um horário com calma, deixei meu link aqui:\n${profileUrl}`
+                                ];
+                                const msg = isInactive ? templates[(client.clientName || 'Cliente').length % templates.length] : `Oi, ${firstName} ✨ tudo bem?`;
+                                
+                                return (
+                                  <a 
+                                    href={hasPhone ? buildWhatsappLink(client.clientPhone, msg) : '#'}
+                                    target={hasPhone ? "_blank" : undefined}
+                                    rel={hasPhone ? "noopener noreferrer" : undefined}
+                                    className={cn(
+                                      "p-3 md:p-4 rounded-2xl transition-all border flex items-center gap-2",
+                                      !hasPhone ? "opacity-50 cursor-not-allowed text-brand-stone bg-brand-linen border-brand-mist" :
+                                      isInactive 
+                                        ? "bg-brand-terracotta/10 text-brand-terracotta border-brand-terracotta/30 hover:bg-brand-terracotta/20"
+                                        : "text-brand-ink hover:bg-brand-linen border-transparent hover:border-brand-mist"
+                                    )}
+                                    title={!hasPhone ? "Cliente sem telefone cadastrado" : isInactive ? "Reativar cliente via WhatsApp" : "Enviar mensagem no WhatsApp"}
+                                    onClick={(e) => {
+                                      if (!hasPhone) e.preventDefault();
+                                    }}
+                                  >
+                                    <MessageCircle size={20} />
+                                    {isInactive && (
+                                      <span className="text-[8px] font-bold uppercase tracking-widest hidden md:inline">Reativar</span>
+                                    )}
+                                  </a>
+                                );
+                              })()}
+                            </div>
+                          </div>
 
-                  {expandedClientId === client.id && (
-                    <ClientNotes client={client} onSave={handleUpdateNotes} />
-                  )}
-                </motion.div>
+                          {expandedClientId === client.id && (
+                            <ClientNotes client={client as any} onSave={handleUpdateNotes} />
+                          )}
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
               ))}
               
-              {hasMore && (
+              {(filteredClients.length > visibleCount || hasMore) && (
                 <div className="pt-8 text-center">
-                  {(searchTerm || filterService || filterStatus !== 'all') && (
+                  {(searchTerm || filterService || filterStatus !== 'all') && hasMore && (
                     <p className="text-[11px] text-brand-stone/70 mb-4 px-4 font-medium opacity-80">
                       Exibindo resultados baseados nos registros já carregados. Carregue mais para ampliar a busca.
                     </p>
                   )}
-                  <PremiumButton 
-                    onClick={() => fetchClients(true)} 
-                    variant="linen" 
-                    className="text-[10px] py-4 px-10 flex items-center gap-2 mx-auto"
+                  <button 
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="text-[10px] font-bold text-brand-stone hover:text-brand-ink uppercase tracking-widest px-8 py-3.5 border border-brand-mist rounded-full hover:border-brand-stone transition-all bg-brand-white/80 backdrop-blur-sm shadow-sm mx-auto flex items-center gap-2"
                   >
-                    <ChevronDown size={14} />
-                    {loadingMore ? 'Carregando...' : 'Carregar mais clientes'}
-                  </PremiumButton>
+                    <ChevronDown size={14} className={cn(loadingMore && "animate-spin")} />
+                    {loadingMore ? 'Carregando...' : 'Ver mais clientes'}
+                  </button>
                 </div>
               )}
             </>

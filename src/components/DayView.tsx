@@ -26,16 +26,6 @@ export default function DayView({
   hideHeader = false
 }: DayViewProps) {
   
-  const timeSlots = useMemo(() => {
-    const slots = [];
-    for (let h = 7; h <= 21; h++) {
-      for (let m = 0; m < 60; m += 30) {
-        slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
-      }
-    }
-    return slots;
-  }, []);
-
   const getDayData = () => {
     let dayAppointments = appointments.filter(a => isConfirmedLikeStatus(a.status) || isCompletedStatus(a.status) || isPendingStatus(a.status));
     
@@ -61,6 +51,30 @@ export default function DayView({
 
   const { dayAppointments, dayBlocks } = getDayData();
   const isEmpty = dayAppointments.length === 0 && dayBlocks.length === 0;
+
+  const timeSlots = useMemo(() => {
+    const slots = new Set<string>();
+    // Add standard slots from 07:00 to 21:30
+    for (let h = 7; h <= 21; h++) {
+      for (let m = 0; m < 60; m += 30) {
+        slots.add(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+      }
+    }
+    
+    // Add non-standard appointment times from dayAppointments
+    dayAppointments.forEach(a => {
+      if (a.time && /^\d{2}:\d{2}$/.test(a.time)) {
+        slots.add(a.time);
+      }
+    });
+
+    // Sort slots chronologically
+    return Array.from(slots).sort((a, b) => {
+      const [hA, mA] = a.split(':').map(Number);
+      const [hB, mB] = b.split(':').map(Number);
+      return (hA * 60 + mA) - (hB * 60 + mB);
+    });
+  }, [dayAppointments]);
 
   const getAppointmentsForTime = (time: string) => {
     return dayAppointments.filter(a => a.time === time);
@@ -171,7 +185,7 @@ export default function DayView({
                     "text-[10px] font-bold tracking-widest",
                     hasActivity ? "text-brand-ink" : "text-brand-stone/50"
                   )}>
-                    {idx % 2 === 0 ? time : ''}
+                    {(idx % 2 === 0 || hasActivity || (!time.endsWith(':00') && !time.endsWith(':30'))) ? time : ''}
                   </span>
                 </div>
 

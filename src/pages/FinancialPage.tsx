@@ -313,12 +313,12 @@ export default function FinancialPage() {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="lg:col-span-2 bg-[#FCFBF9] p-5 sm:p-8 md:p-10 rounded-[32px] border border-[#F2EFEA] shadow-[0_8px_40px_-12px_rgba(137,103,88,0.06)] relative overflow-hidden flex flex-col justify-between min-h-[auto] md:min-h-[320px]"
+                className="lg:col-span-2 bg-[#FCFBF9] p-5 sm:p-8 md:p-10 lg:p-6 xl:p-10 rounded-[32px] border border-[#F2EFEA] shadow-[0_8px_40px_-12px_rgba(137,103,88,0.06)] relative overflow-hidden flex flex-col justify-between min-h-[auto] md:min-h-[320px]"
               >
                 <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-brand-terracotta/[0.04] rounded-full blur-[60px] -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
                 
                 <div className="relative z-10 flex flex-col h-full justify-between">
-                  <div className="flex md:items-center flex-col md:flex-row justify-between gap-4 md:gap-5 mb-6 md:mb-12">
+                  <div className="flex md:items-center flex-col md:flex-row justify-between gap-4 md:gap-5 mb-6 md:mb-8">
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-brand-stone/80 mb-2 flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-brand-terracotta"></span>
@@ -341,12 +341,12 @@ export default function FinancialPage() {
                     )}
                   </div>
                   
-                  <div className="flex flex-col lg:flex-row lg:items-end gap-3 md:gap-8 lg:gap-10">
-                    <div className="flex-1 min-w-0">
+                  <div className="flex flex-col lg:flex-row lg:items-end gap-3 md:gap-8 lg:gap-6 xl:gap-10">
+                    <div className="lg:flex-[1.4] flex-1 min-w-0">
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Recebido
                       </p>
-                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-2xl xs:text-3xl sm:text-4xl md:text-5xl xl:text-[56px] font-serif text-brand-ink tracking-tight leading-none whitespace-nowrap tabular-nums mb-1 md:mb-2">
+                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-2xl xs:text-3xl sm:text-4xl md:text-5xl lg:text-4xl xl:text-5xl font-serif text-brand-ink tracking-tight leading-none whitespace-nowrap tabular-nums mb-1 md:mb-2">
                         <span className="text-[0.45em] font-sans text-brand-stone/60 tracking-wider font-medium uppercase shrink-0">R$</span>
                         <span>
                           {formatCurrency(currentMonthData.current?.revenue || 0).replace(/^[^\d-]+/, '')}
@@ -357,14 +357,14 @@ export default function FinancialPage() {
                       </p>
                     </div>
                     
-                    <div className="hidden lg:block h-20 w-px bg-brand-mist/60" />
+                    <div className="hidden lg:block h-20 w-px bg-brand-mist/60 shrink-0" />
                     <div className="block lg:hidden h-px w-full bg-brand-mist/60" />
                     
-                    <div className="flex-1 flex flex-col justify-end min-w-0">
+                    <div className="lg:flex-1 flex-1 flex flex-col justify-end min-w-0">
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Receita confirmada
                       </p>
-                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-lg xs:text-xl sm:text-2xl md:text-3xl xl:text-4xl font-serif text-brand-ink/80 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
+                      <div className="flex items-baseline gap-1 md:gap-1.5 max-w-full text-lg xs:text-xl sm:text-2xl md:text-3xl lg:text-2xl xl:text-3xl font-serif text-brand-ink/80 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
                         <span className="text-[0.5em] font-sans text-brand-stone/50 tracking-wider font-medium uppercase shrink-0">R$</span>
                         <span>
                           {formatCurrency(currentMonthData.current?.plannedRevenue || 0).replace(/^[^\d-]+/, '')}
@@ -374,15 +374,15 @@ export default function FinancialPage() {
                         Clientes confirmadas para os próximos dias.
                       </p>
                     </div>
-
-                    <div className="hidden lg:block h-20 w-px bg-brand-mist/60" />
+ 
+                    <div className="hidden lg:block h-20 w-px bg-brand-mist/60 shrink-0" />
                     <div className="block lg:hidden h-px w-full bg-brand-mist/60" />
-
-                    <div className="flex-1 flex flex-col justify-end min-w-0">
+ 
+                    <div className="lg:flex-1 flex-1 flex flex-col justify-end min-w-0">
                       <p className="text-[9px] md:text-[10px] font-medium uppercase tracking-[0.2em] text-brand-stone mb-1 md:mb-2 text-wrap">
                         Aguardando confirmação
                       </p>
-                      <div className="flex items-baseline gap-1 max-w-full text-base xs:text-lg sm:text-xl md:text-2xl xl:text-3xl font-serif text-brand-ink/60 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
+                      <div className="flex items-baseline gap-1 max-w-full text-base xs:text-lg sm:text-xl md:text-2xl lg:text-xl xl:text-2xl font-serif text-brand-ink/60 mb-1 md:mb-2 leading-none tracking-tight whitespace-nowrap tabular-nums">
                         <span className="text-[0.5em] font-sans text-brand-stone/50 tracking-wider font-medium uppercase shrink-0">R$</span>
                         <span>
                           {formatCurrency(currentMonthData.current?.pendingRevenue || 0).replace(/^[^\d-]+/, '')}
