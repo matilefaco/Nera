@@ -1,22 +1,24 @@
+# Sincronizado com server.ts (fonte de verdade dinâmica em produção)
 User-agent: *
 Allow: /
 Allow: /profissionais
 Allow: /p/
-Allow: /sobre
-Allow: /termos
-Allow: /privacidade
-
-Disallow: /dashboard/
-Disallow: /onboarding/
-Disallow: /settings/
-Disallow: /checkout/
-Disallow: /api/
-Disallow: /admin/
+Disallow: /dashboard
+Disallow: /onboarding
+Disallow: /settings
+Disallow: /configuracoes
+Disallow: /profile
+Disallow: /agenda
+Disallow: /pedidos
+Disallow: /financeiro
+Disallow: /services
+Disallow: /cupons
+Disallow: /avaliacoes
+Disallow: /indicacoes
+Disallow: /whatsapp-history
+Disallow: /checkout
 Disallow: /login
 Disallow: /register
-Disallow: /success
-Disallow: /cancel
-Disallow: /referrals
-Disallow: /reconcile
+Disallow: /verificar-email
 
 Sitemap: https://usenera.com/sitemap.xml

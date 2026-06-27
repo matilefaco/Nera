@@ -6,6 +6,7 @@ import * as Sentry from "@sentry/google-cloud-serverless";
 import { logger } from "./server/utils/logger.js";
 import { isNonPublicProfile } from "./server/utils/qualityFilter.js";
 import { formatSpecialtyLabel, getServiceLocationCopy } from "./src/lib/copy.js";
+import { landingVariants } from "./src/constants/landingVariants.js";
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -215,55 +216,62 @@ export async function createServerApp() {
   });
 
   app.get("/sitemap.xml", async (req, res) => {
+    const baseUrl = "https://usenera.com";
+    const staticPages = [
+      "/",
+      "/profissionais",
+      "/termos",
+      "/privacidade",
+      "/para-nail-designers",
+      "/para-sobrancelhistas",
+      "/para-esteticistas",
+      "/para-cabeleireiras"
+    ];
+
+    let professionalSlugs: string[] = [];
+
     try {
       const db = firebaseAdmin.getDb();
-      if (!db) return res.status(503).send("Database warming up. Please retry in a moment.");
+      if (db) {
+        // Fetch indexable professionals - enforce quality filters at query level if possible
+        const snapshot = await db.collection("users")
+          .where("onboardingCompleted", "==", true)
+          .where("indexable", "==", true)
+          .where("role", "==", "professional")
+          .limit(1000)
+          .get();
 
-      const baseUrl = "https://usenera.com";
-      const staticPages = [
-        "",
-        "/profissionais",
-        "/termos",
-        "/privacidade"
-      ];
-
-      // Fetch indexable professionals - enforce quality filters at query level if possible
-      const snapshot = await db.collection("users")
-        .where("onboardingCompleted", "==", true)
-        .where("indexable", "==", true)
-        .where("role", "==", "professional")
-        .limit(1000)
-        .get();
-
-      const professionalSlugs = snapshot.docs
-        .map(doc => doc.data())
-        .filter(data => {
-          // Exclude any fake, test, QA, example or non-public profile using our centralized helper
-          return !isNonPublicProfile(data);
-        })
-        .map(data => `/p/${data.slug}`);
-
-      const allPages = [...staticPages, ...professionalSlugs];
-
-      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-      xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
-      
-      allPages.forEach(page => {
-        xml += `  <url>\n`;
-        xml += `    <loc>${baseUrl}${page}</loc>\n`;
-        xml += `    <changefreq>${page === "" ? "daily" : "weekly"}</changefreq>\n`;
-        xml += `    <priority>${page === "" ? "1.0" : page.startsWith("/p/") ? "0.8" : "0.6"}</priority>\n`;
-        xml += `  </url>\n`;
-      });
-
-      xml += `</urlset>`;
-
-      res.setHeader("Content-Type", "application/xml");
-      res.status(200).send(xml);
+        professionalSlugs = snapshot.docs
+          .map(doc => doc.data())
+          .filter(data => {
+            // Exclude any fake, test, QA, example or non-public profile using our centralized helper
+            return !isNonPublicProfile(data);
+          })
+          .map(data => `/p/${data.slug}`);
+      } else {
+        logger.warn("SEO", "Database not initialized when generating sitemap, returning static pages fallback");
+      }
     } catch (err) {
-      logger.error("SEO", "Sitemap generation error", { error: err });
-      res.status(500).send("Error generating sitemap");
+      logger.error("SEO", "Sitemap generation database query error, returning static pages fallback", { error: err });
     }
+
+    const allPages = [...staticPages, ...professionalSlugs];
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    
+    allPages.forEach(page => {
+      xml += `  <url>\n`;
+      xml += `    <loc>${baseUrl}${page === "/" ? "" : page}</loc>\n`;
+      xml += `    <changefreq>${page === "/" ? "daily" : "weekly"}</changefreq>\n`;
+      xml += `    <priority>${page === "/" ? "1.0" : page.startsWith("/p/") ? "0.8" : "0.6"}</priority>\n`;
+      xml += `  </url>\n`;
+    });
+
+    xml += `</urlset>`;
+
+    res.setHeader("Content-Type", "application/xml");
+    res.status(200).send(xml);
   });
 
   // 7. Root-level OG Proxy
@@ -642,10 +650,87 @@ export async function createServerApp() {
       if (!fs.existsSync(indexPath)) return next();
       
       let html = getCachedIndexHtml(indexPath);
-      const title = "nera — agenda e presença para profissionais de beleza";
-      const description = "Agendamentos, vitrine profissional e presença digital para profissionais de beleza que levam o próprio trabalho a sério.";
+      const title = "Nera | Agenda online para profissionais da beleza";
+      const description = "Agenda online, vitrine digital, lembretes e gestão de clientes para nail designers, lash designers, esteticistas, manicures e profissionais da beleza.";
       const pageUrl = "https://usenera.com/";
       const ogImage = "https://usenera.com/og-default.png";
+
+      const structuredData = {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://usenera.com/#organization",
+            "name": "Nera",
+            "url": "https://usenera.com",
+            "logo": "https://usenera.com/og-default.png"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://usenera.com/#software",
+            "name": "Nera",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "pt-BR",
+            "url": "https://usenera.com",
+            "description": description
+          },
+          {
+            "@type": "FAQPage",
+            "@id": "https://usenera.com/#faq",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "Preciso baixar aplicativo?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Não. A Nera funciona diretamente pelo navegador."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Minhas clientes precisam criar conta?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Não. Elas podem solicitar horários sem criar cadastro."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Funciona pelo celular?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sim. A Nera foi pensada para funcionar na rotina da profissional."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Posso cancelar quando quiser?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sim. Sem fidelidade e sem burocracia."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "A Nera cobra taxa por agendamento?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Não. Você paga apenas o plano escolhido."
+                }
+              },
+              {
+                "@type": "Question",
+                "name": "Serve para quem atende sozinha?",
+                "acceptedAnswer": {
+                  "@type": "Answer",
+                  "text": "Sim. A Nera foi criada justamente para profissionais autônomas da beleza."
+                }
+              }
+            ]
+          }
+        ]
+      };
 
       const metaTags = `
         <title>${title}</title>
@@ -655,8 +740,113 @@ export async function createServerApp() {
         <meta property="og:description" content="${description}" />
         <meta property="og:type" content="website" />
         <meta property="og:url" content="${pageUrl}" />
+        <meta property="og:site_name" content="Nera" />
+        <meta property="og:locale" content="pt_BR" />
         <meta property="og:image" content="${ogImage}" />
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="${title}" />
+        <meta name="twitter:description" content="${description}" />
+        <meta name="twitter:image" content="${ogImage}" />
+        <script type="application/ld+json">
+          ${JSON.stringify(structuredData)}
+        </script>
+      `;
+
+      if (html.includes("</head>")) {
+        html = html.replace(/<title>.*?<\/title>/i, "");
+        html = html.replace("</head>", `${metaTags}\n</head>`);
+      }
+      if (viteServer) html = await viteServer.transformIndexHtml(req.originalUrl, html);
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      next();
+    }
+  });
+
+  // 10b. Niche Landing Pages SSR
+  app.get("/para-:nichePath", async (req, res, next) => {
+    try {
+      const { nichePath } = req.params;
+      const variant = landingVariants[nichePath];
+      if (!variant) {
+        return next();
+      }
+
+      const indexPath = process.env.NODE_ENV === "production" 
+        ? path.join(process.cwd(), "dist", "index.html")
+        : path.join(process.cwd(), "index.html");
+
+      if (!fs.existsSync(indexPath)) return next();
+      
+      let html = getCachedIndexHtml(indexPath);
+      const title = variant.title;
+      const description = variant.description;
+      const pageUrl = `https://usenera.com/para-${nichePath}`;
+      const ogImage = "https://usenera.com/og-default.png";
+
+      const faqs = [
+        { q: "Preciso baixar aplicativo?", a: "Não. A Nera funciona diretamente pelo navegador de qualquer celular ou computador." },
+        { q: "Minhas clientes precisam criar conta?", a: "Não. Suas clientes agendam horários sem precisar de login, senha ou download." },
+        { q: "Como funcionam os lembretes do WhatsApp?", a: "No plano Pro, as clientes recebem confirmações e lembretes amigáveis de forma automatizada." },
+        { q: "Posso cancelar quando quiser?", a: "Sim. Sem contratos longos ou burocracia, cancele a qualquer momento com um clique." },
+        { q: "A Nera cobra taxa por agendamento?", a: "Não. Todo o seu faturamento de serviços é 100% seu. Cobramos apenas o valor fixo do plano." },
+        { q: "Serve para quem trabalha sozinha?", a: "Sim. Criamos a Nera focada exatamente na realidade de profissionais autônomas de beleza." }
+      ];
+
+      const structuredData = {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": `https://usenera.com/para-${nichePath}#organization`,
+            "name": "Nera",
+            "url": "https://usenera.com",
+            "logo": "https://usenera.com/og-default.png"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": `https://usenera.com/para-${nichePath}#software`,
+            "name": "Nera",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "pt-BR",
+            "url": `https://usenera.com/para-${nichePath}`,
+            "description": description
+          },
+          {
+            "@type": "FAQPage",
+            "@id": `https://usenera.com/para-${nichePath}#faq`,
+            "mainEntity": faqs.map(faq => ({
+              "@type": "Question",
+              "name": faq.q,
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": faq.a
+              }
+            }))
+          }
+        ]
+      };
+
+      const metaTags = `
+        <title>${title}</title>
+        <meta name="description" content="${description}" />
+        <link rel="canonical" href="${pageUrl}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${description}" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="${pageUrl}" />
+        <meta property="og:site_name" content="Nera" />
+        <meta property="og:locale" content="pt_BR" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="${title}" />
+        <meta name="twitter:description" content="${description}" />
+        <meta name="twitter:image" content="${ogImage}" />
+        <script type="application/ld+json">
+          ${JSON.stringify(structuredData)}
+        </script>
       `;
 
       if (html.includes("</head>")) {

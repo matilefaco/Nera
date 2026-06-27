@@ -19,6 +19,7 @@ import PublicProfile from './pages/PublicProfile';
 
 // Pages (Lazy Loaded for performance)
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const LandingPageVariant = React.lazy(() => import('./pages/LandingPageVariant'));
 const LoginPage = React.lazy(() => import('./pages/LoginPage'));
 const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
 const TermsPage = React.lazy(() => import('./pages/TermsPage'));
@@ -154,6 +155,7 @@ export default function App() {
                   <Routes>
                   {/* ... routes ... */}
                   <Route path="/" element={<LandingPage />} />
+                  <Route path="/para-:nichePath" element={<LandingPageVariant />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/privacidade" element={<PrivacyPage />} />
