@@ -90,9 +90,9 @@ const ClientNotes = ({
   };
 
   return (
-    <div className="mt-2 pt-4 border-t border-brand-mist animate-in slide-in-from-top-2 fade-in duration-200">
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-[10px] font-bold uppercase tracking-widest text-brand-stone">
+    <div className="mt-4 pt-4 border-t border-brand-mist/60 space-y-3.5 animate-in slide-in-from-top-2 fade-in duration-200">
+      <div className="flex items-center justify-between mb-1">
+        <label className="block text-[11px] font-bold uppercase tracking-widest text-brand-stone/80">
           Notas privadas
         </label>
         {saved && (
@@ -105,10 +105,10 @@ const ClientNotes = ({
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Ex: alérgica a produto X, prefere manhã, aniversário em março..."
-        className="w-full bg-brand-linen/30 border border-brand-mist rounded-xl p-3 text-sm text-brand-ink placeholder:text-brand-stone/40 focus:outline-none focus:border-brand-stone focus:ring-1 focus:ring-brand-stone min-h-[80px] resize-y"
+        className="w-full bg-brand-linen/30 border border-brand-mist rounded-xl p-3.5 text-sm text-brand-ink placeholder:text-brand-stone/40 focus:outline-none focus:border-brand-stone focus:ring-1 focus:ring-brand-stone min-h-[80px] resize-y"
       />
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-[9px] text-brand-stone/60 italic">
+      <div className="flex items-center justify-between pt-1">
+        <span className="text-[10px] text-brand-stone/70 italic">
           Visível apenas para você.
         </span>
         <button
@@ -687,19 +687,19 @@ export default function ClientsPage() {
         {/* Stats Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mb-10">
           <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Total de Clientes</p>
+            <p className="text-[10px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Total de Clientes</p>
             <p className="text-2xl sm:text-3xl font-serif text-brand-ink leading-none">{clients.length}{hasMore ? '+' : ''}</p>
           </div>
           <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Novas Atendidas (30D)</p>
+            <p className="text-[10px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Novas Atendidas (30D)</p>
             <p className="text-2xl sm:text-3xl font-serif text-brand-ink leading-none">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) < 30 && c.confirmedAppointments === 1).length}</p>
           </div>
           <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Atendidas Recentemente</p>
+            <p className="text-[10px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Atendidas Recentemente</p>
             <p className="text-2xl sm:text-3xl font-serif text-green-600/90 leading-none">{clients.filter(c => getDaysSinceLastVisit(c.lastAppointmentDate) < 30).length}</p>
           </div>
           <div className="bg-brand-white p-4 sm:p-5 rounded-[24px] border border-brand-mist/60 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.03)] flex flex-col justify-center">
-            <p className="text-[8px] sm:text-[9px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Ticket Médio Geral</p>
+            <p className="text-[10px] font-bold text-brand-stone/80 uppercase tracking-widest mb-1.5 truncate">Ticket Médio Geral</p>
             <p className="text-xl sm:text-2xl font-serif text-brand-ink leading-none">{formatCurrency((clients.reduce((acc, curr) => acc + curr.totalSpent, 0) / Math.max(1, clients.reduce((acc, curr) => acc + curr.confirmedAppointments, 0))))}</p>
           </div>
         </div>
@@ -767,7 +767,7 @@ export default function ClientsPage() {
                   >
                     <div className="col-span-1 md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="bg-[#FFF4F0]/60 p-5 rounded-[20px] border border-brand-terracotta/10 flex flex-col justify-between">
-                        <p className="text-[9px] font-bold text-brand-terracotta uppercase tracking-widest mb-3">Faturamento Parado</p>
+                        <p className="text-[10px] font-bold text-brand-terracotta uppercase tracking-widest mb-3">Faturamento Parado</p>
                         <div>
                           <p className="text-3xl font-serif text-brand-ink leading-none mb-1">{formatCurrency(potentialRev)}</p>
                           <p className="text-[10px] text-brand-stone font-light">Até este valor pode ser recuperado se as {atRisk.length} clientes em risco voltarem.</p>
@@ -777,7 +777,7 @@ export default function ClientsPage() {
                       <div className="grid grid-rows-2 gap-4">
                         <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between shadow-[0_2px_12px_-4px_rgba(0,0,0,0.02)]">
                           <div>
-                            <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Clientes VIP</p>
+                            <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-1">Clientes VIP</p>
                             <p className="text-xl font-serif text-brand-ink leading-none">{vip.length}</p>
                           </div>
                           <div className="w-10 h-10 rounded-full bg-brand-ink/5 flex items-center justify-center">
@@ -786,7 +786,7 @@ export default function ClientsPage() {
                         </div>
                         <div className="bg-brand-white p-5 rounded-[20px] border border-brand-mist/60 flex items-center justify-between shadow-[0_2px_12px_-4px_rgba(0,0,0,0.02)]">
                           <div>
-                            <p className="text-[9px] font-bold text-brand-stone uppercase tracking-widest mb-1">Voltas Recentes</p>
+                            <p className="text-[10px] font-bold text-brand-stone uppercase tracking-widest mb-1">Voltas Recentes</p>
                             <p className="text-xl font-serif text-green-600 leading-none">{recent.length}</p>
                           </div>
                           <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
@@ -797,7 +797,7 @@ export default function ClientsPage() {
                     </div>
 
                     <div className="bg-brand-ink text-white p-5 rounded-[20px] flex flex-col shadow-md">
-                      <p className="text-[9px] font-bold text-white/60 uppercase tracking-widest mb-4">Clientes para chamar de volta</p>
+                      <p className="text-[10px] font-bold text-white/60 uppercase tracking-widest mb-4">Clientes para chamar de volta</p>
                       {topOpps.length > 0 ? (
                         <div className="flex flex-col gap-3 flex-1">
                           {topOpps.map(opp => {
@@ -809,8 +809,8 @@ export default function ClientsPage() {
                                   <span className="text-[10px] text-brand-terracotta font-bold">{formatCurrency(avgTicket)}</span>
                                 </div>
                                 <div className="flex justify-between items-end">
-                                  <span className="text-[9px] text-white/50 leading-tight">Última vez há {getDaysSinceLastVisit(opp.lastAppointmentDate)} dias</span>
-                                  <span className="text-[8px] uppercase tracking-widest text-brand-terracotta bg-brand-terracotta/10 px-2 py-0.5 rounded border border-brand-terracotta/20">Oportunidade</span>
+                                  <span className="text-[10px] text-white/50 leading-tight">Última vez há {getDaysSinceLastVisit(opp.lastAppointmentDate)} dias</span>
+                                  <span className="text-[10px] uppercase tracking-widest text-brand-terracotta bg-brand-terracotta/10 px-2 py-0.5 rounded border border-brand-terracotta/20">Oportunidade</span>
                                 </div>
                               </div>
                             );
@@ -914,7 +914,7 @@ export default function ClientsPage() {
                       setFilterStatus(f.id as typeof filterStatus);
                     }}
                     className={cn(
-                      "px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap flex items-center gap-1",
+                      "px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest border transition-all whitespace-nowrap flex items-center gap-1",
                       filterStatus === f.id
                         ? "bg-brand-ink text-brand-white border-brand-ink shadow-sm"
                         : isLocked 
@@ -940,7 +940,7 @@ export default function ClientsPage() {
                   <button
                     onClick={() => setFilterService(null)}
                     className={cn(
-                      "px-4 py-2 rounded-full text-[9px] font-semibold uppercase tracking-wider border whitespace-nowrap transition-all",
+                      "px-4 py-2 rounded-full text-[10px] font-semibold uppercase tracking-wider border whitespace-nowrap transition-all",
                       !filterService
                         ? "bg-brand-terracotta text-white border-brand-terracotta shadow-sm"
                         : "bg-brand-white text-brand-stone/70 border-brand-mist/50 hover:border-brand-mist hover:text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]"
@@ -953,7 +953,7 @@ export default function ClientsPage() {
                       key={service}
                       onClick={() => setFilterService(service === filterService ? null : service)}
                       className={cn(
-                        "px-4 py-2 rounded-full text-[9px] font-semibold uppercase tracking-wider border whitespace-nowrap transition-all",
+                        "px-4 py-2 rounded-full text-[10px] font-semibold uppercase tracking-wider border whitespace-nowrap transition-all",
                         filterService === service
                           ? "bg-brand-terracotta text-white border-brand-terracotta shadow-sm"
                           : "bg-brand-white text-brand-stone/70 border-brand-mist/50 hover:border-brand-mist hover:text-brand-ink shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]"
@@ -1003,37 +1003,37 @@ export default function ClientsPage() {
                                   
                                   {/* Intelligent Tags */}
                                   {plan !== 'free' && client.segment === 'vip' && (
-                                    <div className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold flex items-center gap-1">
+                                    <div className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-100 text-[10px] font-bold flex items-center gap-1">
                                       <Star size={8} className="fill-amber-600" /> VIP
                                     </div>
                                   )}
                                   {plan !== 'free' && client.segment === 'recurring' && (
-                                    <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 text-[8px] font-bold">
+                                    <div className="bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full border border-blue-100 text-[10px] font-bold">
                                       FREQUENTE
                                     </div>
                                   )}
                                   {plan !== 'free' && client.segment === 'new' && (
-                                    <div className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100 text-[8px] font-bold">
+                                    <div className="bg-green-50 text-green-600 px-2 py-0.5 rounded-full border border-green-100 text-[10px] font-bold">
                                       NOVA
                                     </div>
                                   )}
                                   {plan !== 'free' && client.segment === 'at_risk' && (
-                                    <div className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 text-[8px] font-bold">
+                                    <div className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full border border-amber-100 text-[10px] font-bold">
                                       ESFRIANDO
                                     </div>
                                   )}
                                   {plan !== 'free' && client.segment === 'inactive' && (
-                                    <div className="bg-brand-linen/50 text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[8px] font-bold flex items-center gap-1">
+                                    <div className="bg-brand-linen/50 text-brand-stone px-2 py-0.5 rounded-full border border-brand-mist text-[10px] font-bold flex items-center gap-1">
                                       AUSENTE ({getDaysSinceLastVisit(client.lastAppointmentDate)} DIAS)
                                     </div>
                                   )}
                                   {client.noShowCount > 0 && (
-                                    <div className="bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100 text-[8px] font-bold flex items-center gap-1">
+                                    <div className="bg-red-50 text-red-600 px-2 py-0.5 rounded-full border border-red-100 text-[10px] font-bold flex items-center gap-1">
                                       <AlertCircle size={8} /> {client.noShowCount} FALTAS
                                     </div>
                                   )}
                                 </div>
-                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] md:text-[10px] text-brand-stone font-medium uppercase tracking-widest">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-brand-stone font-medium uppercase tracking-widest">
                                   <span className="flex items-center gap-1.5"><Calendar size={12} className="text-brand-terracotta"/> {client.confirmedAppointments} atendimentos</span>
                                   <span className="text-brand-ink font-semibold">{formatCurrency(client.totalSpent)} valor total</span>
                                   {plan !== 'free' && client.segment === 'recurring' && <span className="text-blue-600 font-bold">{client.appts90}x em 90 dias</span>}
@@ -1076,7 +1076,7 @@ export default function ClientsPage() {
                                   >
                                     <MessageCircle size={20} />
                                     {isInactive && (
-                                      <span className="text-[8px] font-bold uppercase tracking-widest hidden md:inline">Reativar</span>
+                                      <span className="text-[10px] font-bold uppercase tracking-widest hidden md:inline">Reativar</span>
                                     )}
                                   </a>
                                 );

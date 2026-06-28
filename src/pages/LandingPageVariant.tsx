@@ -364,41 +364,41 @@ export default function LandingPageVariant({ nichePath: propNichePath }: Landing
               </h2>
               <p className="forwho-sub reveal">{variant.forWhoDesc}</p>
             </div>
-            <div className="professions reveal grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <Link to="/para-nail-designers" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Nail Designer' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Nail Designer' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+            <div className="professions reveal grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+              <Link to="/para-nail-designers" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Nail Designer' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Nail Designer' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Nail designer</span>
               </Link>
-              <Link to="/para-cabeleireiras" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Cabeleireira' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Cabeleireira' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-cabeleireiras" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Cabeleireira' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Cabeleireira' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Cabeleireira</span>
               </Link>
-              <Link to="/para-esteticistas" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Esteticista' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Esteticista' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-esteticistas" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Esteticista' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Esteticista' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Esteticista</span>
               </Link>
-              <Link to="/para-sobrancelhistas" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Sobrancelhista' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Sobrancelhista' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-sobrancelhistas" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Sobrancelhista' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Sobrancelhista' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Sobrancelhista</span>
               </Link>
-              <Link to="/para-lash-designers" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Lash Designer' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Lash Designer' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-lash-designers" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Lash Designer' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Lash Designer' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Lash designer</span>
               </Link>
-              <Link to="/para-maquiadoras" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Maquiadora' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Maquiadora' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-maquiadoras" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Maquiadora' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Maquiadora' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Maquiadora</span>
               </Link>
-              <Link to="/para-podologas" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Podóloga' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Podóloga' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-podologas" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Podóloga' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Podóloga' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Podóloga</span>
               </Link>
-              <Link to="/para-depiladoras" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Depiladora' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Depiladora' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-depiladoras" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Depiladora' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Depiladora' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Depiladora</span>
               </Link>
-              <Link to="/para-massagistas" className={`prof-item hover:scale-105 transition-transform ${variant.niche === 'Massagista' ? 'font-bold' : ''}`}>
-                <div className={`prof-dot ${variant.niche === 'Massagista' ? 'bg-brand-terracotta scale-125' : ''}`}></div>
+              <Link to="/para-massagistas" className={`prof-item hover:scale-[1.02] transition-transform ${variant.niche === 'Massagista' ? 'font-bold' : ''}`}>
+                <div className={`prof-dot ${variant.niche === 'Massagista' ? 'bg-brand-terracotta scale-110' : ''}`}></div>
                 <span className="prof-name">Massagista</span>
               </Link>
             </div>

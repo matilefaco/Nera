@@ -1292,7 +1292,7 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 hide-scrollbar pt-4 md:pt-0">
+          <div className="flex flex-wrap items-center gap-3 md:gap-4 w-full md:w-auto pb-1 md:pb-0 hide-scrollbar pt-4 md:pt-0">
             {profile?.slug && (
               <a 
                 href={getPublicProfileUrl(profile.slug)} 

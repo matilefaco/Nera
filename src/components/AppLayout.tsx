@@ -109,7 +109,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
                   {item.title}
                 </div>
                 {item.hasBadge && pendingCount > 0 && (
-                  <span className="w-5 h-5 bg-brand-terracotta text-white text-[9px] rounded-full flex items-center justify-center font-bold animate-pulse">
+                  <span className="w-5 h-5 bg-brand-terracotta text-white text-[10px] rounded-full flex items-center justify-center font-bold animate-pulse">
                     {pendingCount}
                   </span>
                 )}
@@ -138,7 +138,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
                 </div>
                 <div className="text-left min-w-0">
                   <p className="text-[10px] font-bold text-brand-ink truncate leading-tight">{profile?.name || 'Profissional'}</p>
-                  <p className="text-[8px] text-brand-stone uppercase tracking-widest truncate">Minha Conta</p>
+                  <p className="text-[10px] text-brand-stone/80 uppercase tracking-widest truncate font-medium">Minha Conta</p>
                 </div>
               </div>
               <ChevronDown size={14} className={cn("text-brand-stone transition-transform", isAccountMenuOpen && "rotate-180")} />
@@ -151,7 +151,7 @@ export default function AppLayout({ children, activeRoute }: AppLayoutProps) {
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className="absolute bottom-full left-0 w-full mb-2 bg-brand-white border border-brand-mist rounded-2xl shadow-xl overflow-hidden z-[100]"
+                    className="absolute bottom-full left-0 w-full mb-2 bg-brand-white border border-brand-mist rounded-2xl shadow-lg overflow-hidden z-[100]"
                   >
                     <div className="p-2 space-y-1">
                       <Link 
