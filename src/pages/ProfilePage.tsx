@@ -38,6 +38,16 @@ const devLog = (...args: any[]) => isDev && console.log(...args);
 
 const WEEKDAYS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SAB'];
 
+const WEEKDAY_NAMES_PT: Record<string, string> = {
+  '1': 'Segunda-feira',
+  '2': 'Terça-feira',
+  '3': 'Quarta-feira',
+  '4': 'Quinta-feira',
+  '5': 'Sexta-feira',
+  '6': 'Sábado',
+  '0': 'Domingo'
+};
+
 const THEME_MOODS: Record<string, { label: string, subtitle: string }> = {
   terracotta: {
     label: "Editorial quente",
@@ -129,6 +139,7 @@ export default function ProfilePage() {
     breakStart, setBreakStart,
     breakEnd, setBreakEnd,
     showBreak, setShowBreak,
+    dayHours, setDayHours,
     paymentMethods, setPaymentMethods,
     acceptsInstallments, setAcceptsInstallments,
     yearsExperience, setYearsExperience,
@@ -339,7 +350,8 @@ export default function ProfilePage() {
       breakStart: data.breakStart || '',
       breakEnd: data.breakEnd || '',
       paymentMethods: [...(Array.isArray(data.paymentMethods) ? data.paymentMethods : [])].sort(),
-      acceptsInstallments: data.acceptsInstallments || false
+      acceptsInstallments: data.acceptsInstallments || false,
+      dayHours: data.dayHours || null
     });
   };
 
@@ -356,7 +368,8 @@ export default function ProfilePage() {
         endTime: profile.workingHours?.endTime || profile.endTime,
         showBreak: !!profile.workingHours?.breakStart || !!profile.workingHours?.breakEnd,
         breakStart: profile.workingHours?.breakStart || '',
-        breakEnd: profile.workingHours?.breakEnd || ''
+        breakEnd: profile.workingHours?.breakEnd || '',
+        dayHours: profile.workingHours?.dayHours || null
       });
       setSavedSnapshotString(initialSnapshot);
     }
@@ -368,14 +381,14 @@ export default function ProfilePage() {
       studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
       advancePaymentRequired, profileTheme,
       editorialPillar, differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
-      acceptsInstallments
+      acceptsInstallments, dayHours
     });
   }, [
     name, specialty, bio, headline, city, whatsapp, instagram, slug, neighborhood, serviceMode,
     studioAddress, serviceAreaType, travelFeeMode, fixedTravelFee, pricingStrategy, antiNoShowEnabled,
     advancePaymentRequired, profileTheme?.variant,
     editorialPillar, differentials, yearsExperience, serviceStyle, serviceAreas, workingDays, startTime, endTime, showBreak, breakStart, breakEnd, paymentMethods,
-    acceptsInstallments
+    acceptsInstallments, dayHours
   ]);
 
   const hasUnsavedChanges = savedSnapshotString !== null && currentSnapshotString !== savedSnapshotString;
@@ -737,6 +750,39 @@ export default function ProfilePage() {
       return;
     }
 
+    // Validate working hours / dayHours
+    const activeDays = Object.keys(dayHours).filter(day => dayHours[day].enabled);
+    if (activeDays.length === 0) {
+      notify.error('Selecione pelo menos 1 dia para atendimento.');
+      return;
+    }
+
+    for (const day of activeDays) {
+      const hours = dayHours[day];
+      if (!hours.startTime || !hours.endTime) {
+        notify.error('Horários de início e fim são obrigatórios para os dias de atendimento.');
+        return;
+      }
+      if (hours.startTime >= hours.endTime) {
+        notify.error('O horário de início deve ser menor que o horário de fim.');
+        return;
+      }
+      if (hours.breakStart || hours.breakEnd) {
+        if (!hours.breakStart || !hours.breakEnd) {
+          notify.error('Para configurar uma pausa, ambos horários de início e fim da pausa devem ser informados.');
+          return;
+        }
+        if (hours.breakStart >= hours.breakEnd) {
+          notify.error('O início da pausa deve ser menor que o fim da pausa.');
+          return;
+        }
+        if (hours.breakStart <= hours.startTime || hours.breakEnd >= hours.endTime) {
+          notify.error('A pausa deve estar dentro do horário de atendimento.');
+          return;
+        }
+      }
+    }
+
     setLoading(true);
     if (isDev) console.log('[ProfileSave] Start');
 
@@ -796,10 +842,22 @@ export default function ProfilePage() {
         antiNoShowEnabled,
         advancePaymentRequired,
         workingHours: {
-          startTime,
-          endTime,
-          workingDays,
-          ...(showBreak ? { breakStart, breakEnd } : { breakStart: null, breakEnd: null })
+          startTime: (() => {
+            const enabledDays = Object.keys(dayHours).filter(day => dayHours[day].enabled).map(Number).sort((a, b) => a - b);
+            const firstDay = enabledDays[0] !== undefined ? String(enabledDays[0]) : null;
+            return firstDay ? dayHours[firstDay].startTime : (startTime || '09:00');
+          })(),
+          endTime: (() => {
+            const enabledDays = Object.keys(dayHours).filter(day => dayHours[day].enabled).map(Number).sort((a, b) => a - b);
+            const firstDay = enabledDays[0] !== undefined ? String(enabledDays[0]) : null;
+            return firstDay ? dayHours[firstDay].endTime : (endTime || '18:00');
+          })(),
+          workingDays: Object.keys(dayHours)
+            .filter(day => dayHours[day].enabled)
+            .map(day => Number(day))
+            .sort((a, b) => a - b),
+          ...(showBreak ? { breakStart, breakEnd } : { breakStart: null, breakEnd: null }),
+          dayHours: dayHours
         },
         professionalIdentity: {
           editorialPillar: editorialPillar,
@@ -1999,95 +2057,253 @@ export default function ProfilePage() {
               <div className="space-y-5">
                 <div className="flex items-center gap-3">
                   <Calendar size={18} className="text-brand-terracotta/70" />
-                  <h3 className="font-serif italic text-lg text-brand-ink">Horários de Atendimento</h3>
-                </div>
-
-              <div className="space-y-3">
-                <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Dias de Trabalho</label>
-                <div className="flex flex-wrap gap-2">
-                  {WEEKDAYS.map((day, idx) => (
-                    <button 
-                      key={idx}
-                      type="button"
-                      onClick={() => toggleDay(idx)}
-                      className={cn(
-                        "min-w-[36px] h-[36px] px-3 flex-1 sm:flex-none rounded-full font-medium text-[10px] transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50",
-                        workingDays.includes(idx) 
-                          ? "bg-brand-ink text-brand-white shadow-md scale-[1.05]" 
-                          : "bg-brand-parchment text-brand-stone border border-brand-mist hover:border-brand-stone/40 hover:bg-white hover:scale-[1.05] active:scale-[0.95]"
-                      )}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 py-1">
-                <div className="space-y-1 min-w-0">
-                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início</label>
-                  <input 
-                    type="time" 
-                    value={startTime} 
-                    onChange={(e) => setStartTime(e.target.value)} 
-                    className="w-full px-4 py-2.5 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
-                  />
-                </div>
-                <div className="space-y-1 min-w-0">
-                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim</label>
-                  <input 
-                    type="time" 
-                    value={endTime} 
-                    onChange={(e) => setEndTime(e.target.value)} 
-                    className="w-full px-4 py-2.5 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 p-4 border border-brand-mist/60 rounded-2xl bg-brand-parchment/30">
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <div className="relative flex items-center justify-center">
-                    <input 
-                      type="checkbox" 
-                      className="peer appearance-none w-5 h-5 rounded-md border-2 border-brand-mist checked:bg-brand-ink checked:border-brand-ink transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50 focus-visible:ring-offset-2"
-                      checked={showBreak}
-                      onChange={(e) => setShowBreak(e.target.checked)}
-                    />
-                    <Check size={12} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
+                  <div>
+                    <h3 className="font-serif italic text-lg text-brand-ink">Horários de Atendimento</h3>
+                    <p className="text-[11px] text-brand-stone font-light">
+                      Configure os dias e horários em que suas clientes podem agendar pela sua vitrine.
+                    </p>
                   </div>
-                  <span className="text-sm text-brand-ink font-medium select-none group-hover:text-brand-ink/80 transition-colors">
-                    Adicionar intervalo (almoço/pausa)
-                  </span>
-                </label>
+                </div>
 
-                {showBreak && (
-                  <div className="mt-4 flex flex-wrap gap-4 items-center">
-                    <div className="grid grid-cols-2 gap-3 flex-1 min-w-[200px]">
-                      <div className="space-y-1 min-w-0">
-                        <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início da pausa</label>
-                        <input 
-                          type="time" 
-                          value={breakStart} 
-                          onChange={(e) => setBreakStart(e.target.value)} 
-                          className="w-full px-4 py-2 bg-white border border-brand-mist/60 rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
-                        />
+                {/* Quick Actions / Ações Rápidas */}
+                <div className="flex flex-wrap gap-2 py-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const monHours = dayHours['1'];
+                      if (!monHours) return;
+                      setDayHours(prev => {
+                        const next = { ...prev };
+                        for (let i = 1; i <= 5; i++) {
+                          next[String(i)] = {
+                            ...monHours,
+                            enabled: true
+                          };
+                        }
+                        return next;
+                      });
+                      notify.success('Horário de segunda-feira copiado para terça a sexta.');
+                    }}
+                    className="px-3 py-1.5 bg-brand-parchment hover:bg-white text-brand-ink border border-brand-mist rounded-lg text-xs font-medium transition-all"
+                  >
+                    Copiar segunda para dias úteis
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDayHours(prev => ({
+                        ...prev,
+                        '6': {
+                          enabled: true,
+                          startTime: '08:00',
+                          endTime: '13:00',
+                          breakStart: null,
+                          breakEnd: null
+                        }
+                      }));
+                      notify.success('Sábado configurado com horário reduzido (08:00 às 13:00).');
+                    }}
+                    className="px-3 py-1.5 bg-brand-parchment hover:bg-white text-brand-ink border border-brand-mist rounded-lg text-xs font-medium transition-all"
+                  >
+                    Sábado reduzido (08h - 13h)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDayHours(prev => {
+                        const next = { ...prev };
+                        for (let i = 0; i <= 6; i++) {
+                          if (next[String(i)]) {
+                            next[String(i)] = {
+                              ...next[String(i)],
+                              breakStart: null,
+                              breakEnd: null
+                            };
+                          }
+                        }
+                        return next;
+                      });
+                      notify.success('Pausas de todos os dias removidas.');
+                    }}
+                    className="px-3 py-1.5 bg-brand-parchment hover:bg-white text-brand-ink border border-brand-mist rounded-lg text-xs font-medium transition-all"
+                  >
+                    Limpar todas as pausas
+                  </button>
+                </div>
+
+                {/* Days list */}
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5, 6, 0].map(dayIdx => {
+                    const dayKey = String(dayIdx);
+                    const dayData = dayHours[dayKey] || { enabled: false, startTime: '09:00', endTime: '18:00' };
+                    const dayName = WEEKDAY_NAMES_PT[dayKey];
+
+                    return (
+                      <div
+                        key={dayIdx}
+                        className={cn(
+                          "p-4 rounded-2xl border transition-all duration-300",
+                          dayData.enabled 
+                            ? "bg-white border-brand-stone/20 shadow-sm" 
+                            : "bg-brand-parchment/40 border-brand-mist/60 opacity-70"
+                        )}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                          {/* Left: day info & toggle */}
+                          <div className="flex items-center gap-3">
+                            <label className="relative flex items-center justify-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="peer appearance-none w-5 h-5 rounded-md border-2 border-brand-mist checked:bg-brand-ink checked:border-brand-ink transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/50"
+                                checked={dayData.enabled}
+                                onChange={() => {
+                                  setDayHours(prev => ({
+                                    ...prev,
+                                    [dayKey]: {
+                                      ...dayData,
+                                      enabled: !dayData.enabled
+                                    }
+                                  }));
+                                }}
+                              />
+                              <Check size={12} className="absolute text-brand-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" />
+                            </label>
+                            <div>
+                              <span className="font-serif italic text-base text-brand-ink block">
+                                {dayName}
+                              </span>
+                              <span className="text-[10px] font-medium text-brand-stone uppercase tracking-widest block mt-0.5">
+                                {dayData.enabled ? 'Ativo' : 'Fechado'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Right: inputs if enabled */}
+                          {dayData.enabled ? (
+                            <div className="flex flex-col gap-3 flex-1 sm:flex-none">
+                              {/* Hours Inputs */}
+                              <div className="flex items-center gap-2">
+                                <div className="space-y-1 min-w-0">
+                                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Início</label>
+                                  <input
+                                    type="time"
+                                    value={dayData.startTime}
+                                    onChange={(e) => {
+                                      setDayHours(prev => ({
+                                        ...prev,
+                                        [dayKey]: {
+                                          ...dayData,
+                                          startTime: e.target.value
+                                        }
+                                      }));
+                                    }}
+                                    className="px-3 py-1.5 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-xs text-brand-ink w-24"
+                                  />
+                                </div>
+                                <span className="text-brand-stone/60 self-end mb-2 text-xs">às</span>
+                                <div className="space-y-1 min-w-0">
+                                  <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim</label>
+                                  <input
+                                    type="time"
+                                    value={dayData.endTime}
+                                    onChange={(e) => {
+                                      setDayHours(prev => ({
+                                        ...prev,
+                                        [dayKey]: {
+                                          ...dayData,
+                                          endTime: e.target.value
+                                        }
+                                      }));
+                                    }}
+                                    className="px-3 py-1.5 bg-brand-parchment border border-brand-mist rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-xs text-brand-ink w-24"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Pauses / Breaks inside card */}
+                              {dayData.breakStart && dayData.breakEnd ? (
+                                <div className="flex items-center gap-2 bg-brand-parchment/40 p-2 rounded-xl border border-brand-mist/40">
+                                  <div className="space-y-1">
+                                    <label className="text-[8px] font-bold text-brand-stone uppercase tracking-[0.1em] ml-1">Pausa</label>
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="time"
+                                        value={dayData.breakStart}
+                                        onChange={(e) => {
+                                          setDayHours(prev => ({
+                                            ...prev,
+                                            [dayKey]: {
+                                              ...dayData,
+                                              breakStart: e.target.value
+                                            }
+                                          }));
+                                        }}
+                                        className="px-2 py-1 bg-white border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-[11px] text-brand-ink w-20"
+                                      />
+                                      <span className="text-brand-stone/50 text-[10px]">-</span>
+                                      <input
+                                        type="time"
+                                        value={dayData.breakEnd}
+                                        onChange={(e) => {
+                                          setDayHours(prev => ({
+                                            ...prev,
+                                            [dayKey]: {
+                                              ...dayData,
+                                              breakEnd: e.target.value
+                                            }
+                                          }));
+                                        }}
+                                        className="px-2 py-1 bg-white border border-brand-mist/50 rounded-lg outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-[11px] text-brand-ink w-20"
+                                      />
+                                    </div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDayHours(prev => ({
+                                        ...prev,
+                                        [dayKey]: {
+                                          ...dayData,
+                                          breakStart: null,
+                                          breakEnd: null
+                                        }
+                                      }));
+                                    }}
+                                    className="text-[10px] text-brand-terracotta hover:underline ml-auto pl-2"
+                                  >
+                                    Remover
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDayHours(prev => ({
+                                      ...prev,
+                                      [dayKey]: {
+                                        ...dayData,
+                                        breakStart: '12:00',
+                                        breakEnd: '13:00'
+                                      }
+                                    }));
+                                  }}
+                                  className="text-[11px] text-brand-stone hover:text-brand-ink hover:underline self-start flex items-center gap-1 ml-1"
+                                >
+                                  + Adicionar intervalo (almoço/pausa)
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-brand-stone italic sm:ml-auto">Fechado</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-1 min-w-0">
-                        <label className="text-[9px] font-bold text-brand-stone uppercase tracking-[0.15em] ml-1">Fim da pausa</label>
-                        <input 
-                          type="time" 
-                          value={breakEnd} 
-                          onChange={(e) => setBreakEnd(e.target.value)} 
-                          className="w-full px-4 py-2 bg-white border border-brand-mist/60 rounded-xl outline-none focus:ring-1 focus:ring-brand-ink transition-all font-medium text-sm text-brand-ink min-w-0"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            <hr className="border-brand-mist/50 my-6" />
+              <hr className="border-brand-mist/50 my-6" />
 
             {/* Location Section */}
             <div id="profile-localizacao" className="mb-2 scroll-mt-24">

@@ -53,6 +53,27 @@ export function useProfileForm(profile: UserProfile | null) {
   const [breakStart, setBreakStart] = useState(profile?.workingHours?.breakStart || '');
   const [breakEnd, setBreakEnd] = useState(profile?.workingHours?.breakEnd || '');
   const [showBreak, setShowBreak] = useState(!!profile?.workingHours?.breakStart || !!profile?.workingHours?.breakEnd);
+  const [dayHours, setDayHours] = useState<Record<string, { enabled: boolean; startTime: string; endTime: string; breakStart?: string | null; breakEnd?: string | null; }>>(() => {
+    if (profile?.workingHours?.dayHours) {
+      return profile.workingHours.dayHours;
+    }
+    const days = profile?.workingHours?.workingDays || profile?.workingDays || [1, 2, 3, 4, 5];
+    const st = profile?.workingHours?.startTime || profile?.startTime || '09:00';
+    const et = profile?.workingHours?.endTime || profile?.endTime || '18:00';
+    const bs = profile?.workingHours?.breakStart || null;
+    const be = profile?.workingHours?.breakEnd || null;
+    const initial: Record<string, any> = {};
+    for (let i = 0; i <= 6; i++) {
+      initial[String(i)] = {
+        enabled: days.includes(i),
+        startTime: st,
+        endTime: et,
+        breakStart: bs,
+        breakEnd: be
+      };
+    }
+    return initial;
+  });
   const [profileTheme, setProfileTheme] = useState<{ variant: "terracotta" | "rose" | "sage" | "navy" | "plum" }>(profile?.profileTheme || { variant: 'terracotta' });
   const [avatarSkipped, setAvatarSkipped] = useState(profile?.avatarSkipped || false);
 
@@ -98,11 +119,46 @@ export function useProfileForm(profile: UserProfile | null) {
         if (wh.breakStart) setBreakStart(wh.breakStart);
         if (wh.breakEnd) setBreakEnd(wh.breakEnd);
         if (wh.breakStart || wh.breakEnd) setShowBreak(true);
+        if (wh.dayHours) {
+          setDayHours(wh.dayHours);
+        } else {
+          const days = wh.workingDays || [1, 2, 3, 4, 5];
+          const st = wh.startTime || '09:00';
+          const et = wh.endTime || '18:00';
+          const bs = wh.breakStart || null;
+          const be = wh.breakEnd || null;
+          const initial: Record<string, any> = {};
+          for (let i = 0; i <= 6; i++) {
+            initial[String(i)] = {
+              enabled: days.includes(i),
+              startTime: st,
+              endTime: et,
+              breakStart: bs,
+              breakEnd: be
+            };
+          }
+          setDayHours(initial);
+        }
       } else {
         // Fallback legado (apenas leitura)
+        const days = profile.workingDays || [1, 2, 3, 4, 5];
+        const st = profile.startTime || '09:00';
+        const et = profile.endTime || '18:00';
         if (profile.workingDays?.length) setWorkingDays(profile.workingDays);
         if (profile.startTime) setStartTime(profile.startTime);
         if (profile.endTime) setEndTime(profile.endTime);
+        
+        const initial: Record<string, any> = {};
+        for (let i = 0; i <= 6; i++) {
+          initial[String(i)] = {
+            enabled: days.includes(i),
+            startTime: st,
+            endTime: et,
+            breakStart: null,
+            breakEnd: null
+          };
+        }
+        setDayHours(initial);
       }
     }
   }, [profile?.uid]);
@@ -140,6 +196,7 @@ export function useProfileForm(profile: UserProfile | null) {
     breakStart, setBreakStart,
     breakEnd, setBreakEnd,
     showBreak, setShowBreak,
+    dayHours, setDayHours,
     avatarSkipped, setAvatarSkipped,
     profileTheme, setProfileTheme
   };

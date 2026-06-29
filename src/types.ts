@@ -57,6 +57,15 @@ export interface WorkingHours {
   workingDays: number[]; // 0-6 (Sunday-Saturday)
   breakStart?: string; // HH:mm
   breakEnd?: string; // HH:mm
+  dayHours?: {
+    [key: string]: {
+      enabled: boolean;
+      startTime: string;
+      endTime: string;
+      breakStart?: string | null;
+      breakEnd?: string | null;
+    };
+  };
 }
 
 export interface ProfessionalIdentity {

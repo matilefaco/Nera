@@ -109,6 +109,43 @@ export function parseLocalDate(dateStr: string): Date {
 }
 
 /**
+ * Retorna a configuração de horário de atendimento efetiva para uma determinada data,
+ * considerando a flexibilidade por dia da semana (dayHours) ou caindo para o comportamento legado.
+ */
+export function getWorkingHoursForDate(workingHours: WorkingHours, date: string): {
+  startTime: string;
+  endTime: string;
+  breakStart: string | null;
+  breakEnd: string | null;
+} | null {
+  if (!workingHours) return null;
+  const dateObj = parseLocalDate(date);
+  const dayOfWeek = dateObj.getDay();
+
+  if (workingHours.dayHours && workingHours.dayHours[String(dayOfWeek)]) {
+    const day = workingHours.dayHours[String(dayOfWeek)];
+    if (!day.enabled) return null;
+    return {
+      startTime: day.startTime || '09:00',
+      endTime: day.endTime || '18:00',
+      breakStart: day.breakStart || null,
+      breakEnd: day.breakEnd || null
+    };
+  }
+
+  // Fallback para o modelo legado/global
+  const workingDays = workingHours.workingDays || [1, 2, 3, 4, 5];
+  if (!workingDays.includes(dayOfWeek)) return null;
+
+  return {
+    startTime: workingHours.startTime || '09:00',
+    endTime: workingHours.endTime || '18:00',
+    breakStart: workingHours.breakStart || null,
+    breakEnd: workingHours.breakEnd || null
+  };
+}
+
+/**
  * Função Mestra de Validação de Reserva
  * Responde se UM horário específico pode ser reservado.
  */
@@ -143,9 +180,8 @@ export function canBookSlot({
   }
 
   // Identificar motivo para o debug
-  const dateObj = parseLocalDate(date);
-  const dayOfWeek = dateObj.getDay();
-  if (!workingHours.workingDays.includes(dayOfWeek)) return { canBook: false, reason: "Não é dia de trabalho" };
+  const effectiveWorkingHours = getWorkingHoursForDate(workingHours, date);
+  if (!effectiveWorkingHours) return { canBook: false, reason: "Não é dia de trabalho" };
 
   const todayStr = getLocalDateStr(now);
   if (date === todayStr) {
@@ -179,15 +215,12 @@ export function getBookableSlotsForDate({
   now?: Date;
 }): string[] {
   if (!date || !workingHours) return [];
-  
-  const startTime = workingHours.startTime || '09:00';
-  const endTime = workingHours.endTime || '18:00';
-  const workingDays = workingHours.workingDays || [1, 2, 3, 4, 5];
 
-  // 1. Verificar se é dia de trabalho
-  const dateObj = parseLocalDate(date);
-  const dayOfWeek = dateObj.getDay();
-  if (!workingDays.includes(dayOfWeek)) return [];
+  const effectiveWorkingHours = getWorkingHoursForDate(workingHours, date);
+  if (!effectiveWorkingHours) return [];
+  
+  const startTime = effectiveWorkingHours.startTime;
+  const endTime = effectiveWorkingHours.endTime;
 
   const [startHour, startMin] = startTime.split(':').map(Number);
   const [endHour, endMin] = endTime.split(':').map(Number);
@@ -197,9 +230,9 @@ export function getBookableSlotsForDate({
   const occupiedSegments: TimeRange[] = [];
 
   // Add breaks if provided
-  if (workingHours.breakStart && workingHours.breakEnd) {
-    const [bh, bm] = workingHours.breakStart.split(':').map(Number);
-    const [beh, bem] = workingHours.breakEnd.split(':').map(Number);
+  if (effectiveWorkingHours.breakStart && effectiveWorkingHours.breakEnd) {
+    const [bh, bm] = effectiveWorkingHours.breakStart.split(':').map(Number);
+    const [beh, bem] = effectiveWorkingHours.breakEnd.split(':').map(Number);
     occupiedSegments.push({ start: bh * 60 + bm, end: beh * 60 + bem, type: 'break' });
   }
 
