@@ -554,12 +554,13 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
       
       if (clientWhatsapp) {
         let slug = professionalSlug;
-        if (!slug) {
+        if (!slug || slug === "app") {
           const proDocSnap = await db.collection('users').doc(professionalId).get();
           slug = proDocSnap.data()?.slug;
         }
 
-        const profileLink = `${baseUrl}/p/${slug || 'app'}`;
+        const activeSlug = (slug || "").trim();
+        const profileLink = (activeSlug && activeSlug !== "app") ? `${baseUrl}/p/${activeSlug}` : baseUrl;
         const formattedDate = date.split('-').reverse().join('/');
         const msg = buildBookingRejectedMessageForClient({
           clientName,
@@ -600,7 +601,8 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
           .where('status', '==', 'waiting')
           .get();
         const waitlistCount = waitlistSnap.size;
-        const profileUrl = pro?.slug ? `${baseUrl}/p/${pro.slug}` : undefined;
+        const activeSlug = (pro?.slug || professionalSlug || "").trim();
+        const profileUrl = (activeSlug && activeSlug !== "app") ? `${baseUrl}/p/${activeSlug}` : baseUrl;
 
         if (proPhone) {
           const formattedDate = date.split('-').reverse().join('/');
@@ -632,7 +634,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
             serviceName: serviceName,
             date: formattedDate,
             time: time,
-            professionalPageUrl: profileUrl || `${baseUrl}/p/${professionalSlug || ''}`
+            professionalPageUrl: profileUrl
           });
           await sendWhatsApp(db, clientWhatsapp, msg, {
             appointmentId,

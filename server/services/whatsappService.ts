@@ -494,7 +494,8 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
 
     await logRef.update({ appointmentId: targetAppt.id });
 
-    const profileLink = `${PUBLIC_APP_URL}/p/${targetAppt.professionalSlug || 'app'}`;
+    const activeSlug = (proDataForPlan?.slug || targetAppt.professionalSlug || targetAppt.manageSlug || targetAppt.publicSlug || "").trim();
+    const profileLink = (activeSlug && activeSlug !== "app") ? `${PUBLIC_APP_URL}/p/${activeSlug}` : PUBLIC_APP_URL;
 
     switch (intent) {
       case 'confirm':
