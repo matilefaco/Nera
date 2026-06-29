@@ -485,6 +485,43 @@ const intervalsOverlap = (
   return Math.max(startA, startB) < Math.min(endA, endB);
 };
 
+function getEffectiveWorkingHoursForDate(workingHours: any, dateStr: string) {
+  if (!workingHours) return null;
+  const dayOfWeek = new Date(dateStr + "T12:00:00").getDay();
+
+  if (workingHours.dayHours) {
+    const day = workingHours.dayHours[String(dayOfWeek)];
+    if (!day || day.enabled !== true) return null;
+    if (!day.startTime || !day.endTime) return null;
+    return {
+      startTime: day.startTime,
+      endTime: day.endTime,
+      breakStart: day.breakStart || null,
+      breakEnd: day.breakEnd || null,
+      dayOfWeek
+    };
+  }
+
+  // Fallback legado
+  const workingDays = workingHours.workingDays;
+  const startTime = workingHours.startTime;
+  const endTime = workingHours.endTime;
+
+  if (Array.isArray(workingDays) && workingDays.length > 0) {
+    if (!workingDays.includes(dayOfWeek)) return null;
+  }
+
+  if (!startTime || !endTime) return null;
+
+  return {
+    startTime,
+    endTime,
+    breakStart: workingHours.breakStart || null,
+    breakEnd: workingHours.breakEnd || null,
+    dayOfWeek
+  };
+}
+
 function getBookingLockId(appointment: any): string | null {
   const dateAttr =
     appointment.date ||
@@ -974,23 +1011,29 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       const apptEndMin = apptStartMin + finalData.duration;
 
       if (proData && proData.workingHours) {
-        if (
-          Array.isArray(proData.workingHours.workingDays) &&
-          proData.workingHours.workingDays.length > 0
-        ) {
-          if (!proData.workingHours.workingDays.includes(apptDayOfWeek)) {
-            const err = new Error(
-              "Horário indisponível. Escolha outro horário.",
-            );
-            (err as any).status = 400;
-            throw err;
-          }
+        const effectiveHours = getEffectiveWorkingHoursForDate(proData.workingHours, apptDateStr);
+        if (effectiveHours === null) {
+          const err = new Error(
+            "Horário indisponível. Escolha outro horário.",
+          );
+          (err as any).status = 400;
+          throw err;
         }
 
-        if (proData.workingHours.startTime && proData.workingHours.endTime) {
-          const whStart = timeToMinutes(proData.workingHours.startTime);
-          const whEnd = timeToMinutes(proData.workingHours.endTime);
-          if (apptStartMin < whStart || apptEndMin > whEnd) {
+        const whStart = timeToMinutes(effectiveHours.startTime);
+        const whEnd = timeToMinutes(effectiveHours.endTime);
+        if (apptStartMin < whStart || apptEndMin > whEnd) {
+          const err = new Error(
+            "Horário indisponível. Escolha outro horário.",
+          );
+          (err as any).status = 400;
+          throw err;
+        }
+
+        if (effectiveHours.breakStart && effectiveHours.breakEnd) {
+          const breakStartMin = timeToMinutes(effectiveHours.breakStart);
+          const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
+          if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
             const err = new Error(
               "Horário indisponível. Escolha outro horário.",
             );
@@ -2451,13 +2494,19 @@ router.post(
         const proSnap = await transaction.get(db.collection("users").doc(uid));
         const proData = proSnap.data() || {};
         const workingHours = proData.workingHours || {};
-        if (workingHours.workingDays && !workingHours.workingDays.includes(apptDayOfWeek)) {
+        const effectiveHours = getEffectiveWorkingHoursForDate(workingHours, apptDateStr);
+        if (effectiveHours === null) {
           throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
         }
-        if (workingHours.startTime && workingHours.endTime) {
-          const start = timeToMinutes(workingHours.startTime);
-          const end = timeToMinutes(workingHours.endTime);
-          if (apptStartMin < start || apptEndMin > end) {
+        const start = timeToMinutes(effectiveHours.startTime);
+        const end = timeToMinutes(effectiveHours.endTime);
+        if (apptStartMin < start || apptEndMin > end) {
+          throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+        }
+        if (effectiveHours.breakStart && effectiveHours.breakEnd) {
+          const breakStartMin = timeToMinutes(effectiveHours.breakStart);
+          const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
+          if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
             throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
           }
         }
@@ -4313,22 +4362,27 @@ router.post(
         debugStep = "WORKING_HOURS";
         // Validate working hours / days
         if (proData.workingHours) {
-          if (
-            Array.isArray(proData.workingHours.workingDays) &&
-            proData.workingHours.workingDays.length > 0
-          ) {
-            if (!proData.workingHours.workingDays.includes(apptDayOfWeek)) {
-              throw {
-                status: 400,
-                message: "Horário indisponível. Escolha outro horário.",
-              };
-            }
+          const effectiveHours = getEffectiveWorkingHoursForDate(proData.workingHours, safeNewDate);
+          if (effectiveHours === null) {
+            throw {
+              status: 400,
+              message: "Horário indisponível. Escolha outro horário.",
+            };
           }
 
-          if (proData.workingHours.startTime && proData.workingHours.endTime) {
-            const whStart = timeToMinutes(proData.workingHours.startTime);
-            const whEnd = timeToMinutes(proData.workingHours.endTime);
-            if (apptStartMin < whStart || apptEndMin > whEnd) {
+          const whStart = timeToMinutes(effectiveHours.startTime);
+          const whEnd = timeToMinutes(effectiveHours.endTime);
+          if (apptStartMin < whStart || apptEndMin > whEnd) {
+            throw {
+              status: 400,
+              message: "Horário indisponível. Escolha outro horário.",
+            };
+          }
+
+          if (effectiveHours.breakStart && effectiveHours.breakEnd) {
+            const breakStartMin = timeToMinutes(effectiveHours.breakStart);
+            const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
+            if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
               throw {
                 status: 400,
                 message: "Horário indisponível. Escolha outro horário.",
@@ -5292,13 +5346,21 @@ router.post(
         const proData = proSnap.data() as any;
 
         if (proData.workingHours) {
-          if (Array.isArray(proData.workingHours.workingDays) && proData.workingHours.workingDays.length > 0 && !proData.workingHours.workingDays.includes(apptDayOfWeek)) {
-             throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          const effectiveHours = getEffectiveWorkingHoursForDate(proData.workingHours, safeNewDate);
+          if (effectiveHours === null) {
+            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
           }
-          if (proData.workingHours.startTime && proData.workingHours.endTime) {
-            const whStart = timeToMinutes(proData.workingHours.startTime);
-            const whEnd = timeToMinutes(proData.workingHours.endTime);
-            if (apptStartMin < whStart || apptEndMin > whEnd) {
+
+          const whStart = timeToMinutes(effectiveHours.startTime);
+          const whEnd = timeToMinutes(effectiveHours.endTime);
+          if (apptStartMin < whStart || apptEndMin > whEnd) {
+            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
+          }
+
+          if (effectiveHours.breakStart && effectiveHours.breakEnd) {
+            const breakStartMin = timeToMinutes(effectiveHours.breakStart);
+            const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
+            if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
               throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
             }
           }
