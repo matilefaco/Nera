@@ -81,6 +81,16 @@ const getClientKey = (
   return `name-${(name || "anon").toLowerCase().replace(/\s+/g, "-")}`;
 };
 
+export function getCanonicalPhone(phone: string): string {
+  const digits = String(phone || "").replace(/\D/g, "");
+  // If Brazilian format (DDD + 8 or 9 digits, possibly with 55 prepended)
+  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+
 // --- NEW: SECURE SLOT LOOKUP (Blindagem) ---
 router.get("/public/occupied-slots/:professionalId", async (req, res) => {
   console.log("[DEBUG_OCCUPIED_SLOTS] Routing info:", {
@@ -784,7 +794,8 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
     const rawEmail = String(appointmentData.clientEmail || "").trim().toLowerCase();
     const rawPhone = String(appointmentData.clientWhatsapp || appointmentData.clientPhone || "").trim();
     const normalizedPhone = rawPhone.replace(/\D/g, "");
-
+    const canonicalPhone = getCanonicalPhone(rawPhone);
+ 
     const finalData: any = {
       ...cleanedData,
       source: "public",
@@ -798,8 +809,8 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       clientEmail: rawEmail.substring(0, 100),
       clientWhatsapp: normalizedPhone.substring(0, 20),
       clientPhone: normalizedPhone.substring(0, 20),
-      clientWhatsappNormalized: normalizedPhone,
-      clientPhoneNormalized: normalizedPhone,
+      clientWhatsappNormalized: canonicalPhone,
+      clientPhoneNormalized: canonicalPhone,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -863,19 +874,19 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       const snapsPromises = [];
 
       // Query canonical fields first
-      if (normalizedPhone) {
+      if (canonicalPhone) {
         snapsPromises.push(
           transaction.get(
             db.collection("appointments")
               .where("professionalId", "==", appointmentData.professionalId)
-              .where("clientWhatsappNormalized", "==", normalizedPhone)
+              .where("clientWhatsappNormalized", "==", canonicalPhone)
           )
         );
         snapsPromises.push(
           transaction.get(
             db.collection("appointments")
               .where("professionalId", "==", appointmentData.professionalId)
-              .where("clientPhoneNormalized", "==", normalizedPhone)
+              .where("clientPhoneNormalized", "==", canonicalPhone)
           )
         );
       }
@@ -5737,9 +5748,11 @@ router.post(
       return res.status(400).json({ error: "WhatsApp inválido." });
     }
 
+    const canonicalPhoneKey = getCanonicalPhone(rawPhone);
+
     try {
       const serviceKey = serviceId ? String(serviceId).trim() : "any";
-      const lockId = `${professionalId}_${requestedDate}_${serviceKey}_${normalizedPhone}`;
+      const lockId = `${professionalId}_${requestedDate}_${serviceKey}_${canonicalPhoneKey}`;
       const lockRef = db.collection("waitlist_locks").doc(lockId);
 
       let waitlistEntryIdToCreate = "";
@@ -5764,28 +5777,46 @@ router.post(
         const expiresAt = proData?.planExpiresAt;
         const subStatus = proData?.stripeSubscriptionStatus;
 
-        let isExpired = false;
-        let timeMillis = 0;
-        if (expiresAt) {
-          if (typeof expiresAt.toMillis === "function") {
-            timeMillis = expiresAt.toMillis();
-          } else {
-            timeMillis = new Date(expiresAt).getTime();
+        let isProActive = false;
+        if (basePlan === "pro") {
+          // Check expiration
+          let isExpired = false;
+          if (expiresAt) {
+            let timeMillis = 0;
+            if (typeof expiresAt.toMillis === "function") {
+              timeMillis = expiresAt.toMillis();
+            } else {
+              timeMillis = new Date(expiresAt).getTime();
+            }
+            if (timeMillis < Date.now()) {
+              isExpired = true;
+            }
+          }
+
+          // Check stripe status if present
+          let isStripeInactive = false;
+          if (subStatus) {
+            const inactiveStatuses = [
+              "canceled",
+              "cancelled",
+              "unpaid",
+              "incomplete_expired",
+              "past_due",
+              "paused",
+              "disabled",
+              "deleted"
+            ];
+            if (inactiveStatuses.includes(String(subStatus).trim().toLowerCase())) {
+              isStripeInactive = true;
+            }
+          }
+
+          if (!isExpired && !isStripeInactive) {
+            isProActive = true;
           }
         }
-        const timeIsExpired = expiresAt ? timeMillis < Date.now() : false;
-        const hasActiveSub = subStatus === "active" || subStatus === "trialing";
 
-        if (expiresAt && timeIsExpired) {
-          isExpired = true;
-        } else if (!hasActiveSub) {
-          if (!expiresAt || timeIsExpired) {
-            isExpired = true;
-          }
-        }
-
-        const activePlan = isExpired ? "free" : basePlan;
-        if (activePlan !== "pro") {
+        if (!isProActive) {
           return { error: "Lista de espera disponível apenas para profissionais com plano ativo.", status: 403 };
         }
 
@@ -5816,22 +5847,38 @@ router.post(
           }
         }
 
-        const checkCanonicalSnap = await transaction.get(
-          db.collection("waitlist")
-            .where("professionalId", "==", professionalId)
-            .where("clientWhatsappNormalized", "==", normalizedPhone)
-            .where("status", "==", "waiting")
-        );
-
         let hasDuplicate = false;
         let duplicateEntryId = "";
 
-        for (const doc of checkCanonicalSnap.docs) {
+        const checkCanonicalSnap1 = await transaction.get(
+          db.collection("waitlist")
+            .where("professionalId", "==", professionalId)
+            .where("clientWhatsappNormalized", "==", canonicalPhoneKey)
+            .where("status", "==", "waiting")
+        );
+        for (const doc of checkCanonicalSnap1.docs) {
           const d = doc.data();
           if (d.requestedDate === requestedDate && (!serviceId || d.serviceId === serviceId)) {
             hasDuplicate = true;
             duplicateEntryId = doc.id;
             break;
+          }
+        }
+
+        if (!hasDuplicate) {
+          const checkCanonicalSnap2 = await transaction.get(
+            db.collection("waitlist")
+              .where("professionalId", "==", professionalId)
+              .where("clientPhoneNormalized", "==", canonicalPhoneKey)
+              .where("status", "==", "waiting")
+          );
+          for (const doc of checkCanonicalSnap2.docs) {
+            const d = doc.data();
+            if (d.requestedDate === requestedDate && (!serviceId || d.serviceId === serviceId)) {
+              hasDuplicate = true;
+              duplicateEntryId = doc.id;
+              break;
+            }
           }
         }
 
@@ -5892,8 +5939,8 @@ router.post(
           professionalId,
           clientName: rawName.substring(0, 100),
           clientWhatsapp: normalizedPhone.substring(0, 20),
-          clientWhatsappNormalized: normalizedPhone,
-          clientPhoneNormalized: normalizedPhone,
+          clientWhatsappNormalized: canonicalPhoneKey,
+          clientPhoneNormalized: canonicalPhoneKey,
           status: "waiting",
           requestedDate,
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
