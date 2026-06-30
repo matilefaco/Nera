@@ -210,6 +210,26 @@ export async function uploadImageToStorage(file: File, path: string): Promise<st
     throw new Error('Usuário não autenticado');
   }
 
+  // 1. Validate MIME Type
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowedMimeTypes.includes(file.type)) {
+    throw new Error(`Tipo de arquivo não permitido (${file.type || 'desconhecido'}). Apenas JPEG, PNG e WebP são aceitos.`);
+  }
+
+  // 2. Validate Size based on destination path/type
+  let maxSize = 5 * 1024 * 1024; // Default 5 MB for portfolio and others
+  let typeLabel = 'portfólio';
+  if (path.startsWith('avatars/') || path.includes('avatar')) {
+    maxSize = 2 * 1024 * 1024; // 2 MB for avatar
+    typeLabel = 'avatar';
+  }
+
+  if (file.size > maxSize) {
+    const sizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+    const limitInMB = maxSize === 2 * 1024 * 1024 ? '2' : '5';
+    throw new Error(`O arquivo de ${typeLabel} é muito grande (${sizeInMB} MB). O limite máximo permitido é de ${limitInMB} MB.`);
+  }
+
   // Convert File to Base64 to bypass iOS Safari File/Blob issues in iFrames
   const base64DataUrl = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
