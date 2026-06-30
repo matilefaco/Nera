@@ -339,13 +339,27 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
           
           if (!serviceName) continue;
 
+          // Strip critical tenant identifiers to prevent manipulation
+          const { professionalId, ownerId, userId, uid: serviceUid, ...safeService } = sanitizedService;
+
           const existingService = existingServicesMap.get(serviceName);
 
           if (existingService) {
+            // Validate that the existing service belongs to the authenticated user (uid)
+            if (existingService.professionalId !== uid) {
+              logger.error("PROFILE", "Tenant bypass attempt: Professional tried to update service belonging to another professional", {
+                uid,
+                serviceId: existingService.id,
+                serviceProfessionalId: existingService.professionalId
+              });
+              throw new Error("Acesso não autorizado para este serviço.");
+            }
+
             // UPDATING existing service
             const serviceRef = db.collection("services").doc(existingService.id);
             transaction.update(serviceRef, {
-              ...sanitizedService,
+              ...safeService,
+              professionalId: uid, // Always force the professionalId to be the authenticated user
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               source: "publish",
               active: true
@@ -354,8 +368,8 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
             // CREATING new service
             const serviceRef = db.collection("services").doc();
             transaction.set(serviceRef, {
-              ...sanitizedService,
-              professionalId: uid,
+              ...safeService,
+              professionalId: uid, // Always force the professionalId to be the authenticated user
               createdAt: admin.firestore.FieldValue.serverTimestamp(),
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
               source: "publish",
