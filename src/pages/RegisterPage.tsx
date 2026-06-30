@@ -179,7 +179,6 @@ export default function RegisterPage() {
       // Update basic profile
       await updateProfile(user, { displayName: name });
 
-      let backendFailed = false;
       try {
         const token = await user.getIdToken();
         const response = await fetch("/api/auth/register", {
@@ -189,22 +188,21 @@ export default function RegisterPage() {
             "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({
-            uid: user.uid,
             name,
             email,
             referredBy: manualReferralCode,
-            plan: activePlan,
           }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-          backendFailed = true;
-          console.error(
-            "[SIGNUP FLOW] Backend DB creation failed, falling back to Client SDK. Error:",
-            data.error || data.message,
-          );
+          if (response.status === 409 || data.code === "USER_ALREADY_EXISTS") {
+            console.log("[SIGNUP FLOW] User already exists in Firestore (idempotent email signup).");
+            toast.success("Tudo certo! Criando seu perfil...");
+          } else {
+            throw new Error(data.error || data.message || "Erro ao registrar perfil no servidor.");
+          }
         } else if (data.code === "VERIFICATION_EMAIL_FAILED") {
           toast.warning(
             data.message ||
@@ -213,66 +211,10 @@ export default function RegisterPage() {
         } else {
           toast.success("Tudo certo! Criando seu perfil...");
         }
-      } catch (fetchErr) {
-        backendFailed = true;
-        console.warn(
-          "[SIGNUP FLOW] Fetch to backend failed, falling back to Client SDK...",
-          fetchErr,
-        );
-      }
-
-      // FALLBACK: If the backend fails (typical in Preview ADC issues), create profile via Client DB
-      if (backendFailed) {
-        try {
-          // Import dynamic to avoid top-level issues if not needed, or just use existing
-          const { getFirestore, doc, setDoc, serverTimestamp } =
-            await import("firebase/firestore");
-          const { app } = await import("../firebase");
-          const db = getFirestore(app);
-          const signupPlan =
-            activePlan === "essencial" || activePlan === "pro"
-              ? activePlan
-              : "free";
-
-          await setDoc(doc(db, "users", user.uid), {
-            uid: user.uid,
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-            slug: generateSlug(name),
-            referralCode: generateReferralCode(name),
-            referredBy: manualReferralCode || null,
-            onboardingCompleted: false,
-            credits: 0,
-            createdAt: serverTimestamp(),
-            specialty: "",
-            bio: "",
-            location: "",
-            whatsapp: "",
-            avatar: "",
-            plan: "free",
-            signupPlan: signupPlan,
-          });
-
-          // Also try to reserve slug just in case
-          const slugValue = generateSlug(name);
-          await setDoc(doc(db, "slugs", slugValue), {
-            uid: user.uid,
-            slug: slugValue,
-            createdAt: serverTimestamp(),
-            source: "registration-fallback",
-          }).catch((e) =>
-            console.warn("Failed to reserve slug in fallback", e),
-          );
-
-          toast.warning(
-            "Sua conta foi criada com avisos do ambiente, mas o acesso está liberado.",
-          );
-        } catch (fallbackErr: any) {
-          console.error("Fallback Client DB error:", fallbackErr);
-          toast.error(
-            "Sua conta foi criada, mas não conseguimos finalizar seu perfil. Avise o suporte.",
-          );
-        }
+      } catch (fetchErr: any) {
+        console.error("[SIGNUP FLOW] Backend registration failed:", fetchErr);
+        toast.error(fetchErr.message || "Erro ao finalizar o cadastro no servidor. Por favor, tente novamente.");
+        return;
       }
 
       // 3. Handle Plan Checkout if applicable
