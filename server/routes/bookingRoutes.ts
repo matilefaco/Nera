@@ -5322,21 +5322,25 @@ router.get(
           const snap = await t.get(ref);
           if (snap.data()?.status !== "invited") return false;
 
+          let lockRef = null;
+          let lockSnap = null;
+
+          if (data.assignedTime) {
+            const cleanTime = data.assignedTime.replace(":", "");
+            const lockId = `${data.professionalId}_${data.requestedDate}_${cleanTime}`;
+            lockRef = db.collection("booking_locks").doc(lockId);
+            lockSnap = await t.get(lockRef);
+          }
+
           // Mark as expired
           t.update(ref, {
             status: "expired"
           });
 
-          // Look for lock
-          if (data.assignedTime) {
-            const cleanTime = data.assignedTime.replace(":", "");
-            const lockId = `${data.professionalId}_${data.requestedDate}_${cleanTime}`;
-            const lockRef = db.collection("booking_locks").doc(lockId);
-            const lockSnap = await t.get(lockRef);
-            if (lockSnap.exists && lockSnap.data()?.waitlistEntryId === entryId) {
-              t.delete(lockRef);
-              logger.info("WAITLIST", `[WAITLIST_LOCK_RELEASED] Lock released for expired waitlist invite ${entryId}`);
-            }
+          // Delete lock if it exists and belongs to this waitlist entry
+          if (lockRef && lockSnap && lockSnap.exists && lockSnap.data()?.waitlistEntryId === entryId) {
+            t.delete(lockRef);
+            logger.info("WAITLIST", `[WAITLIST_LOCK_RELEASED] Lock released for expired waitlist invite ${entryId}`);
           }
           return true;
         });
