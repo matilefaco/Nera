@@ -78,8 +78,8 @@ export default function WaitlistModal({ open, onClose, profile, services, initia
         status: 'waiting'
       });
       setStep('success');
-    } catch (e) {
-      notify.error('Erro ao entrar na lista. Tente novamente.');
+    } catch (e: any) {
+      notify.error(e?.message || 'Erro ao entrar na lista. Tente novamente.');
     } finally {
       setLoading(false);
     }

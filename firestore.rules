@@ -58,11 +58,17 @@ service cloud.firestore {
 
     function isValidWaitlistEntry(data) {
       return data.keys().hasAll(['professionalId', 'clientName', 'clientWhatsapp', 'requestedDate', 'serviceId', 'status']) &&
-             data.professionalId is string && data.professionalId.size() > 0 &&
-             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() < 100 &&
-             data.clientWhatsapp is string && data.clientWhatsapp.size() >= 10 &&
-             data.requestedDate is string &&
-             data.status in ['waiting', 'invited', 'expired', 'booked', 'cancelled'];
+             data.keys().hasOnly(['professionalId', 'clientName', 'clientWhatsapp', 'clientEmail', 'requestedDate', 'serviceId', 'serviceName', 'status', 'period', 'preferredTime', 'createdAt', 'invitationSentAt', 'invitationExpiresAt', 'assignedTime', 'updatedAt']) &&
+             data.professionalId is string && data.professionalId.size() > 0 && data.professionalId.size() <= 128 &&
+             data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 100 &&
+             data.clientWhatsapp is string && data.clientWhatsapp.size() >= 10 && data.clientWhatsapp.size() <= 20 &&
+             (!('clientEmail' in data) || (data.clientEmail is string && data.clientEmail.size() <= 100)) &&
+             data.requestedDate is string && data.requestedDate.matches('^\\d{4}-\\d{2}-\\d{2}$') &&
+             data.status in ['waiting', 'invited', 'expired', 'booked', 'cancelled'] &&
+             (!('period' in data) || (data.period is string && data.period in ['any', 'morning', 'afternoon', 'night'])) &&
+             (!('preferredTime' in data) || (data.preferredTime is string && data.preferredTime.size() <= 10)) &&
+             (!('serviceName' in data) || (data.serviceName is string && data.serviceName.size() <= 100)) &&
+             (!('serviceId' in data) || (data.serviceId is string && data.serviceId.size() <= 128));
     }
 
     function isValidWaitlistStats(data) {

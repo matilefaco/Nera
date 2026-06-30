@@ -780,6 +780,10 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
     const reservationCode = generateReservationCode(appointmentData.date);
     const manageSlug = generateSecureToken(24);
 
+    const rawName = String(appointmentData.clientName || "").trim();
+    const rawEmail = String(appointmentData.clientEmail || "").trim().toLowerCase();
+    const rawPhone = String(appointmentData.clientWhatsapp || appointmentData.clientPhone || "").trim();
+
     const finalData: any = {
       ...cleanedData,
       source: "public",
@@ -789,10 +793,10 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       manageToken: manageSlug,
       reservationCode,
       manageSlug,
-      clientWhatsapp:
-        appointmentData.clientWhatsapp || appointmentData.clientPhone || "",
-      clientPhone:
-        appointmentData.clientWhatsapp || appointmentData.clientPhone || "",
+      clientName: rawName.substring(0, 100),
+      clientEmail: rawEmail.substring(0, 100),
+      clientWhatsapp: rawPhone.substring(0, 20),
+      clientPhone: rawPhone.substring(0, 20),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -827,6 +831,91 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         (err as any).status = 403;
         throw err;
       }
+
+      // --- ANTI-ABUSE DEDUPLICATION CHECK ---
+      let hasDuplicate = false;
+      const duplicateStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted"];
+      const limitTime = Date.now() - 24 * 60 * 60 * 1000; // 24h ago
+
+      if (rawPhone) {
+        const phoneSnap1 = await transaction.get(
+          db.collection("appointments")
+            .where("professionalId", "==", appointmentData.professionalId)
+            .where("clientPhone", "==", rawPhone)
+        );
+        const phoneSnap2 = await transaction.get(
+          db.collection("appointments")
+            .where("professionalId", "==", appointmentData.professionalId)
+            .where("clientWhatsapp", "==", rawPhone)
+        );
+
+        const docs = [...phoneSnap1.docs, ...phoneSnap2.docs];
+        const uniqueDocs = Array.from(new Map(docs.map(doc => [doc.id, doc])).values());
+
+        for (const doc of uniqueDocs) {
+          const data = doc.data();
+          if (duplicateStatuses.includes(data.status)) {
+            let createdTime = 0;
+            if (data.createdAt) {
+              if (typeof data.createdAt.toMillis === "function") {
+                createdTime = data.createdAt.toMillis();
+              } else {
+                createdTime = new Date(data.createdAt).getTime();
+              }
+            }
+            const isRecent = createdTime >= limitTime;
+            const isSameDate = data.date === appointmentData.date;
+
+            if (isRecent || isSameDate) {
+              hasDuplicate = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!hasDuplicate && rawEmail) {
+        const emailSnap = await transaction.get(
+          db.collection("appointments")
+            .where("professionalId", "==", appointmentData.professionalId)
+            .where("clientEmail", "==", rawEmail)
+        );
+
+        for (const doc of emailSnap.docs) {
+          const data = doc.data();
+          if (duplicateStatuses.includes(data.status)) {
+            let createdTime = 0;
+            if (data.createdAt) {
+              if (typeof data.createdAt.toMillis === "function") {
+                createdTime = data.createdAt.toMillis();
+              } else {
+                createdTime = new Date(data.createdAt).getTime();
+              }
+            }
+            const isRecent = createdTime >= limitTime;
+            const isSameDate = data.date === appointmentData.date;
+
+            if (isRecent || isSameDate) {
+              hasDuplicate = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (hasDuplicate) {
+        logger.warn("BOOKING", `Duplicate booking attempt blocked for contact: ${rawPhone || rawEmail}`, {
+          professionalId: appointmentData.professionalId,
+          date: appointmentData.date
+        });
+        const err = new Error(
+          "Já existe uma solicitação recente para este contato. Aguarde a confirmação da profissional ou tente novamente mais tarde."
+        );
+        (err as any).status = 409;
+        (err as any).code = "DUPLICATE_BOOKING_ATTEMPT";
+        throw err;
+      }
+      // --- END OF ANTI-ABUSE DEDUPLICATION CHECK ---
 
       // Enforce Active Plan Limits Securely Inside Transaction
       const basePlan = proData?.plan || "free";
