@@ -82,6 +82,7 @@ export default function PendingRequestsPage() {
   );
 
   const [handledIds, setHandledIds] = useState<string[]>([]);
+  const [highlightedCardId, setHighlightedCardId] = useState<string | null>(null);
 
   const { isSubscribed, isSupported, requestPermission } =
     usePushNotifications();
@@ -253,6 +254,43 @@ export default function PendingRequestsPage() {
           setSelectedRequest(target);
           setIsModalOpen(true);
         }
+      }
+    }
+  }, [loading, localRequests]);
+
+  // Listen for appointmentId in URL to highlight and open details modal automatically
+  useEffect(() => {
+    if (loading || localRequests.length === 0) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const appointmentId = params.get("appointmentId");
+
+    if (appointmentId) {
+      const target = localRequests.find((r) => r.id === appointmentId);
+      if (target) {
+        // Clear params from URL to prevent re-opening or re-scrolling
+        params.delete("appointmentId");
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+        window.history.replaceState({}, "", newUrl);
+
+        // Open details modal
+        setSelectedRequest(target);
+        setIsModalOpen(true);
+
+        // Scroll to card and highlight it
+        setHighlightedCardId(appointmentId);
+        setTimeout(() => {
+          const el = document.getElementById(`appointment-card-${appointmentId}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 300);
+
+        // Clear highlight after 4 seconds
+        setTimeout(() => {
+          setHighlightedCardId(null);
+        }, 4000);
       }
     }
   }, [loading, localRequests]);
@@ -458,6 +496,7 @@ export default function PendingRequestsPage() {
                 return (
                   <motion.div
                     key={request.id}
+                    id={`appointment-card-${request.id}`}
                     layout
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -468,8 +507,8 @@ export default function PendingRequestsPage() {
                     }}
                     className={cn(
                       "bg-brand-white p-6 md:p-8 rounded-[48px] border-2 shadow-xl relative overflow-hidden transition-all flex flex-col h-full",
-                      confirmedId === request.id
-                        ? "border-brand-ink"
+                      confirmedId === request.id || highlightedCardId === request.id
+                        ? "border-brand-ink ring-4 ring-brand-ink/10"
                         : "border-transparent",
                       !confirmedId &&
                         timeInfo?.isVeryNew &&

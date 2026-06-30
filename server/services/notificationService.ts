@@ -329,7 +329,7 @@ export const sendNewBookingRequestNotification = async (
           clienteNome: payload.clientName,
           clienteWhatsApp: payload.clientWhatsapp || "Não informado",
           local: payload.locationDetail || payload.neighborhood || "Estúdio",
-          linkManage: `${baseUrl}/pedidos`,
+          linkManage: `${baseUrl}/pedidos?appointmentId=${payload.appointmentId}`,
         });
 
         const attemptAtMs = Date.now();

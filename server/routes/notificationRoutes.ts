@@ -545,7 +545,7 @@ router.post("/notify", requireFirebaseAuth, authMutationLimiter, async (req, res
           clienteNome: clientName,
           clienteWhatsApp: payload.clientWhatsapp || 'Não informado',
           local: payload.locationDetail || payload.neighborhood || 'Estúdio',
-          linkManage: `${baseUrl}/pedidos`
+          linkManage: `${baseUrl}/pedidos?appointmentId=${appointmentId}`
         });
 
         await sendWhatsApp(db, proPhone, msg, {
