@@ -303,6 +303,27 @@ router.get("/test-whatsapp", debugOnly, async (req, res) => {
 });
 
 router.post("/zapi/webhook", async (req, res) => {
+  const webhookToken = process.env.ZAPI_WEBHOOK_TOKEN;
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!webhookToken) {
+    if (isProduction) {
+      logger.error("WHATSAPP", "Security Error: ZAPI_WEBHOOK_TOKEN is not configured in production environment.");
+      return res.status(503).json({ error: "Service unavailable due to misconfiguration" });
+    } else {
+      logger.warn("WHATSAPP", "ZAPI_WEBHOOK_TOKEN is not configured. Bypassing authentication in non-production environment.");
+    }
+  } else {
+    const receivedToken = req.headers["client-token"] || req.headers["x-zapi-token"];
+    if (!receivedToken || receivedToken !== webhookToken) {
+      logger.warn("WHATSAPP", "Unauthorized webhook access attempt", {
+        hasHeader: !!receivedToken,
+        tokenLength: receivedToken ? String(receivedToken).length : 0
+      });
+      return res.status(401).json({ error: "Unauthorized: Invalid or missing token" });
+    }
+  }
+
   const db = getDb();
   const payload = req.body;
   const messageId = payload.messageId || payload.id;
