@@ -1,5 +1,6 @@
 import express from "express";
 import admin from "firebase-admin";
+import { requireFirebaseAuth, AuthenticatedRequest } from "../middleware/authMiddleware.js";
 import {
   sendPasswordResetEmail,
   sendVerificationEmail,
@@ -17,20 +18,51 @@ const router = express.Router();
  * POST /api/auth/register
  * Creates a new user via Admin SDK to avoid default Firebase emails and control branding.
  */
-router.post("/register", async (req, res) => {
-  const { uid, name, email, referredBy, plan } = req.body;
+router.post("/register", requireFirebaseAuth, async (req: AuthenticatedRequest, res) => {
+  const authUid = req.uid;
+  if (!authUid) {
+    return res.status(401).json({ error: "Não autenticado" });
+  }
 
-  if (!email || !uid || !name) {
+  const { uid: bodyUid, name, email: bodyEmail, referredBy, plan } = req.body;
+
+  // Derive email preferencialmente from req.user?.email, fallback to bodyEmail
+  const tokenEmail = req.user?.email;
+  const finalEmail = (tokenEmail || bodyEmail || "").trim().toLowerCase();
+
+  if (!name || !finalEmail) {
     return res.status(400).json({ error: "Dados incompletos" });
   }
 
-  const cleanEmail = email.trim().toLowerCase();
+  // Se body.uid existir e body.uid !== req.uid: retornar 403.
+  if (bodyUid && bodyUid !== authUid) {
+    return res.status(403).json({ error: "Acesso negado. UID divergente." });
+  }
+
+  // Se body.email existir e req.user.email existir e body.email !== req.user.email: retornar 403
+  if (bodyEmail && tokenEmail && bodyEmail.trim().toLowerCase() !== tokenEmail.trim().toLowerCase()) {
+    return res.status(403).json({ error: "Acesso negado. Email divergente." });
+  }
+
+  const cleanEmail = finalEmail;
   const cleanName = name.trim();
   const signupPlan = plan === "essencial" || plan === "pro" ? plan : "free";
 
   try {
-    // 1. Initialize Firestore Profile with standard fields
     const db = admin.firestore();
+
+    // Antes de criar, buscar users/{req.uid}
+    const userDocRef = db.collection("users").doc(authUid);
+    const userDoc = await userDocRef.get();
+
+    // Se users/{req.uid} já existir: retornar 409
+    if (userDoc.exists) {
+      return res.status(409).json({
+        ok: false,
+        code: "USER_ALREADY_EXISTS",
+        message: "User already exists",
+      });
+    }
 
     // START: Robust Unique Slug Generation
     let slug = generateSlug(cleanName);
@@ -60,7 +92,7 @@ router.post("/register", async (req, res) => {
         if (!slugDoc.exists && usersSnap.empty) {
           // Reserve it in slugs collection immediately
           transaction.set(slugRef, {
-            uid,
+            uid: authUid,
             slug: currentSlug,
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
             source: "registration",
@@ -90,29 +122,27 @@ router.post("/register", async (req, res) => {
 
     const referralCode = generateReferralCode(cleanName);
 
-    await db
-      .collection("users")
-      .doc(uid)
-      .set({
-        uid,
-        name: cleanName,
-        email: cleanEmail,
-        slug,
-        referralCode,
-        referredBy: referredBy || null,
-        onboardingCompleted: false,
-        credits: 0,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        specialty: "",
-        bio: "",
-        location: "",
-        whatsapp: "",
-        avatar: "",
-        plan: "free",
-        signupPlan: signupPlan,
-      });
+    // Create only the safe fields
+    await userDocRef.set({
+      uid: authUid,
+      name: cleanName,
+      email: cleanEmail,
+      slug,
+      referralCode,
+      referredBy: referredBy || null,
+      onboardingCompleted: false,
+      credits: 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      specialty: "",
+      bio: "",
+      location: "",
+      whatsapp: "",
+      avatar: "",
+      plan: "free",
+      signupPlan: signupPlan,
+    });
 
-    logger.info("AUTH", "Firestore profile initialized", { uid });
+    logger.info("AUTH", "Firestore profile initialized", { uid: authUid });
 
     // 3. Generate verification link (premium flow)
     const actionCodeSettings = {
@@ -137,7 +167,7 @@ router.post("/register", async (req, res) => {
         logger.error(
           "AUTH",
           "Premium verification email failed during signup",
-          { uid, error: emailResult.error }
+          { uid: authUid, error: emailResult.error }
         );
         return res.json({
           ok: true,
@@ -148,7 +178,7 @@ router.post("/register", async (req, res) => {
       }
     } catch (linkError: any) {
       logger.error("AUTH", "Failed to generate or send verification link", {
-        uid,
+        uid: authUid,
         error: linkError.message,
         code: linkError.code,
       });
@@ -161,11 +191,11 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    logger.info("AUTH", "Registration completed successfully", { uid });
+    logger.info("AUTH", "Registration completed successfully", { uid: authUid });
 
     return res.json({
       ok: true,
-      uid,
+      uid: authUid,
       message: "Conta criada com sucesso.",
     });
   } catch (error: any) {

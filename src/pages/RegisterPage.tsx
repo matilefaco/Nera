@@ -195,9 +195,13 @@ export default function RegisterPage() {
 
       let backendFailed = false;
       try {
+        const token = await user.getIdToken();
         const response = await fetch("/api/auth/register", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
+          },
           body: JSON.stringify({
             uid: user.uid,
             name,
