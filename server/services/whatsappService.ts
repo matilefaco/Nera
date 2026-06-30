@@ -247,7 +247,7 @@ export async function sendWhatsApp(
         return { success: true, skipped: 'blocked_by_policy' };
       }
 
-      if (allowedInPro && activePlan !== 'pro' && !pro.whatsappNotifications) {
+      if (allowedInPro && activePlan !== 'pro') {
         logger.info("WHATSAPP", `Policy block: User is not PRO. WhatsApp blocked for client type: ${metadata.type}`, {
           userId: metadata.userId,
           type: metadata.type
@@ -256,7 +256,7 @@ export async function sendWhatsApp(
       }
     } else {
       // Professional messages
-      if (activePlan !== 'pro' && !pro.whatsappNotifications) {
+      if (activePlan !== 'pro') {
         logger.info("WHATSAPP", `Policy block: User is not PRO. WhatsApp blocked for professional type: ${metadata.type}`, {
           userId: metadata.userId,
           type: metadata.type

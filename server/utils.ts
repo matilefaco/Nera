@@ -114,8 +114,8 @@ export async function sendWhatsAppMeta(to: string, message: string, metadata: { 
     const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
     const activePlan = isExpired ? 'free' : plan;
 
-    // Se não for PRO nem tiver flag explícita, bloqueia o envio geral de WhatsApp
-    if (activePlan !== 'pro' && !pro.whatsappNotifications) {
+    // Se não for PRO, bloqueia o envio geral de WhatsApp
+    if (activePlan !== 'pro') {
       logger.info("WHATSAPP-META", `Policy block: User is not PRO. WhatsApp blocked for type: ${metadata.type}`, {
         userId: metadata.userId
       });

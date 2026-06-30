@@ -119,7 +119,7 @@ service cloud.firestore {
                          'billingSource', 'manualPlanGrant', 'credits', 'trialUsed', 'trialStartedAt',
                          'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'internalAccount', 'internalType', 'excludeFromAnalytics',
                          'trialEndsAt', 'currentPeriodEnd',
-                         'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive'
+                         'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive', 'whatsappNotifications'
                        ]);
       allow update: if (isOwner(userId) && 
                         isValidUser(incoming()) && 
@@ -130,7 +130,7 @@ service cloud.firestore {
                           'billingSource', 'manualPlanGrant', 'credits', 'trialUsed', 'trialStartedAt',
                           'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'internalAccount', 'internalType', 'excludeFromAnalytics',
                           'trialEndsAt', 'currentPeriodEnd',
-                          'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive'
+                          'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive', 'whatsappNotifications'
                         ])) || isAdmin();
       
       match /client_notes/{noteId} {
