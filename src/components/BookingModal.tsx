@@ -633,14 +633,26 @@ export default function BookingModal({
   }, [selectedDate, availableSlots]);
 
   const fullSlotsFetchedRef = useRef(false);
+  const lastProfIdRef = useRef<string | null>(null);
+  const lastServiceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const profId = profile?.professionalId || profile?.uid;
+    const currentServiceId = selectedService?.id || "";
 
     if (!open) {
       fullSlotsFetchedRef.current = false;
       setAvailabilityLoaded(false);
+      lastProfIdRef.current = null;
+      lastServiceIdRef.current = null;
       return;
+    }
+
+    if (profId !== lastProfIdRef.current || currentServiceId !== lastServiceIdRef.current) {
+      fullSlotsFetchedRef.current = false;
+      setAvailabilityLoaded(false);
+      lastProfIdRef.current = profId || null;
+      lastServiceIdRef.current = currentServiceId || null;
     }
 
     if (
@@ -700,6 +712,9 @@ export default function BookingModal({
         } catch (err) {
           if (isDev)
             console.error("[Slots] error actual= blockedTimes query:", err);
+          setSlotsLoadError("timeout");
+          setSelectedTime("");
+          return; // Abort loading slots if blocked schedules fetch fails
         }
 
         // 2. Fetch Appointments securely via backend
@@ -780,7 +795,6 @@ export default function BookingModal({
       } finally {
         if (isMounted) {
           setIsLoadingSlots(false);
-          setAvailabilityLoaded(true);
           if (isDev) console.log(`[Slots] finally setIsLoadingSlots(false)`);
         }
       }
