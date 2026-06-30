@@ -4615,6 +4615,13 @@ router.post(
           updatedData,
         );
 
+        await sendClientRescheduleProfessionalWhatsAppFailSoft(
+          updatedData.id,
+          updatedData.previousDate,
+          updatedData.previousTime,
+          updatedData,
+        );
+
         // 2. Call the background actions (Waitlist, Calendar, Notification events) without awaiting for performance
         postRescheduleActions(
           updatedData.id,
@@ -4717,6 +4724,102 @@ async function sendClientRescheduleProfessionalEmailFailSoft(
       `[RESCHEDULE_PRO_EMAIL_FAILED] Exception logic. appointmentId: ${appointmentId}, error: ${err.message}`,
     );
     return;
+  }
+}
+
+// Helper that executes fail-soft for professional WhatsApp when client reschedules
+async function sendClientRescheduleProfessionalWhatsAppFailSoft(
+  appointmentId: string,
+  previousDate: string,
+  previousTime: string,
+  updatedData: any,
+): Promise<void> {
+  try {
+    const db = getDb();
+    logger.info(
+      "WHATSAPP",
+      `[RESCHEDULE_PRO_WA_START] appointmentId: ${appointmentId}`,
+    );
+
+    const proDoc = await db
+      .collection("users")
+      .doc(updatedData.professionalId)
+      .get();
+    
+    if (!proDoc.exists) {
+      logger.warn(
+        "WHATSAPP",
+        `[RESCHEDULE_PRO_WA_SKIPPED] professional not found. appointmentId: ${appointmentId}`,
+      );
+      return;
+    }
+
+    const proData = proDoc.data() || {};
+    if (!proData.whatsapp) {
+      logger.info(
+        "WHATSAPP",
+        `[RESCHEDULE_PRO_WA_SKIPPED] professional missing WhatsApp. appointmentId: ${appointmentId}`,
+      );
+      return;
+    }
+
+    const formatToBRDate = (d: string) => {
+      if (!d) return d;
+      const [y, m, day] = d.split("-");
+      if (y && m && day) return `${day}/${m}/${y}`;
+      return d;
+    };
+
+    const message = `Olá, ${proData.name || "Profissional"}! 🔄
+
+A cliente *${updatedData.clientName}* remarcou o agendamento dela.
+
+*Serviço:* ${updatedData.serviceName || "Serviço"}
+*Data/Hora anterior:* ${formatToBRDate(previousDate)} às ${previousTime}
+*Nova Data/Hora:* ${formatToBRDate(updatedData.date)} às ${updatedData.time}
+
+Acesse seu painel para ver todos os detalhes:
+${PUBLIC_APP_URL}/dashboard`;
+
+    const idempotencyKey = `booking_rescheduled_pro_${appointmentId}_${updatedData.date}_${updatedData.time}`;
+
+    const resWA = await sendWhatsApp(db, proData.whatsapp, message, {
+      userId: updatedData.professionalId,
+      appointmentId,
+      clientName: updatedData.clientName,
+      clientWhatsapp: updatedData.clientWhatsapp || "",
+      type: "booking_rescheduled_pro",
+      idempotencyKey,
+    });
+
+    if (resWA.success) {
+      if (resWA.duplicate) {
+        logger.info(
+          "WHATSAPP",
+          `[RESCHEDULE_PRO_WA_DUPLICATE] eventKey: ${idempotencyKey}`,
+        );
+      } else if (resWA.skipped) {
+        logger.info(
+          "WHATSAPP",
+          `[RESCHEDULE_PRO_WA_SKIPPED] skipped by sendWhatsApp (${resWA.skipped}). eventKey: ${idempotencyKey}`,
+        );
+      } else {
+        logger.info(
+          "WHATSAPP",
+          `[RESCHEDULE_PRO_WA_SUCCESS] eventKey: ${idempotencyKey}`,
+        );
+      }
+    } else {
+      logger.error(
+        "WHATSAPP",
+        `[RESCHEDULE_PRO_WA_FAILED] eventKey: ${idempotencyKey}. Error: ${resWA.error || "Unknown error"}`,
+      );
+    }
+  } catch (err: any) {
+    logger.error(
+      "WHATSAPP",
+      `[RESCHEDULE_PRO_WA_FAILED] Exception logic. appointmentId: ${appointmentId}, error: ${err.message}`,
+    );
   }
 }
 
