@@ -783,6 +783,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
     const rawName = String(appointmentData.clientName || "").trim();
     const rawEmail = String(appointmentData.clientEmail || "").trim().toLowerCase();
     const rawPhone = String(appointmentData.clientWhatsapp || appointmentData.clientPhone || "").trim();
+    const normalizedPhone = rawPhone.replace(/\D/g, "");
 
     const finalData: any = {
       ...cleanedData,
@@ -795,8 +796,8 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       manageSlug,
       clientName: rawName.substring(0, 100),
       clientEmail: rawEmail.substring(0, 100),
-      clientWhatsapp: rawPhone.substring(0, 20),
-      clientPhone: rawPhone.substring(0, 20),
+      clientWhatsapp: normalizedPhone.substring(0, 20),
+      clientPhone: normalizedPhone.substring(0, 20),
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
@@ -837,19 +838,47 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       const duplicateStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted"];
       const limitTime = Date.now() - 24 * 60 * 60 * 1000; // 24h ago
 
+      // Generate phone query variations to match existing formats (formatted or unformatted)
+      const phoneQueries: string[] = [];
       if (rawPhone) {
-        const phoneSnap1 = await transaction.get(
-          db.collection("appointments")
-            .where("professionalId", "==", appointmentData.professionalId)
-            .where("clientPhone", "==", rawPhone)
-        );
-        const phoneSnap2 = await transaction.get(
-          db.collection("appointments")
-            .where("professionalId", "==", appointmentData.professionalId)
-            .where("clientWhatsapp", "==", rawPhone)
-        );
+        phoneQueries.push(rawPhone);
+      }
+      if (normalizedPhone && !phoneQueries.includes(normalizedPhone)) {
+        phoneQueries.push(normalizedPhone);
+      }
+      if (normalizedPhone.startsWith("55") && normalizedPhone.length > 10) {
+        const without55 = normalizedPhone.slice(2);
+        if (!phoneQueries.includes(without55)) {
+          phoneQueries.push(without55);
+        }
+      } else if (normalizedPhone.length === 10 || normalizedPhone.length === 11) {
+        const with55 = "55" + normalizedPhone;
+        if (!phoneQueries.includes(with55)) {
+          phoneQueries.push(with55);
+        }
+      }
 
-        const docs = [...phoneSnap1.docs, ...phoneSnap2.docs];
+      if (phoneQueries.length > 0) {
+        const snapsPromises = [];
+        for (const pq of phoneQueries) {
+          snapsPromises.push(
+            transaction.get(
+              db.collection("appointments")
+                .where("professionalId", "==", appointmentData.professionalId)
+                .where("clientPhone", "==", pq)
+            )
+          );
+          snapsPromises.push(
+            transaction.get(
+              db.collection("appointments")
+                .where("professionalId", "==", appointmentData.professionalId)
+                .where("clientWhatsapp", "==", pq)
+            )
+          );
+        }
+
+        const snaps = await Promise.all(snapsPromises);
+        const docs = snaps.flatMap(snap => snap.docs);
         const uniqueDocs = Array.from(new Map(docs.map(doc => [doc.id, doc])).values());
 
         for (const doc of uniqueDocs) {
@@ -5649,6 +5678,151 @@ router.post(
         logger.error("BOOKING", "Professional reschedule error", { error: err });
         res.status(500).json({ error: "Erro ao reagendar" });
       }
+    }
+  }
+);
+
+router.post(
+  "/public/waitlist",
+  bookingRateLimiter,
+  async (req: express.Request, res: express.Response) => {
+    const db = getDb();
+    const {
+      professionalId,
+      serviceId,
+      serviceName,
+      requestedDate,
+      clientName,
+      clientWhatsapp,
+      clientEmail,
+      period,
+      preferredTime,
+    } = req.body;
+
+    if (!professionalId || !clientWhatsapp || !requestedDate || !clientName) {
+      return res.status(400).json({ error: "Profissional, data, nome e WhatsApp são obrigatórios." });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) {
+      return res.status(400).json({ error: "Data inválida." });
+    }
+
+    const rawName = String(clientName).trim();
+    const rawEmail = String(clientEmail || "").trim().toLowerCase();
+    const rawPhone = String(clientWhatsapp).trim();
+
+    const normalizedPhone = rawPhone.replace(/\D/g, "");
+    if (normalizedPhone.length < 10 || normalizedPhone.length > 20) {
+      return res.status(400).json({ error: "WhatsApp inválido." });
+    }
+
+    try {
+      // 1. Verify Professional exists and is active/pro
+      const proSnap = await db.collection("users").doc(professionalId).get();
+      if (!proSnap.exists) {
+        return res.status(404).json({ error: "Profissional não encontrado." });
+      }
+      const proData = proSnap.data() as any;
+      if (
+        proData?.accountStatus === "scheduled_for_deletion" ||
+        proData?.accountStatus === "deleted"
+      ) {
+        return res.status(403).json({ error: "Profissional indisponível." });
+      }
+
+      // Check if plan is pro
+      if (proData?.plan !== "pro") {
+        return res.status(403).json({ error: "Este recurso não está disponível para esta profissional." });
+      }
+
+      // 2. Deduplicate in backend
+      // Generate standard variations of normalizedPhone
+      const phoneQueries: string[] = [normalizedPhone];
+      if (normalizedPhone.startsWith("55") && normalizedPhone.length > 10) {
+        const without55 = normalizedPhone.slice(2);
+        if (!phoneQueries.includes(without55)) {
+          phoneQueries.push(without55);
+        }
+      } else if (normalizedPhone.length === 10 || normalizedPhone.length === 11) {
+        const with55 = "55" + normalizedPhone;
+        if (!phoneQueries.includes(with55)) {
+          phoneQueries.push(with55);
+        }
+      }
+
+      let hasDuplicate = false;
+
+      // Query database for existing waiting entries
+      for (const pq of phoneQueries) {
+        const qSnap = await db.collection("waitlist")
+          .where("professionalId", "==", professionalId)
+          .where("clientWhatsapp", "==", pq)
+          .where("status", "==", "waiting")
+          .get();
+
+        for (const doc of qSnap.docs) {
+          const d = doc.data();
+          if (d.requestedDate === requestedDate && (!serviceId || d.serviceId === serviceId)) {
+            hasDuplicate = true;
+            break;
+          }
+        }
+        if (hasDuplicate) break;
+      }
+
+      if (!hasDuplicate && rawEmail) {
+        const qSnap = await db.collection("waitlist")
+          .where("professionalId", "==", professionalId)
+          .where("clientEmail", "==", rawEmail)
+          .where("status", "==", "waiting")
+          .get();
+
+        for (const doc of qSnap.docs) {
+          const d = doc.data();
+          if (d.requestedDate === requestedDate && (!serviceId || d.serviceId === serviceId)) {
+            hasDuplicate = true;
+            break;
+          }
+        }
+      }
+
+      if (hasDuplicate) {
+        return res.status(409).json({ error: "Você já está na lista de espera para essa data." });
+      }
+
+      // 3. Create entry safely
+      const finalEntry: any = {
+        professionalId,
+        clientName: rawName.substring(0, 100),
+        clientWhatsapp: normalizedPhone.substring(0, 20),
+        status: "waiting",
+        requestedDate,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (rawEmail) {
+        finalEntry.clientEmail = rawEmail.substring(0, 100);
+      }
+      if (serviceId) {
+        finalEntry.serviceId = String(serviceId).substring(0, 128);
+      }
+      if (serviceName) {
+        finalEntry.serviceName = String(serviceName).substring(0, 100);
+      }
+      if (period) {
+        finalEntry.period = String(period).substring(0, 20);
+      }
+      if (preferredTime) {
+        finalEntry.preferredTime = String(preferredTime).substring(0, 10);
+      }
+
+      await db.collection("waitlist").add(finalEntry);
+
+      return res.json({ success: true });
+    } catch (err: any) {
+      logger.error("WAITLIST", "Public waitlist endpoint error", { error: err });
+      return res.status(500).json({ error: "Erro ao entrar na lista de espera." });
     }
   }
 );

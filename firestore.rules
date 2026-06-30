@@ -224,9 +224,7 @@ service cloud.firestore {
 
     match /waitlist/{entryId} {
       allow get, list: if (isSignedIn() && (resource.data.get('professionalId', '') == request.auth.uid)) || isAdmin();
-      allow create: if isValidWaitlistEntry(incoming()) && 
-                    get(/databases/$(database)/documents/users/$(incoming().get('professionalId', ''))).data.get('plan', 'free') == 'pro' &&
-                    (incoming().get('status', '') == 'waiting' || (isSignedIn() && incoming().get('professionalId', '') == request.auth.uid));
+      allow create: if (isSignedIn() && incoming().get('professionalId', '') == request.auth.uid && isValidWaitlistEntry(incoming())) || isAdmin();
       allow update: if (isSignedIn() && 
                         existing().get('professionalId', '') == request.auth.uid && 
                         incoming().get('professionalId', '') == request.auth.uid && 

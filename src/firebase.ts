@@ -794,94 +794,29 @@ export async function rescheduleBookingByProfessional(appointmentId: string, pro
  */
 
 export async function addToWaitlist(entry: Partial<WaitlistEntry>) {
-  devLog('[Waitlist] Adding entry...');
+  devLog('[Waitlist] Adding entry via API...');
   if (!entry.professionalId || !entry.clientWhatsapp) {
     throw new Error('Telefone e profissional são necessários.');
   }
 
-  // Deduplication check:
-  // Query if there is already a 'waiting' entry for this professionalId, with the same clientWhatsapp (or same email if provided),
-  // and same requestedDate or serviceId.
   try {
-    const q1 = query(
-      collection(db, 'waitlist'),
-      where('professionalId', '==', entry.professionalId),
-      where('clientWhatsapp', '==', entry.clientWhatsapp),
-      where('status', '==', 'waiting')
-    );
-    const snap1 = await getDocs(q1);
-    
-    let hasDuplicate = false;
-    for (const docSnapshot of snap1.docs) {
-      const d = docSnapshot.data();
-      if (d.requestedDate === entry.requestedDate || d.serviceId === entry.serviceId) {
-        hasDuplicate = true;
-        break;
-      }
-    }
-
-    if (!hasDuplicate && entry.clientEmail) {
-      const q2 = query(
-        collection(db, 'waitlist'),
-        where('professionalId', '==', entry.professionalId),
-        where('clientEmail', '==', entry.clientEmail.trim().toLowerCase()),
-        where('status', '==', 'waiting')
-      );
-      const snap2 = await getDocs(q2);
-      for (const docSnapshot of snap2.docs) {
-        const d = docSnapshot.data();
-        if (d.requestedDate === entry.requestedDate || d.serviceId === entry.serviceId) {
-          hasDuplicate = true;
-          break;
-        }
-      }
-    }
-
-    if (hasDuplicate) {
-      throw new Error('Você já está na lista de espera para este dia ou serviço.');
-    }
-
-    // Explicitly restrict/allow only safe fields
-    const allowedKeys = [
-      'professionalId',
-      'clientName',
-      'clientWhatsapp',
-      'clientEmail',
-      'requestedDate',
-      'serviceId',
-      'serviceName',
-      'status',
-      'period',
-      'preferredTime'
-    ];
-
-    const safeEntry: any = {};
-    for (const key of allowedKeys) {
-      if (entry[key as keyof WaitlistEntry] !== undefined) {
-        let val = entry[key as keyof WaitlistEntry];
-        if (typeof val === 'string') {
-          val = val.trim();
-          // limit string lengths
-          if (key === 'clientName') val = val.substring(0, 100);
-          if (key === 'clientEmail') val = val.toLowerCase().substring(0, 100);
-          if (key === 'clientWhatsapp') val = val.substring(0, 20);
-        }
-        safeEntry[key] = val;
-      }
-    }
-
-    const waitlistRef = collection(db, 'waitlist');
-    await addDoc(waitlistRef, {
-      ...safeEntry,
-      status: 'waiting',
-      createdAt: serverTimestamp()
+    const response = await fetch(`/api/public/waitlist`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(entry)
     });
-    devLog('[Waitlist] Entry added');
-  } catch (error: any) {
-    if (error.message === 'Você já está na lista de espera para este dia ou serviço.') {
-      throw error;
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const message = errorData.error || `Erro do servidor: ${response.status}`;
+      throw new Error(message);
     }
-    handleFirestoreError(error, OperationType.CREATE, 'waitlist');
+
+    devLog('[Waitlist] Entry added successfully via API');
+  } catch (error: any) {
+    devLog('[Waitlist] Error adding waitlist entry:', error);
     throw error;
   }
 }
