@@ -52,6 +52,9 @@ export default function TermsPage() {
           <p>
             A Nera é um software de gestão e uma vitrine digital (SaaS) desenhada exclusivamente para profissionais de beleza, estética e bem-estar. Nós fornecemos a tecnologia de hospedagem do seu perfil, sistema de marcações de horários e integrações; contudo, a Nera não realiza os serviços oferecidos e não atua em nome dos profissionais na prestação de serviço fim.
           </p>
+          <p>
+            A Nera atua exclusivamente como fornecedora de tecnologia e infraestrutura digital. A plataforma facilita a organização, divulgação, comunicação e gestão de agendamentos, mas não participa da execução dos serviços de beleza oferecidos pelas profissionais cadastradas.
+          </p>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
             2. Cadastro e Responsabilidade da Profissional
@@ -101,6 +104,9 @@ export default function TermsPage() {
           </h2>
           <p>
             A Nera utiliza provedores modernos de infraestrutura e segurança reconhecidos pelo mercado. Todavia, como qualquer software, não podemos garantir 100% de disponibilidade todos os dias (em casos de queda extrema da infraestrutura global), e não nos responsabilizamos por perdas indiretas decorrentes de indisponibilidades temporárias da plataforma. Trabalhamos ininterruptamente para sustentar a nossa comunidade. Além disso, não nos responsabilizamos pela relação comercial e pelo contato final gerado entre profissional e cliente através dos nossos portais.
+          </p>
+          <p>
+            A responsabilidade pela prestação dos serviços, qualidade técnica, resultados, preços, atrasos, cancelamentos, reagendamentos, políticas comerciais e atendimento ao cliente final é exclusiva da profissional cadastrada. A Nera não se responsabiliza por procedimentos realizados, resultados prometidos, eventuais danos, insatisfações ou conflitos decorrentes da relação direta entre profissional e cliente.
           </p>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">

@@ -53,7 +53,7 @@ export default function PrivacyPage() {
           <ul className="space-y-3.5 pl-5 list-disc marker:text-brand-terracotta/50 text-brand-stone/85 my-4">
             <li><strong className="font-semibold text-brand-ink">De profissionais:</strong> Dados de cadastro (nome, e-mail, telefone/WhatsApp), informações do negócio (serviços oferecidos, horários de funcionamento, preços, bio), dados financeiros processados de forma segura pelo Stripe e configurações de integrações (como token do Google Calendar, quando autorizado).</li>
             <li><strong className="font-semibold text-brand-ink">De clientes das profissionais:</strong> Dados inseridos no momento do agendamento (nome, número de telefone para contato via WhatsApp, e-mail para confirmações) e histórico de agendamentos.</li>
-            <li><strong className="font-semibold text-brand-ink">Dados de uso e navegação:</strong> Informações automáticas de analytics (como páginas visitadas e interações no sistema) para nos ajudar a melhorar continuamente a plataforma, utilizando apenas dados estritamente necessários.</li>
+            <li><strong className="font-semibold text-brand-ink">Dados de uso e navegação:</strong> Coletamos informações técnicas e de interação, como páginas visitadas, eventos de navegação, tipo de dispositivo, navegador, origem de acesso e interações realizadas na plataforma. Esses dados nos ajudam a melhorar a experiência, identificar erros, proteger a plataforma e aprimorar os recursos oferecidos.</li>
           </ul>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
@@ -68,14 +68,44 @@ export default function PrivacyPage() {
           </ul>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
-            3. Os clientes da profissional
+            3. Base Legal para Tratamento de Dados
+          </h2>
+          <p>
+            A Nera realiza o tratamento de dados pessoais com fundamento nas bases legais previstas pela Lei Geral de Proteção de Dados (LGPD), incluindo:
+          </p>
+          <ul className="space-y-3 pl-5 list-disc marker:text-brand-terracotta/50 text-brand-stone/85 my-4">
+            <li>execução do contrato e prestação dos serviços contratados;</li>
+            <li>cumprimento de obrigações legais e regulatórias;</li>
+            <li>exercício regular de direitos;</li>
+            <li>legítimo interesse para melhoria da plataforma, segurança e prevenção de fraudes;</li>
+            <li>consentimento do usuário, quando aplicável.</li>
+          </ul>
+          <p>
+            Sempre tratamos apenas os dados necessários para cada finalidade e adotamos medidas para proteger a privacidade dos usuários e clientes das profissionais que utilizam a plataforma.
+          </p>
+
+          <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
+            4. Cookies e Tecnologias Semelhantes
+          </h2>
+          <p>
+            Utilizamos cookies e tecnologias semelhantes para manter a plataforma funcionando corretamente, preservar sessões de acesso, reforçar a segurança, compreender o uso da Nera e melhorar continuamente a experiência dos usuários.
+          </p>
+          <p>
+            Também podemos utilizar ferramentas de análise, como Microsoft Clarity, para entender como as pessoas interagem com nossas páginas, identificar dificuldades de navegação e aprimorar nossos serviços. Essas informações são utilizadas de forma agregada ou técnica, com a finalidade de melhoria, segurança e evolução da plataforma.
+          </p>
+          <p>
+            O usuário pode gerenciar cookies diretamente nas configurações do seu navegador. Alguns cookies necessários, no entanto, podem ser essenciais para o funcionamento adequado da plataforma.
+          </p>
+
+          <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
+            5. Os clientes da profissional
           </h2>
           <p>
             A Nera atua como provadora da infraestrutura técnica (operadora). A responsabilidade sobre o relacionamento e a coleta dos dados do cliente final perante a Lei Geral de Proteção de Dados (LGPD) primariamente pertence à <strong className="font-semibold text-brand-ink">profissional</strong> (controladora). Nós garantimos que esses dados serão utilizados pela Nera apenas para viabilizar as confirmações de agendamento e exibir o histórico na conta do profissional. Nunca venderemos dados dos seus clientes para terceiros.
           </p>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
-            4. Compartilhamento e Integrações
+            6. Compartilhamento e Integrações
           </h2>
           <p>
             Não vendemos suas informações. Compartilhamos dados apenas com provedores essenciais para o funcionamento da plataforma:
@@ -87,31 +117,47 @@ export default function PrivacyPage() {
           </ul>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
-            5. Retenção e Segurança
+            7. Retenção e Segurança
           </h2>
           <p>
             Mantemos precauções e padrões técnicos de segurança do mercado para proteger suas informações pessoais contra perda, uso indevido, acesso não autorizado e alteração. Seu acesso é protegido mediante autenticação do Google, mantendo o ambiente da sua agenda seguro. Ao cancelar sua conta, você pode solicitar a remoção permanente do banco de dados das suas informações sensíveis.
           </p>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
-            6. Direitos do Titular (LGPD)
+            8. Direitos do Titular (LGPD)
           </h2>
           <p>
             De acordo com a Lei Geral de Proteção de Dados do Brasil, você tem direito de solicitar o acesso, a correção e a exclusão dos seus dados pessoais que estejam sob nosso controle, bem como entender de forma transparente como estão sendo tratados. A Nera se compromete a honrar esses direitos prontamente.
           </p>
+          <p className="mt-3">
+            Além dos direitos previstos pela legislação aplicável, o titular dos dados poderá solicitar:
+          </p>
+          <ul className="space-y-3 pl-5 list-disc marker:text-brand-terracotta/50 text-brand-stone/85 my-4">
+            <li>confirmação da existência de tratamento de dados;</li>
+            <li>acesso aos dados pessoais armazenados;</li>
+            <li>correção de dados incompletos, inexatos ou desatualizados;</li>
+            <li>portabilidade dos dados, quando aplicável;</li>
+            <li>anonimização, bloqueio ou eliminação de dados tratados em desconformidade com a legislação;</li>
+            <li>exclusão de dados pessoais, observadas as hipóteses legais de retenção obrigatória;</li>
+            <li>informações sobre compartilhamento de dados com terceiros;</li>
+            <li>revogação do consentimento, quando o tratamento depender dessa base legal.</li>
+          </ul>
+          <p>
+            As solicitações poderão ser realizadas através do canal oficial de contato informado nesta Política de Privacidade.
+          </p>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
-            7. Alterações nesta Política
+            9. Alterações nesta Política
           </h2>
           <p>
             Sempre que implementarmos novidades que exijam uma mudança nesta política, atualizaremos esta página. Se a mudança for significativa em relação ao uso de seus dados, notificaremos você ativamente pelo painel Nera ou por e-mail.
           </p>
 
           <h2 className="text-xl sm:text-2xl font-serif text-brand-ink font-semibold tracking-tight mt-10 pt-4 pb-2 border-b border-brand-mist/40">
-            8. Fale Conosco
+            10. Fale Conosco
           </h2>
           <p>
-            Se tiver qualquer dúvida sobre sua privacidade na Nera ou desejar exercer algum de seus direitos relativos aos dados, estamos à disposição. Entre em contato conosco através do e-mail: <strong className="text-brand-terracotta hover:underline cursor-pointer">contato@usenera.com</strong>.
+            Se tiver qualquer dúvida sobre sua privacidade na Nera ou desejar exercer algum de seus direitos relativos aos dados, estamos à disposição. Solicitações relacionadas à privacidade, proteção de dados e direitos previstos na LGPD podem ser encaminhadas para o canal oficial de atendimento da Nera. Entre em contato conosco através do e-mail: <strong className="text-brand-terracotta hover:underline cursor-pointer">contato@usenera.com</strong>.
           </p>
         </div>
       </main>
