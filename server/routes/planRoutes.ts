@@ -1356,7 +1356,13 @@ router.post("/reconcile-user", requireFirebaseAuth, async (req: AuthenticatedReq
   try {
     // 1. Verify caller is Admin OR targeting themselves
     const callerDoc = await db.collection("users").doc(callerUid!).get();
-    const isAdmin = callerDoc.exists && callerDoc.data()?.role === 'admin';
+    
+    // Validate admin exclusively by Firebase custom claim in production.
+    // In non-production, allow fallback to Firestore role for easier development/testing.
+    const isFirebaseAdmin = req.user?.admin === true;
+    const isFirestoreAdminNonProd = (process.env.NODE_ENV !== "production") && (callerDoc.exists && callerDoc.data()?.role === 'admin');
+    const isAdmin = isFirebaseAdmin || isFirestoreAdminNonProd;
+
     const isSelf = targetUid === callerUid;
 
     if (!isAdmin && !isSelf) {

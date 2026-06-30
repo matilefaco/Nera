@@ -110,12 +110,25 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isSignedIn() && (isOwner(userId) || isAdmin()); 
       allow list: if isAdmin();
-      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow create: if isOwner(userId) && 
+                       isValidUser(incoming()) &&
+                       !incoming().keys().hasAny([
+                         'role', 'admin', 'claims', 'customClaims',
+                         'plan', 'signupPlan', 'planRank', 'planExpiresAt', 
+                         'stripeCustomerId', 'stripeSubscriptionId', 'stripeSubscriptionStatus', 'subscriptionStatus',
+                         'billingSource', 'manualPlanGrant', 'credits', 'trialUsed', 'trialStartedAt',
+                         'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'internalAccount', 'internalType', 'excludeFromAnalytics',
+                         'trialEndsAt', 'currentPeriodEnd',
+                         'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive'
+                       ]);
       allow update: if (isOwner(userId) && 
                         isValidUser(incoming()) && 
                         !incoming().diff(existing()).affectedKeys().hasAny([
-                          'plan', 'planRank', 'planExpiresAt', 
-                          'stripeCustomerId', 'stripeSubscriptionId', 'subscriptionStatus',
+                          'role', 'admin', 'claims', 'customClaims',
+                          'plan', 'signupPlan', 'planRank', 'planExpiresAt', 
+                          'stripeCustomerId', 'stripeSubscriptionId', 'stripeSubscriptionStatus', 'subscriptionStatus',
+                          'billingSource', 'manualPlanGrant', 'credits', 'trialUsed', 'trialStartedAt',
+                          'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'internalAccount', 'internalType', 'excludeFromAnalytics',
                           'trialEndsAt', 'currentPeriodEnd',
                           'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive'
                         ])) || isAdmin();
