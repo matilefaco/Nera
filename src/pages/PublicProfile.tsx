@@ -1051,6 +1051,8 @@ function PublicProfileContent() {
           const day = weeklyAvailability.find((d) => d.date === date);
           if (day?.status === "full" && features?.waitlist) {
             setIsWaitlistOpen(true);
+          } else if (day?.status === "blocked") {
+            notify.info("Dia indisponível (Folga). Escolha outro dia.");
           } else if (day?.status !== "closed") {
             setSelectedInitialDate(date);
             if (services.length > 0) setPreSelectedService(null);

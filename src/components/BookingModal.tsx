@@ -421,6 +421,7 @@ export default function BookingModal({
   };
 
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [availabilityLoaded, setAvailabilityLoaded] = useState(false);
   const [slotsLoadError, setSlotsLoadError] = useState<"timeout" | null>(null);
   const [retrySlotsCount, setRetrySlotsCount] = useState(0);
 
@@ -452,6 +453,10 @@ export default function BookingModal({
     dayAppointments,
     blockedSchedules,
   ]);
+
+  useEffect(() => {
+    setAvailabilityLoaded(false);
+  }, [open, profile?.professionalId, profile?.uid, selectedService?.id]);
 
   const [wasRestored, setWasRestored] = useState(false);
 
@@ -634,6 +639,7 @@ export default function BookingModal({
 
     if (!open) {
       fullSlotsFetchedRef.current = false;
+      setAvailabilityLoaded(false);
       return;
     }
 
@@ -650,11 +656,13 @@ export default function BookingModal({
     }
 
     if (fullSlotsFetchedRef.current && !slotsLoadError) {
+      setAvailabilityLoaded(true);
       return; // Already loaded full 15-day window
     }
 
     let isMounted = true;
     setIsLoadingSlots(true);
+    setAvailabilityLoaded(false);
     setSlotsLoadError(null);
     if (isDev)
       console.log(`[Slots] start - Date: ${selectedDate}, Pro: ${profId}`);
@@ -761,6 +769,7 @@ export default function BookingModal({
         setBlockedSchedules(currentBlocked);
         setDayAppointments(currentAppts);
         fullSlotsFetchedRef.current = true;
+        setAvailabilityLoaded(true);
         if (isDev)
           console.log(
             `[Slots] arrays set. currentAppts: ${currentAppts.length}, currentBlocked: ${currentBlocked.length}`,
@@ -771,6 +780,7 @@ export default function BookingModal({
       } finally {
         if (isMounted) {
           setIsLoadingSlots(false);
+          setAvailabilityLoaded(true);
           if (isDev) console.log(`[Slots] finally setIsLoadingSlots(false)`);
         }
       }
@@ -787,6 +797,7 @@ export default function BookingModal({
     profile?.uid,
     open,
     retrySlotsCount,
+    selectedService?.id,
   ]);
 
   const getTravelFee = () => {
@@ -1439,11 +1450,12 @@ export default function BookingModal({
                                 isBlockedDay = hasFolgaBlock || isBlockageCovered;
                               }
 
-                              const isSelectable = isWorkingDay && !isBlockedDay;
+                              const isSelectable = availabilityLoaded && isWorkingDay && !isBlockedDay;
 
                               return (
                                 <button
                                   key={offset}
+                                  disabled={!isSelectable}
                                   onClick={() => {
                                     if (!isWorkingDay) {
                                       notify.info(
@@ -1477,13 +1489,15 @@ export default function BookingModal({
                                         : "opacity-20 text-red-500",
                                     )}
                                   >
-                                    {isBlockedDay
-                                      ? "Folga"
-                                      : date
-                                          .toLocaleDateString("pt-BR", {
-                                            weekday: "short",
-                                          })
-                                          .replace(".", "")}
+                                    {!availabilityLoaded
+                                      ? "..."
+                                      : isBlockedDay
+                                        ? "Folga"
+                                        : date
+                                            .toLocaleDateString("pt-BR", {
+                                              weekday: "short",
+                                            })
+                                            .replace(".", "")}
                                   </span>
                                   <span
                                     className={cn(
