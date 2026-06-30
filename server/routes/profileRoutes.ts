@@ -329,7 +329,7 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
           const data = doc.data();
           const key = (data.name || "").toLowerCase().trim();
           if (key && !existingServicesMap.has(key)) {
-            existingServicesMap.set(key, { id: doc.id, ...data });
+            existingServicesMap.set(key, { ...data, id: doc.id });
           }
         });
 
@@ -339,8 +339,8 @@ router.post("/save", requireFirebaseAuth, authMutationLimiter, async (req: Authe
           
           if (!serviceName) continue;
 
-          // Strip critical tenant identifiers to prevent manipulation
-          const { professionalId, ownerId, userId, uid: serviceUid, ...safeService } = sanitizedService;
+          // Strip critical tenant identifiers to prevent manipulation, including client-supplied id
+          const { id, professionalId, ownerId, userId, uid: serviceUid, ...safeService } = sanitizedService;
 
           const existingService = existingServicesMap.get(serviceName);
 
