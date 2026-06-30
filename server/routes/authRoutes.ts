@@ -46,7 +46,7 @@ router.post("/register", requireFirebaseAuth, async (req: AuthenticatedRequest, 
 
   const cleanEmail = finalEmail;
   const cleanName = name.trim();
-  const signupPlan = plan === "essencial" || plan === "pro" ? plan : "free";
+  const signupPlan = "free";
 
   try {
     const db = admin.firestore();

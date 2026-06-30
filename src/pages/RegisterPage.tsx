@@ -105,44 +105,30 @@ export default function RegisterPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      const slug = generateSlug(user.displayName || "profissional");
-      const userReferralCode = generateReferralCode(
-        user.displayName || "PROFISSIONAL",
-      );
+      const token = await user.getIdToken();
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: user.displayName || "",
+          email: user.email || ""
+        }),
+      });
 
-      try {
-        await setDoc(
-          doc(db, "users", user.uid),
-          {
-            uid: user.uid,
-            name: user.displayName,
-            email: user.email,
-            slug,
-            specialty: "",
-            bio: "",
-            location: "",
-            whatsapp: "",
-            avatar: user.photoURL || "",
-            onboardingCompleted: false,
-            referredBy: manualReferralCode || null,
-            referralCode: userReferralCode,
-            credits: 0,
-            plan: "free",
-            signupPlan: activePlan,
-            createdAt: new Date().toISOString(),
-          },
-          { merge: true },
-        );
-      } catch (firestoreError: any) {
-        console.error(
-          "[SIGNUP FLOW] Firestore profile creation failed:",
-          firestoreError,
-        );
-        handleFirestoreError(
-          firestoreError,
-          OperationType.WRITE,
-          `users/${user.uid}`,
-        );
+      if (!response.ok) {
+        let errData: any = {};
+        try {
+          errData = await response.json();
+        } catch (e) {}
+
+        if (response.status === 409 || errData.code === "USER_ALREADY_EXISTS") {
+          console.log("[SIGNUP FLOW] User already exists in Firestore (idempotent Google login/register).");
+        } else {
+          throw new Error(errData.error || "Erro ao registrar perfil no servidor.");
+        }
       }
 
       notify.success("Que prazer ter você conosco! Bem-vinda à Nera.", {
