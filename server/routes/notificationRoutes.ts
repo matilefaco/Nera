@@ -130,7 +130,7 @@ import {
   buildReminderMessage24h,
   buildReviewRequestMessage
 } from "../services/whatsappMessages.js";
-import { shouldSendEmail, markEmailSent, sendWhatsAppMeta, PUBLIC_APP_URL } from "../utils.js";
+import { shouldSendEmail, markEmailSent, sendWhatsAppMeta } from "../utils.js";
 import { sendProfessionalBookingRescheduledEmail } from '../emails/sendEmail.js';
 import { updateGoogleCalendarEvent, deleteGoogleCalendarEvent } from "./calendarRoutes.js";
 import { checkPlanFeature } from "../middleware/planMiddleware.js";
@@ -542,7 +542,7 @@ router.post("/notify", requireFirebaseAuth, notificationMutationLimiter, async (
       }
       pro = proDoc.data() || {};
 
-      // Map safePayload from apptData and pro (never trusting the incoming payload for sensitive contact fields)
+      // Map safePayload from apptData and pro (never trusting the incoming payload for sensitive fields or controls)
       safePayload = {
         appointmentId,
         professionalId: uid,
@@ -559,10 +559,10 @@ router.post("/notify", requireFirebaseAuth, notificationMutationLimiter, async (
         paymentMethods: apptData.paymentMethods || [],
         locationDetail: apptData.locationDetail || '',
         neighborhood: apptData.neighborhood || '',
-        reason: apptData.cancellationReason || payload.reason || '',
-        previousDate: apptData.previousDate || payload.previousDate || '',
-        previousTime: apptData.previousTime || payload.previousTime || '',
-        rescheduledBy: payload.rescheduledBy || (type === 'BOOKING_RESCHEDULED_BY_CLIENT' ? 'client' : 'professional'),
+        reason: apptData.cancellationReason || apptData.reason || 'Não informado',
+        previousDate: apptData.previousDate || '',
+        previousTime: apptData.previousTime || '',
+        rescheduledBy: apptData.rescheduledBy || (type === 'BOOKING_RESCHEDULED_BY_CLIENT' ? 'client' : 'professional'),
         professionalSlug: pro.slug || ''
       };
     } else if (type.startsWith('WAITLIST_')) {
@@ -592,7 +592,7 @@ router.post("/notify", requireFirebaseAuth, notificationMutationLimiter, async (
       }
       pro = proDoc.data() || {};
 
-      // Map safePayload from waitlistData and pro
+      // Map safePayload from waitlistData and pro without raw payload inputs
       safePayload = {
         id: waitlistEntryId,
         waitlistEntryId,
@@ -603,8 +603,8 @@ router.post("/notify", requireFirebaseAuth, notificationMutationLimiter, async (
         serviceName: waitlistData.serviceName || 'Serviço',
         requestedDate: waitlistData.requestedDate || '',
         date: waitlistData.requestedDate || '',
-        assignedTime: waitlistData.assignedTime || waitlistData.preferredTime || payload.assignedTime || payload.time || '',
-        time: waitlistData.assignedTime || waitlistData.preferredTime || payload.assignedTime || payload.time || '',
+        assignedTime: waitlistData.assignedTime || waitlistData.preferredTime || '',
+        time: waitlistData.assignedTime || waitlistData.preferredTime || '',
         candidateName: waitlistData.clientName || 'Cliente',
         candidateId: waitlistEntryId,
         professionalName: pro.name || 'Profissional',

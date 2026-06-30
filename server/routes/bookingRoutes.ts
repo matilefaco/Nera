@@ -33,6 +33,10 @@ import {
   sendBookingPendingClientNotification,
   sendNewBookingRequestNotification,
   sendBookingConfirmedClientNotification,
+  sendWaitlistAcceptedProfessionalNotification,
+  sendBookingRescheduledNotification,
+  sendWaitlistInvitationNotification,
+  sendWaitlistSlotOpenedNotification,
 } from "../services/notificationService.js";
 import { requireCronSecret } from "../middleware/cronSecretMiddleware.js";
 import { PUBLIC_APP_URL, shouldSendEmail, markEmailSent, buildPublicBookingUrl } from "../utils.js";
@@ -1543,19 +1547,13 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
 
              await Promise.allSettled([
                 sendBookingConfirmedClientNotification({ appointmentId: apptRef.id }, baseUrl),
-                fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    type: "WAITLIST_ACCEPTED_PROFESSIONAL",
-                    payload: {
-                      professionalId: appointmentData.professionalId,
-                      clientName: appointmentData.clientName,
-                      date: finalData.date,
-                      time: finalData.time,
-                    },
-                  }),
-                }).catch((e) => logger.error("NOTIFICATION", "Failed to send WAITLIST_ACCEPTED_PROFESSIONAL", { error: e }))
+                sendWaitlistAcceptedProfessionalNotification({
+                  professionalId: appointmentData.professionalId,
+                  clientName: appointmentData.clientName,
+                  date: finalData.date,
+                  time: finalData.time,
+                  waitlistEntryId: appointmentData.waitlistEntryId,
+                }),
              ]);
           } else {
             await Promise.allSettled([
@@ -4843,15 +4841,14 @@ async function postRescheduleActions(
     };
 
     if (actor !== "client") {
-      await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "BOOKING_RESCHEDULED_BY_PROFESSIONAL",
-          payload: notifyPayload,
-        }),
-      }).catch((e) =>
-        logger.error("BOOKING", "Failed to send notification via /notify", e),
+      await sendBookingRescheduledNotification({
+        appointmentId,
+        previousDate,
+        previousTime,
+        updatedData,
+        rescheduledBy: actor,
+      }, PUBLIC_APP_URL).catch((e) =>
+        logger.error("BOOKING", "Failed to send notification via helper", e),
       );
     }
 
@@ -4968,21 +4965,10 @@ async function triggerWaitlistCheckBackend(
 
       if (!inviteSuccess) return;
 
-      await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "WAITLIST_INVITATION",
-          payload: {
-            id: entryId,
-            ...entryData,
-            assignedTime: time,
-            expiresAt: expiresAt.toISOString(),
-            professionalName: proSettings.name,
-            professionalSlug: proSettings.slug || "",
-          },
-        }),
-      }).catch((e) =>
+      await sendWaitlistInvitationNotification({
+        waitlistEntryId: entryId,
+        assignedTime: time,
+      }, PUBLIC_APP_URL).catch((e) =>
         logger.error("WAITLIST", "Waitlist Invitation Error", { error: e }),
       );
     } else {
@@ -5003,20 +4989,11 @@ async function triggerWaitlistCheckBackend(
 
       if (!notifySuccess) return;
 
-      await fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "WAITLIST_SLOT_OPENED",
-          payload: {
-            professionalId,
-            date,
-            time,
-            candidateName: entryData.clientName,
-            candidateId: entryId,
-          },
-        }),
-      }).catch((e) =>
+      await sendWaitlistSlotOpenedNotification({
+        waitlistEntryId: entryId,
+        date,
+        time,
+      }, PUBLIC_APP_URL).catch((e) =>
         logger.error("WAITLIST", "Waitlist Notify Error", { error: e }),
       );
     }

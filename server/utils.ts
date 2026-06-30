@@ -78,7 +78,7 @@ export async function markEmailSent(appointmentId: string, eventKey: string) {
 }
 
 // WhatsApp Notification Handler (Official Meta Cloud API)
-export async function sendWhatsAppMeta(to: string, message: string, metadata: { userId?: string, appointmentId?: string, type?: string, clientName?: string, clientWhatsapp?: string } = {}) {
+export async function sendWhatsAppMeta(to: string, message: string, metadata: { userId?: string, appointmentId?: string, type?: string, clientName?: string, clientWhatsapp?: string, idempotencyKey?: string } = {}) {
   const db = getDb();
 
   // ----- INÍCIO DA POLÍTICA WA GLOBAL (META) -----

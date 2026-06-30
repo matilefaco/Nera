@@ -838,11 +838,7 @@ export async function triggerWaitlistCheck(professionalId: string, date: string,
 
         // Send Notification
         notify('WAITLIST_INVITATION', {
-          id: entryId,
-          ...entryData,
-          assignedTime: time,
-          expiresAt: expiresAt.toISOString(),
-          professionalName: proSettings.name
+          waitlistEntryId: entryId
         }).catch(e => { if (isDev) console.error("[Waitlist Invitation Error]", e); });
 
         // Set a cleanup task would be ideal, but for now we'll handle expiration during booking attempt
