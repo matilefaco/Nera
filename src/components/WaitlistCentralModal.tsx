@@ -6,7 +6,7 @@ import {
   ArrowUpRight, AlertCircle, Info, Phone,
   CheckCircle2, Send
 } from 'lucide-react';
-import { db, inviteFromWaitlist, getUserProfile } from '../firebase';
+import { db, inviteFromWaitlist, getUserProfile, notify as sendBackendNotification } from '../firebase';
 import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { notify } from '../lib/notify';
 import { cn, buildWhatsappLink, formatLocalDate } from '../lib/utils';
@@ -81,23 +81,8 @@ setLoading(false);
       const msg = `Boa notícia!\n\nAcabou de surgir um horário para o serviço que você queria.\n\nEssa vaga ficará reservada para você por 15 minutos.\n\nClique abaixo para confirmar:\n${waitlistInviteUrl}`;
       
       // Trigger backend notification (email + automated whatsapp if configured)
-      fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "WAITLIST_INVITATION",
-          payload: {
-            clientWhatsapp: entry.clientWhatsapp,
-            clientEmail: entry.clientEmail,
-            clientName: entry.clientName,
-            requestedDate: entry.requestedDate,
-            assignedTime: targetTime,
-            professionalName: profile?.name || "Profissional",
-            serviceName: entry.serviceName,
-            id: entry.id,
-            professionalSlug: professionalSlug
-          }
-        })
+      sendBackendNotification("WAITLIST_INVITATION", {
+        waitlistEntryId: entry.id
       }).catch(console.error);
 
       // Open WhatsApp as a fallback for professionals without automated WhatsApp

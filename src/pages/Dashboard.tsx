@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { db, auth, handleBookingError, inviteFromWaitlist, updateAppointmentStatus } from '../firebase';
+import { db, auth, handleBookingError, inviteFromWaitlist, updateAppointmentStatus, notify as sendBackendNotification } from '../firebase';
 import { 
   collection, query, where, onSnapshot, orderBy, doc, updateDoc, 
   addDoc, deleteDoc, serverTimestamp, limit, getDocs, getCountFromServer
@@ -955,23 +955,8 @@ export default function Dashboard() {
       );
       
       // Trigger backend notification (email + automated whatsapp if configured)
-      fetch(`${PUBLIC_APP_URL}/api/notifications/notify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "WAITLIST_INVITATION",
-          payload: {
-            clientWhatsapp: entry.clientWhatsapp,
-            clientEmail: entry.clientEmail,
-            clientName: entry.clientName,
-            requestedDate: entry.requestedDate,
-            assignedTime: time,
-            professionalName: profile?.name || "Profissional",
-            serviceName: entry.serviceName,
-            id: entry.id,
-            professionalSlug: professionalSlug
-          }
-        })
+      sendBackendNotification("WAITLIST_INVITATION", {
+        waitlistEntryId: entry.id
       }).catch(console.error);
 
       window.open(buildWhatsappLink(entry.clientWhatsapp, msg), '_blank');

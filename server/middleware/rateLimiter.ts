@@ -81,3 +81,21 @@ export const authMutationLimiter = rateLimit({
     error: "Aguarde um instante antes de tentar novamente."
   }
 });
+
+export const notificationMutationLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  validate: false,
+  keyGenerator: (req: any) => {
+    return req.uid || req.ip;
+  },
+  skip: (req: any) => {
+    if (process.env.NODE_ENV !== 'production') return true;
+    return false;
+  },
+  message: {
+    error: "Aguarde um instante antes de tentar novamente. Limite de notificações excedido."
+  }
+});
