@@ -56,7 +56,7 @@ import {
   formatDateKey,
   getTodayLocale,
 } from "../lib/utils";
-import { getAvailableSlots, canBookSlot } from "../lib/bookingUtils";
+import { getAvailableSlots, canBookSlot, getBookableSlotsForDate, getWorkingHoursForDate, getBlockedRanges, mergeBlockedRanges } from "../lib/bookingUtils";
 import { isActiveSlotStatus } from "../constants/appointmentStatus";
 import { notify } from "../lib/notify";
 import {
@@ -638,7 +638,6 @@ export default function BookingModal({
     }
 
     if (
-      !selectedDate ||
       !profId ||
       profId === "undefined" ||
       profId === "null"
@@ -1405,11 +1404,43 @@ export default function BookingModal({
                               date.setDate(date.getDate() + offset);
                               const dateStr = formatDateKey(date);
                               const isSelected = selectedDate === dateStr;
-                              const dayOfWeek = date.getDay();
-                              const isWorkingDay =
-                                profile?.workingHours?.workingDays?.includes(
-                                  dayOfWeek,
+                              
+                              const effectiveHours = getWorkingHoursForDate(profile?.workingHours, dateStr);
+                              const isWorkingDay = !!effectiveHours;
+                              
+                              const slotsForDay = getBookableSlotsForDate({
+                                date: dateStr,
+                                workingHours: profile?.workingHours,
+                                appointments: dayAppointments.filter((a) => a.date === dateStr),
+                                blockedSchedules,
+                                serviceDuration: Number(selectedService?.duration) || 60,
+                                now: new Date()
+                              });
+
+                              let isBlockedDay = false;
+                              if (isWorkingDay && slotsForDay.length === 0) {
+                                const dayBlocks = blockedSchedules.filter((b) => b.date === dateStr);
+                                const hasFolgaBlock = dayBlocks.some(
+                                  (b) =>
+                                    b.type === "full_day" ||
+                                    b.reason?.toLowerCase() === "folga" ||
+                                    b.customReason?.toLowerCase() === "folga"
                                 );
+                                let isBlockageCovered = false;
+                                if (effectiveHours) {
+                                  const [sh, sm] = effectiveHours.startTime.split(":").map(Number);
+                                  const [eh, em] = effectiveHours.endTime.split(":").map(Number);
+                                  const whStart = sh * 60 + sm;
+                                  const whEnd = eh * 60 + em;
+                                  const rawBlocks = getBlockedRanges(dateStr, blockedSchedules);
+                                  const mergedBlocks = mergeBlockedRanges(rawBlocks);
+                                  isBlockageCovered = mergedBlocks.some((b) => b.start <= whStart && b.end >= whEnd);
+                                }
+                                isBlockedDay = hasFolgaBlock || isBlockageCovered;
+                              }
+
+                              const isSelectable = isWorkingDay && !isBlockedDay;
+
                               return (
                                 <button
                                   key={offset}
@@ -1420,6 +1451,12 @@ export default function BookingModal({
                                       );
                                       return;
                                     }
+                                    if (isBlockedDay) {
+                                      notify.info(
+                                        "Dia indisponível (Folga)",
+                                      );
+                                      return;
+                                    }
                                     setSelectedDate(dateStr);
                                     setSelectedTime("");
                                   }}
@@ -1427,29 +1464,31 @@ export default function BookingModal({
                                     "min-w-[70px] aspect-[4/5] rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0",
                                     isSelected
                                       ? "bg-brand-ink text-brand-white border-brand-ink premium-shadow scale-105"
-                                      : isWorkingDay
+                                      : isSelectable
                                         ? "bg-brand-parchment border-brand-mist hover:border-brand-ink"
-                                        : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed",
+                                        : "bg-brand-mist/10 border-transparent text-brand-stone/40 cursor-not-allowed opacity-50",
                                   )}
                                 >
                                   <span
                                     className={cn(
                                       "text-[8px] font-bold uppercase tracking-widest mb-1",
-                                      isWorkingDay
+                                      isSelectable
                                         ? "opacity-40"
-                                        : "opacity-20",
+                                        : "opacity-20 text-red-500",
                                     )}
                                   >
-                                    {date
-                                      .toLocaleDateString("pt-BR", {
-                                        weekday: "short",
-                                      })
-                                      .replace(".", "")}
+                                    {isBlockedDay
+                                      ? "Folga"
+                                      : date
+                                          .toLocaleDateString("pt-BR", {
+                                            weekday: "short",
+                                          })
+                                          .replace(".", "")}
                                   </span>
                                   <span
                                     className={cn(
                                       "text-lg font-serif",
-                                      !isWorkingDay && "opacity-40",
+                                      !isSelectable && "opacity-40 line-through",
                                     )}
                                   >
                                     {date.getDate()}

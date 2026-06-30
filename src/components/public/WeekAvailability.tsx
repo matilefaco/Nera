@@ -7,7 +7,7 @@ export interface WeeklyDayAvailability {
   date: string;
   label: string;
   dayNumber: string;
-  status: 'available' | 'low' | 'full' | 'closed';
+  status: 'available' | 'low' | 'full' | 'closed' | 'blocked';
   slotsCount: number;
 }
 
@@ -52,57 +52,66 @@ export const WeekAvailability = ({ availability, onSelectDate }: WeekAvailabilit
         </div>
 
         <div className="flex overflow-x-auto pb-8 -mx-4 px-4 sm:-mx-6 sm:px-6 scrollbar-hide md:grid md:grid-cols-7 md:gap-4 md:overflow-visible">
-          {availability.map((day, idx) => (
-            <motion.button
-              key={day.date}
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.05 }}
-              onClick={() => onSelectDate(day.date)}
-              disabled={day.status === 'closed'}
-              className={cn(
-                "flex-shrink-0 w-24 md:w-full p-4 rounded-[28px] border flex flex-col items-center gap-3 transition-all",
-                day.status === 'closed' 
-                  ? "bg-brand-linen/40 border-brand-mist/50 opacity-60 cursor-not-allowed"
-                  : "bg-brand-white border-brand-mist hover:border-[var(--theme-accent,var(--color-brand-terracotta))] active:scale-95 shadow-sm hover:shadow-md",
-                day.date === availability[0].date && day.status !== 'closed' && "ring-1 ring-[var(--theme-accent,var(--color-brand-terracotta))]/20"
-              )}
-            >
-              <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">
-                {day.label}
-              </span>
-              <span className="text-2xl font-serif text-brand-ink">
-                {day.dayNumber}
-              </span>
-              <div className="mt-1 flex flex-col items-center">
-                {day.status === 'available' && (
-                  <>
-                    <span className="text-[8px] font-bold text-green-600 uppercase tracking-wider">Disponível</span>
-                    <span className="text-[10px] text-brand-stone font-light">{day.slotsCount} horários</span>
-                  </>
+          {availability.map((day, idx) => {
+            const isInactive = day.status === 'closed' || day.status === 'blocked';
+            return (
+              <motion.button
+                key={day.date}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.05 }}
+                onClick={() => onSelectDate(day.date)}
+                disabled={isInactive}
+                className={cn(
+                  "flex-shrink-0 w-24 md:w-full p-4 rounded-[28px] border flex flex-col items-center gap-3 transition-all",
+                  isInactive 
+                    ? "bg-brand-linen/40 border-brand-mist/50 opacity-60 cursor-not-allowed"
+                    : "bg-brand-white border-brand-mist hover:border-[var(--theme-accent,var(--color-brand-terracotta))] active:scale-95 shadow-sm hover:shadow-md",
+                  day.date === availability[0].date && !isInactive && "ring-1 ring-[var(--theme-accent,var(--color-brand-terracotta))]/20"
                 )}
-                {day.status === 'low' && (
-                  <>
-                    <span className="text-[8px] font-bold text-[var(--theme-accent,var(--color-brand-terracotta))] uppercase tracking-wider">Poucas vagas</span>
-                    <span className="text-[10px] text-brand-stone font-light">{day.slotsCount === 1 ? '1 horário' : `${day.slotsCount} horários`}</span>
-                  </>
-                )}
-                {day.status === 'full' && (
-                  <>
-                    <span className="text-[8px] font-bold text-red-500 uppercase tracking-wider">Cheio</span>
-                    <span className="text-[10px] text-brand-stone font-light italic">Sem vagas</span>
-                  </>
-                )}
-                {day.status === 'closed' && (
-                  <>
-                    <span className="text-[8px] font-bold text-brand-stone/60 uppercase tracking-wider">Fechado</span>
-                    <span className="text-[10px] text-brand-stone/40 font-light italic">-</span>
-                  </>
-                )}
-              </div>
-            </motion.button>
-          ))}
+              >
+                <span className="text-[9px] font-bold uppercase tracking-widest text-brand-stone">
+                  {day.label}
+                </span>
+                <span className="text-2xl font-serif text-brand-ink">
+                  {day.dayNumber}
+                </span>
+                <div className="mt-1 flex flex-col items-center">
+                  {day.status === 'available' && (
+                    <>
+                      <span className="text-[8px] font-bold text-green-600 uppercase tracking-wider">Disponível</span>
+                      <span className="text-[10px] text-brand-stone font-light">{day.slotsCount} horários</span>
+                    </>
+                  )}
+                  {day.status === 'low' && (
+                    <>
+                      <span className="text-[8px] font-bold text-[var(--theme-accent,var(--color-brand-terracotta))] uppercase tracking-wider">Poucas vagas</span>
+                      <span className="text-[10px] text-brand-stone font-light">{day.slotsCount === 1 ? '1 horário' : `${day.slotsCount} horários`}</span>
+                    </>
+                  )}
+                  {day.status === 'full' && (
+                    <>
+                      <span className="text-[8px] font-bold text-red-500 uppercase tracking-wider">Cheio</span>
+                      <span className="text-[10px] text-brand-stone font-light italic">Sem vagas</span>
+                    </>
+                  )}
+                  {day.status === 'closed' && (
+                    <>
+                      <span className="text-[8px] font-bold text-brand-stone/60 uppercase tracking-wider">Fechado</span>
+                      <span className="text-[10px] text-brand-stone/40 font-light italic">-</span>
+                    </>
+                  )}
+                  {day.status === 'blocked' && (
+                    <>
+                      <span className="text-[8px] font-bold text-brand-stone/60 uppercase tracking-wider">Folga</span>
+                      <span className="text-[10px] text-brand-stone/40 font-light italic">-</span>
+                    </>
+                  )}
+                </div>
+              </motion.button>
+            );
+          })}
         </div>
         
         <div className="mt-4 flex items-center justify-center gap-2 text-[10px] text-brand-stone/60 uppercase tracking-widest">

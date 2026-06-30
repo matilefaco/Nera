@@ -60,6 +60,9 @@ import {
   getNextAvailableSlot,
   getLocalDateStr,
   getBookableSlotsForDate,
+  getWorkingHoursForDate,
+  getBlockedRanges,
+  mergeBlockedRanges,
 } from "../lib/bookingUtils";
 import { PublicHero } from "../components/public/PublicHero";
 import { ServicesSection } from "../components/public/ServicesSection";
@@ -691,15 +694,38 @@ function PublicProfileContent() {
             now,
           });
 
-          const isWorkingDay = (
-            profile.workingHours.workingDays || [1, 2, 3, 4, 5]
-          ).includes(dayOfWeek);
+          const effectiveHours = getWorkingHoursForDate(profile.workingHours, dateStr);
+          const isWorkingDay = !!effectiveHours;
 
-          let status: "available" | "low" | "full" | "closed" = "available";
+          let status: "available" | "low" | "full" | "closed" | "blocked" = "available";
           if (!isWorkingDay) {
             status = "closed";
           } else if (slots.length === 0) {
-            status = "full";
+            // Check if there is a full-day block or folga
+            const dayBlocks = blockedSchedules.filter((b) => b.date === dateStr);
+            const hasFolgaBlock = dayBlocks.some(
+              (b) =>
+                b.type === "full_day" ||
+                b.reason?.toLowerCase() === "folga" ||
+                b.customReason?.toLowerCase() === "folga"
+            );
+
+            let isBlockageCovered = false;
+            if (effectiveHours) {
+              const [sh, sm] = effectiveHours.startTime.split(":").map(Number);
+              const [eh, em] = effectiveHours.endTime.split(":").map(Number);
+              const whStart = sh * 60 + sm;
+              const whEnd = eh * 60 + em;
+              const rawBlocks = getBlockedRanges(dateStr, blockedSchedules);
+              const mergedBlocks = mergeBlockedRanges(rawBlocks);
+              isBlockageCovered = mergedBlocks.some((b) => b.start <= whStart && b.end >= whEnd);
+            }
+
+            if (hasFolgaBlock || isBlockageCovered) {
+              status = "blocked";
+            } else {
+              status = "full";
+            }
           } else if (slots.length <= 3) {
             status = "low";
           }
