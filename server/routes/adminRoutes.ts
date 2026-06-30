@@ -2,6 +2,7 @@ import express from "express";
 import admin from "firebase-admin";
 import { getDb } from "../firebaseAdmin.js";
 import { logger, maskUid } from "../utils/logger.js";
+import { deleteUser, deleteUserBySlug } from "../services/userDeletionService.js";
 
 const router = express.Router();
 
@@ -145,5 +146,37 @@ function prefixEmail(email: string) {
   const parts = email.split("@");
   return `${parts[0].substring(0, 3)}***@${parts[1]}`;
 }
+
+/**
+ * POST /delete-user
+ * Exclui com segurança um usuário por UID ou Slug (modo dryRun ativo por padrão).
+ * Headers: x-admin-grant-secret
+ * Payload: { uid?: string, slug?: string, dryRun?: boolean }
+ */
+router.post("/delete-user", requireAdminSecret, async (req, res) => {
+  try {
+    const { uid, slug, dryRun = true } = req.body;
+
+    if (!uid && !slug) {
+      return res.status(400).json({ error: "Deve fornecer uid ou slug para exclusão." });
+    }
+
+    let report;
+    if (uid) {
+      report = await deleteUser(uid, { dryRun });
+    } else if (slug) {
+      report = await deleteUserBySlug(slug, { dryRun });
+    }
+
+    return res.status(200).json({
+      success: true,
+      dryRun,
+      report
+    });
+  } catch (error: any) {
+    logger.error("ADMIN", "Erro no endpoint delete-user", { error: error.message });
+    return res.status(error.message.includes("não foi encontrado") ? 404 : 500).json({ error: error.message });
+  }
+});
 
 export default router;
