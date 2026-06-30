@@ -51,6 +51,8 @@ import {
   onSnapshot,
   orderBy,
   limit,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { usePendingAppointments } from "../contexts/PendingAppointmentsContext";
@@ -260,7 +262,7 @@ export default function PendingRequestsPage() {
 
   // Listen for appointmentId in URL to highlight and open details modal automatically
   useEffect(() => {
-    if (loading || localRequests.length === 0) return;
+    if (loading || !user?.uid) return;
 
     const params = new URLSearchParams(window.location.search);
     const appointmentId = params.get("appointmentId");
@@ -291,9 +293,58 @@ export default function PendingRequestsPage() {
         setTimeout(() => {
           setHighlightedCardId(null);
         }, 4000);
+      } else {
+        // Clear params from URL to prevent re-opening or re-scrolling
+        params.delete("appointmentId");
+        const newSearch = params.toString();
+        const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+        window.history.replaceState({}, "", newUrl);
+
+        const fetchSingleDoc = async () => {
+          try {
+            const docRef = doc(db, "appointments", appointmentId);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              const isOwner = data.professionalId === user.uid;
+              const isValidStatus = [
+                "pending",
+                "pending_confirmation",
+                "pending_conflict",
+              ].includes(data.status);
+
+              if (isOwner && isValidStatus) {
+                const fullRequest = { id: docSnap.id, ...data } as Appointment;
+                
+                // Set selected request and open details modal
+                setSelectedRequest(fullRequest);
+                setIsModalOpen(true);
+
+                // Add to truePending temporarily so it's rendered on the page and actions work seamlessly
+                setTruePending((prev) => {
+                  if (prev.some((p) => p.id === appointmentId)) return prev;
+                  return [fullRequest, ...prev];
+                });
+              } else if (!isOwner) {
+                notify.error("Acesso não autorizado a este agendamento.");
+              } else {
+                notify.info("Este agendamento já foi atualizado ou não está pendente.");
+              }
+            } else {
+              notify.error("Pedido não encontrado.");
+            }
+          } catch (err) {
+            if (isDev) {
+              console.error("[PendingRequestsPage] Error fetching deep linked appointment:", err);
+            }
+            notify.error("Erro ao buscar detalhes do agendamento.");
+          }
+        };
+
+        fetchSingleDoc();
       }
     }
-  }, [loading, localRequests]);
+  }, [loading, user?.uid, localRequests]);
 
   const handleRespond = async (
     id: string,

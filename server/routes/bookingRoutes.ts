@@ -4781,7 +4781,7 @@ A cliente *${updatedData.clientName}* remarcou o agendamento dela.
 Acesse seu painel para ver todos os detalhes:
 ${PUBLIC_APP_URL}/dashboard`;
 
-    const idempotencyKey = `booking_rescheduled_pro_${appointmentId}_${updatedData.date}_${updatedData.time}`;
+    const idempotencyKey = `booking_rescheduled_pro_${appointmentId}_${previousDate}_${previousTime}_${updatedData.date}_${updatedData.time}`;
 
     const resWA = await sendWhatsApp(db, proData.whatsapp, message, {
       userId: updatedData.professionalId,
