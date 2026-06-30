@@ -397,6 +397,10 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
     const db = getDb();
     if (!db) throw new Error("Database not connected");
 
+    if (slug.toUpperCase().startsWith("NR-")) {
+      return res.status(404).json({ found: false, error: "Link de gerenciamento inválido ou expirado." });
+    }
+
     const slugStr = slug.toLowerCase();
     let appointmentData: any = null;
     let appointmentId: string | null = null;
@@ -426,16 +430,7 @@ router.get("/reservation/:slug", publicReadLimiter, async (req, res) => {
       }
     }
 
-    // Strategy 3: Reservation Code (Uppercase)
-    if (!appointmentData) {
-      const q = await db.collection('appointments').where('reservationCode', '==', slug.toUpperCase()).limit(1).get();
-      if (!q.empty) {
-        appointmentId = q.docs[0].id;
-        appointmentData = q.docs[0].data();
-      }
-    }
-
-    // Strategy 4 was removed to prevent insecure document ID lookups.
+    // Strategy 3 (Reservation Code lookup) and Strategy 4 (document ID lookup) have been removed to prevent insecure lookups using weak public identifiers.
 
     if (!appointmentData) {
       return res.status(404).json({ found: false, error: "Reservation not found" });

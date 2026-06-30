@@ -686,9 +686,13 @@ export async function cancelBookingByClient(manageSlug: string, reason?: string)
 export async function getAppointmentByToken(token: string): Promise<Appointment | null> {
   devLog(`[BOOKING_MANAGEMENT] Multi-Strategy Search for: ${token}`);
   
+  if (token.toUpperCase().startsWith("NR-")) {
+    if (isDev) console.warn(`[BOOKING_MANAGEMENT] Blocked lookup by reservationCode format: ${token}`);
+    return null;
+  }
+  
   const strategies = [
     { field: 'manageSlug', value: token },
-    { field: 'reservationCode', value: token.toUpperCase() },
     { field: 'token', value: token },
     { field: 'publicToken', value: token },
     { field: 'manageToken', value: token }

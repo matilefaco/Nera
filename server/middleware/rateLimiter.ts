@@ -2,8 +2,6 @@ import rateLimit from "express-rate-limit";
 
 const skipHandler = (req: any) => {
   if (process.env.NODE_ENV !== 'production') return true;
-  // Skip if it's an internal dashboard request (has auth header)
-  if (req.headers && req.headers.authorization) return true;
   return false;
 };
 

@@ -459,6 +459,8 @@ const generateRandomSuffix = (length: number = 4) => {
     .toUpperCase();
 };
 
+// NOTE: reservationCode is strictly a human-readable visual reference for communication.
+// It must NEVER be used as a security credential or token for public management/lookup.
 const generateReservationCode = (date: string) => {
   const formattedDate = (date || "").replace(/-/g, "");
   return `NR-${formattedDate}-${generateRandomSuffix()}`;
