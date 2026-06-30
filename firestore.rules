@@ -219,7 +219,8 @@ service cloud.firestore {
     match /waitlist/{entryId} {
       allow get, list: if (isSignedIn() && (resource.data.get('professionalId', '') == request.auth.uid)) || isAdmin();
       allow create: if isValidWaitlistEntry(incoming()) && 
-                    get(/databases/$(database)/documents/users/$(incoming().professionalId)).data.get('plan', 'free') == 'pro';
+                    get(/databases/$(database)/documents/users/$(incoming().get('professionalId', ''))).data.get('plan', 'free') == 'pro' &&
+                    (incoming().get('status', '') == 'waiting' || (isSignedIn() && incoming().get('professionalId', '') == request.auth.uid));
       allow update: if (isSignedIn() && 
                         existing().get('professionalId', '') == request.auth.uid && 
                         incoming().get('professionalId', '') == request.auth.uid && 
@@ -240,11 +241,18 @@ service cloud.firestore {
     match /booking_locks/{lockId} {
       allow get: if isSignedIn() && (resource == null || resource.data.get('professionalId', '') == request.auth.uid) || isAdmin();
       allow list: if isSignedIn() && resource.data.get('professionalId', '') == request.auth.uid || isAdmin();
-      allow create: if isSignedIn() && incoming().get('professionalId', '') == request.auth.uid;
-      allow update: if (isSignedIn() && 
-                        existing().get('professionalId', '') == request.auth.uid && 
-                        incoming().get('professionalId', '') == request.auth.uid) || isAdmin();
-      allow delete: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) || isAdmin();
+      allow create: if isSignedIn() && 
+                    incoming().get('professionalId', '') == request.auth.uid &&
+                    lockId.matches('^' + request.auth.uid + '_.*') &&
+                    (!incoming().get('status', '').matches('^(pending|waitlist_lock)$') || incoming().get('expiresAt', null) != null);
+      allow update: if isSignedIn() && 
+                    existing().get('professionalId', '') == request.auth.uid && 
+                    incoming().get('professionalId', '') == request.auth.uid &&
+                    lockId.matches('^' + request.auth.uid + '_.*') &&
+                    (!incoming().get('status', '').matches('^(pending|waitlist_lock)$') || incoming().get('expiresAt', null) != null);
+      allow delete: if (isSignedIn() && 
+                        existing().get('professionalId', '') == request.auth.uid &&
+                        lockId.matches('^' + request.auth.uid + '_.*')) || isAdmin();
     }
 
     match /coupons/{couponId} {
