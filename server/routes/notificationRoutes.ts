@@ -443,8 +443,13 @@ router.post("/push/subscribe", async (req, res) => {
       throw new Error("Subscription não foi salva no Firestore (users collection)");
     }
 
-    // DEBUG COLLECTION: Save to a root level collection for easier debugging only in non-production
-    if (process.env.NODE_ENV !== "production") {
+    // DEBUG COLLECTION: Save to a root level collection for easier debugging only in explicit debug/dev environments
+    const isExplicitDebugEnv =
+      process.env.NODE_ENV === "development" ||
+      process.env.NODE_ENV === "test" ||
+      process.env.FUNCTIONS_EMULATOR === "true";
+
+    if (isExplicitDebugEnv) {
       const maskedUserAgent = (userAgent || req.headers['user-agent'] || 'unknown').substring(0, 100);
       await db.collection('push_subscriptions_debug').doc(subscriptionId).set({
         userId,
