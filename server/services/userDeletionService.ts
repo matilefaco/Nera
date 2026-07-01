@@ -4,6 +4,7 @@ import { logger } from "../utils/logger.js";
 
 export interface UserDeletionOptions {
   dryRun?: boolean;
+  includeThirdPartyAnonymization?: boolean;
 }
 
 export interface UserDeletionReport {
@@ -23,6 +24,7 @@ export interface UserDeletionReport {
   anonymizedRecordsCount?: number;
   anonymizedDetails?: Record<string, number>;
   message?: string;
+  includeThirdPartyAnonymization?: boolean;
   diagnostics?: {
     emails?: {
       masked: string;
@@ -102,7 +104,11 @@ function getPhoneVariants(phoneStr: string): string[] {
 /**
  * Searches for a user's details and returns a report/cleanup mapping.
  */
-async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promise<{
+async function gatherUserData(
+  uid: string,
+  db: admin.firestore.Firestore,
+  options: UserDeletionOptions = {}
+): Promise<{
   report: UserDeletionReport;
   docRefsToDelete: Record<string, admin.firestore.DocumentReference[]>;
   subcolRefsToDelete: admin.firestore.DocumentReference[];
@@ -304,12 +310,13 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
     logger.warn("DELETION", `Erro ao verificar Firebase Storage do usuário: ${uid}`, { error: err.message });
   }
 
-  // 8. ADVANCED SAFETY NET: Query and anonymize Wellington's data as a CLIENT in third-party collections
-  const runThirdPartySearch = emails.length > 0 || uniquePhones.length > 0;
+  // 8. ADVANCED SAFETY NET: Query and anonymize data as a CLIENT in third-party collections
+  // DESATIVADO DE FORMA INACESSÍVEL POR PADRÃO - SEGURANÇA MÁXIMA DO ESCOPO DA PROFISSIONAL
+  const runThirdPartySearch = false;
   
-  logger.info("DELETION", `[DRY-RUN LOG] Busca de terceiros: ${runThirdPartySearch ? "EXECUTADA" : "IGNORADA"}. Emails válidos: ${emails.length}, Telefones válidos: ${uniquePhones.length}`);
+  logger.info("DELETION", `[DRY-RUN LOG] Busca de terceiros: DESATIVADA POR SEGURANÇA. Escopo estrito apenas aos dados próprios do profissional.`);
 
-  let thirdPartySearchMsg = "";
+  let thirdPartySearchMsg = "Escopo: somente dados pertencentes ao profissional/slug informado.";
   const matchesByCollection: Record<string, Record<string, number>> = {
     appointments: {},
     waitlist: {},
@@ -373,7 +380,7 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
   });
 
   if (!runThirdPartySearch) {
-    thirdPartySearchMsg = "Busca de terceiros ignorada: nenhum identificador forte encontrado.";
+    thirdPartySearchMsg = "Escopo: somente dados pertencentes ao profissional/slug informado.";
   } else {
     thirdPartySearchMsg = "Busca de terceiros executada com sucesso.";
     logger.info("DELETION", `Consultando referências de cliente do usuário para anonimização...`, { emails, uniquePhones });
@@ -642,6 +649,7 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
     anonymizedRecordsCount,
     anonymizedDetails,
     message: thirdPartySearchMsg,
+    includeThirdPartyAnonymization: !!options.includeThirdPartyAnonymization,
     diagnostics: {
       emails: emailDiagnostics,
       phones: phoneDiagnostics,
@@ -671,7 +679,7 @@ export async function deleteUser(uid: string, options: UserDeletionOptions = {})
     throw new Error("UID inválido ou vazio para a exclusão.");
   }
 
-  const { report, docRefsToDelete, subcolRefsToDelete, storageFilesToDelete, docRefsToAnonymize } = await gatherUserData(uid, db);
+  const { report, docRefsToDelete, subcolRefsToDelete, storageFilesToDelete, docRefsToAnonymize } = await gatherUserData(uid, db, options);
 
   // If dryRun is requested (or true by default), stop here and return the report
   if (options.dryRun !== false) {

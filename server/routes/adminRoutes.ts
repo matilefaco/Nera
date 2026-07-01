@@ -162,10 +162,11 @@ router.post("/delete-user", requireAdminSecret, async (req, res) => {
     }
 
     let report;
+    const options = { dryRun, includeThirdPartyAnonymization: false };
     if (uid) {
-      report = await deleteUser(uid, { dryRun });
+      report = await deleteUser(uid, options);
     } else if (slug) {
-      report = await deleteUserBySlug(slug, { dryRun });
+      report = await deleteUserBySlug(slug, options);
     }
 
     return res.status(200).json({
