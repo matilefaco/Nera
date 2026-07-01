@@ -37,10 +37,31 @@ service cloud.firestore {
 
     function isValidService(data) {
       return data.keys().hasAll(['professionalId', 'name', 'duration', 'price']) &&
+             data.keys().hasOnly(['professionalId', 'name', 'description', 'duration', 'price', 'serviceCategory', 'category', 'categoryData', 'badge', 'active', 'order', 'createdAt', 'updatedAt']) &&
              data.professionalId == request.auth.uid &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.duration is number && data.duration >= 15 && data.duration <= 480 &&
-             data.price is number && data.price >= 0;
+             data.price is number && data.price >= 0 &&
+             (!('categoryData' in data) || (
+               data.categoryData.keys().hasOnly(['label', 'slug']) &&
+               data.categoryData.label is string &&
+               data.categoryData.slug is string
+             ));
+    }
+
+    function isValidBlockedSlot(data) {
+      return data.keys().hasAll(['professionalId', 'date', 'time']) &&
+             data.keys().hasOnly(['professionalId', 'date', 'time', 'appointmentId']) &&
+             data.professionalId is string && data.date is string && data.time is string &&
+             (!('appointmentId' in data) || data.appointmentId is string);
+    }
+
+    function isValidAvailability(data) {
+      return data.keys().hasAll(['professionalId', 'dayOfWeek', 'startTime', 'endTime']) &&
+             data.keys().hasOnly(['professionalId', 'dayOfWeek', 'startTime', 'endTime', 'active']) &&
+             data.professionalId is string && data.dayOfWeek is number &&
+             data.startTime is string && data.endTime is string &&
+             (!('active' in data) || data.active is bool);
     }
 
     function isValidAppointment(data) {
@@ -50,10 +71,16 @@ service cloud.firestore {
 
     function isValidBlockedSchedule(data) {
       return data.keys().hasAll(['professionalId', 'date', 'type']) &&
+             data.keys().hasOnly(['professionalId', 'date', 'startTime', 'endTime', 'reason', 'customReason', 'type', 'isRecurring', 'recurringDays', 'createdAt']) &&
              data.professionalId is string && data.professionalId.size() > 0 &&
              data.date is string && data.type in ['manual', 'automatic', 'full_day'] &&
              (!('startTime' in data) || data.startTime is string) &&
-             (!('endTime' in data) || data.endTime is string);
+             (!('endTime' in data) || data.endTime is string) &&
+             (!('reason' in data) || data.reason is string) &&
+             (!('customReason' in data) || data.customReason is string) &&
+             (!('isRecurring' in data) || data.isRecurring is bool) &&
+             (!('recurringDays' in data) || data.recurringDays is list) &&
+             (!('createdAt' in data) || data.createdAt is timestamp);
     }
 
     function isValidWaitlistEntry(data) {
@@ -178,20 +205,22 @@ service cloud.firestore {
     }
 
     match /blocked_slots/{slotId} {
-      allow get, list: if true;
-      allow create: if (isSignedIn() && incoming().get('professionalId', '') == request.auth.uid);
+      allow get, list: if isSignedIn() && (resource.data.professionalId == request.auth.uid || isAdmin());
+      allow create: if (isSignedIn() && incoming().get('professionalId', '') == request.auth.uid && isValidBlockedSlot(incoming())) || isAdmin();
       allow update: if (isSignedIn() && 
                         existing().get('professionalId', '') == request.auth.uid && 
-                        incoming().get('professionalId', '') == request.auth.uid) || isAdmin();
+                        incoming().get('professionalId', '') == request.auth.uid &&
+                        isValidBlockedSlot(incoming())) || isAdmin();
       allow delete: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) || isAdmin();
     }
 
     match /availability/{availabilityId} {
-      allow get, list: if true;
-      allow create: if isSignedIn() && incoming().get('professionalId', '') == request.auth.uid;
+      allow get, list: if isSignedIn() && (resource.data.professionalId == request.auth.uid || isAdmin());
+      allow create: if (isSignedIn() && incoming().get('professionalId', '') == request.auth.uid && isValidAvailability(incoming())) || isAdmin();
       allow update: if (isDocOwner(existing()) && 
                         incoming().get('professionalId', '') == existing().get('professionalId', '') && 
-                        incoming().get('professionalId', '') == request.auth.uid) || isAdmin();
+                        incoming().get('professionalId', '') == request.auth.uid &&
+                        isValidAvailability(incoming())) || isAdmin();
       allow delete: if isDocOwner(existing()) || isAdmin();
     }
 
