@@ -170,6 +170,8 @@ export default function ManageBookingPage() {
   useEffect(() => {
     if (view !== 'reschedule' || !professional || !selectedDate) return;
 
+    let isSubscribed = true;
+
     const qAppts = query(
       collection(db, 'appointments'),
       where('professionalId', '==', professional.professionalId || (professional as any).uid),
@@ -179,32 +181,42 @@ export default function ManageBookingPage() {
     const unsubAppts = onSnapshot(qAppts, (snap) => {
       try {
         const allAppts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
-        setDayAppointments(allAppts.filter(a => isActiveSlotStatus(a.status)));
+        if (isSubscribed) {
+          setDayAppointments(allAppts.filter(a => isActiveSlotStatus(a.status)));
+        }
       } catch (err) {
         if (isDev) console.error("Error in onSnapshot callback:", err);
       }
     }, (error) => { if (isDev) console.error("Firestore onSnapshot error:", error); });
 
-    const blockedRef = collection(db, 'blocked_schedules');
+    const profId = professional.professionalId || (professional as any).uid;
     const dayOfWeek = selectedDate ? new Date(selectedDate + 'T12:00:00').getDay() : null;
 
-    const unsubBlocked = onSnapshot(query(blockedRef, where('professionalId', '==', professional.professionalId || (professional as any).uid)), (snap) => {
+    const fetchBlockedSchedules = async () => {
       try {
-        const allBlocked = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
-const dayBlocked = allBlocked.filter(b => {
+        const response = await fetch(`/api/profile/public-blocked-schedules/${profId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch public blocked schedules: ${response.status}`);
+        }
+        const allBlocked = await response.json();
+        if (isSubscribed) {
+          const dayBlocked = allBlocked.filter((b: any) => {
             const isToday = b.date === selectedDate;
             const isRecurringToday = dayOfWeek !== null && b.isRecurring && b.recurringDays?.includes(dayOfWeek);
             return isToday || isRecurringToday;
           });
-setBlockedSchedules(dayBlocked);
+          setBlockedSchedules(dayBlocked);
+        }
       } catch (err) {
-        if (isDev) console.error("Error in onSnapshot callback:", err);
+        if (isDev) console.error("Error fetching public blocked schedules:", err);
       }
-    }, (error) => { if (isDev) console.error("Firestore onSnapshot error:", error); });
+    };
+
+    fetchBlockedSchedules();
 
     return () => {
+      isSubscribed = false;
       unsubAppts();
-      unsubBlocked();
     };
   }, [view, professional, selectedDate]);
 
