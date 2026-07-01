@@ -3,6 +3,7 @@ import { logger, maskPhone, maskUid } from "../utils/logger.js";
 import { PUBLIC_APP_URL } from "../utils.js";
 import admin from "firebase-admin";
 import { config } from "dotenv";
+import crypto from "crypto";
 
 if (process.env.NODE_ENV !== "production" && !process.env.FUNCTION_TARGET && !process.env.K_SERVICE) {
   config();
@@ -411,6 +412,26 @@ export function detectWhatsAppIntent(message: string): 'confirm' | 'reschedule' 
 }
 
 /**
+ * Helper to recursively sanitize a debug payload of sensitive keys (tokens, keys, secrets, credentials, auth)
+ */
+function sanitizeDebugPayload(payload: any): any {
+  if (!payload || typeof payload !== 'object') return payload;
+  const sensitiveKeys = ['token', 'headers', 'keys', 'auth', 'apiKey', 'password', 'secret', 'credentials', 'authorization'];
+  const sanitized: any = Array.isArray(payload) ? [] : {};
+  for (const [key, value] of Object.entries(payload)) {
+    const isSensitive = sensitiveKeys.some(sk => key.toLowerCase().includes(sk));
+    if (isSensitive) {
+      sanitized[key] = '[REDACTED]';
+    } else if (value && typeof value === 'object') {
+      sanitized[key] = sanitizeDebugPayload(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  return sanitized;
+}
+
+/**
  * Handle Inbound Message logic
  */
 export async function handleInboundMessage(_db: admin.firestore.Firestore, phone: string, message: string, rawPayload: any) {
@@ -419,18 +440,49 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
   const phoneVariations = getPhoneVariations(phone);
   const intent = detectWhatsAppIntent(message);
   
+  const isExplicitDebugEnv =
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.FUNCTIONS_EMULATOR === "true";
+
+  // Phone hashes and masked versions to minimize personal data
+  const phoneHash = crypto.createHash('sha256').update(normalizedPhone).digest('hex');
+  const phoneLast4 = normalizedPhone.slice(-4);
+  const phoneMasked = maskPhone(normalizedPhone);
+
+  // Message metadata
+  const messageLength = (message || "").length;
+  const hasMessage = !!message;
+  const messagePreview = message ? message.trim().substring(0, 40) : "";
+
+  // Attempt to extract metadata safely from rawPayload without credentials
+  const eventType = rawPayload?.type || rawPayload?.event || "message";
+  const messageType = rawPayload?.message?.type || "text";
+
   const logRef = db.collection('whatsapp_inbound_logs').doc();
   const logData: any = {
     id: logRef.id,
-    phone: normalizedPhone,
-    phoneVariations,
-    rawMessage: message,
-    normalizedMessage: message.trim(),
+    provider: "zapi",
+    eventType,
+    messageType,
+    phoneMasked,
+    phoneLast4,
+    phoneHash,
+    messagePreview,
+    messageLength,
+    hasMessage,
     intent,
     status: 'received',
-    rawPayload,
     createdAt: admin.firestore.FieldValue.serverTimestamp()
   };
+
+  if (isExplicitDebugEnv) {
+    logData.phone = normalizedPhone;
+    logData.phoneVariations = phoneVariations;
+    logData.rawMessage = message;
+    logData.normalizedMessage = message.trim();
+    logData.rawPayload = sanitizeDebugPayload(rawPayload);
+  }
 
   await logRef.set(logData);
 
@@ -464,7 +516,23 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
       });
 
     const targetAppt = futureAppts[0];
-    
+
+    if (!targetAppt) {
+      logger.warn("WHATSAPP", `No active appointment for variants of ${maskPhone(normalizedPhone)}`);
+      await logRef.update({ 
+        status: 'ignored', 
+        error: 'No active appointment found',
+        diagnostics: isExplicitDebugEnv
+          ? { phoneVariations, totalFound: apptsSnap.docs.length }
+          : { phoneVariations: phoneVariations.map(v => maskPhone(v)), totalFound: apptsSnap.docs.length }
+      });
+      await sendWhatsApp(db, normalizedPhone, "Não encontrei um agendamento ativo vinculado a este número. Acesse sua página de agendamento ou fale com a profissional.", {
+        userId: 'system',
+        type: 'inbound_error'
+      });
+      return { success: false, reason: 'no_appointment' };
+    }
+
     // Plan check for automation
     const proDocForPlan = await db.collection('users').doc(targetAppt.professionalId).get();
     const proDataForPlan = proDocForPlan.exists ? proDocForPlan.data() as any : null;
@@ -478,21 +546,10 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
       return { success: false, reason: 'unauthorized_plan' };
     }
 
-    if (!targetAppt) {
-      logger.warn("WHATSAPP", `No active appointment for variants of ${maskPhone(normalizedPhone)}`);
-      await logRef.update({ 
-        status: 'ignored', 
-        error: 'No active appointment found',
-        diagnostics: { phoneVariations, totalFound: apptsSnap.docs.length }
-      });
-      await sendWhatsApp(db, normalizedPhone, "Não encontrei um agendamento ativo vinculado a este número. Acesse sua página de agendamento ou fale com a profissional.", {
-        userId: 'system',
-        type: 'inbound_error'
-      });
-      return { success: false, reason: 'no_appointment' };
-    }
-
-    await logRef.update({ appointmentId: targetAppt.id });
+    await logRef.update({ 
+      appointmentId: targetAppt.id,
+      professionalId: targetAppt.professionalId
+    });
 
     const activeSlug = (proDataForPlan?.slug || targetAppt.professionalSlug || targetAppt.manageSlug || targetAppt.publicSlug || "").trim();
     const profileLink = (activeSlug && activeSlug !== "app") ? `${PUBLIC_APP_URL}/p/${activeSlug}` : PUBLIC_APP_URL;
