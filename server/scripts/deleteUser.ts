@@ -70,6 +70,9 @@ async function main() {
     console.log(`Estimativa de Exclusões Totais: ${report.estimatedDeletes}`);
     console.log("----------------------------------------------------------------");
     console.log(`Registros de Terceiros a Anonimizar: ${report.anonymizedRecordsCount || 0}`);
+    if (report.message) {
+      console.log(`  Nota: ${report.message}`);
+    }
     if (report.anonymizedDetails && Object.keys(report.anonymizedDetails).length > 0) {
       for (const [colName, count] of Object.entries(report.anonymizedDetails)) {
         console.log(`  - ${colName}: ${count} documento(s)`);

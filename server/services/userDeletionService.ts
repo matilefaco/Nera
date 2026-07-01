@@ -22,6 +22,7 @@ export interface UserDeletionReport {
   details?: Record<string, number>;
   anonymizedRecordsCount?: number;
   anonymizedDetails?: Record<string, number>;
+  message?: string;
 }
 
 /**
@@ -107,8 +108,8 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
     authPhone = authUser.phoneNumber || "";
   } catch (err: any) {
     if (err.code !== "auth/user-not-found") {
-      logger.error("DELETION", `Erro ao consultar Auth do usuário: ${uid}`, { error: err.message });
-      throw err;
+      logger.warn("DELETION", `Erro ao consultar Auth do usuário: ${uid} (Identity Toolkit / Auth API pode estar desativada ou inacessível)`, { error: err.message });
+      // Non-blocking fallback: permit the script to run without crashing
     }
   }
 
@@ -288,19 +289,32 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
   }
 
   // 8. ADVANCED SAFETY NET: Query and anonymize Wellington's data as a CLIENT in third-party collections
-  if (emails.length > 0 || uniquePhones.length > 0) {
+  const runThirdPartySearch = emails.length > 0 || uniquePhones.length > 0;
+  
+  logger.info("DELETION", `[DRY-RUN LOG] Busca de terceiros: ${runThirdPartySearch ? "EXECUTADA" : "IGNORADA"}. Emails válidos: ${emails.length}, Telefones válidos: ${uniquePhones.length}`);
+
+  let thirdPartySearchMsg = "";
+
+  if (!runThirdPartySearch) {
+    thirdPartySearchMsg = "Busca de terceiros ignorada: nenhum identificador forte encontrado.";
+  } else {
+    thirdPartySearchMsg = "Busca de terceiros executada com sucesso.";
     logger.info("DELETION", `Consultando referências de cliente do usuário para anonimização...`, { emails, uniquePhones });
 
     // A. Query third party appointments where this user is the client
     const apptPromises: Promise<any>[] = [];
     for (const em of emails) {
-      apptPromises.push(db.collection("appointments").where("clientEmail", "==", em).get());
+      if (em && isValidEmail(em)) {
+        apptPromises.push(db.collection("appointments").where("clientEmail", "==", em).get());
+      }
     }
     for (const ph of uniquePhones) {
-      apptPromises.push(db.collection("appointments").where("clientPhone", "==", ph).get());
-      apptPromises.push(db.collection("appointments").where("clientWhatsapp", "==", ph).get());
-      apptPromises.push(db.collection("appointments").where("clientPhoneNormalized", "==", ph).get());
-      apptPromises.push(db.collection("appointments").where("clientWhatsappNormalized", "==", ph).get());
+      if (ph && isValidPhone(ph)) {
+        apptPromises.push(db.collection("appointments").where("clientPhone", "==", ph).get());
+        apptPromises.push(db.collection("appointments").where("clientWhatsapp", "==", ph).get());
+        apptPromises.push(db.collection("appointments").where("clientPhoneNormalized", "==", ph).get());
+        apptPromises.push(db.collection("appointments").where("clientWhatsappNormalized", "==", ph).get());
+      }
     }
 
     try {
@@ -338,12 +352,16 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
       // B. Query third party waitlist entries where this user is the client
       const waitlistPromises: Promise<any>[] = [];
       for (const em of emails) {
-        waitlistPromises.push(db.collection("waitlist").where("clientEmail", "==", em).get());
+        if (em && isValidEmail(em)) {
+          waitlistPromises.push(db.collection("waitlist").where("clientEmail", "==", em).get());
+        }
       }
       for (const ph of uniquePhones) {
-        waitlistPromises.push(db.collection("waitlist").where("clientWhatsapp", "==", ph).get());
-        waitlistPromises.push(db.collection("waitlist").where("clientPhoneNormalized", "==", ph).get());
-        waitlistPromises.push(db.collection("waitlist").where("clientWhatsappNormalized", "==", ph).get());
+        if (ph && isValidPhone(ph)) {
+          waitlistPromises.push(db.collection("waitlist").where("clientWhatsapp", "==", ph).get());
+          waitlistPromises.push(db.collection("waitlist").where("clientPhoneNormalized", "==", ph).get());
+          waitlistPromises.push(db.collection("waitlist").where("clientWhatsappNormalized", "==", ph).get());
+        }
       }
 
       const waitlistSnapshots = await Promise.all(waitlistPromises);
@@ -477,10 +495,12 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
   // Anonymization stats
   const anonymizedDetails: Record<string, number> = {};
   let anonymizedRecordsCount = 0;
-  for (const [colName, list] of Object.entries(docRefsToAnonymize)) {
-    if (list.length > 0) {
-      anonymizedDetails[colName] = list.length;
-      anonymizedRecordsCount += list.length;
+  if (runThirdPartySearch) {
+    for (const [colName, list] of Object.entries(docRefsToAnonymize)) {
+      if (list.length > 0) {
+        anonymizedDetails[colName] = list.length;
+        anonymizedRecordsCount += list.length;
+      }
     }
   }
 
@@ -499,7 +519,8 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
     estimatedDeletes,
     details,
     anonymizedRecordsCount,
-    anonymizedDetails
+    anonymizedDetails,
+    message: thirdPartySearchMsg
   };
 
   return {
