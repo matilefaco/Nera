@@ -29,27 +29,48 @@ router.post("/public/track", async (req, res) => {
   try {
     const { professionalId, type, referrer, origin } = req.body;
 
-    if (!professionalId || !type) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (
+      typeof professionalId !== "string" || 
+      professionalId.length === 0 || 
+      professionalId.length > 128
+    ) {
+      return res.status(400).json({ error: "Invalid professionalId" });
     }
+
+    const allowedTypes = [
+      "visit",
+      "click_book",
+      "click_book_sticky",
+      "click_book_final",
+      "week_calendar_click"
+    ];
+
+    if (!allowedTypes.includes(type)) {
+      return res.status(400).json({ error: "Invalid event type" });
+    }
+
+    const sanitizedReferrer = typeof referrer === "string" ? referrer.substring(0, 2048) : "";
+    const sanitizedOrigin = typeof origin === "string" ? origin.substring(0, 64) : "other";
 
     const db = getDb();
     if (!db) throw new Error("Database not connected");
 
     const proDoc = await db.collection("users").doc(professionalId).get();
-    if (proDoc.exists) {
-      const proData = proDoc.data();
-      if (proData?.internalAccount === true || proData?.excludeFromAnalytics === true) {
-        return res.status(200).json({ ok: true });
-      }
+    if (!proDoc.exists) {
+      return res.status(404).json({ error: "Professional not found" });
+    }
+
+    const proData = proDoc.data();
+    if (proData?.internalAccount === true || proData?.excludeFromAnalytics === true) {
+      return res.status(200).json({ ok: true });
     }
 
     // Add document to Firestore (write)
     await db.collection("analytics_events").add({
       professionalId,
       type,
-      referrer: referrer || "",
-      origin: origin || "other",
+      referrer: sanitizedReferrer,
+      origin: sanitizedOrigin,
       timestamp: new Date()
     });
 

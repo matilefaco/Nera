@@ -102,7 +102,7 @@ service cloud.firestore {
       return data.keys().hasAll(['professionalId', 'type', 'timestamp']) &&
              data.diff({}).addedKeys().hasOnly(['professionalId', 'type', 'timestamp', 'referrer', 'origin', 'payload']) &&
              data.professionalId is string && data.professionalId.size() > 0 && data.professionalId.size() <= 128 &&
-             data.type is string && data.type.size() > 0 && data.type.size() <= 64 &&
+             data.type in ['quick_block_created'] &&
              (!('origin' in data) || (data.origin is string && data.origin.size() <= 64)) &&
              (!('referrer' in data) || (data.referrer is string && data.referrer.size() <= 2048)) &&
              (!('payload' in data) || (
@@ -287,7 +287,7 @@ service cloud.firestore {
 
     match /analytics_events/{eventId} {
       allow get, list: if isSignedIn() && resource.data.professionalId == request.auth.uid;
-      allow create: if isValidAnalyticsEvent(incoming());
+      allow create: if isSignedIn() && incoming().get('professionalId', '') == request.auth.uid && isValidAnalyticsEvent(incoming());
       allow delete: if isAdmin();
     }
 
