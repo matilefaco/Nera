@@ -180,9 +180,9 @@ export default function ManageBookingPage() {
         // Fetch appointments for the selected date securely via occupied-slots API
         const startStr = selectedDate;
         const endStr = selectedDate;
-        const excludeId = appointment?.id || '';
+        const excludeId = appointment?.appointmentId || appointment?.id || '';
         const slotsResponse = await fetch(
-          `/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}&excludeAppointmentId=${excludeId}`
+          `/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}&excludeAppointmentId=${encodeURIComponent(excludeId)}`
         );
         if (slotsResponse.ok) {
           const data = await slotsResponse.json();
