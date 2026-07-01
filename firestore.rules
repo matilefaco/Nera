@@ -210,8 +210,7 @@ service cloud.firestore {
       allow get: if true;
       allow list: if isAdmin();
       allow create: if isSignedIn() && incoming().get('professionalId', '') == request.auth.uid;
-      allow update: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) ||
-                    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedAt', 'updatedAt']);
+      allow update: if (isSignedIn() && existing().get('professionalId', '') == request.auth.uid) || isAdmin();
     }
 
     match /blocked_schedules/{scheduleId} {
