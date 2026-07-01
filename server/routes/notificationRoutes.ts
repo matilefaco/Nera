@@ -443,12 +443,19 @@ router.post("/push/subscribe", async (req, res) => {
       throw new Error("Subscription não foi salva no Firestore (users collection)");
     }
 
-    // DEBUG COLLECTION: Save to a root level collection for easier debugging
-        await db.collection('push_subscriptions_debug').doc(subscriptionId).set({
-      ...dataToSave,
-      userId,
-      verified: true
-    }, { merge: true });
+    // DEBUG COLLECTION: Save to a root level collection for easier debugging only in non-production
+    if (process.env.NODE_ENV !== "production") {
+      const maskedUserAgent = (userAgent || req.headers['user-agent'] || 'unknown').substring(0, 100);
+      await db.collection('push_subscriptions_debug').doc(subscriptionId).set({
+        userId,
+        subscriptionId,
+        createdAt: docSnap.exists ? (docSnap.data()?.createdAt || admin.firestore.FieldValue.serverTimestamp()) : admin.firestore.FieldValue.serverTimestamp(),
+        userAgent: maskedUserAgent,
+        environment: process.env.NODE_ENV || 'development',
+        verified: true,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+    }
 
     logger.info("PUSH", "Push subscription saved successfully");
     res.status(201).json({ 
