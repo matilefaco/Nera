@@ -368,6 +368,7 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
           }
 
           return {
+            id: doc.id,
             date,
             time,
             duration: finalDuration,
@@ -409,6 +410,7 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
 
             // Consider possible active locks mapping to pending
             return {
+              id: doc.id,
               date,
               time,
               duration: Number(data.duration) || 60,

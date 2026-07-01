@@ -172,28 +172,32 @@ export default function ManageBookingPage() {
 
     let isSubscribed = true;
 
-    const qAppts = query(
-      collection(db, 'appointments'),
-      where('professionalId', '==', professional.professionalId || (professional as any).uid),
-      where('date', '==', selectedDate)
-    );
-
-    const unsubAppts = onSnapshot(qAppts, (snap) => {
-      try {
-        const allAppts = snap.docs.map(d => ({ id: d.id, ...d.data() } as Appointment));
-        if (isSubscribed) {
-          setDayAppointments(allAppts.filter(a => isActiveSlotStatus(a.status)));
-        }
-      } catch (err) {
-        if (isDev) console.error("Error in onSnapshot callback:", err);
-      }
-    }, (error) => { if (isDev) console.error("Firestore onSnapshot error:", error); });
-
     const profId = professional.professionalId || (professional as any).uid;
     const dayOfWeek = selectedDate ? new Date(selectedDate + 'T12:00:00').getDay() : null;
 
-    const fetchBlockedSchedules = async () => {
+    const fetchRescheduleData = async () => {
       try {
+        // Fetch appointments for the selected date securely via occupied-slots API
+        const startStr = selectedDate;
+        const endStr = selectedDate;
+        const slotsResponse = await fetch(
+          `/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}`
+        );
+        if (slotsResponse.ok) {
+          const data = await slotsResponse.json();
+          if (isSubscribed) {
+            const occupiedAppts = (data.slots || []) as Appointment[];
+            setDayAppointments(occupiedAppts.filter(a => isActiveSlotStatus(a.status)));
+          }
+        } else {
+          if (isDev) console.error(`[Reschedule] Failed to fetch occupied slots, status: ${slotsResponse.status}`);
+        }
+      } catch (err) {
+        if (isDev) console.error("[Reschedule] Error fetching occupied slots:", err);
+      }
+
+      try {
+        // Fetch blocked schedules
         const response = await fetch(`/api/profile/public-blocked-schedules/${profId}`);
         if (!response.ok) {
           throw new Error(`Failed to fetch public blocked schedules: ${response.status}`);
@@ -208,15 +212,14 @@ export default function ManageBookingPage() {
           setBlockedSchedules(dayBlocked);
         }
       } catch (err) {
-        if (isDev) console.error("Error fetching public blocked schedules:", err);
+        if (isDev) console.error("[Reschedule] Error fetching public blocked schedules:", err);
       }
     };
 
-    fetchBlockedSchedules();
+    fetchRescheduleData();
 
     return () => {
       isSubscribed = false;
-      unsubAppts();
     };
   }, [view, professional, selectedDate]);
 
