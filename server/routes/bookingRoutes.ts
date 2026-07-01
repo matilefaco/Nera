@@ -92,7 +92,7 @@ export function getCanonicalPhone(phone: string): string {
 
 
 // --- NEW: SECURE SLOT LOOKUP (Blindagem) ---
-router.get("/public/occupied-slots/:professionalId", async (req, res) => {
+router.get("/public/occupied-slots/:professionalId", bookingRateLimiter, async (req, res) => {
   console.log("[DEBUG_OCCUPIED_SLOTS] Routing info:", {
     params: req.params,
     professionalId: req.params.professionalId,
@@ -105,12 +105,14 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
   const { professionalId } = req.params;
   const start = req.query?.start;
   const end = req.query?.end;
+  const excludeAppointmentIdQuery = req.query?.excludeAppointmentId;
 
   let startVal = start;
   let endVal = end;
+  let excludeAppointmentIdVal = excludeAppointmentIdQuery;
 
   // Fallback for Firebase / Proxies dropping query strings from req.query
-  if (!startVal || !endVal) {
+  if (!startVal || !endVal || !excludeAppointmentIdVal) {
     try {
       const urlStr = req.originalUrl || req.url || "";
       if (urlStr.includes("?")) {
@@ -119,6 +121,7 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
         );
         if (!startVal) startVal = searchParams.get("start");
         if (!endVal) endVal = searchParams.get("end");
+        if (!excludeAppointmentIdVal) excludeAppointmentIdVal = searchParams.get("excludeAppointmentId");
       }
     } catch (e) {
       console.error("Error parsing fallback query params:", e);
@@ -140,18 +143,24 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
       .json({ error: "Identificador de profissional inválido", slots: [] });
   }
 
-  // Ensure start and end are valid strings (Express can return string | string[] | ParsedQs | ParsedQs[])
-  const startStr =
+  // Ensure start, end and excludeAppointmentId are valid strings (Express can return string | string[] | ParsedQs | ParsedQs[])
+  let startStr =
     typeof startVal === "string"
       ? startVal.trim()
       : Array.isArray(startVal)
         ? String(startVal[0]).trim()
         : "";
-  const endStr =
+  let endStr =
     typeof endVal === "string"
       ? endVal.trim()
       : Array.isArray(endVal)
         ? String(endVal[0]).trim()
+        : "";
+  const excludeAppointmentId =
+    typeof excludeAppointmentIdVal === "string"
+      ? excludeAppointmentIdVal.trim()
+      : Array.isArray(excludeAppointmentIdVal)
+        ? String(excludeAppointmentIdVal[0]).trim()
         : "";
 
   if (!startStr || !endStr) {
@@ -204,13 +213,13 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
 
   const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  if (diffDays > 180) {
-    return res
-      .status(400)
-      .json({
-        error: "O intervalo máximo de consulta é de 180 dias.",
-        slots: [],
-      });
+  if (diffDays > 31) {
+    // Limit internally to 31 days to avoid breaking the UI
+    const limitDate = new Date(startDate.getTime() + 31 * 24 * 60 * 60 * 1000);
+    const yyyy = limitDate.getFullYear();
+    const mm = String(limitDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(limitDate.getDate()).padStart(2, '0');
+    endStr = `${yyyy}-${mm}-${dd}`;
   }
 
   try {
@@ -322,6 +331,11 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
         if (!date || date < startStr || date > endStr) return null;
         if (!time) return null;
 
+        // Exclude this specific appointment if requested
+        if (excludeAppointmentId && doc.id === excludeAppointmentId) {
+          return null;
+        }
+
         // Guard against corrupted or NaN duration values
         const rawDuration = data.duration || data.serviceDuration;
         const durationValue =
@@ -390,6 +404,11 @@ router.get("/public/occupied-slots/:professionalId", async (req, res) => {
 
             if (!date || date < startStr || date > endStr) return null;
             if (!time) return null;
+
+            // Exclude lock if it is associated with the excluded appointment ID
+            if (excludeAppointmentId && data.appointmentId === excludeAppointmentId) {
+              return null;
+            }
 
             let isExpired = false;
             if (data.expiresAt) {

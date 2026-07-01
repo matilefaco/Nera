@@ -180,8 +180,9 @@ export default function ManageBookingPage() {
         // Fetch appointments for the selected date securely via occupied-slots API
         const startStr = selectedDate;
         const endStr = selectedDate;
+        const excludeId = appointment?.id || '';
         const slotsResponse = await fetch(
-          `/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}`
+          `/api/public/occupied-slots/${profId}?start=${startStr}&end=${endStr}&excludeAppointmentId=${excludeId}`
         );
         if (slotsResponse.ok) {
           const data = await slotsResponse.json();
@@ -221,7 +222,7 @@ export default function ManageBookingPage() {
     return () => {
       isSubscribed = false;
     };
-  }, [view, professional, selectedDate]);
+  }, [view, professional, selectedDate, appointment]);
 
   const availableSlots = useMemo(() => {
     if (!selectedDate || !appointment || !professional) return [];
