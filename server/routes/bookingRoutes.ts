@@ -918,11 +918,26 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         if (duplicateStatuses.includes(data.status)) {
           const isSameDate = data.date === appointmentData.date;
           const isSameTime = data.time === appointmentData.time;
-          const isSameService = (appointmentData.serviceId && data.serviceId === appointmentData.serviceId) || 
-                                (appointmentData.serviceName && data.serviceName && appointmentData.serviceName === data.serviceName);
 
-          const isSameDateAndTime = isSameDate && isSameTime;
-          const isSameDateAndService = isSameDate && isSameService;
+          // Service Comparison Logic:
+          // 1. If both existing appointment and new attempt possess a serviceId, compare strictly by serviceId.
+          // 2. If serviceIds differ, they are considered different services (even if serviceName matches).
+          // 3. If neither side has a serviceId, compare normalized serviceNames as a fallback for legacy support.
+          // 4. If only one side has a serviceId, do not assume they are identical. For precision, treat as different.
+          let isSameService = false;
+          const existingServiceId = data.serviceId;
+          const newServiceId = appointmentData.serviceId;
+
+          if (existingServiceId && newServiceId) {
+            isSameService = existingServiceId === newServiceId;
+          } else if (!existingServiceId && !newServiceId) {
+            const existingName = (data.serviceName || "").trim().toLowerCase();
+            const newName = (appointmentData.serviceName || "").trim().toLowerCase();
+            isSameService = existingName !== "" && existingName === newName;
+          } else {
+            // Asymmetric presence of serviceId - treat as different services to prevent false deduplication
+            isSameService = false;
+          }
 
           let createdTime = 0;
           if (data.createdAt) {
@@ -933,9 +948,11 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
             }
           }
           const isWithin5Minutes = (Date.now() - createdTime) <= 5 * 60 * 1000;
-          const isRecentSameDateAndService = isSameDate && isSameService && isWithin5Minutes;
 
-          if (isSameDateAndTime || isSameDateAndService || isRecentSameDateAndService) {
+          const isSameSlot = isSameDate && isSameTime;
+          const isRecentSameServiceSameDay = isSameDate && isSameService && isWithin5Minutes;
+
+          if (isSameSlot || isRecentSameServiceSameDay) {
             hasDuplicate = true;
             break;
           }
@@ -954,11 +971,26 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           if (duplicateStatuses.includes(data.status)) {
             const isSameDate = data.date === appointmentData.date;
             const isSameTime = data.time === appointmentData.time;
-            const isSameService = (appointmentData.serviceId && data.serviceId === appointmentData.serviceId) || 
-                                  (appointmentData.serviceName && data.serviceName && appointmentData.serviceName === data.serviceName);
 
-            const isSameDateAndTime = isSameDate && isSameTime;
-            const isSameDateAndService = isSameDate && isSameService;
+            // Service Comparison Logic:
+            // 1. If both existing appointment and new attempt possess a serviceId, compare strictly by serviceId.
+            // 2. If serviceIds differ, they are considered different services (even if serviceName matches).
+            // 3. If neither side has a serviceId, compare normalized serviceNames as a fallback for legacy support.
+            // 4. If only one side has a serviceId, do not assume they are identical. For precision, treat as different.
+            let isSameService = false;
+            const existingServiceId = data.serviceId;
+            const newServiceId = appointmentData.serviceId;
+
+            if (existingServiceId && newServiceId) {
+              isSameService = existingServiceId === newServiceId;
+            } else if (!existingServiceId && !newServiceId) {
+              const existingName = (data.serviceName || "").trim().toLowerCase();
+              const newName = (appointmentData.serviceName || "").trim().toLowerCase();
+              isSameService = existingName !== "" && existingName === newName;
+            } else {
+              // Asymmetric presence of serviceId - treat as different services to prevent false deduplication
+              isSameService = false;
+            }
 
             let createdTime = 0;
             if (data.createdAt) {
@@ -969,9 +1001,11 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
               }
             }
             const isWithin5Minutes = (Date.now() - createdTime) <= 5 * 60 * 1000;
-            const isRecentSameDateAndService = isSameDate && isSameService && isWithin5Minutes;
 
-            if (isSameDateAndTime || isSameDateAndService || isRecentSameDateAndService) {
+            const isSameSlot = isSameDate && isSameTime;
+            const isRecentSameServiceSameDay = isSameDate && isSameService && isWithin5Minutes;
+
+            if (isSameSlot || isRecentSameServiceSameDay) {
               hasDuplicate = true;
               break;
             }
