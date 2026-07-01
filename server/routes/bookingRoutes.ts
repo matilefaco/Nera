@@ -849,7 +849,6 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       // --- ANTI-ABUSE DEDUPLICATION CHECK ---
       let hasDuplicate = false;
       const duplicateStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted"];
-      const limitTime = Date.now() - 24 * 60 * 60 * 1000; // 24h ago
 
       // Generate phone query variations to match existing formats (formatted or unformatted)
       const phoneQueries: string[] = [];
@@ -917,6 +916,14 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
       for (const doc of uniqueDocs) {
         const data = doc.data();
         if (duplicateStatuses.includes(data.status)) {
+          const isSameDate = data.date === appointmentData.date;
+          const isSameTime = data.time === appointmentData.time;
+          const isSameService = (appointmentData.serviceId && data.serviceId === appointmentData.serviceId) || 
+                                (appointmentData.serviceName && data.serviceName && appointmentData.serviceName === data.serviceName);
+
+          const isSameDateAndTime = isSameDate && isSameTime;
+          const isSameDateAndService = isSameDate && isSameService;
+
           let createdTime = 0;
           if (data.createdAt) {
             if (typeof data.createdAt.toMillis === "function") {
@@ -925,10 +932,10 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
               createdTime = new Date(data.createdAt).getTime();
             }
           }
-          const isRecent = createdTime >= limitTime;
-          const isSameDate = data.date === appointmentData.date;
+          const isWithin5Minutes = (Date.now() - createdTime) <= 5 * 60 * 1000;
+          const isRecentSameDateAndService = isSameDate && isSameService && isWithin5Minutes;
 
-          if (isRecent || isSameDate) {
+          if (isSameDateAndTime || isSameDateAndService || isRecentSameDateAndService) {
             hasDuplicate = true;
             break;
           }
@@ -945,6 +952,14 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
         for (const doc of emailSnap.docs) {
           const data = doc.data();
           if (duplicateStatuses.includes(data.status)) {
+            const isSameDate = data.date === appointmentData.date;
+            const isSameTime = data.time === appointmentData.time;
+            const isSameService = (appointmentData.serviceId && data.serviceId === appointmentData.serviceId) || 
+                                  (appointmentData.serviceName && data.serviceName && appointmentData.serviceName === data.serviceName);
+
+            const isSameDateAndTime = isSameDate && isSameTime;
+            const isSameDateAndService = isSameDate && isSameService;
+
             let createdTime = 0;
             if (data.createdAt) {
               if (typeof data.createdAt.toMillis === "function") {
@@ -953,10 +968,10 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
                 createdTime = new Date(data.createdAt).getTime();
               }
             }
-            const isRecent = createdTime >= limitTime;
-            const isSameDate = data.date === appointmentData.date;
+            const isWithin5Minutes = (Date.now() - createdTime) <= 5 * 60 * 1000;
+            const isRecentSameDateAndService = isSameDate && isSameService && isWithin5Minutes;
 
-            if (isRecent || isSameDate) {
+            if (isSameDateAndTime || isSameDateAndService || isRecentSameDateAndService) {
               hasDuplicate = true;
               break;
             }
@@ -970,7 +985,7 @@ router.post("/public/create-booking", bookingRateLimiter, async (req, res) => {
           date: appointmentData.date
         });
         const err = new Error(
-          "Já existe uma solicitação recente para este contato. Aguarde a confirmação da profissional ou tente novamente mais tarde."
+          "Já existe uma solicitação muito parecida para este contato. Aguarde a confirmação da profissional ou escolha outro horário."
         );
         (err as any).status = 409;
         (err as any).code = "DUPLICATE_BOOKING_ATTEMPT";
