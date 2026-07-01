@@ -25,6 +25,45 @@ export interface UserDeletionReport {
 }
 
 /**
+ * Checks if an email is a real, valid email and not a generic/placeholder or too short.
+ */
+function isValidEmail(email: string): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  
+  // Exclude empty, short or obviously generic placeholders
+  if (clean.length < 5) return false;
+  if (
+    clean === "removido@nera.com.br" ||
+    clean.includes("removed") ||
+    clean.includes("example.com") ||
+    clean.includes("test.com")
+  ) {
+    return false;
+  }
+  
+  // Standard email format verification
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(clean);
+}
+
+/**
+ * Checks if a phone number is real, valid, and not a generic placeholder/repeating sequence.
+ */
+function isValidPhone(phone: string): boolean {
+  if (!phone) return false;
+  const digits = phone.replace(/\D/g, "");
+  
+  // Must be a numeric string of real length (Brazil phone numbers are typically 10 or 11 digits, so let's enforce min 10 digits and max 15 digits)
+  if (digits.length < 10 || digits.length > 15) return false;
+  
+  // Reject obviously generic repeated pattern placeholders (e.g. 00000000000, 11111111111, 99999999999)
+  if (/^(\d)\1+$/.test(digits)) return false;
+  
+  return true;
+}
+
+/**
  * Normalizes phone numbers to produce all possible matching variants
  * to avoid missing matches in third-party collections.
  */
@@ -86,14 +125,16 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
     profilePhone = data?.whatsapp || data?.phone || "";
   }
 
-  // Consolidate unique email and phone search inputs
-  const emails = Array.from(new Set([profileEmail, authEmail].map(e => e.trim().toLowerCase()).filter(Boolean)));
+  // Consolidate unique email and phone search inputs, filtering with strong validators
+  const rawEmails = Array.from(new Set([profileEmail, authEmail].map(e => e.trim().toLowerCase()).filter(Boolean)));
+  const emails = rawEmails.filter(isValidEmail);
+
   const basePhones = Array.from(new Set([profilePhone, authPhone].map(p => p.trim()).filter(Boolean)));
-  const phones: string[] = [];
+  const rawPhones: string[] = [];
   for (const p of basePhones) {
-    phones.push(...getPhoneVariants(p));
+    rawPhones.push(...getPhoneVariants(p));
   }
-  const uniquePhones = Array.from(new Set(phones));
+  const uniquePhones = Array.from(new Set(rawPhones)).filter(isValidPhone);
 
   const docRefsToDelete: Record<string, admin.firestore.DocumentReference[]> = {};
   const subcolRefsToDelete: admin.firestore.DocumentReference[] = [];
