@@ -23,6 +23,22 @@ export interface UserDeletionReport {
   anonymizedRecordsCount?: number;
   anonymizedDetails?: Record<string, number>;
   message?: string;
+  diagnostics?: {
+    emails?: {
+      masked: string;
+      domain: string;
+      firstLetter: string;
+      length: number;
+      origin: string;
+    }[];
+    phones?: {
+      masked: string;
+      digitCount: number;
+      lastFour: string;
+      origin: string;
+    }[];
+    matchesByCollection?: Record<string, Record<string, number>>;
+  };
 }
 
 /**
@@ -294,6 +310,67 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
   logger.info("DELETION", `[DRY-RUN LOG] Busca de terceiros: ${runThirdPartySearch ? "EXECUTADA" : "IGNORADA"}. Emails válidos: ${emails.length}, Telefones válidos: ${uniquePhones.length}`);
 
   let thirdPartySearchMsg = "";
+  const matchesByCollection: Record<string, Record<string, number>> = {
+    appointments: {},
+    waitlist: {},
+    reviews: {},
+    review_requests: {},
+    whatsapp_logs: {},
+    alerts: {}
+  };
+
+  const maskIdentifier = (id: string): string => {
+    if (id.includes("@")) {
+      const parts = id.split("@");
+      const username = parts[0] || "";
+      const domain = parts[1] || "";
+      const maskedUsername = username.length > 1 ? username[0] + "*".repeat(username.length - 1) : "*";
+      return `${maskedUsername}@${domain}`;
+    } else {
+      const digits = id.replace(/\D/g, "");
+      if (digits.length <= 4) return "****";
+      return "*".repeat(digits.length - 4) + digits.substring(digits.length - 4);
+    }
+  };
+
+  const emailDiagnostics = emails.map(em => {
+    const parts = em.split("@");
+    const domain = parts[1] || "";
+    const firstLetter = parts[0] ? parts[0][0] : "";
+    const isProfile = em === profileEmail.trim().toLowerCase();
+    const isAuth = em === authEmail.trim().toLowerCase();
+    let origin = "Desconhecido";
+    if (isProfile && isAuth) origin = "Perfil e Auth";
+    else if (isProfile) origin = "Perfil (email)";
+    else if (isAuth) origin = "Auth (email)";
+
+    return {
+      masked: maskIdentifier(em),
+      domain,
+      firstLetter,
+      length: em.length,
+      origin
+    };
+  });
+
+  const phoneDiagnostics = uniquePhones.map(ph => {
+    const digits = ph.replace(/\D/g, "");
+    const lastFour = digits.substring(digits.length - 4);
+    
+    const isProfile = profilePhone ? getPhoneVariants(profilePhone).includes(ph) : false;
+    const isAuth = authPhone ? getPhoneVariants(authPhone).includes(ph) : false;
+    let origin = "Desconhecido";
+    if (isProfile && isAuth) origin = "Perfil e Auth";
+    else if (isProfile) origin = "Perfil (whatsapp/phone)";
+    else if (isAuth) origin = "Auth (phoneNumber)";
+
+    return {
+      masked: maskIdentifier(ph),
+      digitCount: digits.length,
+      lastFour,
+      origin
+    };
+  });
 
   if (!runThirdPartySearch) {
     thirdPartySearchMsg = "Busca de terceiros ignorada: nenhum identificador forte encontrado.";
@@ -302,73 +379,110 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
     logger.info("DELETION", `Consultando referências de cliente do usuário para anonimização...`, { emails, uniquePhones });
 
     // A. Query third party appointments where this user is the client
-    const apptPromises: Promise<any>[] = [];
+    const apptQueries: { promise: Promise<any>, identifier: string }[] = [];
     for (const em of emails) {
       if (em && isValidEmail(em)) {
-        apptPromises.push(db.collection("appointments").where("clientEmail", "==", em).get());
+        apptQueries.push({
+          promise: db.collection("appointments").where("clientEmail", "==", em).get(),
+          identifier: em
+        });
       }
     }
     for (const ph of uniquePhones) {
       if (ph && isValidPhone(ph)) {
-        apptPromises.push(db.collection("appointments").where("clientPhone", "==", ph).get());
-        apptPromises.push(db.collection("appointments").where("clientWhatsapp", "==", ph).get());
-        apptPromises.push(db.collection("appointments").where("clientPhoneNormalized", "==", ph).get());
-        apptPromises.push(db.collection("appointments").where("clientWhatsappNormalized", "==", ph).get());
+        apptQueries.push({
+          promise: db.collection("appointments").where("clientPhone", "==", ph).get(),
+          identifier: ph
+        });
+        apptQueries.push({
+          promise: db.collection("appointments").where("clientWhatsapp", "==", ph).get(),
+          identifier: ph
+        });
+        apptQueries.push({
+          promise: db.collection("appointments").where("clientPhoneNormalized", "==", ph).get(),
+          identifier: ph
+        });
+        apptQueries.push({
+          promise: db.collection("appointments").where("clientWhatsappNormalized", "==", ph).get(),
+          identifier: ph
+        });
       }
     }
 
     try {
-      const apptSnapshots = await Promise.all(apptPromises);
       const anonymizedApptIds: string[] = [];
 
-      for (const snap of apptSnapshots) {
+      for (const q of apptQueries) {
+        const snap = await q.promise;
+        let queryMatches = 0;
         for (const doc of snap.docs) {
           const data = doc.data();
           // Safety: Only update/anonymize if it belongs to another professional (not deleted)
           if (data.professionalId !== uid) {
-            anonymizedApptIds.push(doc.id);
-            const appointmentUpdate = {
-              clientName: "Cliente Removido",
-              clientEmail: "removido@nera.com.br",
-              clientPhone: "00000000000",
-              clientWhatsapp: "00000000000",
-              clientPhoneNormalized: "00000000000",
-              clientWhatsappNormalized: "00000000000",
-              clientPhotoUrl: "",
-              clientNotes: admin.firestore.FieldValue.delete(),
-              timeline: admin.firestore.FieldValue.arrayUnion({
-                type: "client_anonymized",
-                createdAt: new Date().toISOString(),
-                actor: "system",
-                label: "Dados pessoais do cliente removidos por solicitação de privacidade"
-              }),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp()
-            };
-            addAnonymize("appointments", doc.ref, appointmentUpdate);
+            queryMatches++;
+            if (!anonymizedApptIds.includes(doc.id)) {
+              anonymizedApptIds.push(doc.id);
+              const appointmentUpdate = {
+                clientName: "Cliente Removido",
+                clientEmail: "removido@nera.com.br",
+                clientPhone: "00000000000",
+                clientWhatsapp: "00000000000",
+                clientPhoneNormalized: "00000000000",
+                clientWhatsappNormalized: "00000000000",
+                clientPhotoUrl: "",
+                clientNotes: admin.firestore.FieldValue.delete(),
+                timeline: admin.firestore.FieldValue.arrayUnion({
+                  type: "client_anonymized",
+                  createdAt: new Date().toISOString(),
+                  actor: "system",
+                  label: "Dados pessoais do cliente removidos por solicitação de privacidade"
+                }),
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+              };
+              addAnonymize("appointments", doc.ref, appointmentUpdate);
+            }
           }
+        }
+        if (queryMatches > 0) {
+          const mKey = maskIdentifier(q.identifier);
+          matchesByCollection.appointments[mKey] = (matchesByCollection.appointments[mKey] || 0) + queryMatches;
         }
       }
 
       // B. Query third party waitlist entries where this user is the client
-      const waitlistPromises: Promise<any>[] = [];
+      const waitlistQueries: { promise: Promise<any>, identifier: string }[] = [];
       for (const em of emails) {
         if (em && isValidEmail(em)) {
-          waitlistPromises.push(db.collection("waitlist").where("clientEmail", "==", em).get());
+          waitlistQueries.push({
+            promise: db.collection("waitlist").where("clientEmail", "==", em).get(),
+            identifier: em
+          });
         }
       }
       for (const ph of uniquePhones) {
         if (ph && isValidPhone(ph)) {
-          waitlistPromises.push(db.collection("waitlist").where("clientWhatsapp", "==", ph).get());
-          waitlistPromises.push(db.collection("waitlist").where("clientPhoneNormalized", "==", ph).get());
-          waitlistPromises.push(db.collection("waitlist").where("clientWhatsappNormalized", "==", ph).get());
+          waitlistQueries.push({
+            promise: db.collection("waitlist").where("clientWhatsapp", "==", ph).get(),
+            identifier: ph
+          });
+          waitlistQueries.push({
+            promise: db.collection("waitlist").where("clientPhoneNormalized", "==", ph).get(),
+            identifier: ph
+          });
+          waitlistQueries.push({
+            promise: db.collection("waitlist").where("clientWhatsappNormalized", "==", ph).get(),
+            identifier: ph
+          });
         }
       }
 
-      const waitlistSnapshots = await Promise.all(waitlistPromises);
-      for (const snap of waitlistSnapshots) {
+      for (const q of waitlistQueries) {
+        const snap = await q.promise;
+        let queryMatches = 0;
         for (const doc of snap.docs) {
           const data = doc.data();
           if (data.professionalId !== uid) {
+            queryMatches++;
             const waitlistUpdate = {
               clientName: "Cliente Removido",
               clientEmail: "removido@nera.com.br",
@@ -379,6 +493,10 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
             };
             addAnonymize("waitlist", doc.ref, waitlistUpdate);
           }
+        }
+        if (queryMatches > 0) {
+          const mKey = maskIdentifier(q.identifier);
+          matchesByCollection.waitlist[mKey] = (matchesByCollection.waitlist[mKey] || 0) + queryMatches;
         }
       }
 
@@ -410,6 +528,9 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
             const colName = doc.ref.parent.id;
 
             if (data.professionalId !== uid && data.userId !== uid) {
+              matchesByCollection[colName] = matchesByCollection[colName] || {};
+              matchesByCollection[colName]["via appointments matched"] = (matchesByCollection[colName]["via appointments matched"] || 0) + 1;
+
               if (colName === "reviews") {
                 const reviewUpdate = {
                   firstName: "Cliente Anônima",
@@ -520,7 +641,12 @@ async function gatherUserData(uid: string, db: admin.firestore.Firestore): Promi
     details,
     anonymizedRecordsCount,
     anonymizedDetails,
-    message: thirdPartySearchMsg
+    message: thirdPartySearchMsg,
+    diagnostics: {
+      emails: emailDiagnostics,
+      phones: phoneDiagnostics,
+      matchesByCollection
+    }
   };
 
   return {

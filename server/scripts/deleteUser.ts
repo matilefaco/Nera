@@ -80,6 +80,56 @@ async function main() {
     } else {
       console.log("  Nenhum registro de terceiro precisa de anonimização.");
     }
+
+    if (report.diagnostics) {
+      console.log("\n----------------------------------------------------------------");
+      console.log("DIAGNÓSTICO DETALHADO DO DRY RUN (SEGURANÇA DE PRIVACIDADE):");
+      console.log("----------------------------------------------------------------");
+      
+      const { emails, phones, matchesByCollection } = report.diagnostics;
+      
+      console.log("\n1. EMAILS VÁLIDOS AVALIADOS:");
+      if (emails && emails.length > 0) {
+        for (const em of emails) {
+          console.log(`  - E-mail Mascarado: ${em.masked}`);
+          console.log(`    * Domínio: ${em.domain}`);
+          console.log(`    * Primeira Letra: '${em.firstLetter}'`);
+          console.log(`    * Tamanho Total: ${em.length} caracteres`);
+          console.log(`    * Origem: ${em.origin}`);
+        }
+      } else {
+        console.log("  Nenhum e-mail válido encontrado.");
+      }
+
+      console.log("\n2. TELEFONES VÁLIDOS AVALIADOS:");
+      if (phones && phones.length > 0) {
+        for (const ph of phones) {
+          console.log(`  - Telefone Mascarado: ${ph.masked}`);
+          console.log(`    * Dígitos: ${ph.digitCount}`);
+          console.log(`    * Últimos 4 Dígitos: ${ph.lastFour}`);
+          console.log(`    * Origem: ${ph.origin}`);
+        }
+      } else {
+        console.log("  Nenhum telefone válido encontrado.");
+      }
+
+      console.log("\n3. DETALHAMENTO DE CORRESPONDÊNCIAS DE TERCEIROS:");
+      let hasMatches = false;
+      if (matchesByCollection) {
+        for (const [colName, matches] of Object.entries(matchesByCollection)) {
+          if (matches && Object.keys(matches).length > 0) {
+            hasMatches = true;
+            console.log(`  - Coleção '${colName}':`);
+            for (const [identifier, count] of Object.entries(matches)) {
+              console.log(`    * Identificador '${identifier}': ${count} documento(s) correspondente(s)`);
+            }
+          }
+        }
+      }
+      if (!hasMatches) {
+        console.log("  Nenhuma correspondência com dados de terceiros foi encontrada.");
+      }
+    }
     console.log("================================================================");
 
     if (dryRun) {
