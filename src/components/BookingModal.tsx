@@ -695,23 +695,21 @@ export default function BookingModal({
         let currentBlocked: any[] = [];
         let currentAppts: any[] = [];
 
-        // 1. Fetch Blocked Schedules (we fetch this every time the date changes to ensure we have the latest, though it fetches all for the pro)
+        // 1. Fetch Blocked Schedules securely via backend (we fetch this every time the date changes to ensure we have the latest)
         try {
-          if (isDev) console.log(`[Slots] blockedTimes query start`);
-          const blockedRef = collection(db, "blocked_schedules");
-          const blockedSnap = await getDocs(
-            query(blockedRef, where("professionalId", "==", profId)),
-          );
-          currentBlocked = blockedSnap.docs.map(
-            (doc) => ({ id: doc.id, ...doc.data() }) as any,
-          );
+          if (isDev) console.log(`[Slots] blockedTimes query start via API`);
+          const blockedResponse = await fetch(`/api/profile/public-blocked-schedules/${profId}`);
+          if (!blockedResponse.ok) {
+            throw new Error(`Failed to fetch public blocked schedules: ${blockedResponse.status}`);
+          }
+          currentBlocked = await blockedResponse.json();
           if (isDev)
             console.log(
-              `[Slots] blockedTimes query success count=${currentBlocked.length}`,
+              `[Slots] blockedTimes API success count=${currentBlocked.length}`,
             );
         } catch (err) {
           if (isDev)
-            console.error("[Slots] error actual= blockedTimes query:", err);
+            console.error("[Slots] error fetching public blocked schedules:", err);
           setSlotsLoadError("timeout");
           setSelectedTime("");
           return; // Abort loading slots if blocked schedules fetch fails

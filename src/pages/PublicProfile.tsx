@@ -639,15 +639,18 @@ function PublicProfileContent() {
           duration = minDuration > 0 ? minDuration : 60;
         }
 
-        // Fetch all blocked schedules for the week once
-        const blockedQ = query(
-          collection(db, "blocked_schedules"),
-          where("professionalId", "==", profId),
-        );
-        const blockedSnap = await getDocs(blockedQ);
-        const blockedSchedules = blockedSnap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() }) as any,
-        );
+        // Fetch all blocked schedules for the week once securely via backend
+        let blockedSchedules: any[] = [];
+        try {
+          const blockedResponse = await fetch(`/api/profile/public-blocked-schedules/${profId}`);
+          if (blockedResponse.ok) {
+            blockedSchedules = await blockedResponse.json();
+          } else {
+            devLog(`[NEXT_SLOT] Failed to fetch public blocked schedules, response status: ${blockedResponse.status}`);
+          }
+        } catch (blockedErr) {
+          devLog("[NEXT_SLOT] Error fetching public blocked schedules:", blockedErr);
+        }
 
         // Fetch all appointments for the next 14 days securely via backend (Blindagem)
         const todayStr = getLocalDateStr(now);

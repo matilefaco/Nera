@@ -180,7 +180,7 @@ service cloud.firestore {
     }
 
     match /services/{serviceId} {
-      allow get, list: if true;
+      allow get, list: if isDocOwner(existing()) || isAdmin();
       allow create: if isSignedIn() && isValidService(incoming());
       allow update: if (isDocOwner(existing()) && 
                         incoming().get('professionalId', '') == existing().get('professionalId', '') && 
@@ -247,7 +247,7 @@ service cloud.firestore {
     }
 
     match /blocked_schedules/{scheduleId} {
-      allow get, list: if true;
+      allow get, list: if isDocOwner(existing()) || isAdmin();
       allow create: if isSignedIn() && incoming().get('professionalId', '') == request.auth.uid && isValidBlockedSchedule(incoming());
       allow update: if isSignedIn() && 
                         existing().get('professionalId', '') == request.auth.uid && 

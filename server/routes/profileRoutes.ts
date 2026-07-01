@@ -836,6 +836,58 @@ router.get("/public-profile/:slug", publicReadLimiter, async (req, res) => {
 });
 
 /**
+ * GET /api/profile/public-blocked-schedules/:professionalId
+ * Returns public/sanitized blocked schedules for a given professionalId.
+ * No reasons or customReasons are exposed.
+ */
+router.get("/public-blocked-schedules/:professionalId", publicReadLimiter, async (req, res) => {
+  const { professionalId } = req.params;
+  const cleanId = professionalId?.trim();
+
+  if (!cleanId || cleanId.length > 128) {
+    return res.status(400).json({ error: "Id profissional inválido." });
+  }
+
+  try {
+    const db = getDb();
+    if (!db) throw new Error("Database not connected");
+
+    const userDoc = await db.collection("users").doc(cleanId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ error: "Profissional não encontrado." });
+    }
+
+    const userData = userDoc.data() || {};
+    if (userData.accountStatus === 'scheduled_for_deletion' || userData.accountStatus === 'deleted') {
+      return res.status(404).json({ error: "Profissional desativado." });
+    }
+
+    const blockedSnap = await db.collection("blocked_schedules")
+      .where("professionalId", "==", cleanId)
+      .get();
+
+    const sanitizedSchedules = blockedSnap.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        professionalId: d.professionalId,
+        date: d.date,
+        startTime: d.startTime,
+        endTime: d.endTime,
+        type: d.type,
+        isRecurring: d.isRecurring || false,
+        recurringDays: d.recurringDays || []
+      };
+    });
+
+    return res.json(sanitizedSchedules);
+  } catch (err: any) {
+    logger.error("PUBLIC_BLOCKED_SCHEDULES", "Error fetching public blocked schedules", { professionalId: cleanId, error: err.message });
+    return res.status(500).json({ error: "Erro ao buscar bloqueios." });
+  }
+});
+
+/**
  * GET /api/profile/public-directory
  * Returns a list of professionals for the directory page, sanitized and filtered.
  */
