@@ -22,7 +22,7 @@ export interface PlanConfig {
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   free: {
     themes: ['terracotta'],
-    portfolioLimit: 3,
+    portfolioLimit: 6,
     features: {
       unlimitedBookings: false,
       whatsappNotifications: false,
@@ -39,7 +39,7 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   },
   essencial: {
     themes: ['terracotta', 'rose', 'sage'],
-    portfolioLimit: 9,
+    portfolioLimit: 12,
     features: {
       unlimitedBookings: true,
       whatsappNotifications: false,
