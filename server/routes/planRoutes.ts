@@ -249,6 +249,7 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
 
     // Check for credits before creating session params
     const credits = userData?.credits || 0;
+    const creditsApplied = credits >= 10 ? credits : 0;
 
     const isUpgrade = userData?.onboardingCompleted === true;
 
@@ -269,7 +270,8 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       metadata: {
         professionalId: uid,
         plan,
-        creditsUsed: credits >= 10 ? 'true' : 'false',
+        creditsApplied: String(creditsApplied),
+        creditsUsed: creditsApplied > 0 ? 'true' : 'false',
         source: isUpgrade ? 'upgrade' : 'signup'
       },
       subscription_data: {
@@ -288,12 +290,12 @@ router.post("/create-checkout", requireFirebaseAuth, async (req: AuthenticatedRe
       };
     }
 
-    if (credits >= 10) {
+    if (creditsApplied > 0) {
       const coupon = await stripe.coupons.create({
-        amount_off: Math.floor(credits * 100),
+        amount_off: Math.floor(creditsApplied * 100),
         currency: "brl",
         duration: "once",
-        name: `Crédito de indicação Nera (R$${credits})`
+        name: `Crédito de indicação Nera (R$${creditsApplied})`
       });
       sessionParams.discounts = [{ coupon: coupon.id }];
     }
@@ -852,7 +854,7 @@ router.post("/webhook", async (req, res) => {
         }
         
         const userData = userDoc.data() || {};
-        const creditsUsed = session.metadata?.creditsUsed === 'true';
+        const creditsApplied = parseFloat(session.metadata?.creditsApplied || "0") || (session.metadata?.creditsUsed === 'true' ? 10 : 0);
 
         // Idempotency Guard: Skip if subscription is already processed and plan matches
         if (userData.stripeSubscriptionId === session.subscription && userData.plan === plan) {
@@ -882,8 +884,9 @@ router.post("/webhook", async (req, res) => {
           updatedAt: new Date().toISOString()
         };
 
-        if (creditsUsed) {
-          updateData.credits = 0;
+        if (creditsApplied > 0) {
+          const currentCredits = userData.credits || 0;
+          updateData.credits = Math.max(0, currentCredits - creditsApplied);
         }
 
         transaction.update(userRef, updateData);
@@ -1299,6 +1302,8 @@ router.post("/confirm-checkout", requireFirebaseAuth, async (req: AuthenticatedR
           return;
         }
 
+        const creditsApplied = parseFloat(session.metadata?.creditsApplied || "0") || (session.metadata?.creditsUsed === 'true' ? 10 : 0);
+
         const updateData: any = {
           plan: plan,
           planRank: plan === 'pro' ? 2 : 1,
@@ -1313,8 +1318,9 @@ router.post("/confirm-checkout", requireFirebaseAuth, async (req: AuthenticatedR
           updatedAt: new Date().toISOString()
         };
 
-        if (session.metadata?.creditsUsed === 'true') {
-          updateData.credits = 0;
+        if (creditsApplied > 0) {
+          const currentCredits = userData.credits || 0;
+          updateData.credits = Math.max(0, currentCredits - creditsApplied);
         }
 
         transaction.update(userRef, updateData);

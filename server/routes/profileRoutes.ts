@@ -991,7 +991,8 @@ router.get("/referrals", requireFirebaseAuth, async (req: AuthenticatedRequest, 
         slug: data.slug || '',
         specialty: data.specialty || '',
         createdAt: data.createdAt ? (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : new Date().toISOString(),
-        plan: data.plan || 'free'
+        plan: data.plan || 'free',
+        referralRewarded: !!data.referralRewarded
       };
     });
 

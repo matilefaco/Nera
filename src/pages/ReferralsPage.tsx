@@ -17,6 +17,7 @@ interface ReferralRecord {
   specialty?: string;
   createdAt: string;
   plan: string;
+  referralRewarded?: boolean;
 }
 
 const isDev = import.meta.env.DEV || (typeof window !== 'undefined' && window.location.hostname.includes('ais-'));
@@ -113,7 +114,7 @@ export default function ReferralsPage() {
     };
   }, [profile?.referralCode, isAuthReady, retryCount, features.referrals]);
 
-  const totalCredits = (referrals.filter(r => r.plan !== 'free').length) * 10;
+  const totalCredits = (referrals.filter(r => !!r.referralRewarded).length) * 10;
   const referralLink = `${window.location.origin}/register?ref=${profile?.referralCode || ''}`;
 
   const handleCopy = () => {
@@ -277,11 +278,11 @@ export default function ReferralsPage() {
 
             {referrals.map((referral, idx) => {
               const firstName = referral.name.split(' ')[0];
-              const isPaid = referral.plan !== 'free';
+              const isPaid = !!referral.referralRewarded;
               
-              const statusLabel = referral.plan === 'pro' ? 'Assinatura ativa' : 
-                                 referral.plan === 'essencial' ? 'Trial ativo' : 
-                                 'Cadastro iniciado';
+              const statusLabel = isPaid 
+                ? (referral.plan === 'pro' ? 'Assinatura ativa' : referral.plan === 'essencial' ? 'Trial ativo' : 'Assinatura ativa') 
+                : 'Pendente';
               
               return (
                 <motion.div 

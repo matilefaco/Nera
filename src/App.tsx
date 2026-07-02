@@ -76,7 +76,7 @@ function ReferralTracker() {
       const searchParams = new URLSearchParams(location.search);
       const ref = searchParams.get('ref');
       if (ref) {
-        sessionStorage.setItem('nera_referred_by', ref);
+        sessionStorage.setItem('nera_referred_by', ref.trim().toUpperCase());
       }
     } catch (err) {
       console.error('[ReferralTracker] Error tracking referral:', err);

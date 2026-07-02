@@ -152,7 +152,7 @@ service cloud.firestore {
                          'plan', 'signupPlan', 'planRank', 'planExpiresAt', 
                          'stripeCustomerId', 'stripeSubscriptionId', 'stripeSubscriptionStatus', 'subscriptionStatus',
                          'billingSource', 'manualPlanGrant', 'credits', 'trialUsed', 'trialStartedAt',
-                         'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'internalAccount', 'internalType', 'excludeFromAnalytics',
+                         'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'referralRewarded', 'internalAccount', 'internalType', 'excludeFromAnalytics',
                          'trialEndsAt', 'currentPeriodEnd',
                          'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive', 'whatsappNotifications'
                        ]);
@@ -163,7 +163,7 @@ service cloud.firestore {
                           'plan', 'signupPlan', 'planRank', 'planExpiresAt', 
                           'stripeCustomerId', 'stripeSubscriptionId', 'stripeSubscriptionStatus', 'subscriptionStatus',
                           'billingSource', 'manualPlanGrant', 'credits', 'trialUsed', 'trialStartedAt',
-                          'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'internalAccount', 'internalType', 'excludeFromAnalytics',
+                          'cancelAtPeriodEnd', 'referralCode', 'referredBy', 'referralRewarded', 'internalAccount', 'internalType', 'excludeFromAnalytics',
                           'trialEndsAt', 'currentPeriodEnd',
                           'whatsappInstanceId', 'whatsappStatus', 'whatsappLastActive', 'whatsappNotifications'
                         ])) || isAdmin();

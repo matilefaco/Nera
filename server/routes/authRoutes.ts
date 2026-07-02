@@ -120,7 +120,73 @@ router.post("/register", requireFirebaseAuth, async (req: AuthenticatedRequest, 
       });
     }
 
-    const referralCode = generateReferralCode(cleanName);
+    // 2. High & transactional uniqueness for referralCode
+    let referralCode = "";
+    let isCodeUnique = false;
+    let codeAttempts = 0;
+    const maxCodeAttempts = 5;
+
+    while (!isCodeUnique && codeAttempts < maxCodeAttempts) {
+      const candidateCode = codeAttempts === 0
+        ? generateReferralCode(cleanName)
+        : generateReferralCode(cleanName + Math.floor(Math.random() * 1000));
+
+      const isUnique = await db.runTransaction(async (transaction) => {
+        const codeRef = db.collection("referral_codes").doc(candidateCode);
+        const usersQuery = db
+          .collection("users")
+          .where("referralCode", "==", candidateCode)
+          .limit(1);
+
+        const [codeDoc, usersSnap] = await Promise.all([
+          transaction.get(codeRef),
+          transaction.get(usersQuery),
+        ]);
+
+        if (!codeDoc.exists && usersSnap.empty) {
+          // Reserve it in referral_codes collection
+          transaction.set(codeRef, {
+            uid: authUid,
+            code: candidateCode,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+          return true;
+        }
+        return false;
+      });
+
+      if (isUnique) {
+        referralCode = candidateCode;
+        isCodeUnique = true;
+      } else {
+        codeAttempts++;
+      }
+    }
+
+    if (!isCodeUnique) {
+      // Fallback to high entropy random code
+      referralCode = `REF${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    }
+
+    // 3. Normalization & Validation of referredBy code
+    let validReferredBy: string | null = null;
+    if (referredBy && typeof referredBy === "string") {
+      const cleanReferredBy = referredBy.trim().toUpperCase().replace(/\s+/g, "");
+      if (/^[A-Z0-9]{4,10}$/.test(cleanReferredBy)) {
+        // confirm that there is exactly one professional in users collection with that code
+        const referrerQuery = await db.collection("users")
+          .where("referralCode", "==", cleanReferredBy)
+          .limit(2)
+          .get();
+        if (referrerQuery.size === 1) {
+          validReferredBy = cleanReferredBy;
+        } else {
+          logger.warn("AUTH", "referredBy code not found or not unique", { cleanReferredBy, size: referrerQuery.size });
+        }
+      } else {
+        logger.warn("AUTH", "referredBy code format invalid", { cleanReferredBy });
+      }
+    }
 
     // Create only the safe fields
     await userDocRef.set({
@@ -129,7 +195,7 @@ router.post("/register", requireFirebaseAuth, async (req: AuthenticatedRequest, 
       email: cleanEmail,
       slug,
       referralCode,
-      referredBy: referredBy || null,
+      referredBy: validReferredBy,
       onboardingCompleted: false,
       credits: 0,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
