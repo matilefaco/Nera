@@ -124,12 +124,21 @@ router.post("/register", requireFirebaseAuth, async (req: AuthenticatedRequest, 
     let referralCode = "";
     let isCodeUnique = false;
     let codeAttempts = 0;
-    const maxCodeAttempts = 5;
+    const maxCodeAttempts = 15;
 
     while (!isCodeUnique && codeAttempts < maxCodeAttempts) {
-      const candidateCode = codeAttempts === 0
-        ? generateReferralCode(cleanName)
-        : generateReferralCode(cleanName + Math.floor(Math.random() * 1000));
+      let candidateCode = "";
+      if (codeAttempts === 0) {
+        candidateCode = generateReferralCode(cleanName);
+      } else if (codeAttempts < 5) {
+        candidateCode = generateReferralCode(cleanName + Math.floor(Math.random() * 1000));
+      } else {
+        // High-entropy secure candidates for subsequent attempts
+        const randPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+        candidateCode = `REF${randPart}`;
+      }
+
+      candidateCode = candidateCode.trim().toUpperCase().replace(/\s+/g, "");
 
       const isUnique = await db.runTransaction(async (transaction) => {
         const codeRef = db.collection("referral_codes").doc(candidateCode);
@@ -164,8 +173,12 @@ router.post("/register", requireFirebaseAuth, async (req: AuthenticatedRequest, 
     }
 
     if (!isCodeUnique) {
-      // Fallback to high entropy random code
-      referralCode = `REF${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+      logger.error("AUTH", "Failed to reserve a unique referral code after multiple attempts", { uid: authUid });
+      return res.status(500).json({
+        ok: false,
+        code: "REFERRAL_CODE_CREATION_FAILED",
+        message: "Não foi possível gerar um código de indicação único para a sua conta. Tente novamente.",
+      });
     }
 
     // 3. Normalization & Validation of referredBy code
@@ -196,6 +209,7 @@ router.post("/register", requireFirebaseAuth, async (req: AuthenticatedRequest, 
       slug,
       referralCode,
       referredBy: validReferredBy,
+      referralRewarded: false,
       onboardingCompleted: false,
       credits: 0,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
