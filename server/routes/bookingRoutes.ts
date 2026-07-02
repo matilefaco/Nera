@@ -2676,10 +2676,28 @@ router.post(
         
         logger.info("BOOKING", `[MANUAL_BOOKING_LOCK_CHECK] ID: ${lockId}`);
         const lockSnap = await transaction.get(lockRef);
-        const blockingStatuses = ["confirmed", "accepted", "completed"];
+        const blockingStatuses = ["confirmed", "accepted", "completed", "concluido"];
 
-        if (lockSnap.exists && blockingStatuses.includes(lockSnap.data()?.status)) {
-             throw new Error("Este horário já está ocupado na agenda.");
+        if (lockSnap.exists) {
+          const lockData = lockSnap.data();
+          if (blockingStatuses.includes(lockData?.status)) {
+            let isRealLock = true;
+            if (lockData?.appointmentId) {
+              const apptDocRef = db.collection("appointments").doc(lockData.appointmentId);
+              const apptDocSnap = await transaction.get(apptDocRef);
+              if (apptDocSnap.exists) {
+                const apptData = apptDocSnap.data();
+                if (!blockingStatuses.includes(apptData?.status)) {
+                  isRealLock = false; // appointment is cancelled or not active
+                }
+              } else {
+                isRealLock = false; // appointment deleted (orphan lock)
+              }
+            }
+            if (isRealLock) {
+              throw { status: 409, message: "Este horário já está ocupado na agenda.", step: "lock" };
+            }
+          }
         }
         
         // 2. Client Summary SECOND READ (Must be before any set)
@@ -2708,54 +2726,10 @@ router.post(
         const apptDateStr = appointmentData.date;
         const apptStartMin = timeToMinutes(appointmentData.time);
         const apptEndMin = apptStartMin + serviceDuration;
-        const apptDayOfWeek = new Date(apptDateStr + "T12:00:00").getDay();
 
-        // 4. WORKING HOURS
-        const proSnap = await transaction.get(db.collection("users").doc(uid));
-        const proData = proSnap.data() || {};
-        const workingHours = proData.workingHours || {};
-        const effectiveHours = getEffectiveWorkingHoursForDate(workingHours, apptDateStr);
-        if (effectiveHours === null) {
-          throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
-        }
-        const start = timeToMinutes(effectiveHours.startTime);
-        const end = timeToMinutes(effectiveHours.endTime);
-        if (apptStartMin < start || apptEndMin > end) {
-          throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
-        }
-        if (effectiveHours.breakStart && effectiveHours.breakEnd) {
-          const breakStartMin = timeToMinutes(effectiveHours.breakStart);
-          const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
-          if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
-            throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
-          }
-        }
-
-        // 5. BLOCKED SCHEDULES
-        const blockedSchedulesSnap = await transaction.get(db.collection("blocked_schedules").where("professionalId", "==", uid));
-        blockedSchedulesSnap.forEach((bSnap) => {
-          const b = bSnap.data();
-          const isRecurring = b.isRecurring === true;
-          const isFixed = b.date === apptDateStr;
-          const recurringDays = Array.isArray(b.recurringDays) ? b.recurringDays : [];
-          const isRecurringToday = isRecurring && recurringDays.includes(apptDayOfWeek);
-          const applies = isFixed || isRecurringToday;
-
-          if (applies) {
-            if (b.full_day || b.allDay) {
-              throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
-            }
-            const bStart = timeToMinutes(b.startTime);
-            const bEnd = timeToMinutes(b.endTime);
-            if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) {
-              throw { status: 400, message: "Horário indisponível. Escolha outro horário." };
-            }
-          }
-        });
-
-        // 6. OVERLAPPING APPOINTMENTS
+        // 4. OVERLAPPING APPOINTMENTS (Skip working hours and blocked schedules checks for manual bookings to allow professional override)
         const apptSnap = await transaction.get(db.collection("appointments").where("professionalId", "==", uid).where("date", "==", appointmentData.date));
-        const activeStatuses = ["pending", "pending_confirmation", "pending_conflict", "confirmed", "accepted", "completed", "concluido"];
+        const activeStatuses = ["confirmed", "accepted", "completed", "concluido"];
         apptSnap.forEach((aSnap) => {
           const existing = aSnap.data();
           if (activeStatuses.includes(existing.status)) {
@@ -2763,7 +2737,7 @@ router.post(
             const existingDuration = Number(existing.duration) || Number(existing.serviceDuration) || 60;
             const existingEnd = existingStart + existingDuration;
             if (intervalsOverlap(apptStartMin, apptEndMin, existingStart, existingEnd)) {
-              throw { status: 409, message: "Este horário já está ocupado na agenda." };
+              throw { status: 409, message: "Este horário já está ocupado na agenda.", step: "overlap" };
             }
           }
         });
@@ -2849,11 +2823,20 @@ router.post(
       logger.info("BOOKING", `[MANUAL_BOOKING_SUCCESS] ID do backend: ${result.appointmentId}`);
       res.json(result);
     } catch (err: any) {
-        logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Falha na transação", { message: err.message, stack: err.stack });
-        if (err.message === "Este horário já está ocupado na agenda.") {
-            return res.status(409).json({ error: err.message, step: "lock" });
+        logger.error("BOOKING", "[MANUAL_BOOKING_ERROR] Falha na transação", { message: err.message || err, stack: err.stack });
+        
+        let errorMsg = err.message || "Erro ao processar o agendamento.";
+        let errorStep = err.step || "transaction";
+        let errorStatus = err.status || 500;
+
+        if (errorMsg === "Este horário já está ocupado na agenda.") {
+          errorStatus = 409;
+          if (errorStep === "transaction") {
+            errorStep = "lock";
+          }
         }
-        res.status(500).json({ error: err.message, step: "transaction" });
+
+        return res.status(errorStatus).json({ error: errorMsg, step: errorStep });
     }
   }
 );

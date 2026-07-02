@@ -625,7 +625,7 @@ export async function createManualAppointment(data: Partial<Appointment>) {
     }
 
     if (!response.ok) {
-        throw new Error(JSON.stringify(result));
+        throw new Error(result.error || result.message || "Erro desconhecido ao criar o agendamento.");
     }
 
     devLog('[Manual Booking] Created successfully', result);
