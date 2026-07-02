@@ -625,7 +625,12 @@ export async function createManualAppointment(data: Partial<Appointment>) {
     }
 
     if (!response.ok) {
-        throw new Error(result.error || result.message || "Erro desconhecido ao criar o agendamento.");
+        const error: any = new Error(result.error || result.message || "Erro desconhecido ao criar o agendamento.");
+        error.code = result.code;
+        error.canOverride = result.canOverride !== undefined ? result.canOverride : false;
+        error.conflicts = result.conflicts || [];
+        error.step = result.step;
+        throw error;
     }
 
     devLog('[Manual Booking] Created successfully', result);

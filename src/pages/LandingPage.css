@@ -218,7 +218,7 @@
   background: transparent;
   color: var(--ink);
   border: 1px solid var(--mist);
-  padding: 22px 40px;
+  padding: 18px 36px;
   border-radius: 100px;
   font-size: 10px;
   font-weight: 500;
@@ -229,9 +229,92 @@
   transition: background 0.2s, border-color 0.2s;
 }
 @media (max-width: 480px) {
-  .landing-page .btn-ghost { padding: 18px 24px; gap: 8px; font-size: 9px; }
+  .landing-page .btn-ghost { padding: 15px 28px; gap: 8px; font-size: 9px; }
 }
 .landing-page .btn-ghost:hover { background: var(--linen); border-color: var(--blush); }
+
+.landing-page .hero-ctas-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .landing-page .hero-ctas-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+  }
+  .landing-page .hero-ctas-row .btn-primary,
+  .landing-page .hero-ctas-row .btn-ghost {
+    width: 100%;
+    max-width: 340px;
+    justify-content: center;
+  }
+}
+
+.landing-page .google-shortcut-container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+}
+@media (max-width: 640px) {
+  .landing-page .google-shortcut-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    margin-top: 24px;
+  }
+}
+
+.landing-page .google-shortcut-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--stone);
+}
+
+.landing-page .btn-google-shortcut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--stone);
+  border: 1px solid var(--mist);
+  padding: 8px 16px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .landing-page .btn-google-shortcut {
+    width: 100%;
+    max-width: 340px;
+    padding: 10px 20px;
+  }
+}
+.landing-page .btn-google-shortcut:hover {
+  background: var(--linen);
+  border-color: var(--stone);
+  color: var(--ink);
+  transform: translateY(-1px);
+}
+.landing-page .btn-google-shortcut:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 
 /* MARQUEE */
 .landing-page .marquee-strip {

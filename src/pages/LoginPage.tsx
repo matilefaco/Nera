@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { signInWithPopup, GoogleAuthProvider, sendSignInLinkToEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { auth } from '../firebase';
 import { Mail, Lock, ArrowRight, Sparkles, LogOut, CheckCircle } from 'lucide-react';
 import { useAuth } from '../AuthContext';
@@ -20,7 +20,63 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
+  const [useMagicLink, setUseMagicLink] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkCooldown, setMagicLinkCooldown] = useState(0);
   const navigate = useNavigate();
+
+  const startMagicLinkCooldown = () => {
+    setMagicLinkCooldown(60);
+    const interval = setInterval(() => {
+      setMagicLinkCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  const deriveNameFromEmail = (emailStr: string): string => {
+    if (!emailStr) return "Usuária Nera";
+    const part = emailStr.split('@')[0];
+    const clean = part.replace(/[._-]/g, ' ');
+    return clean
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const ensureUserRegisteredInFirestore = async (firebaseUser: any) => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: firebaseUser.displayName || deriveNameFromEmail(firebaseUser.email || ""),
+          email: firebaseUser.email || "",
+        }),
+      });
+
+      if (response.ok) {
+        console.log("[Auth] Auto-registration succeeded.");
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 409 || errData.code === "USER_ALREADY_EXISTS") {
+          console.log("[Auth] User already exists in Firestore.");
+        } else {
+          console.warn("[Auth] Firestore registration warning:", errData.error);
+        }
+      }
+    } catch (err) {
+      console.error("[Auth] Failed to ensure Firestore registration:", err);
+    }
+  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,10 +112,45 @@ export default function LoginPage() {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       notify.success('Seja bem-vinda.');
+      
+      if (result.user) {
+        await ensureUserRegisteredInFirestore(result.user);
+      }
+
       const returnUrl = searchParams.get('returnUrl');
       navigate(returnUrl || '/dashboard');
     } catch (error: any) {
       notify.error(getHumanError(error.code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      notify.error("Por favor, insira seu e-mail.");
+      return;
+    }
+    if (loading || magicLinkCooldown > 0) return;
+
+    setLoading(true);
+    try {
+      const returnUrl = searchParams.get('returnUrl') || '';
+      const actionCodeSettings = {
+        url: `${window.location.origin}/login-magic-callback${returnUrl ? `?returnUrl=${encodeURIComponent(returnUrl)}` : ''}`,
+        handleCodeInApp: true,
+      };
+      
+      await sendSignInLinkToEmail(auth, email.trim().toLowerCase(), actionCodeSettings);
+      window.localStorage.setItem('emailForSignIn', email.trim().toLowerCase());
+      
+      setMagicLinkSent(true);
+      notify.success('Link de acesso enviado!');
+      startMagicLinkCooldown();
+    } catch (error: any) {
+      console.error('[MagicLink] Error sending link:', error);
+      notify.error('Ocorreu um erro ao enviar o link. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -257,9 +348,89 @@ export default function LoginPage() {
               </form>
             )}
           </div>
+        ) : useMagicLink ? (
+          <div className="space-y-6">
+            {magicLinkSent ? (
+              <div className="bg-brand-linen/50 p-8 rounded-[24px] border border-brand-mist text-center">
+                <Sparkles className="w-12 h-12 text-brand-terracotta mx-auto mb-4 animate-pulse" />
+                <h3 className="text-lg font-serif mb-2">Verifique seu e-mail</h3>
+                <p className="text-brand-stone text-xs leading-relaxed mb-6 font-light">
+                  Enviamos um link seguro para <strong>{email}</strong>. Abra o link no seu dispositivo para acessar sua conta.
+                </p>
+                <div className="flex flex-col gap-4">
+                  <button 
+                    type="button"
+                    disabled={magicLinkCooldown > 0}
+                    onClick={handleSendMagicLink}
+                    className="text-[10px] font-medium text-brand-terracotta uppercase tracking-widest hover:underline disabled:opacity-50"
+                  >
+                    {magicLinkCooldown > 0 ? `Reenviar link em ${magicLinkCooldown}s` : 'Não recebi o e-mail (Reenviar)'}
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => { setUseMagicLink(false); setMagicLinkSent(false); }}
+                    className="text-[10px] font-medium text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors"
+                  >
+                    Voltar para login com senha
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSendMagicLink} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seu E-mail</label>
+                  <div className="relative">
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-mist" size={18} />
+                    <input 
+                      type="email" 
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="exemplo@estudio.com"
+                      className="w-full pl-14 pr-6 py-4 bg-brand-parchment border border-brand-mist rounded-[20px] focus:ring-1 focus:ring-brand-ink outline-none transition-all text-brand-ink font-light"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  <button 
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-brand-ink text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {loading ? 'Enviando...' : 'Receber link de acesso'} <ArrowRight size={18} />
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setUseMagicLink(false)}
+                    className="text-[10px] font-medium text-brand-stone uppercase tracking-widest hover:text-brand-ink transition-colors"
+                  >
+                    Voltar para login com senha
+                  </button>
+                </div>
+              </form>
+            )}
+
+            <div className="relative my-8">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-brand-mist"></div>
+              </div>
+              <div className="relative flex justify-center text-[10px] uppercase tracking-widest">
+                <span className="bg-brand-white px-4 text-brand-mist font-medium">Ou continue com</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleGoogleLogin}
+              className="w-full bg-brand-white border border-brand-mist text-brand-ink py-4 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-linen transition-all flex items-center justify-center gap-4"
+            >
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+              Continuar com Google
+            </button>
+          </div>
         ) : (
           <>
-            <form onSubmit={handleEmailLogin} className="space-y-6 mb-10">
+            <form onSubmit={handleEmailLogin} className="space-y-6 mb-8">
               <div className="space-y-2">
                 <label className="text-[10px] font-medium text-brand-stone uppercase tracking-widest ml-1">Seu E-mail</label>
                 <div className="relative">
@@ -299,16 +470,26 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <button 
-                type="submit"
-                disabled={loading}
-                className="w-full bg-brand-ink text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {loading ? 'Acessando...' : 'Acessar Meu Painel'} <ArrowRight size={18} />
-              </button>
+              <div className="flex flex-col gap-4">
+                <button 
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-brand-ink text-brand-white py-5 rounded-full text-[11px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                >
+                  {loading ? 'Acessando...' : 'Acessar Meu Painel'} <ArrowRight size={18} />
+                </button>
+                
+                <button 
+                  type="button"
+                  onClick={() => setUseMagicLink(true)}
+                  className="text-[10px] font-medium text-brand-terracotta hover:text-brand-sienna uppercase tracking-widest transition-colors py-1"
+                >
+                  Entrar sem senha (receber link por e-mail)
+                </button>
+              </div>
             </form>
 
-            <div className="relative mb-10">
+            <div className="relative mb-8">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-brand-mist"></div>
               </div>

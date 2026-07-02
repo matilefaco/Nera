@@ -37,6 +37,7 @@ const ReviewPage = React.lazy(() => import('./pages/ReviewPage'));
 const BookingResponsePage = React.lazy(() => import('./pages/BookingResponsePage'));
 const VerifyEmailPage = React.lazy(() => import('./pages/VerifyEmailPage'));
 const AuthActionPage = React.lazy(() => import('./pages/AuthActionPage'));
+const MagicLinkCallbackPage = React.lazy(() => import('./pages/MagicLinkCallbackPage'));
 const PendingRequestsPage = React.lazy(() => import('./pages/PendingRequestsPage'));
 const ManageBookingPage = React.lazy(() => import('./pages/ManageBookingPage'));
 const CouponsPage = React.lazy(() => import('./pages/CouponsPage'));
@@ -185,6 +186,7 @@ export default function App() {
                   <Route path="/para-massagistas" element={<LandingPageVariant nichePath="para-massagistas" />} />
                   <Route path="/para-:nichePath" element={<LandingPageVariant />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/login-magic-callback" element={<MagicLinkCallbackPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/privacidade" element={<PrivacyPage />} />
               <Route path="/termos" element={<TermsPage />} />

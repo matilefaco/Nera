@@ -1,11 +1,86 @@
-import React, { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '../firebase';
+import { notify } from '../lib/notify';
 import './LandingPage.css';
 import PricingGrid from '../components/PricingGrid';
 import { ShowcaseSequence } from '../components/ShowcaseSequence';
 
 export default function LandingPage() {
   const navRef = useRef<HTMLElement>(null);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+
+  const deriveNameFromEmail = (emailStr: string): string => {
+    if (!emailStr) return "Usuária Nera";
+    const part = emailStr.split('@')[0];
+    const clean = part.replace(/[._-]/g, ' ');
+    return clean
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const ensureUserRegisteredInFirestore = async (firebaseUser: any) => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      let referredBy = "";
+      try {
+        referredBy = sessionStorage.getItem("nera_referred_by") || "";
+      } catch (e) {}
+
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: firebaseUser.displayName || deriveNameFromEmail(firebaseUser.email || ""),
+          email: firebaseUser.email || "",
+          referredBy: referredBy.trim().toUpperCase().replace(/\s+/g, ""),
+        }),
+      });
+
+      if (response.ok) {
+        console.log("[Auth] Auto-registration succeeded.");
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 409 || errData.code === "USER_ALREADY_EXISTS") {
+          console.log("[Auth] User already exists in Firestore.");
+        } else {
+          console.warn("[Auth] Firestore registration warning:", errData.error);
+        }
+      }
+    } catch (err) {
+      console.error("[Auth] Failed to ensure Firestore registration:", err);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      notify.success('Seja bem-vinda à Nera.');
+      
+      if (result.user) {
+        await ensureUserRegisteredInFirestore(result.user);
+      }
+      
+      navigate('/dashboard');
+    } catch (error: any) {
+      if (error.code === 'auth/popup-closed-by-user') {
+        notify.info('Login cancelado.');
+      } else {
+        console.error('[Google Auth Error]', error);
+        notify.error('Não foi possível realizar o login com Google.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -81,13 +156,28 @@ export default function LandingPage() {
             </p>
 
             <div className="hero-ctas fade-in d3">
-              <Link to="/register" className="btn-primary">
-                <span>Começar grátis</span>
-                <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-              </Link>
-              <Link to="/p/helena-prado" className="btn-ghost" aria-label="Ver vitrine de exemplo">
-                Ver vitrine de exemplo →
-              </Link>
+              <div className="hero-ctas-row">
+                <Link to="/register" className="btn-primary">
+                  <span>Começar grátis</span>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </Link>
+
+                <Link to="/p/helena-prado" className="btn-ghost" aria-label="Ver vitrine de exemplo">
+                  <span>Ver vitrine de exemplo →</span>
+                </Link>
+              </div>
+
+              <div className="google-shortcut-container">
+                <span className="google-shortcut-text">Acesso rápido:</span>
+                <button 
+                  onClick={handleGoogleAuth}
+                  disabled={loading}
+                  className="btn-google-shortcut"
+                >
+                  <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>Continuar com Google</span>
+                </button>
+              </div>
             </div>
 
           </div>

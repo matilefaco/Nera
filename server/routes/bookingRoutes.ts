@@ -2669,36 +2669,11 @@ router.post(
 
     try {
       const result = await db.runTransaction(async (transaction: any) => {
-        // 1. Lock check FIRST READ
         const cleanTime = String(appointmentData.time).replace(":", "");
         const lockId = `${uid}_${appointmentData.date}_${cleanTime}`;
         const lockRef = db.collection("booking_locks").doc(lockId);
-        
-        logger.info("BOOKING", `[MANUAL_BOOKING_LOCK_CHECK] ID: ${lockId}`);
-        const lockSnap = await transaction.get(lockRef);
-        const blockingStatuses = ["confirmed", "accepted", "completed", "concluido"];
 
-        if (lockSnap.exists) {
-          const lockData = lockSnap.data();
-          if (blockingStatuses.includes(lockData?.status)) {
-            let isRealLock = false;
-            if (lockData?.appointmentId) {
-              const apptDocRef = db.collection("appointments").doc(lockData.appointmentId);
-              const apptDocSnap = await transaction.get(apptDocRef);
-              if (apptDocSnap.exists) {
-                const apptData = apptDocSnap.data();
-                if (blockingStatuses.includes(apptData?.status)) {
-                  isRealLock = true; // appointment is active and confirmed
-                }
-              }
-            }
-            if (isRealLock) {
-              throw { status: 409, message: "Este horário já está ocupado na agenda.", step: "lock" };
-            }
-          }
-        }
-        
-        // 2. Client Summary SECOND READ (Must be before any set)
+        // 1. Client Summary READ (Must be before any set/writes)
         const clientKey = getClientKey(
           appointmentData.clientWhatsapp,
           appointmentData.clientEmail,
@@ -2708,7 +2683,7 @@ router.post(
         const summaryRef = db.collection("client_summaries").doc(summaryId);
         const summarySnap = await transaction.get(summaryRef);
 
-        // 3. SERVICE VALIDATION & OWNER CHECK
+        // 2. Service READ
         const serviceRef = db.collection("services").doc(appointmentData.serviceId);
         const serviceSnap = await transaction.get(serviceRef);
         if (!serviceSnap.exists) {
@@ -2725,20 +2700,209 @@ router.post(
         const apptStartMin = timeToMinutes(appointmentData.time);
         const apptEndMin = apptStartMin + serviceDuration;
 
-        // 4. OVERLAPPING APPOINTMENTS (Skip working hours and blocked schedules checks for manual bookings to allow professional override)
-        const apptSnap = await transaction.get(db.collection("appointments").where("professionalId", "==", uid).where("date", "==", appointmentData.date));
+        // 3. Conflict Detection READS
+        const apptsSnap = await transaction.get(
+          db.collection("appointments")
+            .where("professionalId", "==", uid)
+            .where("date", "==", appointmentData.date)
+        );
+        const locksSnap = await transaction.get(
+          db.collection("booking_locks")
+            .where("professionalId", "==", uid)
+            .where("date", "==", appointmentData.date)
+        );
+        const blockedSnap = await transaction.get(
+          db.collection("blocked_schedules")
+            .where("professionalId", "==", uid)
+        );
+
+        // 4. CONFLICT ANALYSIS
+        const conflicts: any[] = [];
+        let canOverride = true;
+        const nowMs = Date.now();
+
         const activeStatuses = ["confirmed", "accepted", "completed", "concluido"];
-        apptSnap.forEach((aSnap) => {
-          const existing = aSnap.data();
-          if (activeStatuses.includes(existing.status)) {
-            const existingStart = timeToMinutes(existing.time);
-            const existingDuration = Number(existing.duration) || Number(existing.serviceDuration) || 60;
-            const existingEnd = existingStart + existingDuration;
-            if (intervalsOverlap(apptStartMin, apptEndMin, existingStart, existingEnd)) {
-              throw { status: 409, message: "Este horário já está ocupado na agenda.", step: "overlap" };
+        const pendingStatuses = ["pending", "pending_confirmation", "pending_conflict"];
+
+        // A. Appointments Overlaps
+        apptsSnap.forEach((doc: any) => {
+          const appt = doc.data();
+          if (!appt) return;
+
+          const apptStart = timeToMinutes(appt.time);
+          const apptDuration = Number(appt.duration) || Number(appt.serviceDuration) || 60;
+          const apptEnd = apptStart + apptDuration;
+
+          if (intervalsOverlap(apptStartMin, apptEndMin, apptStart, apptEnd)) {
+            if (activeStatuses.includes(appt.status)) {
+              canOverride = false;
+              conflicts.push({
+                type: "confirmed_appointment",
+                appointmentId: doc.id,
+                clientName: appt.clientName || "Cliente",
+                serviceName: appt.serviceName || "Serviço",
+                date: appt.date,
+                time: appt.time,
+                status: appt.status,
+              });
+            } else if (pendingStatuses.includes(appt.status)) {
+              // Check if associated lock is expired
+              let isExpired = false;
+              const cleanTimeAppt = String(appt.time).replace(":", "");
+              const associatedLockId = `${uid}_${appt.date}_${cleanTimeAppt}`;
+              const matchedLockDoc = locksSnap.docs.find((l: any) => l.id === associatedLockId);
+              if (matchedLockDoc) {
+                const lockData = matchedLockDoc.data();
+                if (lockData && lockData.expiresAt) {
+                  let expiresAtMs = 0;
+                  if (typeof lockData.expiresAt.toMillis === "function") {
+                    expiresAtMs = lockData.expiresAt.toMillis();
+                  } else {
+                    expiresAtMs = new Date(lockData.expiresAt).getTime();
+                  }
+                  isExpired = expiresAtMs <= nowMs;
+                }
+              }
+              if (!isExpired) {
+                conflicts.push({
+                  type: "pending_appointment",
+                  appointmentId: doc.id,
+                  clientName: appt.clientName || "Cliente",
+                  serviceName: appt.serviceName || "Serviço",
+                  date: appt.date,
+                  time: appt.time,
+                  status: appt.status,
+                });
+              }
             }
           }
         });
+
+        // B. Booking Locks Overlaps
+        locksSnap.forEach((doc: any) => {
+          const lockData = doc.data();
+          if (!lockData) return;
+
+          let isExpired = false;
+          if (lockData.expiresAt) {
+            if (typeof lockData.expiresAt.toMillis === "function") {
+              isExpired = lockData.expiresAt.toMillis() <= nowMs;
+            } else {
+              isExpired = new Date(lockData.expiresAt).getTime() <= nowMs;
+            }
+          }
+
+          if (isExpired) return;
+
+          const lockStart = timeToMinutes(lockData.time);
+          const lockDuration = Number(lockData.duration) || 60;
+          const lockEnd = lockStart + lockDuration;
+
+          if (intervalsOverlap(apptStartMin, apptEndMin, lockStart, lockEnd)) {
+            const alreadyListedAppt = conflicts.find(
+              (c) => c.appointmentId && c.appointmentId === lockData.appointmentId
+            );
+            if (alreadyListedAppt) return;
+
+            const isConfirmedLock = activeStatuses.includes(lockData.status);
+            if (isConfirmedLock) {
+              canOverride = false;
+            }
+
+            conflicts.push({
+              type: "booking_lock",
+              lockId: doc.id,
+              clientName: lockData.clientName || "Reserva temporária",
+              serviceName: lockData.serviceName || "Serviço",
+              date: lockData.date,
+              time: lockData.time,
+              status: lockData.status || "pending",
+              appointmentId: lockData.appointmentId || null,
+            });
+          }
+        });
+
+        // C. Blocked Schedules / Folgas Overlaps
+        const apptDayOfWeek = new Date(apptDateStr + "T12:00:00").getDay();
+        blockedSnap.forEach((bDoc: any) => {
+          const b = bDoc.data();
+          if (!b) return;
+
+          const isFixed = b.date === apptDateStr;
+          const isRecurring =
+            b.isRecurring &&
+            Array.isArray(b.recurringDays) &&
+            b.recurringDays.includes(apptDayOfWeek);
+
+          if (isFixed || isRecurring) {
+            if (b.type === "full_day" || b.allDay) {
+              conflicts.push({
+                type: "blocked_schedule",
+                blockedId: bDoc.id,
+                serviceName: b.title || "Horário Bloqueado (Dia Inteiro)",
+                date: apptDateStr,
+                time: b.startTime || "00:00",
+                status: "blocked",
+              });
+            } else if (b.startTime && b.endTime) {
+              const bStart = timeToMinutes(b.startTime);
+              const bEnd = timeToMinutes(b.endTime);
+              if (intervalsOverlap(apptStartMin, apptEndMin, bStart, bEnd)) {
+                conflicts.push({
+                  type: "blocked_schedule",
+                  blockedId: bDoc.id,
+                  serviceName: b.title || "Horário Bloqueado / Folga",
+                  date: apptDateStr,
+                  time: `${b.startTime} - ${b.endTime}`,
+                  status: "blocked",
+                });
+              }
+            }
+          }
+        });
+
+        // 5. Conflict Validation
+        if (conflicts.length > 0) {
+          if (!appointmentData.forceCreate) {
+            throw {
+              status: 409,
+              code: "MANUAL_BOOKING_CONFLICT",
+              message: "Já existe um conflito neste horário.",
+              canOverride: canOverride,
+              conflicts: conflicts,
+              step: "conflict"
+            };
+          } else if (!canOverride) {
+            throw {
+              status: 409,
+              code: "MANUAL_BOOKING_CONFLICT",
+              message: "Este horário já está ocupado por um agendamento confirmado e não pode ser sobrescrito.",
+              canOverride: false,
+              conflicts: conflicts,
+              step: "conflict"
+            };
+          }
+        }
+
+        // 6. RESOLVE CONFLICTS FOR FORCE-CREATE (WRITES)
+        if (appointmentData.forceCreate && conflicts.length > 0) {
+          logger.info("BOOKING", `[MANUAL_BOOKING_OVERRIDE] Professional ${uid} did manual override. Resolving ${conflicts.length} conflicts.`);
+          for (const conf of conflicts) {
+            if (conf.type === "pending_appointment" && conf.appointmentId) {
+              const apptRef = db.collection("appointments").doc(conf.appointmentId);
+              const updatePayload = {
+                status: "pending_conflict",
+                conflictReason: "Conflito com o agendamento manual criado pela profissional",
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              };
+              const safeUpdate = sanitizeAppointment(updatePayload, true);
+              transaction.update(apptRef, safeUpdate);
+            } else if (conf.type === "booking_lock" && conf.lockId) {
+              const lockRefDoc = db.collection("booking_locks").doc(conf.lockId);
+              transaction.delete(lockRefDoc);
+            }
+          }
+        }
 
         // 7. Insert into appointments (WRITES)
         const appointmentId = db.collection("appointments").doc().id;
@@ -2788,7 +2952,7 @@ router.post(
         
         logger.info("BOOKING", `[MANUAL_BOOKING_APPOINTMENT_CREATED] ID: ${appointmentId}`);
 
-        // 4. Set booking Lock (WRITES)
+        // 8. Set booking Lock (WRITES)
         transaction.set(lockRef, {
             professionalId: uid,
             date: appointmentData.date,
@@ -2804,7 +2968,7 @@ router.post(
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        // 5. Update Client Summary (WITH PRE-FETCHED READ)
+        // 9. Update Client Summary (WITH PRE-FETCHED READ)
         await updateClientSummaryInternal(
             transaction,
             safeAppointment,
@@ -2826,15 +2990,17 @@ router.post(
         let errorMsg = err.message || "Erro ao processar o agendamento.";
         let errorStep = err.step || "transaction";
         let errorStatus = err.status || 500;
+        let errorCode = err.code || null;
+        let canOverride = err.canOverride !== undefined ? err.canOverride : false;
+        let conflicts = err.conflicts || [];
 
-        if (errorMsg === "Este horário já está ocupado na agenda.") {
-          errorStatus = 409;
-          if (errorStep === "transaction") {
-            errorStep = "lock";
-          }
-        }
-
-        return res.status(errorStatus).json({ error: errorMsg, step: errorStep });
+        return res.status(errorStatus).json({
+          error: errorMsg,
+          code: errorCode,
+          canOverride,
+          conflicts,
+          step: errorStep
+        });
     }
   }
 );

@@ -257,6 +257,13 @@ export default function AgendaPage() {
   }, [openManualFromUrl, setSearchParams]);
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [conflictData, setConflictData] = useState<{
+    message: string;
+    canOverride: boolean;
+    conflicts: any[];
+    payload: any;
+  } | null>(null);
   const [openSlots, setOpenSlots] = useState<string[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -833,13 +840,69 @@ export default function AgendaPage() {
         hasCustomerAddress: manualLocationType === "home" && !!manualClientAddress,
       });
 
-      if (err.message?.includes("permiss") || err.message?.includes("Sessão expirada") || err.code === 'permission-denied') {
+      if (err.code === "MANUAL_BOOKING_CONFLICT") {
+        const selectedSvc = services.find((s) => s.id === manualService);
+        setIsManualModalOpen(false);
+        setConflictData({
+          message: err.message,
+          canOverride: err.canOverride !== undefined ? err.canOverride : false,
+          conflicts: err.conflicts || [],
+          payload: {
+            professionalId: user.uid,
+            clientName: manualClient.trim(),
+            clientWhatsapp: cleanWhatsapp(manualPhone),
+            serviceId: selectedSvc?.id,
+            serviceName: selectedSvc?.name,
+            duration: Number(selectedSvc?.duration) || 60,
+            price: priceNum,
+            travelFee: 0,
+            totalPrice: priceNum,
+            date: manualDate,
+            time: manualTime,
+            locationType: manualLocationType,
+            source: "manual",
+            waitlistEntryId: manualWaitlistEntryId || undefined,
+            ...(manualLocationType === "home" && manualClientAddress ? {
+              customerAddress: { street: manualClientAddress, number: "", neighborhood: "", city: "" }
+            } : {}),
+            notes: "Agendamento criado manualmente",
+          }
+        });
+        setIsConflictModalOpen(true);
+      } else if (err.message?.includes("permiss") || err.message?.includes("Sessão expirada") || err.code === 'permission-denied') {
         notify.error("Não foi possível salvar por uma regra de permissão. Verifique o login e tente novamente.");
       } else if (err.message === "Este horário já está ocupado na agenda.") {
         notify.error("Esse horário já está ocupado na sua agenda.");
       } else {
         notify.error(`Não foi possível criar o agendamento agora. Detalhes: ${err.message || 'Tente novamente.'}`);
       }
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleForceCreateManual = async (payload: any) => {
+    setIsCreating(true);
+    try {
+      await createManualAppointment({
+        ...payload,
+        forceCreate: true,
+      });
+      notify.success(
+        `Agendamento de ${payload.clientName} criado com sucesso.`,
+      );
+      setManualClient("");
+      setManualPhone("");
+      setManualService("");
+      setManualPrice("");
+      setManualTime("");
+      setManualClientAddress("");
+      setManualWaitlistEntryId(null);
+      setIsConflictModalOpen(false);
+      setConflictData(null);
+    } catch (err: any) {
+      console.error("Force Manual Booking Error Detailed:", err);
+      notify.error(`Não foi possível criar o agendamento mesmo com override: ${err.message || 'Tente novamente.'}`);
     } finally {
       setIsCreating(false);
     }
@@ -1906,6 +1969,125 @@ export default function AgendaPage() {
                     </>
                   )}
                 </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isConflictModalOpen && conflictData && (
+            <div className="fixed inset-0 z-[220] flex items-center justify-center p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => {
+                  setIsConflictModalOpen(false);
+                  setIsManualModalOpen(true);
+                }}
+                className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-lg bg-brand-white rounded-t-[32px] md:rounded-[40px] px-6 sm:px-10 pt-12 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)] md:max-h-[85vh] no-scrollbar"
+              >
+                <button
+                  onClick={() => {
+                    setIsConflictModalOpen(false);
+                    setIsManualModalOpen(true);
+                  }}
+                  className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-brand-mist/40 rounded-full text-brand-stone/80 hover:text-brand-ink transition-colors z-20"
+                >
+                  <X size={20} />
+                </button>
+
+                <div className="flex items-center gap-3 mb-4 text-amber-600">
+                  <AlertCircle size={28} className="shrink-0" />
+                  <h3 className="text-2xl font-serif text-brand-ink">
+                    Conflito de Horário
+                  </h3>
+                </div>
+
+                <p className="text-sm text-brand-stone font-light mb-6">
+                  {conflictData.canOverride
+                    ? "Identificamos conflitos com pré-reservas ou bloqueios de horário. Como profissional, você tem a opção de prosseguir e sobrescrever essas marcações pendentes."
+                    : "Este horário já está ocupado por um agendamento confirmado e não pode ser sobrescrito diretamente."}
+                </p>
+
+                <div className="bg-brand-parchment border border-brand-mist rounded-2xl p-5 mb-8 max-h-60 overflow-y-auto space-y-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-stone mb-2">
+                    Conflitos Identificados:
+                  </p>
+                  {conflictData.conflicts.map((c: any, index: number) => {
+                    let title = "Bloqueio ou Conflito";
+                    let desc = "";
+
+                    if (c.type === "confirmed_appointment") {
+                      title = "Agendamento Confirmado";
+                      desc = `${c.clientName} - ${c.serviceName} (${c.time})`;
+                    } else if (c.type === "pending_appointment") {
+                      title = "Agendamento Pendente";
+                      desc = `${c.clientName} - ${c.serviceName} (${c.time})`;
+                    } else if (c.type === "booking_lock") {
+                      title = "Reserva Temporária / Pré-Reserva";
+                      desc = `${c.clientName || "Reserva"} (${c.time})`;
+                    } else if (c.type === "blocked_schedule") {
+                      title = "Horário Bloqueado / Folga";
+                      desc = `${c.serviceName} (${c.time})`;
+                    }
+
+                    return (
+                      <div
+                        key={index}
+                        className="flex gap-3 text-sm font-light text-brand-ink border-b border-brand-mist/40 pb-3 last:border-0 last:pb-0"
+                      >
+                        <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
+                        <div>
+                          <p className="font-medium text-brand-ink text-xs uppercase tracking-wider">
+                            {title}
+                          </p>
+                          <p className="text-sm text-brand-stone font-light mt-0.5">
+                            {desc}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {conflictData.canOverride ? (
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => handleForceCreateManual(conflictData.payload)}
+                      disabled={isCreating}
+                      className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isCreating ? "Agendando..." : "Confirmar e Sobrescrever"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsConflictModalOpen(false);
+                        setIsManualModalOpen(true);
+                      }}
+                      disabled={isCreating}
+                      className="w-full py-4 text-brand-stone hover:text-brand-ink rounded-2xl text-[10px] font-medium uppercase tracking-widest transition-all"
+                    >
+                      Voltar e Ajustar Horário
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setIsConflictModalOpen(false);
+                      setIsManualModalOpen(true);
+                    }}
+                    className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg"
+                  >
+                    Voltar e Alterar Horário
+                  </button>
+                )}
               </motion.div>
             </div>
           )}
