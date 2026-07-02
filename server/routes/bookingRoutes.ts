@@ -2709,28 +2709,47 @@ router.post(
         const apptEndMin = apptStartMin + serviceDuration;
 
         // --- WORKING HOURS VALIDATION ---
-        if (proData.workingHours) {
-          const effectiveHours = getEffectiveWorkingHoursForDate(proData.workingHours, apptDateStr);
-          if (effectiveHours === null) {
-            throw { status: 400, message: "Dia fechado/desativado para atendimento." };
-          }
+        const effectiveWorkingHours = proData.workingHours || {
+          workingDays: proData.workingDays,
+          startTime: proData.startTime,
+          endTime: proData.endTime,
+          breakStart: proData.breakStart,
+          breakEnd: proData.breakEnd,
+          dayHours: proData.dayHours
+        };
 
-          const whStart = timeToMinutes(effectiveHours.startTime);
-          const whEnd = timeToMinutes(effectiveHours.endTime);
+        const hasHoursConfig = !!(
+          effectiveWorkingHours &&
+          (effectiveWorkingHours.dayHours || (effectiveWorkingHours.startTime && effectiveWorkingHours.endTime))
+        );
 
-          if (apptStartMin < whStart) {
-            throw { status: 400, message: "Horário selecionado está antes do início do expediente." };
-          }
-          if (apptEndMin > whEnd) {
-            throw { status: 400, message: "O agendamento ultrapassa o fim do expediente." };
-          }
+        if (!hasHoursConfig) {
+          throw {
+            status: 400,
+            message: "Horários de atendimento não configurados. Atualize seu perfil antes de criar agendamentos."
+          };
+        }
 
-          if (effectiveHours.breakStart && effectiveHours.breakEnd) {
-            const breakStartMin = timeToMinutes(effectiveHours.breakStart);
-            const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
-            if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
-              throw { status: 400, message: "Horário selecionado coincide com o horário de pausa." };
-            }
+        const effectiveHours = getEffectiveWorkingHoursForDate(effectiveWorkingHours, apptDateStr);
+        if (effectiveHours === null) {
+          throw { status: 400, message: "Dia fechado/desativado para atendimento." };
+        }
+
+        const whStart = timeToMinutes(effectiveHours.startTime);
+        const whEnd = timeToMinutes(effectiveHours.endTime);
+
+        if (apptStartMin < whStart) {
+          throw { status: 400, message: "Horário selecionado está antes do início do expediente." };
+        }
+        if (apptEndMin > whEnd) {
+          throw { status: 400, message: "O agendamento ultrapassa o fim do expediente." };
+        }
+
+        if (effectiveHours.breakStart && effectiveHours.breakEnd) {
+          const breakStartMin = timeToMinutes(effectiveHours.breakStart);
+          const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
+          if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
+            throw { status: 400, message: "Horário selecionado coincide com o horário de pausa." };
           }
         }
 
