@@ -1082,28 +1082,36 @@ export default function ProfilePage() {
     
     // Basic aesthetic / quality heuristics
     if (file.size < 60 * 1024) {
-      const hasShownSizeWarning = sessionStorage.getItem('has_shown_portfolio_size_warning');
-      if (!hasShownSizeWarning) {
-        toast('Imagens com um pouco mais de resolução costumam transmitir mais confiança.', {
-          icon: '✨',
-          style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
-        });
-        sessionStorage.setItem('has_shown_portfolio_size_warning', 'true');
+      try {
+        const hasShownSizeWarning = sessionStorage.getItem('has_shown_portfolio_size_warning');
+        if (!hasShownSizeWarning) {
+          toast('Imagens com um pouco mais de resolução costumam transmitir mais confiança.', {
+            icon: '✨',
+            style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
+          });
+          sessionStorage.setItem('has_shown_portfolio_size_warning', 'true');
+        }
+      } catch (e) {
+        // Ignored in sandbox
       }
     }
     
-    const lastUploadName = sessionStorage.getItem('last_portfolio_upload');
-    if (lastUploadName === file.name) {
-      const hasShownDuplicateWarning = sessionStorage.getItem('has_shown_portfolio_duplicate_warning');
-      if (!hasShownDuplicateWarning) {
-        toast('Essa imagem parece muito semelhante a uma que você já adicionou.', {
-          icon: '💡',
-          style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
-        });
-        sessionStorage.setItem('has_shown_portfolio_duplicate_warning', 'true');
+    try {
+      const lastUploadName = sessionStorage.getItem('last_portfolio_upload');
+      if (lastUploadName === file.name) {
+        const hasShownDuplicateWarning = sessionStorage.getItem('has_shown_portfolio_duplicate_warning');
+        if (!hasShownDuplicateWarning) {
+          toast('Essa imagem parece muito semelhante a uma que você já adicionou.', {
+            icon: '💡',
+            style: { background: '#F2EBE3', color: '#1B1918', borderColor: '#E5DFD7' }
+          });
+          sessionStorage.setItem('has_shown_portfolio_duplicate_warning', 'true');
+        }
       }
+      sessionStorage.setItem('last_portfolio_upload', file.name);
+    } catch (e) {
+      // Ignored in sandbox
     }
-    sessionStorage.setItem('last_portfolio_upload', file.name);
 
     // 1. Immediate Local Preview
     const selectedService = professionalServices.find(s => s.id === pendingPortfolioLinkedServiceId);

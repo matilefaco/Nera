@@ -45,11 +45,19 @@ export default function RegisterPage() {
     const refFromUrl = searchParams.get("ref");
     if (refFromUrl) {
       const normalized = refFromUrl.trim().toUpperCase().replace(/\s+/g, "");
-      sessionStorage.setItem("nera_referred_by", normalized);
+      try {
+        sessionStorage.setItem("nera_referred_by", normalized);
+      } catch (e) {
+        // Ignored in iframe environments
+      }
       return normalized;
     }
-    const saved = sessionStorage.getItem("nera_referred_by");
-    return saved ? saved.trim().toUpperCase().replace(/\s+/g, "") : "";
+    try {
+      const saved = sessionStorage.getItem("nera_referred_by");
+      return saved ? saved.trim().toUpperCase().replace(/\s+/g, "") : "";
+    } catch (e) {
+      return "";
+    }
   });
   const [activePlan, setActivePlan] = useState<"free" | "essencial" | "pro">(
     (searchParams.get("plan") as any) || "free",

@@ -2681,17 +2681,15 @@ router.post(
         if (lockSnap.exists) {
           const lockData = lockSnap.data();
           if (blockingStatuses.includes(lockData?.status)) {
-            let isRealLock = true;
+            let isRealLock = false;
             if (lockData?.appointmentId) {
               const apptDocRef = db.collection("appointments").doc(lockData.appointmentId);
               const apptDocSnap = await transaction.get(apptDocRef);
               if (apptDocSnap.exists) {
                 const apptData = apptDocSnap.data();
-                if (!blockingStatuses.includes(apptData?.status)) {
-                  isRealLock = false; // appointment is cancelled or not active
+                if (blockingStatuses.includes(apptData?.status)) {
+                  isRealLock = true; // appointment is active and confirmed
                 }
-              } else {
-                isRealLock = false; // appointment deleted (orphan lock)
               }
             }
             if (isRealLock) {

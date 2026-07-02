@@ -85,9 +85,7 @@ export const notificationMutationLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  validate: {
-    keyGenerator: false
-  },
+  validate: false,
   keyGenerator: (req: any) => {
     return req.uid || req.ip || "127.0.0.1";
   },

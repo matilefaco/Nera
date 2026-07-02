@@ -12,7 +12,7 @@ async function start() {
 
   console.log("[DEV SERVER] Initializing Express + Vite...");
   const app = await createServerApp();
-  const port = 3000;
+  const port = process.env.PORT ? parseInt(process.env.PORT) : 3000;
   
   app.listen(port, "0.0.0.0", () => {
     console.log(`[DEV SERVER] Running at http://localhost:${port}`);

@@ -50,8 +50,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (user && profile && !profile.referralCode) {
       // Prevent infinite loop if updateDoc fails and reverts state constantly
       const key = `referral_attempt_${user.uid}`;
-      if (sessionStorage.getItem(key)) return;
-      sessionStorage.setItem(key, 'true');
+      try {
+        if (sessionStorage.getItem(key)) return;
+        sessionStorage.setItem(key, 'true');
+      } catch (e) {
+        if (isDev) console.warn('[AuthContext] sessionStorage blocked in this sandbox:', e);
+      }
 
       const code = user.uid.slice(0, 8).toUpperCase();
       updateDoc(doc(db, 'users', user.uid), { referralCode: code })
