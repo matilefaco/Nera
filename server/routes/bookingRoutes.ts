@@ -2779,6 +2779,7 @@ router.post(
         });
 
         // B. Booking Locks Overlaps
+        const orphanLocksToDelete: any[] = [];
         locksSnap.forEach((doc: any) => {
           const lockData = doc.data();
           if (!lockData) return;
@@ -2804,21 +2805,61 @@ router.post(
             );
             if (alreadyListedAppt) return;
 
-            const isConfirmedLock = activeStatuses.includes(lockData.status);
-            if (isConfirmedLock) {
-              canOverride = false;
-            }
+            const isConfirmedLockStatus = activeStatuses.includes(lockData.status);
+            if (isConfirmedLockStatus) {
+              // It's a confirmed lock. Let's verify if it's a REAL confirmed lock or an ORPHAN lock.
+              let isConfirmedLockReal = false;
+              if (lockData.appointmentId) {
+                const matchedApptDoc = apptsSnap.docs.find((d: any) => d.id === lockData.appointmentId);
+                if (matchedApptDoc) {
+                  const appt = matchedApptDoc.data();
+                  if (
+                    appt &&
+                    (normalizeId(appt.professionalId) === normalizeId(uid) || appt.professionalId === uid) &&
+                    activeStatuses.includes(appt.status)
+                  ) {
+                    // Check if the corresponding appointment actually overlaps the requested slot
+                    const apptStart = timeToMinutes(appt.time);
+                    const apptDuration = Number(appt.duration) || Number(appt.serviceDuration) || 60;
+                    const apptEnd = apptStart + apptDuration;
+                    if (intervalsOverlap(apptStartMin, apptEndMin, apptStart, apptEnd)) {
+                      isConfirmedLockReal = true;
+                    }
+                  }
+                }
+              }
 
-            conflicts.push({
-              type: "booking_lock",
-              lockId: doc.id,
-              clientName: lockData.clientName || "Reserva temporária",
-              serviceName: lockData.serviceName || "Serviço",
-              date: lockData.date,
-              time: lockData.time,
-              status: lockData.status || "pending",
-              appointmentId: lockData.appointmentId || null,
-            });
+              if (isConfirmedLockReal) {
+                // Real confirmed lock: cannot be overridden!
+                canOverride = false;
+                conflicts.push({
+                  type: "booking_lock",
+                  lockId: doc.id,
+                  clientName: lockData.clientName || "Reserva temporária",
+                  serviceName: lockData.serviceName || "Serviço",
+                  date: lockData.date,
+                  time: lockData.time,
+                  status: lockData.status || "pending",
+                  appointmentId: lockData.appointmentId || null,
+                });
+              } else {
+                // Orphan lock! Treat as orphan/inconsistent, do not block creation, log it, and queue for deletion.
+                logger.info("BOOKING", `[MANUAL_BOOKING_ORPHAN_LOCK] Found orphan confirmed lock: ${doc.id}`);
+                orphanLocksToDelete.push(doc.ref);
+              }
+            } else {
+              // It's a pending lock (or waitlist_lock). It is overrideable.
+              conflicts.push({
+                type: "booking_lock",
+                lockId: doc.id,
+                clientName: lockData.clientName || "Reserva temporária",
+                serviceName: lockData.serviceName || "Serviço",
+                date: lockData.date,
+                time: lockData.time,
+                status: lockData.status || "pending",
+                appointmentId: lockData.appointmentId || null,
+              });
+            }
           }
         });
 
@@ -2897,11 +2938,47 @@ router.post(
               };
               const safeUpdate = sanitizeAppointment(updatePayload, true);
               transaction.update(apptRef, safeUpdate);
+
+              // Find and delete any lock associated with this appointmentId or waitlistEntryId in locksSnap
+              const matchedApptDoc = apptsSnap.docs.find((d: any) => d.id === conf.appointmentId);
+              const apptDataForConflict = matchedApptDoc ? matchedApptDoc.data() : null;
+              const apptWaitlistEntryId = apptDataForConflict?.waitlistEntryId;
+
+              locksSnap.forEach((lDoc: any) => {
+                const lData = lDoc.data();
+                if (lData) {
+                  const matchesAppt = lData.appointmentId === conf.appointmentId;
+                  const matchesWaitlist = apptWaitlistEntryId && lData.waitlistEntryId === apptWaitlistEntryId;
+                  if (matchesAppt || matchesWaitlist) {
+                    logger.info("BOOKING", `[MANUAL_BOOKING_OVERRIDE] Deleting associated lock ${lDoc.id} for pending appointment ${conf.appointmentId}`);
+                    transaction.delete(lDoc.ref);
+                  }
+                }
+              });
             } else if (conf.type === "booking_lock" && conf.lockId) {
               const lockRefDoc = db.collection("booking_locks").doc(conf.lockId);
               transaction.delete(lockRefDoc);
             }
           }
+        }
+
+        // Deletar orphan locks detectados se houver
+        if (orphanLocksToDelete.length > 0) {
+          logger.info("BOOKING", `[MANUAL_BOOKING] Deleting ${orphanLocksToDelete.length} orphan locks`);
+          orphanLocksToDelete.forEach((lockRefDoc: any) => {
+            transaction.delete(lockRefDoc);
+          });
+        }
+
+        // Deletar booking lock do waitlist entry se houver
+        if (appointmentData.waitlistEntryId) {
+          locksSnap.forEach((lDoc: any) => {
+            const lData = lDoc.data();
+            if (lData && lData.waitlistEntryId === appointmentData.waitlistEntryId) {
+              logger.info("BOOKING", `[MANUAL_BOOKING] Deleting lock ${lDoc.id} associated with waitlistEntryId ${appointmentData.waitlistEntryId}`);
+              transaction.delete(lDoc.ref);
+            }
+          });
         }
 
         // 7. Insert into appointments (WRITES)
