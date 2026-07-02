@@ -148,7 +148,7 @@ export default function ReferralsPage() {
 
             {features.referrals && (
               <div className="bg-brand-ink text-white p-6 rounded-3xl min-w-[200px]">
-                <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 block mb-1">Total Ganho</span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-white/40 block mb-1">Saldo Disponível</span>
                 <span className="text-3xl font-serif text-brand-terracotta">{formatCurrency(profile?.credits || 0)}</span>
                 {(profile?.credits || 0) > 0 && (
                   <div className="mt-2 text-[9px] text-brand-linen/80 uppercase tracking-widest font-medium border-t border-white/10 pt-2">

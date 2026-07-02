@@ -41,9 +41,14 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [manualReferralCode, setManualReferralCode] = useState(
-    searchParams.get("ref") || "",
-  );
+  const [manualReferralCode, setManualReferralCode] = useState(() => {
+    const refFromUrl = searchParams.get("ref");
+    if (refFromUrl) {
+      sessionStorage.setItem("nera_referred_by", refFromUrl);
+      return refFromUrl;
+    }
+    return sessionStorage.getItem("nera_referred_by") || "";
+  });
   const [activePlan, setActivePlan] = useState<"free" | "essencial" | "pro">(
     (searchParams.get("plan") as any) || "free",
   );
@@ -114,7 +119,8 @@ export default function RegisterPage() {
         },
         body: JSON.stringify({
           name: user.displayName || "",
-          email: user.email || ""
+          email: user.email || "",
+          referredBy: manualReferralCode,
         }),
       });
 

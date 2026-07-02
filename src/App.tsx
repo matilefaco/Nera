@@ -68,6 +68,24 @@ function RouteLogger() {
   return null;
 }
 
+function ReferralTracker() {
+  const location = useLocation();
+
+  React.useEffect(() => {
+    try {
+      const searchParams = new URLSearchParams(location.search);
+      const ref = searchParams.get('ref');
+      if (ref) {
+        sessionStorage.setItem('nera_referred_by', ref);
+      }
+    } catch (err) {
+      console.error('[ReferralTracker] Error tracking referral:', err);
+    }
+  }, [location.search]);
+
+  return null;
+}
+
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
@@ -148,6 +166,7 @@ export default function App() {
         <PendingAppointmentsProvider>
           <Router>
             <RouteLogger />
+            <ReferralTracker />
             <CaptureModeLoader />
             <div className="min-h-screen font-sans selection:bg-brand-rose/20 selection:text-brand-rose">
               <AppErrorBoundary>
