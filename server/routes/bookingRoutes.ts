@@ -3019,6 +3019,7 @@ router.post(
 
         // 6. RESOLVE CONFLICTS FOR FORCE-CREATE (WRITES)
         const appointmentId = db.collection("appointments").doc().id;
+        const impactedAppointments: any[] = [];
         if (appointmentData.forceCreate && conflicts.length > 0) {
           logger.info("BOOKING", `[MANUAL_BOOKING_OVERRIDE] Professional ${uid} did manual override. Resolving ${conflicts.length} conflicts.`);
           for (const conf of conflicts) {
@@ -3034,6 +3035,20 @@ router.post(
               };
               const safeUpdate = sanitizeAppointment(updatePayload, true);
               transaction.update(apptRef, safeUpdate);
+
+              impactedAppointments.push({
+                appointmentId: conf.appointmentId,
+                clientName: conf.clientName || "Cliente",
+                serviceName: conf.serviceName || "Serviço",
+                date: conf.date,
+                time: conf.time,
+                duration: conf.duration || 60,
+                price: conf.price || 0,
+                status: "pending_conflict",
+                createdAt: conf.createdAt || Date.now(),
+                conflictReason: "Conflito com o agendamento manual criado pela profissional",
+                supersededByAppointmentId: appointmentId
+              });
 
               // Find and delete any lock associated with this appointmentId or waitlistEntryId in locksSnap
               const matchedApptDoc = apptsSnap.docs.find((d: any) => d.id === conf.appointmentId);
@@ -3166,7 +3181,7 @@ router.post(
         );
         logger.info("BOOKING", `[MANUAL_BOOKING_CLIENT_SUMMARY_UPDATED] Executado.`);
 
-        return { success: true, appointmentId };
+        return { success: true, appointmentId, impactedAppointments };
       });
       
       logger.info("BOOKING", `[MANUAL_BOOKING_SUCCESS] ID do backend: ${result.appointmentId}`);

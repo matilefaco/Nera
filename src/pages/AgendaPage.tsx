@@ -888,12 +888,15 @@ export default function AgendaPage() {
   const handleForceCreateManual = async (payload: any) => {
     setIsCreating(true);
     try {
-      const impacted = conflictData?.conflicts?.filter((c: any) => c.type === "pending_appointment") || [];
-
-      await createManualAppointment({
+      const res: any = await createManualAppointment({
         ...payload,
         forceCreate: true,
       });
+
+      const impacted = (res && Array.isArray(res.impactedAppointments))
+        ? res.impactedAppointments
+        : (conflictData?.conflicts?.filter((c: any) => c.type === "pending_appointment" || c.status === "pending_appointment") || []);
+
       notify.success(
         `Agendamento de ${payload.clientName} criado com sucesso.`,
       );
@@ -924,6 +927,7 @@ export default function AgendaPage() {
     setIsResolvingConflicts(true);
     try {
       const token = await user.getIdToken(true);
+      const successfulIds: string[] = [];
       const errors: string[] = [];
 
       for (const appt of overrideImpactedAppointments) {
@@ -936,7 +940,9 @@ export default function AgendaPage() {
               "Content-Type": "application/json",
             },
           });
-          if (!res.ok) {
+          if (res.ok) {
+            successfulIds.push(appt.appointmentId);
+          } else {
             const errData = await res.json().catch(() => ({}));
             errors.push(errData.error || `Erro ao recusar (${res.status})`);
           }
@@ -945,14 +951,20 @@ export default function AgendaPage() {
         }
       }
 
-      if (errors.length > 0) {
-        notify.error(`Falha parcial ao cancelar e avisar: ${errors.join(", ")}`);
-      } else {
-        notify.success("Cliente avisada e pedido cancelado.");
-      }
+      const remaining = overrideImpactedAppointments.filter(
+        (appt: any) => !appt.appointmentId || !successfulIds.includes(appt.appointmentId)
+      );
 
-      setIsOverrideResolutionModalOpen(false);
-      setOverrideImpactedAppointments([]);
+      setOverrideImpactedAppointments(remaining);
+
+      if (successfulIds.length > 0 && remaining.length === 0) {
+        notify.success("Clientes avisadas e pedidos cancelados.");
+        setIsOverrideResolutionModalOpen(false);
+      } else if (successfulIds.length > 0 && remaining.length > 0) {
+        notify.error("Alguns pedidos foram resolvidos, mas outros precisam de nova tentativa.");
+      } else {
+        notify.error("Não foi possível resolver os pedidos agora. Tente novamente.");
+      }
     } catch (err: any) {
       notify.error("Não foi possível resolver os conflitos. Tente novamente.");
     } finally {
@@ -2319,6 +2331,22 @@ export default function AgendaPage() {
                       return dateStr;
                     };
 
+                    const formatRelativeTime = (timeMs: any) => {
+                      if (!timeMs) return null;
+                      const ms = typeof timeMs === "object" && typeof timeMs.toMillis === "function"
+                        ? timeMs.toMillis()
+                        : (typeof timeMs === "string" ? new Date(timeMs).getTime() : Number(timeMs));
+                      if (isNaN(ms) || ms <= 0) return null;
+
+                      const diffMin = Math.round((Date.now() - ms) / 60000);
+                      if (diffMin < 1) return "Criado agora";
+                      if (diffMin < 60) return `Criado há ${diffMin} ${diffMin === 1 ? "minuto" : "minutos"}`;
+                      const diffHours = Math.round(diffMin / 60);
+                      if (diffHours < 24) return `Criado há ${diffHours} ${diffHours === 1 ? "hora" : "horas"}`;
+                      const diffDays = Math.round(diffHours / 24);
+                      return `Criado há ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`;
+                    };
+
                     return (
                       <div key={idx} className="bg-brand-parchment/60 border border-brand-mist/50 rounded-2xl p-4 space-y-2 text-xs font-light text-brand-ink">
                         <div className="flex items-center justify-between font-semibold text-brand-stone">
@@ -2353,6 +2381,11 @@ export default function AgendaPage() {
                             }
                           </div>
                         </div>
+                        {appt.createdAt && (
+                          <div className="text-[10px] text-amber-700/80 font-light italic pt-1.5 border-t border-brand-mist/20">
+                            {formatRelativeTime(appt.createdAt)}
+                          </div>
+                        )}
                       </div>
                     );
                   })}

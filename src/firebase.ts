@@ -634,7 +634,7 @@ export async function createManualAppointment(data: Partial<Appointment>) {
     }
 
     devLog('[Manual Booking] Created successfully', result);
-    return true;
+    return result;
   } catch (error: any) {
     if (isDev) console.error('[Manual Booking] Failed:', error);
     throw error;
