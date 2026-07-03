@@ -2761,7 +2761,7 @@ router.post(
             date: apptDateStr,
             time: appointmentData.time,
             status: "closed",
-            duration: appointmentData.serviceDuration,
+            duration: serviceDuration,
           });
         } else {
           const whStart = timeToMinutes(effectiveHours.startTime);
@@ -2774,7 +2774,7 @@ router.post(
               date: apptDateStr,
               time: appointmentData.time,
               status: "outside",
-              duration: appointmentData.serviceDuration,
+              duration: serviceDuration,
             });
           }
           if (apptEndMin > whEnd) {
@@ -2784,7 +2784,7 @@ router.post(
               date: apptDateStr,
               time: appointmentData.time,
               status: "outside",
-              duration: appointmentData.serviceDuration,
+              duration: serviceDuration,
             });
           }
 
@@ -2798,7 +2798,7 @@ router.post(
                 date: apptDateStr,
                 time: appointmentData.time,
                 status: "break",
-                duration: appointmentData.serviceDuration,
+                duration: serviceDuration,
               });
             }
           }
@@ -2972,7 +2972,7 @@ router.post(
                 date: apptDateStr,
                 time: b.startTime || "00:00",
                 status: "blocked",
-                duration: appointmentData.serviceDuration,
+                duration: serviceDuration,
               });
             } else if (b.startTime && b.endTime) {
               const bStart = timeToMinutes(b.startTime);
