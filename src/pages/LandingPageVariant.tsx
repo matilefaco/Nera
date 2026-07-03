@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import SEOHead from '../components/SEOHead';
 import './LandingPage.css';
 import PricingGrid from '../components/PricingGrid';
 import { ShowcaseSequence } from '../components/ShowcaseSequence';
@@ -200,22 +200,12 @@ export default function LandingPageVariant({ nichePath: propNichePath }: Landing
 
   return (
     <div className="landing-page">
-      <Helmet>
-        <title>{variant.title}</title>
-        <meta name="description" content={variant.description} />
-        <link rel="canonical" href={`https://usenera.com${variant.path}`} />
-        <meta property="og:title" content={variant.title} />
-        <meta property="og:description" content={variant.description} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={`https://usenera.com${variant.path}`} />
-        <meta property="og:site_name" content="Nera" />
-        <meta property="og:locale" content="pt_BR" />
-        <meta property="og:image" content="https://usenera.com/og-default.png" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={variant.title} />
-        <meta name="twitter:description" content={variant.description} />
-        <meta name="twitter:image" content="https://usenera.com/og-default.png" />
-      </Helmet>
+      <SEOHead
+        title={variant.title}
+        description={variant.description}
+        canonical={`https://usenera.com${variant.path}`}
+        url={`https://usenera.com${variant.path}`}
+      />
 
       {/* NAV */}
       <nav id="nav" ref={navRef}>

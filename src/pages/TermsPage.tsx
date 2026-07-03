@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowLeft } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
+import SEOHead from '../components/SEOHead';
 
 export default function TermsPage() {
   useEffect(() => {
@@ -10,10 +10,11 @@ export default function TermsPage() {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-sans selection:bg-brand-terracotta/20 selection:text-brand-ink">
-      <Helmet>
-        <title>Termos de Uso | Nera</title>
-        <meta name="description" content="Termos de uso aplicáveis à plataforma Nera." />
-      </Helmet>
+      <SEOHead
+        title="Termos de Uso | Nera"
+        description="Termos de uso aplicáveis à plataforma Nera."
+        canonical="https://usenera.com/termos"
+      />
 
       {/* Basic Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FDFBF7]/80 backdrop-blur-md border-b border-[#E8E1D9]">

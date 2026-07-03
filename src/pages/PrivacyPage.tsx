@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowLeft } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
+import SEOHead from '../components/SEOHead';
 
 export default function PrivacyPage() {
   useEffect(() => {
@@ -10,10 +10,11 @@ export default function PrivacyPage() {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-sans selection:bg-brand-terracotta/20 selection:text-brand-ink">
-      <Helmet>
-        <title>Política de Privacidade | Nera</title>
-        <meta name="description" content="Política de Privacidade e uso de dados na plataforma Nera." />
-      </Helmet>
+      <SEOHead
+        title="Política de Privacidade | Nera"
+        description="Política de Privacidade e uso de dados na plataforma Nera."
+        canonical="https://usenera.com/privacidade"
+      />
 
       {/* Basic Header */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FDFBF7]/80 backdrop-blur-md border-b border-[#E8E1D9]">
