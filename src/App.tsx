@@ -48,6 +48,9 @@ const CheckoutCanceledPage = React.lazy(() => import('./pages/CheckoutCanceledPa
 const ReferralsPage = React.lazy(() => import('./pages/ReferralsPage'));
 const WhatsAppHistoryPage = React.lazy(() => import('./pages/WhatsAppHistoryPage'));
 const FinancialPage = React.lazy(() => import('./pages/FinancialPage'));
+const NeraVsBooksy = React.lazy(() => import('./pages/NeraVsBooksy'));
+const NeraVsTrinks = React.lazy(() => import('./pages/NeraVsTrinks'));
+const AgendamentoWhatsApp = React.lazy(() => import('./pages/AgendamentoWhatsApp'));
 
 // Special handling for named export
 const ReviewsModerationPage = React.lazy(() => 
@@ -175,6 +178,9 @@ export default function App() {
                   <Routes>
                   {/* ... routes ... */}
                   <Route path="/" element={<LandingPage />} />
+                  <Route path="/nera-vs-booksy" element={<NeraVsBooksy />} />
+                  <Route path="/nera-vs-trinks" element={<NeraVsTrinks />} />
+                  <Route path="/sistema-de-agendamento-whatsapp" element={<AgendamentoWhatsApp />} />
                   <Route path="/para-nail-designers" element={<LandingPageVariant nichePath="para-nail-designers" />} />
                   <Route path="/para-sobrancelhistas" element={<LandingPageVariant nichePath="para-sobrancelhistas" />} />
                   <Route path="/para-esteticistas" element={<LandingPageVariant nichePath="para-esteticistas" />} />

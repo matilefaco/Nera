@@ -233,6 +233,34 @@
 }
 .landing-page .btn-ghost:hover { background: var(--linen); border-color: var(--blush); }
 
+.landing-page .btn-secondary-terra {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: transparent;
+  color: var(--terra);
+  border: 1px solid var(--terra);
+  padding: 18px 36px;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+}
+@media (max-width: 480px) {
+  .landing-page .btn-secondary-terra { padding: 15px 28px; gap: 8px; font-size: 9px; }
+}
+.landing-page .btn-secondary-terra:hover {
+  background: rgba(168, 92, 58, 0.04);
+  border-color: var(--sienna);
+  color: var(--sienna);
+  transform: translateY(-1px);
+}
+
 .landing-page .hero-ctas-row {
   display: flex;
   flex-direction: row;
@@ -247,7 +275,8 @@
     width: 100%;
   }
   .landing-page .hero-ctas-row .btn-primary,
-  .landing-page .hero-ctas-row .btn-ghost {
+  .landing-page .hero-ctas-row .btn-ghost,
+  .landing-page .hero-ctas-row .btn-secondary-terra {
     width: 100%;
     max-width: 340px;
     justify-content: center;
@@ -1130,6 +1159,6 @@
   .landing-page #manifesto { padding: 100px 24px; }
   .landing-page #cta { padding: 120px 24px; }
   .landing-page .hero-ctas { align-items: stretch; }
-  .landing-page .btn-primary, .landing-page .btn-ghost { justify-content: center; text-align: center; }
+  .landing-page .btn-primary, .landing-page .btn-ghost, .landing-page .btn-secondary-terra { justify-content: center; text-align: center; }
   .landing-page .cta-h2 { font-size: clamp(52px, 12vw, 96px); }
 }

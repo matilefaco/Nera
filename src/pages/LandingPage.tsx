@@ -480,6 +480,14 @@ export default function LandingPage() {
             </div>
           </div>
           <div>
+            <div className="footer-col-title">Comparações</div>
+            <div className="footer-links">
+              <Link to="/nera-vs-booksy" className="footer-link">Nera vs Booksy</Link>
+              <Link to="/nera-vs-trinks" className="footer-link">Nera vs Trinks</Link>
+              <Link to="/sistema-de-agendamento-whatsapp" className="footer-link">Agenda com WhatsApp</Link>
+            </div>
+          </div>
+          <div>
             <div className="footer-col-title">Legal</div>
             <div className="footer-links">
               <Link to="/privacidade" className="footer-link">Privacidade</Link>

@@ -231,7 +231,10 @@ export async function createServerApp() {
       "/para-maquiadoras",
       "/para-podologas",
       "/para-depiladoras",
-      "/para-massagistas"
+      "/para-massagistas",
+      "/nera-vs-booksy",
+      "/nera-vs-trinks",
+      "/sistema-de-agendamento-whatsapp"
     ];
 
     let professionalSlugs: string[] = [];
@@ -403,7 +406,10 @@ export async function createServerApp() {
       "/checkout/success",
       "/checkout/canceled",
       "/plans",
-      "/planos"
+      "/planos",
+      "/nera-vs-booksy",
+      "/nera-vs-trinks",
+      "/sistema-de-agendamento-whatsapp"
     ];
 
     if (staticRoutes.includes(cleanPath)) {
@@ -1161,10 +1167,180 @@ export async function createServerApp() {
     }
   });
 
+  // 10bb. Custom Comparison & WhatsApp Pages SSR
+  app.get(["/nera-vs-booksy", "/nera-vs-trinks", "/sistema-de-agendamento-whatsapp"], async (req, res, next) => {
+    try {
+      const cleanPath = req.path.replace(/\/+$/, "") || "/";
+      const indexPath = getTemplatePath();
+
+      if (!fs.existsSync(indexPath)) return next();
+      
+      let html = getCachedIndexHtml(indexPath);
+      let title = "";
+      let description = "";
+      let pageUrl = `https://usenera.com${cleanPath}`;
+      let ogImage = "https://usenera.com/og-default.png";
+      let structuredData: any = {};
+
+      if (cleanPath === "/nera-vs-booksy") {
+        title = "Nera ou Booksy: qual faz mais sentido para profissionais independentes?";
+        description = "Compare de forma honesta a Nera e o Booksy. Entenda as diferenças em autonomia, vitrine digital própria e experiência simples para você e suas clientes.";
+        structuredData = {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "SoftwareApplication",
+              "name": "Nera",
+              "applicationCategory": "BusinessApplication",
+              "operatingSystem": "Web",
+              "inLanguage": "pt-BR",
+              "url": pageUrl,
+              "description": description
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "A Nera é uma alternativa ao Booksy?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Sim, especialmente para profissionais autônomas e pequenos estúdios que preferem uma vitrine digital própria e elegante em vez de competir em um marketplace aberto."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "A Nera cobra comissão por agendamento?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Não. Na Nera, 100% do valor dos seus serviços é seu. Nós cobramos apenas uma assinatura fixa mensal simples."
+                  }
+                }
+              ]
+            }
+          ]
+        };
+      } else if (cleanPath === "/nera-vs-trinks") {
+        title = "Nera ou Trinks: compare duas formas de organizar sua agenda de beleza";
+        description = "Compare de forma objetiva a Nera e o Trinks. Entenda qual plataforma de agendamento combina melhor com o dia a dia da profissional de beleza independente.";
+        structuredData = {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "SoftwareApplication",
+              "name": "Nera",
+              "applicationCategory": "BusinessApplication",
+              "operatingSystem": "Web",
+              "inLanguage": "pt-BR",
+              "url": pageUrl,
+              "description": description
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "A Nera substitui o Trinks?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Para profissionais autônomas e pequenos estúdios de beleza, sim. A Nera substitui oferecendo uma experiência infinitamente mais moderna, rápida e simplificada."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "Minhas clientes precisam instalar algum aplicativo?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Não. Suas clientes agendam horários por uma página elegante e leve que abre no navegador de qualquer celular."
+                  }
+                }
+              ]
+            }
+          ]
+        };
+      } else if (cleanPath === "/sistema-de-agendamento-whatsapp") {
+        title = "Sistema de agendamento com WhatsApp para profissionais de beleza";
+        description = "Pare de responder as mesmas mensagens o dia todo. Automatize suas marcações com um link de agendamento profissional integrado com lembretes de WhatsApp.";
+        structuredData = {
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "SoftwareApplication",
+              "name": "Nera",
+              "applicationCategory": "BusinessApplication",
+              "operatingSystem": "Web",
+              "inLanguage": "pt-BR",
+              "url": pageUrl,
+              "description": description
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "A Nera agenda automaticamente pelo WhatsApp?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "A Nera fornece um link elegante para colocar na bio. Suas clientes escolhem o serviço e o horário, e você confirma. No Pro, lembretes de agendamento são disparados por WhatsApp."
+                  }
+                },
+                {
+                  "@type": "Question",
+                  "name": "A Nera envia lembretes amigáveis de confirmação?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "Sim. No plano Pro, as clientes recebem confirmações e lembretes automáticos sobre o agendamento, reduzindo faltas."
+                  }
+                }
+              ]
+            }
+          ]
+        };
+      }
+
+      const metaTags = `
+        <title>${title}</title>
+        <meta name="description" content="${description}" />
+        <link rel="canonical" href="${pageUrl}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${description}" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="${pageUrl}" />
+        <meta property="og:site_name" content="Nera" />
+        <meta property="og:locale" content="pt_BR" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="${title}" />
+        <meta name="twitter:description" content="${description}" />
+        <meta name="twitter:image" content="${ogImage}" />
+        <script type="application/ld+json">
+          ${JSON.stringify(structuredData)}
+        </script>
+      `;
+
+      if (html.includes("</head>")) {
+        html = html.replace(/<title>.*?<\/title>/i, "");
+        html = html.replace("</head>", `${metaTags}\n</head>`);
+      }
+      if (viteServer) html = await viteServer.transformIndexHtml(req.originalUrl, html);
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      next();
+    }
+  });
+
   // 10c. Catch-all for invalid pages (real 404)
   app.get("*", (req, res, next) => {
     const cleanPath = req.path.replace(/\/+$/, "") || "/";
     const hasExtension = cleanPath.includes(".") && !cleanPath.endsWith("/");
+
+    // Bypass catch-all in development mode for Vite internal paths
+    if (process.env.NODE_ENV !== "production" || viteServer) {
+      if (req.path.startsWith("/@") || req.path.includes("vite") || req.path.includes("node_modules")) {
+        return next();
+      }
+    }
 
     if (!hasExtension && !cleanPath.startsWith("/api/") && !isValidRoute(req.path)) {
       return res.status(404).send(`
