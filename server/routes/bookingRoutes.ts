@@ -2967,7 +2967,7 @@ router.post(
                 date: apptDateStr,
                 time: b.startTime || "00:00",
                 status: "blocked",
-                duration: null,
+                duration: appointmentData.serviceDuration || 60,
               });
             } else if (b.startTime && b.endTime) {
               const bStart = timeToMinutes(b.startTime);
@@ -3831,6 +3831,13 @@ router.post(
       if (result.success && result.updatedData) {
         // Find pro doc for their name and slug
         const proData = req.userData;
+
+        if (!result.updatedData.clientEmail && !result.updatedData.clientWhatsapp) {
+          logger.warn("BOOKING", "missing_client_contact_for_conflict_resolution", {
+            appointmentId,
+            professionalId: result.updatedData.professionalId,
+          });
+        }
 
         if (result.updatedData.clientEmail) {
           try {
