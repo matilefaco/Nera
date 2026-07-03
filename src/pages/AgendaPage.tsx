@@ -2029,13 +2029,25 @@ export default function AgendaPage() {
                       desc = `${c.clientName} - ${c.serviceName} (${c.time})`;
                     } else if (c.type === "pending_appointment") {
                       title = "Agendamento Pendente";
-                      desc = `${c.clientName} - ${c.serviceName} (${c.time})`;
+                      desc = "Existe uma solicitação pendente para esse horário.";
                     } else if (c.type === "booking_lock") {
                       title = "Reserva Temporária / Pré-Reserva";
                       desc = `${c.clientName || "Reserva"} (${c.time})`;
                     } else if (c.type === "blocked_schedule") {
                       title = "Horário Bloqueado / Folga";
-                      desc = `${c.serviceName} (${c.time})`;
+                      desc = "Esse horário está bloqueado na sua agenda.";
+                    } else if (c.type === "closed_day") {
+                      title = "Dia Fechado";
+                      desc = "Esse dia está marcado como fechado na sua agenda.";
+                    } else if (c.type === "outside_working_hours") {
+                      title = "Fora de Expediente";
+                      desc = "Esse horário está fora do seu expediente configurado.";
+                    } else if (c.type === "break_time") {
+                      title = "Horário de Pausa";
+                      desc = "Esse horário está dentro de uma pausa configurada.";
+                    } else if (c.type === "waitlist_lock") {
+                      title = "Convite da Lista de Espera";
+                      desc = "Existe um convite da lista de espera segurando esse horário.";
                     }
 
                     return (

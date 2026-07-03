@@ -2731,27 +2731,6 @@ router.post(
         }
 
         const effectiveHours = getEffectiveWorkingHoursForDate(effectiveWorkingHours, apptDateStr);
-        if (effectiveHours === null) {
-          throw { status: 400, message: "Dia fechado/desativado para atendimento." };
-        }
-
-        const whStart = timeToMinutes(effectiveHours.startTime);
-        const whEnd = timeToMinutes(effectiveHours.endTime);
-
-        if (apptStartMin < whStart) {
-          throw { status: 400, message: "Horário selecionado está antes do início do expediente." };
-        }
-        if (apptEndMin > whEnd) {
-          throw { status: 400, message: "O agendamento ultrapassa o fim do expediente." };
-        }
-
-        if (effectiveHours.breakStart && effectiveHours.breakEnd) {
-          const breakStartMin = timeToMinutes(effectiveHours.breakStart);
-          const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
-          if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
-            throw { status: 400, message: "Horário selecionado coincide com o horário de pausa." };
-          }
-        }
 
         // 3. Conflict Detection READS
         const apptsSnap = await transaction.get(
@@ -2773,6 +2752,53 @@ router.post(
         const conflicts: any[] = [];
         let canOverride = true;
         const nowMs = Date.now();
+
+        // A0. Working Hours, Closed Days, and Breaks (Overridable conflicts)
+        if (effectiveHours === null) {
+          conflicts.push({
+            type: "closed_day",
+            serviceName: "Dia fechado/desativado",
+            date: apptDateStr,
+            time: appointmentData.time,
+            status: "closed",
+          });
+        } else {
+          const whStart = timeToMinutes(effectiveHours.startTime);
+          const whEnd = timeToMinutes(effectiveHours.endTime);
+
+          if (apptStartMin < whStart) {
+            conflicts.push({
+              type: "outside_working_hours",
+              serviceName: "Antes do início do expediente",
+              date: apptDateStr,
+              time: appointmentData.time,
+              status: "outside",
+            });
+          }
+          if (apptEndMin > whEnd) {
+            conflicts.push({
+              type: "outside_working_hours",
+              serviceName: "Ultrapassa o fim do expediente",
+              date: apptDateStr,
+              time: appointmentData.time,
+              status: "outside",
+            });
+          }
+
+          if (effectiveHours.breakStart && effectiveHours.breakEnd) {
+            const breakStartMin = timeToMinutes(effectiveHours.breakStart);
+            const breakEndMin = timeToMinutes(effectiveHours.breakEnd);
+            if (intervalsOverlap(apptStartMin, apptEndMin, breakStartMin, breakEndMin)) {
+              conflicts.push({
+                type: "break_time",
+                serviceName: "Horário de pausa",
+                date: apptDateStr,
+                time: appointmentData.time,
+                status: "break",
+              });
+            }
+          }
+        }
 
         const activeStatuses = ["confirmed", "accepted", "completed", "concluido"];
         const pendingStatuses = ["pending", "pending_confirmation", "pending_conflict"];
@@ -2902,11 +2928,12 @@ router.post(
               }
             } else {
               // It's a pending lock (or waitlist_lock). It is overrideable.
+              const isWaitlist = lockData.status === "waitlist_lock";
               conflicts.push({
-                type: "booking_lock",
+                type: isWaitlist ? "waitlist_lock" : "booking_lock",
                 lockId: doc.id,
-                clientName: lockData.clientName || "Reserva temporária",
-                serviceName: lockData.serviceName || "Serviço",
+                clientName: lockData.clientName || (isWaitlist ? "Lista de espera" : "Reserva temporária"),
+                serviceName: lockData.serviceName || (isWaitlist ? "Lista de espera" : "Serviço"),
                 date: lockData.date,
                 time: lockData.time,
                 status: lockData.status || "pending",
@@ -3008,7 +3035,7 @@ router.post(
                   }
                 }
               });
-            } else if (conf.type === "booking_lock" && conf.lockId) {
+            } else if ((conf.type === "booking_lock" || conf.type === "waitlist_lock") && conf.lockId) {
               const lockRefDoc = db.collection("booking_locks").doc(conf.lockId);
               transaction.delete(lockRefDoc);
             }
@@ -3065,6 +3092,21 @@ router.post(
           createdAt: admin.firestore.FieldValue.serverTimestamp(),
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         };
+
+        if (appointmentData.forceCreate && conflicts.length > 0) {
+          appointmentToSave.manualOverride = true;
+          appointmentToSave.manualOverrideReasons = conflicts.map((c) => {
+            if (c.type === "closed_day") return "Dia fechado";
+            if (c.type === "outside_working_hours") return "Fora de expediente";
+            if (c.type === "break_time") return "Horário de pausa";
+            if (c.type === "blocked_schedule") return `Horário bloqueado: ${c.serviceName}`;
+            if (c.type === "pending_appointment") return `Agendamento pendente: ${c.clientName} (${c.serviceName})`;
+            if (c.type === "booking_lock") return "Reserva temporária";
+            if (c.type === "waitlist_lock") return "Lista de espera";
+            return `${c.type}: ${c.serviceName || ""}`;
+          });
+          appointmentToSave.lastChangeBy = "professional";
+        }
 
         if (appointmentData.waitlistEntryId) {
           appointmentToSave.waitlistEntryId = String(appointmentData.waitlistEntryId).trim();
