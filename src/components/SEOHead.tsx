@@ -14,6 +14,8 @@ export default function SEOHead({ title, description, image, url, canonical }: S
   const defaultImage = 'https://usenera.com/og-default.png';
   const ogImage = image || defaultImage;
 
+  const canonicalUrl = canonical || url || currentUrl;
+
   return (
     <Helmet>
       {/* Primary Meta Tags */}
@@ -21,7 +23,7 @@ export default function SEOHead({ title, description, image, url, canonical }: S
       <meta name="title" content={title} />
       <meta name="description" content={description} />
       
-      {canonical && <link rel="canonical" href={canonical} />}
+      <link rel="canonical" href={canonicalUrl} />
 
       {/* Open Graph / Facebook */}
       <meta property="og:type" content="website" />

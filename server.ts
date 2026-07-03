@@ -354,12 +354,113 @@ export async function createServerApp() {
     });
   }
 
+  function getTemplatePath(): string {
+    if (process.env.NODE_ENV !== "production") {
+      return path.join(process.cwd(), "index.html");
+    }
+    const appHtmlPath = path.join(process.cwd(), "dist", "app.html");
+    if (fs.existsSync(appHtmlPath)) {
+      return appHtmlPath;
+    }
+    return path.join(process.cwd(), "dist", "index.html");
+  }
+
+  function cleanIndexHtmlMeta(rawHtml: string): string {
+    let cleaned = rawHtml;
+    // Remove any pre-existing title tag
+    cleaned = cleaned.replace(/<title>.*?<\/title>/gi, "");
+    // Remove any pre-existing description meta tag
+    cleaned = cleaned.replace(/<meta\s+name=["']description["']\s+content=["'].*?["']\s*\/?>/gi, "");
+    cleaned = cleaned.replace(/<meta\s+content=["'].*?["']\s+name=["']description["']\s*\/?>/gi, "");
+    // Remove any pre-existing canonical link
+    cleaned = cleaned.replace(/<link\s+rel=["']canonical["']\s+href=["'].*?["']\s*\/?>/gi, "");
+    cleaned = cleaned.replace(/<link\s+href=["'].*?["']\s+rel=["']canonical["']\s*\/?>/gi, "");
+    return cleaned;
+  }
+
+  function isValidRoute(urlPath: string): boolean {
+    const cleanPath = urlPath.split("?")[0].replace(/\/+$/, "") || "/";
+
+    const staticRoutes = [
+      "/",
+      "/profissionais",
+      "/termos",
+      "/privacidade",
+      "/para-nail-designers",
+      "/para-sobrancelhistas",
+      "/para-esteticistas",
+      "/para-cabeleireiras",
+      "/para-lash-designers",
+      "/para-maquiadoras",
+      "/para-podologas",
+      "/para-depiladoras",
+      "/para-massagistas",
+      "/login",
+      "/login-magic-callback",
+      "/register",
+      "/verificar-email",
+      "/auth/action",
+      "/checkout/success",
+      "/checkout/canceled",
+      "/plans",
+      "/planos"
+    ];
+
+    if (staticRoutes.includes(cleanPath)) {
+      return true;
+    }
+
+    const prefixRoutes = [
+      "/dashboard",
+      "/onboarding",
+      "/settings",
+      "/configuracoes",
+      "/profile",
+      "/agenda",
+      "/pedidos",
+      "/financeiro",
+      "/billing",
+      "/services",
+      "/cupons",
+      "/avaliacoes",
+      "/whatsapp-history",
+      "/trocar-senha",
+      "/clients",
+      "/clientes",
+      "/indicacoes",
+      "/referrals",
+      "/admin"
+    ];
+
+    if (prefixRoutes.some(prefix => cleanPath === prefix || cleanPath.startsWith(prefix + "/"))) {
+      return true;
+    }
+
+    if (cleanPath.startsWith("/p/")) {
+      return true;
+    }
+    if (cleanPath.startsWith("/r/")) {
+      return true;
+    }
+    if (cleanPath.startsWith("/review/")) {
+      return true;
+    }
+    if (cleanPath.startsWith("/og/p/")) {
+      return true;
+    }
+    if (/^\/booking-request\/[^/]+\/respond$/.test(cleanPath)) {
+      return true;
+    }
+
+    return false;
+  }
+
   function getCachedIndexHtml(indexPath: string): string {
     if (process.env.NODE_ENV !== "production") {
-      return fs.readFileSync(indexPath, "utf-8");
+      return cleanIndexHtmlMeta(fs.readFileSync(indexPath, "utf-8"));
     }
     if (cachedIndexHtml) return cachedIndexHtml;
-    const html = fs.readFileSync(indexPath, "utf-8");
+    const html = cleanIndexHtmlMeta(fs.readFileSync(indexPath, "utf-8"));
     cachedIndexHtml = html;
     return html;
   }
@@ -370,9 +471,7 @@ export async function createServerApp() {
       const db = firebaseAdmin.getDb();
       if (!db) return next();
       
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+      const indexPath = getTemplatePath();
 
       if (!fs.existsSync(indexPath)) return next();
       
@@ -689,9 +788,7 @@ export async function createServerApp() {
       const db = firebaseAdmin.getDb();
       if (!db) return next();
       
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+      const indexPath = getTemplatePath();
 
       if (!fs.existsSync(indexPath)) return next();
       
@@ -763,9 +860,7 @@ export async function createServerApp() {
   // 8. Public Directory SSR
   app.get("/profissionais", publicLookupLimiter, async (req, res, next) => {
     try {
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+      const indexPath = getTemplatePath();
 
       if (!fs.existsSync(indexPath)) return next();
       
@@ -829,9 +924,7 @@ export async function createServerApp() {
     "/plans*"
   ], async (req, res, next) => {
     try {
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+      const indexPath = getTemplatePath();
 
       if (!fs.existsSync(indexPath)) return next();
       
@@ -853,9 +946,7 @@ export async function createServerApp() {
   // 10. Homepage SSR
   app.get("/", async (req, res, next) => {
     try {
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+      const indexPath = getTemplatePath();
 
       if (!fs.existsSync(indexPath)) return next();
       
@@ -984,9 +1075,7 @@ export async function createServerApp() {
         return next();
       }
 
-      const indexPath = process.env.NODE_ENV === "production" 
-        ? path.join(process.cwd(), "dist", "index.html")
-        : path.join(process.cwd(), "index.html");
+      const indexPath = getTemplatePath();
 
       if (!fs.existsSync(indexPath)) return next();
       
@@ -1072,6 +1161,39 @@ export async function createServerApp() {
     }
   });
 
+  // 10c. Catch-all for invalid pages (real 404)
+  app.get("*", (req, res, next) => {
+    const cleanPath = req.path.replace(/\/+$/, "") || "/";
+    const hasExtension = cleanPath.includes(".") && !cleanPath.endsWith("/");
+
+    if (!hasExtension && !cleanPath.startsWith("/api/") && !isValidRoute(req.path)) {
+      return res.status(404).send(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Página Não Encontrada | Nera</title>
+          <meta name="robots" content="noindex, nofollow">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; text-align: center; padding: 100px 20px; background: #FAF8F6; color: #18120E; }
+            h1 { font-size: 48px; margin-bottom: 16px; font-weight: 300; }
+            p { color: #8F827A; margin-bottom: 24px; }
+            a { display: inline-block; padding: 12px 24px; background: #D98D74; color: white; text-decoration: none; border-radius: 24px; font-weight: 500; }
+            a:hover { background: #c67d64; }
+          </style>
+        </head>
+        <body>
+          <h1>404</h1>
+          <p>A página que você procura não foi encontrada ou não existe.</p>
+          <a href="/">Voltar ao início</a>
+        </body>
+        </html>
+      `);
+    }
+    next();
+  });
+
   // 11. Vite/Static serving
   if (viteServer) {
     app.use(viteServer.middlewares);
@@ -1086,8 +1208,9 @@ export async function createServerApp() {
           }
         }
     }));
+    const finalHtmlName = fs.existsSync(path.join(distPath, 'app.html')) ? 'app.html' : 'index.html';
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'), {
+      res.sendFile(path.join(distPath, finalHtmlName), {
          headers: {
            'Cache-Control': 'public, no-cache'
          }
