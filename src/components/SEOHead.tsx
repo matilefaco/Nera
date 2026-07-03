@@ -33,6 +33,22 @@ export default function SEOHead({ title, description, image, url, canonical }: S
           el.remove();
         }
       });
+
+      // Find all static server-rendered Open Graph tags (without data-rh/data-react-helmet)
+      const ogTags = document.querySelectorAll('meta[property^="og:"]');
+      ogTags.forEach((el) => {
+        if (!el.hasAttribute('data-rh') && !el.hasAttribute('data-react-helmet')) {
+          el.remove();
+        }
+      });
+
+      // Find all static server-rendered Twitter tags (without data-rh/data-react-helmet)
+      const twitterTags = document.querySelectorAll('meta[name^="twitter:"], meta[property^="twitter:"]');
+      twitterTags.forEach((el) => {
+        if (!el.hasAttribute('data-rh') && !el.hasAttribute('data-react-helmet')) {
+          el.remove();
+        }
+      });
     };
 
     // Run immediately on mount or dependency changes
