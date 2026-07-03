@@ -48,6 +48,8 @@ import { useUpgradeTriggers } from '../hooks/useUpgradeTriggers';
 import { getPublicProfileUrl } from '../lib/env';
 
 import { ActivationChecklist } from '../components/ActivationChecklist';
+import { NeraReleaseNotesCard, NeraReleaseNotesModal } from '../components/NeraReleaseNotes';
+import { hasNewReleases } from '../config/neraReleaseNotes';
 
 // --- SAFE HELPERS ---
 function safeString(value: unknown, fallback = ''): string {
@@ -349,6 +351,8 @@ export default function Dashboard() {
   const [isDashboardBlockOpen, setIsDashboardBlockOpen] = useState(false);
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
+  const [isReleaseNotesOpen, setIsReleaseNotesOpen] = useState(false);
+  const [showReleaseNotesCard, setShowReleaseNotesCard] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
     return profile?.dismissedTips?.pushBanner || safeLocalStorage.getItem("nera_push_banner_dismissed") === "true";
   });
@@ -372,6 +376,35 @@ export default function Dashboard() {
       });
     } catch (err) {
       console.error(`Failed to dismiss ${tipKey}`, err);
+    }
+  };
+
+  // Check if we should display the release notes card
+  useEffect(() => {
+    if (!profile) return;
+    try {
+      const lastViewed = profile.lastNeraReleaseViewedAt;
+      const hasNew = hasNewReleases(lastViewed);
+      setShowReleaseNotesCard(hasNew);
+    } catch (err) {
+      if (isDev) console.error("Error evaluating release notes visibility:", err);
+      setShowReleaseNotesCard(false); // Fail-soft
+    }
+  }, [profile?.lastNeraReleaseViewedAt, profile]);
+
+  const handleOpenReleaseNotes = async () => {
+    setIsReleaseNotesOpen(true);
+    if (user) {
+      try {
+        const docRef = doc(db, 'users', user.uid);
+        await updateDoc(docRef, {
+          lastNeraReleaseViewedAt: new Date().toISOString()
+        });
+        // Snappy local UI hide
+        setShowReleaseNotesCard(false);
+      } catch (err) {
+        if (isDev) console.error("Failed to update lastNeraReleaseViewedAt in Firestore:", err);
+      }
     }
   };
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
@@ -1326,6 +1359,11 @@ export default function Dashboard() {
             </button>
           </div>
         </header>
+
+        {/* Release Notes Card */}
+        {showReleaseNotesCard && (
+          <NeraReleaseNotesCard onOpen={handleOpenReleaseNotes} />
+        )}
 
         {pendingReviewsCount > 0 && (
           <div className="bg-brand-parchment border border-brand-mist rounded-[16px] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm animate-fade-in my-6">
@@ -2360,6 +2398,11 @@ export default function Dashboard() {
         count={usageCount}
         totalClients={totalClientsCount}
         averageTicket={financialMetrics.averageTicket}
+      />
+
+      <NeraReleaseNotesModal 
+        open={isReleaseNotesOpen}
+        onClose={() => setIsReleaseNotesOpen(false)}
       />
 
       {/* Floating Action Button for active appointment */}

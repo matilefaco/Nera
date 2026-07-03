@@ -227,6 +227,7 @@ export interface UserProfile {
   endTime?: string;
   /** @deprecated Use workingHours.workingDays */
   workingDays?: number[];
+  lastNeraReleaseViewedAt?: string;
 }
 
 export interface Review {
