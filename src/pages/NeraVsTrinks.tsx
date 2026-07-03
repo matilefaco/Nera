@@ -105,7 +105,7 @@ export default function NeraVsTrinks() {
           <div className="hero-bg-glyph opacity-10">n</div>
           <div className="hero-inner max-w-4xl mx-auto text-center">
             <div className="hero-tag inline-flex items-center gap-2 px-3 py-1 bg-brand-linen/60 rounded-full border border-brand-mist/40 mx-auto mb-6">
-              <div className="hero-tag-dot bg-brand-terra"></div>
+              <div className="hero-tag-dot bg-brand-terracotta"></div>
               <span className="text-xs uppercase tracking-widest text-brand-stone font-medium">Comparativo objetivo</span>
             </div>
 
@@ -157,14 +157,14 @@ export default function NeraVsTrinks() {
                 <thead>
                   <tr className="bg-brand-linen/40 border-b border-brand-mist/50">
                     <th className="p-6 text-xs uppercase tracking-wider text-brand-stone font-medium">Critério</th>
-                    <th className="p-6 text-xs uppercase tracking-wider text-brand-terra font-semibold">Nera (Design e Leveza)</th>
+                    <th className="p-6 text-xs uppercase tracking-wider text-brand-terracotta font-semibold">Nera (Design e Leveza)</th>
                     <th className="p-6 text-xs uppercase tracking-wider text-brand-stone font-medium">Trinks (ERP e Tradicional)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-mist/30 text-sm">
                   <tr>
                     <td className="p-6 font-medium text-brand-ink">Público principal</td>
-                    <td className="p-6 text-brand-terra font-medium">Profissionais autônomas e pequenos estúdios</td>
+                    <td className="p-6 text-brand-terracotta font-medium">Profissionais autônomas e pequenos estúdios</td>
                     <td className="p-6 text-brand-stone">Salões de grande porte, franquias e redes</td>
                   </tr>
                   <tr>
@@ -288,28 +288,28 @@ export default function NeraVsTrinks() {
             <h2 className="text-2xl sm:text-3xl font-serif text-brand-ink mb-6">Por que profissionais autônomas preferem a Nera</h2>
             <div className="grid sm:grid-cols-2 gap-6 text-left mt-12">
               <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terra flex items-center justify-center shrink-0 font-medium">1</div>
+                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terracotta flex items-center justify-center shrink-0 font-medium">1</div>
                 <div>
                   <h4 className="font-serif text-brand-ink mb-2">Menos complexidade</h4>
                   <p className="text-brand-stone text-xs font-light leading-relaxed">Sem dezenas de relatórios confusos que você nunca vai abrir. Apenas o que importa para o seu dia a dia.</p>
                 </div>
               </div>
               <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terra flex items-center justify-center shrink-0 font-medium">2</div>
+                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terracotta flex items-center justify-center shrink-0 font-medium">2</div>
                 <div>
                   <h4 className="font-serif text-brand-ink mb-2">Foco na sua marca própria</h4>
                   <p className="text-brand-stone text-xs font-light leading-relaxed">Sua cliente interage com a sua marca e a sua vitrine digital, fortalecendo a sua relação de fidelização.</p>
                 </div>
               </div>
               <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terra flex items-center justify-center shrink-0 font-medium">3</div>
+                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terracotta flex items-center justify-center shrink-0 font-medium">3</div>
                 <div>
                   <h4 className="font-serif text-brand-ink mb-2">Experiência mais moderna</h4>
                   <p className="text-brand-stone text-xs font-light leading-relaxed">Visual clean que valoriza as fotos dos seus trabalhos e transmite sofisticação às suas clientes.</p>
                 </div>
               </div>
               <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terra flex items-center justify-center shrink-0 font-medium">4</div>
+                <div className="w-8 h-8 rounded-full bg-brand-linen/60 text-brand-terracotta flex items-center justify-center shrink-0 font-medium">4</div>
                 <div>
                   <h4 className="font-serif text-brand-ink mb-2">Sua agenda pelo celular</h4>
                   <p className="text-brand-stone text-xs font-light leading-relaxed">Adicione agendamentos manuais em segundos, envie lembretes amigáveis e controle seu caixa na palma da mão.</p>
@@ -325,7 +325,7 @@ export default function NeraVsTrinks() {
         <div className="wrap">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-10">
-              <span className="text-xs uppercase tracking-[0.2em] text-brand-terra font-semibold block mb-2">Soluções Customizadas</span>
+              <span className="text-xs uppercase tracking-[0.2em] text-brand-terracotta font-semibold block mb-2">Soluções Customizadas</span>
               <h2 className="text-2xl sm:text-3xl font-serif text-brand-ink">Feito sob medida para o seu nicho</h2>
               <p className="text-brand-stone text-sm sm:text-base mt-2 font-light">
                 A Nera se adapta perfeitamente à linguagem visual e às necessidades de cada especialidade.
@@ -333,38 +333,38 @@ export default function NeraVsTrinks() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terra/45 transition-colors flex flex-col justify-between">
+              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terracotta/45 transition-colors flex flex-col justify-between">
                 <div>
                   <h4 className="font-serif text-lg text-brand-ink mb-2">Nail Designers</h4>
                   <p className="text-brand-stone text-xs leading-relaxed font-light mb-4">
                     Gerencie decorações, manutenção e tempos de secagem com uma agenda sob seu controle.
                   </p>
                 </div>
-                <Link to="/para-nail-designers" className="text-brand-terra font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
+                <Link to="/para-nail-designers" className="text-brand-terracotta font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
                   <span>É nail designer? Veja a solução específica →</span>
                 </Link>
               </div>
 
-              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terra/45 transition-colors flex flex-col justify-between">
+              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terracotta/45 transition-colors flex flex-col justify-between">
                 <div>
                   <h4 className="font-serif text-lg text-brand-ink mb-2">Lash Designers</h4>
                   <p className="text-brand-stone text-xs leading-relaxed font-light mb-4">
                     Ofereça agendamento elegante para extensões de cílios, manutenção e lashing com facilidade.
                   </p>
                 </div>
-                <Link to="/para-lash-designers" className="text-brand-terra font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
+                <Link to="/para-lash-designers" className="text-brand-terracotta font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
                   <span>É lash designer? Veja a solução específica →</span>
                 </Link>
               </div>
 
-              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terra/45 transition-colors flex flex-col justify-between">
+              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terracotta/45 transition-colors flex flex-col justify-between">
                 <div>
                   <h4 className="font-serif text-lg text-brand-ink mb-2">Esteticistas & Outros</h4>
                   <p className="text-brand-stone text-xs leading-relaxed font-light mb-4">
                     Sistemas robustos de agendamento de pacotes, limpeza de pele e cuidados corporais.
                   </p>
                 </div>
-                <Link to="/para-esteticistas" className="text-brand-terra font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
+                <Link to="/para-esteticistas" className="text-brand-terracotta font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
                   <span>Conheça a solução para Estética →</span>
                 </Link>
               </div>
@@ -397,7 +397,7 @@ export default function NeraVsTrinks() {
                 <div key={idx} className="border-b border-brand-mist/40 pb-4">
                   <button 
                     onClick={() => toggleFaq(idx)}
-                    className="w-full flex items-center justify-between text-left py-2 hover:text-brand-terra transition-colors"
+                    className="w-full flex items-center justify-between text-left py-2 hover:text-brand-terracotta transition-colors"
                   >
                     <span className="font-serif text-base sm:text-lg text-brand-ink">{faq.q}</span>
                     <ChevronDown size={18} className={`text-brand-stone transition-transform ${openFaq === idx ? 'rotate-180' : ''}`} />

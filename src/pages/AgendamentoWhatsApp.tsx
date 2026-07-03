@@ -105,9 +105,9 @@ export default function AgendamentoWhatsApp() {
           <div className="hero-bg-glyph opacity-10">n</div>
           <div className="hero-inner max-w-4xl mx-auto text-center">
             <div className="hero-tag inline-flex items-center gap-2 px-3 py-1 bg-brand-linen/60 rounded-full border border-brand-mist/40 mx-auto mb-6">
-              <div className="hero-tag-dot bg-brand-terra"></div>
+              <div className="hero-tag-dot bg-brand-terracotta"></div>
               <span className="text-xs uppercase tracking-widest text-brand-stone font-medium flex items-center gap-1">
-                <MessageSquare size={12} className="text-brand-terra" /> Agendamento e WhatsApp
+                <MessageSquare size={12} className="text-brand-terracotta" /> Agendamento e WhatsApp
               </span>
             </div>
 
@@ -149,7 +149,7 @@ export default function AgendamentoWhatsApp() {
         <div className="wrap">
           <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-12 items-center">
             <div>
-              <span className="text-xs tracking-[0.25em] text-brand-terra uppercase font-semibold block mb-3">— O desafio da rotina</span>
+              <span className="text-xs tracking-[0.25em] text-brand-terracotta uppercase font-semibold block mb-3">— O desafio da rotina</span>
               <h2 className="text-2xl sm:text-3xl font-serif text-brand-ink mb-6">O que acontece quando você vive no WhatsApp?</h2>
               <div className="space-y-4 text-brand-stone font-light text-sm sm:text-base leading-relaxed">
                 <p>
@@ -177,7 +177,7 @@ export default function AgendamentoWhatsApp() {
                 <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 text-xs">✗</div>
                 <p className="text-brand-stone text-xs sm:text-sm font-light">"Às 16h não consigo. E na sexta?"</p>
               </div>
-              <p className="text-xs font-serif text-brand-terra font-medium text-center border-t border-brand-mist/40 pt-4">Nera elimina esse fluxo cansativo para sempre.</p>
+              <p className="text-xs font-serif text-brand-terracotta font-medium text-center border-t border-brand-mist/40 pt-4">Nera elimina esse fluxo cansativo para sempre.</p>
             </div>
           </div>
         </div>
@@ -195,19 +195,19 @@ export default function AgendamentoWhatsApp() {
 
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="p-6 bg-white rounded-2xl border border-brand-mist/30">
-                <Smartphone className="text-brand-terra mb-4" size={24} />
+                <Smartphone className="text-brand-terracotta mb-4" size={24} />
                 <h4 className="font-serif text-brand-ink mb-2">Sua vitrine exclusiva</h4>
                 <p className="text-brand-stone text-xs font-light leading-relaxed">Suas clientes acessam um link bonito, veem fotos dos seus trabalhos, seus serviços e preços detalhados de forma profissional.</p>
               </div>
 
               <div className="p-6 bg-white rounded-2xl border border-brand-mist/30">
-                <Calendar className="text-brand-terra mb-4" size={24} />
+                <Calendar className="text-brand-terracotta mb-4" size={24} />
                 <h4 className="font-serif text-brand-ink mb-2">Pedidos de horários</h4>
                 <p className="text-brand-stone text-xs font-light leading-relaxed">A cliente escolhe o dia e horário que deseja. Você recebe o pedido organizado e confirma quando fizer sentido, mantendo o controle total.</p>
               </div>
 
               <div className="p-6 bg-white rounded-2xl border border-brand-mist/30">
-                <Bell className="text-brand-terra mb-4" size={24} />
+                <Bell className="text-brand-terracotta mb-4" size={24} />
                 <h4 className="font-serif text-brand-ink mb-2">Lembretes e mensagens</h4>
                 <p className="text-brand-stone text-xs font-light leading-relaxed">No plano Pro, o sistema ajuda você a enviar confirmações e lembretes amigáveis de agendamento por e-mail ou WhatsApp, reduzindo as faltas ocultas.</p>
               </div>
@@ -227,7 +227,7 @@ export default function AgendamentoWhatsApp() {
 
             <div className="space-y-8 relative before:absolute before:inset-0 before:left-4 before:w-0.5 before:bg-brand-linen before:my-4">
               <div className="relative flex gap-6 items-start">
-                <div className="w-8 h-8 rounded-full bg-brand-terra text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">1</div>
+                <div className="w-8 h-8 rounded-full bg-brand-terracotta text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">1</div>
                 <div>
                   <h4 className="font-serif text-brand-ink text-base sm:text-lg mb-1">Você compartilha seu link</h4>
                   <p className="text-brand-stone text-sm font-light leading-relaxed">Coloque seu link exclusivo na bio do Instagram ou configure uma mensagem automática de recepção no WhatsApp.</p>
@@ -235,7 +235,7 @@ export default function AgendamentoWhatsApp() {
               </div>
 
               <div className="relative flex gap-6 items-start">
-                <div className="w-8 h-8 rounded-full bg-brand-terra text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">2</div>
+                <div className="w-8 h-8 rounded-full bg-brand-terracotta text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">2</div>
                 <div>
                   <h4 className="font-serif text-brand-ink text-base sm:text-lg mb-1">A cliente escolhe horário e serviço</h4>
                   <p className="text-brand-stone text-sm font-light leading-relaxed">A cliente acessa sua página elegante, seleciona os serviços que deseja realizar e os horários que você determinou como disponíveis.</p>
@@ -243,7 +243,7 @@ export default function AgendamentoWhatsApp() {
               </div>
 
               <div className="relative flex gap-6 items-start">
-                <div className="w-8 h-8 rounded-full bg-brand-terra text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">3</div>
+                <div className="w-8 h-8 rounded-full bg-brand-terracotta text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">3</div>
                 <div>
                   <h4 className="font-serif text-brand-ink text-base sm:text-lg mb-1">Você dá o aval com um clique</h4>
                   <p className="text-brand-stone text-sm font-light leading-relaxed">Você recebe o pedido e clica para aceitar. A Nera se encarrega de organizar tudo na sua grade de horários e marcar como ocupado.</p>
@@ -251,7 +251,7 @@ export default function AgendamentoWhatsApp() {
               </div>
 
               <div className="relative flex gap-6 items-start">
-                <div className="w-8 h-8 rounded-full bg-brand-terra text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">4</div>
+                <div className="w-8 h-8 rounded-full bg-brand-terracotta text-white flex items-center justify-center font-serif text-sm shrink-0 z-10">4</div>
                 <div>
                   <h4 className="font-serif text-brand-ink text-base sm:text-lg mb-1">Informações confirmadas</h4>
                   <p className="text-brand-stone text-sm font-light leading-relaxed">A sua cliente recebe as informações de confirmação e lembretes para não esquecer do compromisso.</p>
@@ -297,7 +297,7 @@ export default function AgendamentoWhatsApp() {
                 "Massoterapeutas & Depiladoras"
               ].map((specialty, idx) => (
                 <div key={idx} className="p-4 bg-brand-parchment/30 rounded-xl border border-brand-mist/20 flex gap-2 items-center">
-                  <Check className="text-brand-terra shrink-0" size={14} />
+                  <Check className="text-brand-terracotta shrink-0" size={14} />
                   <span className="text-brand-ink text-xs sm:text-sm font-medium">{specialty}</span>
                 </div>
               ))}
@@ -311,7 +311,7 @@ export default function AgendamentoWhatsApp() {
         <div className="wrap">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-10">
-              <span className="text-xs uppercase tracking-[0.2em] text-brand-terra font-semibold block mb-2">Páginas de Especialidade</span>
+              <span className="text-xs uppercase tracking-[0.2em] text-brand-terracotta font-semibold block mb-2">Páginas de Especialidade</span>
               <h2 className="text-2xl sm:text-3xl font-serif text-brand-ink">Confira as soluções para seu nicho</h2>
               <p className="text-brand-stone text-sm sm:text-base mt-2 font-light">
                 Veja como a Nera se adapta com precisão para cada área de atendimento.
@@ -319,38 +319,38 @@ export default function AgendamentoWhatsApp() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terra/45 transition-colors flex flex-col justify-between">
+              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terracotta/45 transition-colors flex flex-col justify-between">
                 <div>
                   <h4 className="font-serif text-lg text-brand-ink mb-2">Nail Designers</h4>
                   <p className="text-brand-stone text-xs leading-relaxed font-light mb-4">
                     Sua vitrine de unhas e alongamentos integrada ao WhatsApp.
                   </p>
                 </div>
-                <Link to="/para-nail-designers" className="text-brand-terra font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
+                <Link to="/para-nail-designers" className="text-brand-terracotta font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
                   <span>É nail designer? Veja a solução específica →</span>
                 </Link>
               </div>
 
-              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terra/45 transition-colors flex flex-col justify-between">
+              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terracotta/45 transition-colors flex flex-col justify-between">
                 <div>
                   <h4 className="font-serif text-lg text-brand-ink mb-2">Lash Designers</h4>
                   <p className="text-brand-stone text-xs leading-relaxed font-light mb-4">
                     Atraia clientes de cílios com portfólio visual e reservas automatizadas.
                   </p>
                 </div>
-                <Link to="/para-lash-designers" className="text-brand-terra font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
+                <Link to="/para-lash-designers" className="text-brand-terracotta font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
                   <span>É lash designer? Veja a solução específica →</span>
                 </Link>
               </div>
 
-              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terra/45 transition-colors flex flex-col justify-between">
+              <div className="p-6 bg-white border border-brand-mist/40 rounded-3xl hover:border-brand-terracotta/45 transition-colors flex flex-col justify-between">
                 <div>
                   <h4 className="font-serif text-lg text-brand-ink mb-2">Esteticistas & Outros</h4>
                   <p className="text-brand-stone text-xs leading-relaxed font-light mb-4">
                     Reserve pacotes de estética e envie lembretes automáticos sem complicação.
                   </p>
                 </div>
-                <Link to="/para-esteticistas" className="text-brand-terra font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
+                <Link to="/para-esteticistas" className="text-brand-terracotta font-medium text-xs flex items-center gap-1 hover:text-brand-sienna transition-colors mt-auto">
                   <span>Conheça a solução para Estética →</span>
                 </Link>
               </div>
@@ -388,7 +388,7 @@ export default function AgendamentoWhatsApp() {
                 <div key={idx} className="border-b border-brand-mist/40 pb-4">
                   <button 
                     onClick={() => toggleFaq(idx)}
-                    className="w-full flex items-center justify-between text-left py-2 hover:text-brand-terra transition-colors"
+                    className="w-full flex items-center justify-between text-left py-2 hover:text-brand-terracotta transition-colors"
                   >
                     <span className="font-serif text-base sm:text-lg text-brand-ink">{faq.q}</span>
                     <ChevronDown size={18} className={`text-brand-stone transition-transform ${openFaq === idx ? 'rotate-180' : ''}`} />
