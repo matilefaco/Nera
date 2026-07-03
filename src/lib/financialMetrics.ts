@@ -80,7 +80,7 @@ export function calculateFinancialMetrics(
 
     // Revenue by service logic: only for valid financially
     if (isCompleted || isConfirmed) {
-      const sName = app.additionalServices?.length > 0 
+      const sName = Array.isArray(app.additionalServices) && app.additionalServices.length > 0 
         ? [app.serviceName, ...app.additionalServices.filter(Boolean).map(s => s?.name || "")].join(" + ")
         : (app.serviceName || "-");
       if (!servicesMap[sName]) servicesMap[sName] = { count: 0, revenue: 0 };

@@ -3736,7 +3736,7 @@ router.post(
           throw { status: 403, message: "Você não tem permissão." };
         }
 
-        if (data.status !== "pending") {
+        if (data.status !== "pending" && data.status !== "pending_conflict") {
           throw {
             status: 400,
             message: `Transição de ${data.status} para recusada não permitida.`,

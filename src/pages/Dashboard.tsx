@@ -109,6 +109,30 @@ const APPOINTMENTS_CACHE_TTL_MS = 5 * 60 * 1000;
 const appointmentsHistoryCache = new Map<string, AppointmentsCacheEntry>();
 const dashboardTodayCache = new Map<string, { confirmedToday: Appointment[], revenue: number }>();
 
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): void => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      // ignore
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      // ignore
+    }
+  }
+};
+
 export default function Dashboard() {
   const { user, profile } = useAuth();
   const { features, plan, signupPlan } = usePlanFeatures();
@@ -163,7 +187,7 @@ export default function Dashboard() {
     }
 
     // 2. Check localStorage
-    const saved = localStorage.getItem("nera_dashboard_tab");
+    const saved = safeLocalStorage.getItem("nera_dashboard_tab");
     if (saved === "hoje" || saved === "crescimento" || saved === "gestao") {
       return saved as DashboardTab;
     }
@@ -173,7 +197,7 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    localStorage.setItem("nera_dashboard_tab", activeTab);
+    safeLocalStorage.setItem("nera_dashboard_tab", activeTab);
   }, [activeTab]);
 
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
@@ -326,10 +350,10 @@ export default function Dashboard() {
   const [isQuickBlockOpen, setIsQuickBlockOpen] = useState(false);
   const [insightDismissed, setInsightDismissed] = useState(false);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(() => {
-    return profile?.dismissedTips?.pushBanner || localStorage.getItem("nera_push_banner_dismissed") === "true";
+    return profile?.dismissedTips?.pushBanner || safeLocalStorage.getItem("nera_push_banner_dismissed") === "true";
   });
   const [blockTipDismissed, setBlockTipDismissed] = useState(() => {
-    return profile?.dismissedTips?.blockTip || localStorage.getItem("nera_block_tip_dismissed") === "true";
+    return profile?.dismissedTips?.blockTip || safeLocalStorage.getItem("nera_block_tip_dismissed") === "true";
   });
 
   // Sync state if profile loads later
@@ -1711,7 +1735,7 @@ export default function Dashboard() {
                       <div className="flex-1">
                         <p className="text-[11px] font-bold text-red-900 leading-tight">Cancelamento de última hora!</p>
                         <p className="text-[10px] text-red-700 font-light mt-1">
-                          {alert.clientName} cancelou {alert.additionalServices?.length > 0 ? [alert.serviceName, ...alert.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" e ") : alert.serviceName} às {alert.scheduledTime}. 
+                          {alert.clientName} cancelou {Array.isArray(alert.additionalServices) && alert.additionalServices.length > 0 ? [alert.serviceName, ...alert.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" e ") : alert.serviceName} às {alert.scheduledTime}. 
                           <span className="font-bold ml-1">Faltavam apenas {alert.hoursUntil}h.</span>
                         </p>
                       </div>
@@ -1805,7 +1829,7 @@ export default function Dashboard() {
                               )}
                             </div>
                             <p className={cn("text-[11px] font-light truncate leading-tight pr-2 mt-0.5", appt.isBlock ? "text-brand-stone/70 italic" : "text-brand-stone")}>
-                              {appt.additionalServices?.length > 0 
+                              {Array.isArray(appt.additionalServices) && appt.additionalServices.length > 0 
                                 ? [appt.serviceName, ...appt.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" • ") 
                                 : appt.serviceName}
                             </p>
@@ -1890,7 +1914,7 @@ export default function Dashboard() {
                    <button 
                      onClick={() => {
                        setPushBannerDismissed(true);
-                       localStorage.setItem("nera_push_banner_dismissed", "true");
+                       safeLocalStorage.setItem("nera_push_banner_dismissed", "true");
                        handleDismissTip("pushBanner");
                      }}
                      className="p-2.5 text-brand-stone hover:bg-brand-mist/20 rounded-full transition-colors focus:ring-2 ring-brand-ink/10 outline-none"
@@ -1943,9 +1967,9 @@ export default function Dashboard() {
                 <div className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div className="space-y-1">
-                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Serviço<span className="none">{selectedRequest.additionalServices?.length ? 's' : ''}</span></p>
+                      <p className="text-[10px] text-brand-stone uppercase tracking-widest">Serviço<span className="none">{Array.isArray(selectedRequest.additionalServices) && selectedRequest.additionalServices.length ? 's' : ''}</span></p>
                       <p className="text-brand-ink font-medium">
-                        {selectedRequest.additionalServices?.length > 0 
+                        {Array.isArray(selectedRequest.additionalServices) && selectedRequest.additionalServices.length > 0 
                           ? [selectedRequest.serviceName, ...selectedRequest.additionalServices.filter(Boolean).map((s:any) => s?.name || "")].filter(Boolean).join(" • ")
                           : selectedRequest.serviceName}
                       </p>
@@ -2313,7 +2337,7 @@ export default function Dashboard() {
             <button 
               onClick={(e) => {
                 e.stopPropagation();
-                localStorage.setItem("nera_share_tip_dismissed", "true");
+                safeLocalStorage.setItem("nera_share_tip_dismissed", "true");
                 setBlockTipDismissed(true);
                 handleDismissTip("blockTip");
               }} 

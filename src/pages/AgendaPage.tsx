@@ -54,6 +54,7 @@ import {
   Tag,
   CalendarCheck2,
   AlertCircle,
+  AlertTriangle,
   Info,
   Share2,
   Search,
@@ -1048,7 +1049,10 @@ export default function AgendaPage() {
     (a) => isConfirmedLikeStatus(a.status) || isCompletedStatus(a.status),
   );
   const pendingRequests = displayedAppointments.filter((a) =>
-    isPendingStatus(a.status),
+    isPendingStatus(a.status) && a.status !== "pending_conflict",
+  );
+  const conflictRequests = displayedAppointments.filter((a) =>
+    a.status === "pending_conflict",
   );
 
   // Mapped Timeline items
@@ -1065,8 +1069,8 @@ export default function AgendaPage() {
 
     // Add appointments
     displayedAppointments.forEach((app) => {
-      // Don't show cancelled or rejected here to keep timeline clean
-      if (isInactiveStatus(app.status)) return;
+      // Don't show cancelled, rejected or pending_conflict here to keep timeline clean
+      if (isInactiveStatus(app.status) || app.status === "pending_conflict") return;
 
       items.push({
         type: "appointment",
@@ -1422,6 +1426,37 @@ export default function AgendaPage() {
                     >
                       {(req.clientName || "Cliente").split(" ")[0]} · {req.time}
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {conflictRequests.length > 0 && (
+              <div className="bg-[#FFF5F5] border border-red-200/50 p-6 rounded-[32px]">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                    <h4 className="text-[9px] font-bold uppercase tracking-widest text-red-600">
+                      Pedidos em conflito ({conflictRequests.length})
+                    </h4>
+                  </div>
+                </div>
+                <p className="text-[11px] text-brand-stone font-light mb-4 leading-relaxed">
+                  Estes pedidos online coincidem com horários que você ocupou manualmente. Clique para abrir detalhes e avisar a cliente sobre o cancelamento.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {conflictRequests.map((req) => (
+                    <button
+                      key={req.id}
+                      onClick={() => {
+                        setSelectedAppointment(req);
+                        setIsDetailsOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-white hover:bg-red-50/50 border border-red-100 hover:border-red-200 rounded-full text-[10px] font-medium text-brand-ink shadow-sm transition-all text-left flex items-center gap-1.5"
+                    >
+                      <span>{(req.clientName || "Cliente").split(" ")[0]}</span>
+                      <span className="text-brand-stone font-light">({req.time})</span>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -2155,29 +2190,33 @@ export default function AgendaPage() {
                         <span
                           className={cn(
                             "px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest max-w-[140px] truncate leading-none",
-                            isConfirmedLikeStatus(selectedAppointment.status)
-                              ? "bg-green-100 text-green-700"
-                              : isPendingStatus(selectedAppointment.status)
-                                ? "bg-orange-100 text-orange-700 animate-pulse"
-                                : isCompletedStatus(selectedAppointment.status)
-                                  ? "bg-brand-linen text-brand-ink"
-                                  : "bg-brand-mist/20 text-brand-stone",
+                            selectedAppointment.status === "pending_conflict"
+                              ? "bg-red-100 text-red-700 border border-red-200"
+                              : isConfirmedLikeStatus(selectedAppointment.status)
+                                ? "bg-green-100 text-green-700"
+                                : isPendingStatus(selectedAppointment.status)
+                                  ? "bg-orange-100 text-orange-700 animate-pulse"
+                                  : isCompletedStatus(selectedAppointment.status)
+                                    ? "bg-brand-linen text-brand-ink"
+                                    : "bg-brand-mist/20 text-brand-stone",
                           )}
                         >
-                          {isConfirmedLikeStatus(selectedAppointment.status)
-                            ? "Confirmado"
-                            : isPendingStatus(selectedAppointment.status) &&
-                                selectedAppointment.status !==
-                                  "pending_confirmation"
-                              ? "Pendente"
-                              : selectedAppointment.status ===
-                                  "pending_confirmation"
-                                ? "Aguardando Cliente"
-                                : isCompletedStatus(selectedAppointment.status)
-                                  ? "Concluído"
-                                  : ["no_show", "no_show_client", "no_show_professional"].includes(selectedAppointment.status)
-                                    ? "Cliente faltou"
-                                    : selectedAppointment.status}
+                          {selectedAppointment.status === "pending_conflict"
+                            ? "Conflito (Sobrescrito)"
+                            : isConfirmedLikeStatus(selectedAppointment.status)
+                              ? "Confirmado"
+                              : isPendingStatus(selectedAppointment.status) &&
+                                  selectedAppointment.status !==
+                                    "pending_confirmation"
+                                ? "Pendente"
+                                : selectedAppointment.status ===
+                                    "pending_confirmation"
+                                  ? "Aguardando Cliente"
+                                  : isCompletedStatus(selectedAppointment.status)
+                                    ? "Concluído"
+                                    : ["no_show", "no_show_client", "no_show_professional"].includes(selectedAppointment.status)
+                                      ? "Cliente faltou"
+                                      : selectedAppointment.status}
                         </span>
                         {selectedAppointment.clientConfirmed24h && (
                           <span className="bg-brand-ink text-white px-2.5 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest flex items-center gap-1 leading-none">
@@ -2198,6 +2237,15 @@ export default function AgendaPage() {
                     </div>
 
                     <div className="space-y-4 sm:space-y-5">
+                      {selectedAppointment.status === "pending_conflict" && (
+                        <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
+                          <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
+                          <div className="text-xs font-light text-red-900 leading-relaxed">
+                            <p className="font-semibold mb-1 text-red-800">Este pedido online está em conflito</p>
+                            Ele foi sobreposto por um agendamento manual feito por você. Você precisa recusar este pedido para liberar e avisar a cliente.
+                          </div>
+                        </div>
+                      )}
                       <div className="p-5 sm:p-6 bg-brand-parchment/60 rounded-[24px] sm:rounded-[32px] border border-brand-mist/50 space-y-4 sm:space-y-5">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand-white rounded-xl sm:rounded-2xl flex items-center justify-center text-brand-terracotta border border-brand-mist/50 shadow-sm shrink-0">
@@ -2578,11 +2626,18 @@ export default function AgendaPage() {
                                     );
                                     setIsDetailsOpen(false);
                                   }}
-                                  className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-brand-rose/70 hover:text-brand-rose hover:bg-brand-rose/5 rounded-xl transition-all mt-1"
+                                  className={cn(
+                                    "w-full py-3 text-[10px] font-bold uppercase tracking-widest rounded-xl transition-all mt-1.5 flex items-center justify-center gap-2",
+                                    selectedAppointment.status === "pending_conflict"
+                                      ? "bg-red-600 text-white hover:bg-red-700 shadow-md border border-transparent"
+                                      : "text-brand-rose/70 hover:text-brand-rose hover:bg-brand-rose/5"
+                                  )}
                                 >
-                                  {selectedAppointment.status === "pending"
-                                    ? "Recusar Pedido"
-                                    : "Cancelar Atendimento"}
+                                  {selectedAppointment.status === "pending_conflict"
+                                    ? "Cancelar pedido e avisar cliente"
+                                    : selectedAppointment.status === "pending"
+                                      ? "Recusar Pedido"
+                                      : "Cancelar Atendimento"}
                                 </button>
                               )}
 
