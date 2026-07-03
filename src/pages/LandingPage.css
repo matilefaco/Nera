@@ -453,7 +453,7 @@
 }
 
 /* HOW IT WORKS */
-.landing-page #how {
+.landing-page #how-legacy-unused {
   padding: 140px 0;
   background: var(--parchment);
 }

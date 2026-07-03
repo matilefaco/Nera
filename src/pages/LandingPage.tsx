@@ -243,7 +243,7 @@ export default function LandingPage() {
       </section>
 
       {/* SHOWCASE / EXPERIENCE */}
-      <section id="showcase" className="py-24 sm:py-32 bg-[#FDFBF7]">
+      <section id="how" className="py-24 sm:py-32 bg-[#FDFBF7]">
         <div className="wrap reveal">
           <ShowcaseSequence />
         </div>
