@@ -1330,7 +1330,56 @@ export async function createServerApp() {
     }
   });
 
-  // 10c. Catch-all for invalid pages (real 404)
+  // 10bbb. Terms & Privacy Pages SSR
+  app.get(["/termos", "/privacidade"], async (req, res, next) => {
+    try {
+      const cleanPath = req.path.replace(/\/+$/, "") || "/";
+      const indexPath = getTemplatePath();
+
+      if (!fs.existsSync(indexPath)) return next();
+      
+      let html = getCachedIndexHtml(indexPath);
+      let title = "";
+      let description = "";
+      let pageUrl = `https://usenera.com${cleanPath}`;
+      let ogImage = "https://usenera.com/og-default.png";
+
+      if (cleanPath === "/termos") {
+        title = "Termos de Uso | Nera";
+        description = "Termos de uso aplicáveis à plataforma Nera.";
+      } else if (cleanPath === "/privacidade") {
+        title = "Política de Privacidade | Nera";
+        description = "Política de Privacidade e uso de dados na plataforma Nera.";
+      }
+
+      const metaTags = `
+        <title>${title}</title>
+        <meta name="description" content="${description}" />
+        <link rel="canonical" href="${pageUrl}" />
+        <meta property="og:title" content="${title}" />
+        <meta property="og:description" content="${description}" />
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="${pageUrl}" />
+        <meta property="og:site_name" content="Nera" />
+        <meta property="og:locale" content="pt_BR" />
+        <meta property="og:image" content="${ogImage}" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="${title}" />
+        <meta name="twitter:description" content="${description}" />
+        <meta name="twitter:image" content="${ogImage}" />
+      `;
+
+      if (html.includes("</head>")) {
+        html = html.replace(/<title>.*?<\/title>/i, "");
+        html = html.replace("</head>", `${metaTags}\n</head>`);
+      }
+      if (viteServer) html = await viteServer.transformIndexHtml(req.originalUrl, html);
+      res.setHeader("Content-Type", "text/html");
+      return res.send(html);
+    } catch (err) {
+      next();
+    }
+  });
   app.get("*", (req, res, next) => {
     const cleanPath = req.path.replace(/\/+$/, "") || "/";
     const hasExtension = cleanPath.includes(".") && !cleanPath.endsWith("/");
