@@ -2857,6 +2857,8 @@ router.post(
                   time: appt.time,
                   status: appt.status,
                   duration: appt.duration || appt.serviceDuration || 60,
+                  price: appt.totalPrice || appt.price || 0,
+                  createdAt: appt.createdAt ? (typeof appt.createdAt.toMillis === 'function' ? appt.createdAt.toMillis() : new Date(appt.createdAt).getTime()) : Date.now(),
                 });
               }
             }

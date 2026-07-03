@@ -259,6 +259,9 @@ export default function AgendaPage() {
 
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
   const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [isOverrideResolutionModalOpen, setIsOverrideResolutionModalOpen] = useState(false);
+  const [overrideImpactedAppointments, setOverrideImpactedAppointments] = useState<any[]>([]);
+  const [isResolvingConflicts, setIsResolvingConflicts] = useState(false);
   const [conflictData, setConflictData] = useState<{
     message: string;
     canOverride: boolean;
@@ -885,6 +888,8 @@ export default function AgendaPage() {
   const handleForceCreateManual = async (payload: any) => {
     setIsCreating(true);
     try {
+      const impacted = conflictData?.conflicts?.filter((c: any) => c.type === "pending_appointment") || [];
+
       await createManualAppointment({
         ...payload,
         forceCreate: true,
@@ -901,11 +906,57 @@ export default function AgendaPage() {
       setManualWaitlistEntryId(null);
       setIsConflictModalOpen(false);
       setConflictData(null);
+
+      if (impacted.length > 0) {
+        setOverrideImpactedAppointments(impacted);
+        setIsOverrideResolutionModalOpen(true);
+      }
     } catch (err: any) {
       console.error("Force Manual Booking Error Detailed:", err);
       notify.error(`Não foi possível criar o agendamento mesmo com override: ${err.message || 'Tente novamente.'}`);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleResolveImpactedAndDecline = async () => {
+    if (!user) return;
+    setIsResolvingConflicts(true);
+    try {
+      const token = await user.getIdToken(true);
+      const errors: string[] = [];
+
+      for (const appt of overrideImpactedAppointments) {
+        if (!appt.appointmentId) continue;
+        try {
+          const res = await fetch(`/api/appointments/${appt.appointmentId}/decline`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            errors.push(errData.error || `Erro ao recusar (${res.status})`);
+          }
+        } catch (err: any) {
+          errors.push(err.message || String(err));
+        }
+      }
+
+      if (errors.length > 0) {
+        notify.error(`Falha parcial ao cancelar e avisar: ${errors.join(", ")}`);
+      } else {
+        notify.success("Cliente avisada e pedido cancelado.");
+      }
+
+      setIsOverrideResolutionModalOpen(false);
+      setOverrideImpactedAppointments([]);
+    } catch (err: any) {
+      notify.error("Não foi possível resolver os conflitos. Tente novamente.");
+    } finally {
+      setIsResolvingConflicts(false);
     }
   };
 
@@ -1440,6 +1491,17 @@ export default function AgendaPage() {
                       Pedidos em conflito ({conflictRequests.length})
                     </h4>
                   </div>
+                  <button
+                    onClick={() => {
+                      if (conflictRequests[0]) {
+                        setSelectedAppointment(conflictRequests[0]);
+                        setIsDetailsOpen(true);
+                      }
+                    }}
+                    className="text-[10px] font-semibold text-red-600 hover:text-red-700 underline underline-offset-2 tracking-wide uppercase transition-all"
+                  >
+                    Resolver agora
+                  </button>
                 </div>
                 <p className="text-[11px] text-brand-stone font-light mb-4 leading-relaxed">
                   Estes pedidos online coincidem com horários que você ocupou manualmente. Clique para abrir detalhes e avisar a cliente sobre o cancelamento.
@@ -2051,57 +2113,118 @@ export default function AgendaPage() {
                     : "Este horário já está ocupado por um agendamento confirmado e não pode ser sobrescrito diretamente."}
                 </p>
 
-                <div className="bg-brand-parchment border border-brand-mist rounded-2xl p-5 mb-8 max-h-60 overflow-y-auto space-y-4">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-stone mb-2">
-                    Conflitos Identificados:
+                <div className="space-y-4 mb-8">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-brand-stone">
+                    Conflitos Identificados ({conflictData.conflicts.length}):
                   </p>
-                  {conflictData.conflicts.map((c: any, index: number) => {
-                    let title = "Bloqueio ou Conflito";
-                    let desc = "";
+                  <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-1 no-scrollbar">
+                    {conflictData.conflicts.map((c: any, index: number) => {
+                      const isClientType = c.type === "pending_appointment" || ["pending", "pending_confirmation", "pending_conflict", "waitlist_lock"].includes(c.status || c.type);
 
-                    if (c.type === "confirmed_appointment") {
-                      title = "Agendamento Confirmado";
-                      desc = `${c.clientName} - ${c.serviceName} (${c.time})`;
-                    } else if (c.type === "pending_appointment") {
-                      title = "Agendamento Pendente";
-                      desc = "Existe uma solicitação pendente para esse horário.";
-                    } else if (c.type === "booking_lock") {
-                      title = "Reserva Temporária / Pré-Reserva";
-                      desc = `${c.clientName || "Reserva"} (${c.time})`;
-                    } else if (c.type === "blocked_schedule") {
-                      title = "Horário Bloqueado / Folga";
-                      desc = "Esse horário está bloqueado na sua agenda.";
-                    } else if (c.type === "closed_day") {
-                      title = "Dia Fechado";
-                      desc = "Esse dia está marcado como fechado na sua agenda.";
-                    } else if (c.type === "outside_working_hours") {
-                      title = "Fora de Expediente";
-                      desc = "Esse horário está fora do seu expediente configurado.";
-                    } else if (c.type === "break_time") {
-                      title = "Horário de Pausa";
-                      desc = "Esse horário está dentro de uma pausa configurada.";
-                    } else if (c.type === "waitlist_lock") {
-                      title = "Convite da Lista de Espera";
-                      desc = "Existe um convite da lista de espera segurando esse horário.";
-                    }
+                      const formatDateBR = (dateStr: string) => {
+                        if (!dateStr) return "";
+                        const parts = dateStr.split("-");
+                        if (parts.length === 3) {
+                          return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                        }
+                        return dateStr;
+                      };
 
-                    return (
-                      <div
-                        key={index}
-                        className="flex gap-3 text-sm font-light text-brand-ink border-b border-brand-mist/40 pb-3 last:border-0 last:pb-0"
-                      >
-                        <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
-                        <div>
-                          <p className="font-medium text-brand-ink text-xs uppercase tracking-wider">
-                            {title}
-                          </p>
-                          <p className="text-sm text-brand-stone font-light mt-0.5">
-                            {desc}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      const formatRelativeTime = (timeMs: number) => {
+                        if (!timeMs) return null;
+                        const diffMin = Math.round((Date.now() - timeMs) / 60000);
+                        if (diffMin < 1) return "Criado agora";
+                        if (diffMin < 60) return `Criado há ${diffMin} ${diffMin === 1 ? "minuto" : "minutos"}`;
+                        const diffHours = Math.round(diffMin / 60);
+                        if (diffHours < 24) return `Criado há ${diffHours} ${diffHours === 1 ? "hora" : "horas"}`;
+                        const diffDays = Math.round(diffHours / 24);
+                        return `Criado há ${diffDays} ${diffDays === 1 ? "dia" : "dias"}`;
+                      };
+
+                      if (isClientType) {
+                        return (
+                          <div key={index} className="bg-amber-50/50 border border-amber-100 rounded-2xl p-5 shadow-xs space-y-3">
+                            <div className="flex items-center gap-2 text-amber-800 text-[10px] font-bold uppercase tracking-wider">
+                              <AlertTriangle size={14} className="text-amber-500" />
+                              Pedido que será impactado
+                            </div>
+                            <div>
+                              <h4 className="text-base font-serif text-brand-ink font-medium">
+                                {c.clientName || "Cliente sem Nome"}
+                              </h4>
+                              <p className="text-xs text-brand-stone font-light">
+                                {c.serviceName || "Serviço não especificado"}
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-brand-stone border-t border-brand-mist/40 pt-3">
+                              <div>
+                                <span className="font-semibold text-brand-ink">Data/Hora:</span> {formatDateBR(c.date)} às {c.time}
+                              </div>
+                              {c.duration && (
+                                <div>
+                                  <span className="font-semibold text-brand-ink">Duração:</span> {c.duration} min
+                                </div>
+                              )}
+                              {c.price !== undefined && (
+                                <div>
+                                  <span className="font-semibold text-brand-ink">Valor:</span> {formatCurrency(c.price)}
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-semibold text-brand-ink">Status:</span> {
+                                  c.status === "pending" || c.type === "pending_appointment" ? "Aguardando confirmação" :
+                                  c.status === "pending_confirmation" ? "Pendente de confirmação" :
+                                  c.status === "pending_conflict" ? "Em conflito pendente" :
+                                  c.type === "waitlist_lock" ? "Convite Lista de Espera" : "Pendente"
+                                }
+                              </div>
+                            </div>
+                            {c.createdAt && (
+                              <div className="text-[10px] text-amber-700/80 font-light italic pt-1.5 border-t border-brand-mist/20">
+                                {formatRelativeTime(c.createdAt)}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div key={index} className="bg-brand-parchment border border-brand-mist rounded-2xl p-5 shadow-xs space-y-2">
+                            <div className="flex items-center gap-2 text-brand-stone text-[10px] font-bold uppercase tracking-wider">
+                              <span className="inline-block w-2 h-2 rounded-full bg-brand-stone/60" />
+                              Regra de Disponibilidade
+                            </div>
+                            <h4 className="text-sm font-serif text-brand-ink font-medium">
+                              {c.type === "blocked_schedule" ? "Horário Bloqueado / Folga" :
+                               c.type === "closed_day" ? "Dia Fechado" :
+                               c.type === "outside_working_hours" ? "Fora de Expediente" :
+                               c.type === "break_time" ? "Horário de Pausa" : "Indisponibilidade"}
+                            </h4>
+                            <p className="text-xs text-brand-stone font-light leading-relaxed">
+                              {c.type === "blocked_schedule" ? `Esse horário está bloqueado na sua agenda: ${c.serviceName || ""}` :
+                               c.type === "closed_day" ? "Esse dia está marcado como fechado na sua agenda." :
+                               c.type === "outside_working_hours" ? "Esse horário está fora do seu expediente configurado." :
+                               c.type === "break_time" ? "Esse horário está dentro de uma pausa configurada." : "Bloqueio ou conflito de horário."}
+                            </p>
+                            <div className="grid grid-cols-2 gap-2 text-xs text-brand-stone border-t border-brand-mist/40 pt-2">
+                              <div>
+                                <span className="font-semibold text-brand-ink">Data:</span> {formatDateBR(c.date)}
+                              </div>
+                              {c.time && (
+                                <div>
+                                  <span className="font-semibold text-brand-ink">Horário:</span> {c.time}
+                                </div>
+                              )}
+                              {c.duration && (
+                                <div>
+                                  <span className="font-semibold text-brand-ink">Duração:</span> {c.duration} min
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+                    })}
+                  </div>
                 </div>
 
                 {conflictData.canOverride ? (
@@ -2135,6 +2258,132 @@ export default function AgendaPage() {
                     Voltar e Alterar Horário
                   </button>
                 )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {isOverrideResolutionModalOpen && overrideImpactedAppointments.length > 0 && (
+            <div className="fixed inset-0 z-[230] flex items-center justify-center p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => {
+                  setIsOverrideResolutionModalOpen(false);
+                  setOverrideImpactedAppointments([]);
+                }}
+                className="absolute inset-0 bg-brand-ink/50 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative w-full max-w-lg bg-brand-white rounded-t-[32px] md:rounded-[40px] px-6 sm:px-10 pt-12 pb-[calc(2rem+env(safe-area-inset-bottom))] shadow-2xl overflow-y-auto max-h-[calc(100dvh-2rem)] md:max-h-[85vh] no-scrollbar space-y-6"
+              >
+                <button
+                  onClick={() => {
+                    setIsOverrideResolutionModalOpen(false);
+                    setOverrideImpactedAppointments([]);
+                  }}
+                  className="absolute top-6 right-6 w-10 h-10 flex items-center justify-center bg-brand-mist/40 rounded-full text-brand-stone/80 hover:text-brand-ink transition-colors z-20"
+                >
+                  <X size={20} />
+                </button>
+
+                <div className="flex items-center gap-3 text-emerald-600">
+                  <CheckCircle2 size={28} className="shrink-0" />
+                  <h3 className="text-2xl font-serif text-brand-ink">
+                    Agendamento confirmado
+                  </h3>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm text-brand-ink font-medium">
+                    O horário foi reservado com sucesso.
+                  </p>
+                  <p className="text-sm text-brand-stone font-light">
+                    Existem clientes impactadas por essa sobrescrita. Deseja resolver isso agora?
+                  </p>
+                </div>
+
+                <div className="space-y-4 max-h-60 overflow-y-auto pr-1 no-scrollbar">
+                  {overrideImpactedAppointments.map((appt: any, idx: number) => {
+                    const formatDateBR = (dateStr: string) => {
+                      if (!dateStr) return "";
+                      const parts = dateStr.split("-");
+                      if (parts.length === 3) {
+                        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                      }
+                      return dateStr;
+                    };
+
+                    return (
+                      <div key={idx} className="bg-brand-parchment/60 border border-brand-mist/50 rounded-2xl p-4 space-y-2 text-xs font-light text-brand-ink">
+                        <div className="flex items-center justify-between font-semibold text-brand-stone">
+                          <span>Cliente Impactada</span>
+                          <span className="text-amber-600 font-medium">Aguardando Resolução</span>
+                        </div>
+                        <div className="font-semibold text-sm text-brand-ink">
+                          {appt.clientName || "Cliente"}
+                        </div>
+                        <div className="text-brand-stone">
+                          {appt.serviceName || "Serviço"}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-brand-mist/30 text-[11px] text-brand-stone">
+                          <div>
+                            <span className="font-semibold text-brand-ink">Horário:</span> {formatDateBR(appt.date)} às {appt.time}
+                          </div>
+                          {appt.price !== undefined && (
+                            <div>
+                              <span className="font-semibold text-brand-ink">Valor:</span> {formatCurrency(appt.price)}
+                            </div>
+                          )}
+                          {appt.duration && (
+                            <div>
+                              <span className="font-semibold text-brand-ink">Duração:</span> {appt.duration} min
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-semibold text-brand-ink">Status:</span> {
+                              appt.status === "pending" ? "Aguardando confirmação" :
+                              appt.status === "pending_confirmation" ? "Pendente" :
+                              appt.status === "pending_conflict" ? "Em conflito" : "Pendente"
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="space-y-3 pt-2">
+                  <button
+                    onClick={handleResolveImpactedAndDecline}
+                    disabled={isResolvingConflicts}
+                    className="w-full py-5 bg-brand-ink text-brand-white rounded-2xl text-[10px] font-medium uppercase tracking-widest hover:bg-brand-espresso transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {isResolvingConflicts ? (
+                      <>
+                        <span className="animate-spin rounded-full h-3.5 w-3.5 border-t-2 border-brand-white" />
+                        Resolvendo...
+                      </>
+                    ) : (
+                      "Avisar cliente e cancelar pedido"
+                    )}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsOverrideResolutionModalOpen(false);
+                      setOverrideImpactedAppointments([]);
+                    }}
+                    disabled={isResolvingConflicts}
+                    className="w-full py-4 text-brand-stone hover:text-brand-ink rounded-2xl text-[10px] font-medium uppercase tracking-widest transition-all"
+                  >
+                    Resolver depois
+                  </button>
+                </div>
               </motion.div>
             </div>
           )}
