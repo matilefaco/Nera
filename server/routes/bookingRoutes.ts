@@ -2851,6 +2851,7 @@ router.post(
                   date: appt.date,
                   time: appt.time,
                   status: appt.status,
+                  duration: appt.duration || appt.serviceDuration || 60,
                 });
               }
             }
@@ -2920,6 +2921,7 @@ router.post(
                   time: lockData.time,
                   status: lockData.status || "pending",
                   appointmentId: lockData.appointmentId || null,
+                  duration: lockData.duration || 60,
                 });
               } else {
                 // Orphan lock! Treat as orphan/inconsistent, do not block creation, log it, and queue for deletion.
@@ -2938,6 +2940,7 @@ router.post(
                 time: lockData.time,
                 status: lockData.status || "pending",
                 appointmentId: lockData.appointmentId || null,
+                duration: lockData.duration || 60,
               });
             }
           }
@@ -2964,6 +2967,7 @@ router.post(
                 date: apptDateStr,
                 time: b.startTime || "00:00",
                 status: "blocked",
+                duration: null,
               });
             } else if (b.startTime && b.endTime) {
               const bStart = timeToMinutes(b.startTime);
@@ -2976,6 +2980,7 @@ router.post(
                   date: apptDateStr,
                   time: `${b.startTime} - ${b.endTime}`,
                   status: "blocked",
+                  duration: bEnd - bStart,
                 });
               }
             }
@@ -3006,6 +3011,7 @@ router.post(
         }
 
         // 6. RESOLVE CONFLICTS FOR FORCE-CREATE (WRITES)
+        const appointmentId = db.collection("appointments").doc().id;
         if (appointmentData.forceCreate && conflicts.length > 0) {
           logger.info("BOOKING", `[MANUAL_BOOKING_OVERRIDE] Professional ${uid} did manual override. Resolving ${conflicts.length} conflicts.`);
           for (const conf of conflicts) {
@@ -3015,6 +3021,9 @@ router.post(
                 status: "pending_conflict",
                 conflictReason: "Conflito com o agendamento manual criado pela profissional",
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                conflictCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                conflictCreatedBy: uid,
+                supersededByAppointmentId: appointmentId,
               };
               const safeUpdate = sanitizeAppointment(updatePayload, true);
               transaction.update(apptRef, safeUpdate);
@@ -3062,7 +3071,6 @@ router.post(
         }
 
         // 7. Insert into appointments (WRITES)
-        const appointmentId = db.collection("appointments").doc().id;
         const apptRef = db.collection("appointments").doc(appointmentId);
         
         // Final object construction based on validated data (EXPLICIT, NO SPREAD of req.body!)
@@ -3820,59 +3828,66 @@ router.post(
       }
 
       // Notify client that professional declined
-      if (
-        result.success &&
-        result.updatedData &&
-        result.updatedData.clientEmail
-      ) {
+      if (result.success && result.updatedData) {
         // Find pro doc for their name and slug
         const proData = req.userData;
 
-        const eventKey = "bookingDeclinedClient";
-        if (await shouldSendEmail(appointmentId, eventKey)) {
-          await sendBookingDeclinedClientEmail({
-            clientEmail: result.updatedData.clientEmail,
-            clientName: result.updatedData.clientName,
-            professionalName: proData?.name || "Profissional",
-            bookingId: result.appointmentId,
-            date: result.updatedData.date,
-            time: result.updatedData.time,
-            serviceName: result.updatedData.serviceName,
-            profileUrl: proData?.slug
-              ? `${PUBLIC_APP_URL}/p/${proData.slug}`
-              : PUBLIC_APP_URL,
-            location:
-              result.updatedData.locationType === "client"
-                ? "Na sua casa"
-                : result.updatedData.locationType === "remote"
-                  ? "Online"
-                  : "No local",
-          });
-          await markEmailSent(appointmentId, eventKey);
+        if (result.updatedData.clientEmail) {
+          try {
+            const eventKey = "bookingDeclinedClient";
+            if (await shouldSendEmail(appointmentId, eventKey)) {
+              await sendBookingDeclinedClientEmail({
+                clientEmail: result.updatedData.clientEmail,
+                clientName: result.updatedData.clientName,
+                professionalName: proData?.name || "Profissional",
+                bookingId: result.appointmentId,
+                date: result.updatedData.date,
+                time: result.updatedData.time,
+                serviceName: result.updatedData.serviceName,
+                profileUrl: proData?.slug
+                  ? `${PUBLIC_APP_URL}/p/${proData.slug}`
+                  : PUBLIC_APP_URL,
+                location:
+                  result.updatedData.locationType === "client"
+                    ? "Na sua casa"
+                    : result.updatedData.locationType === "remote"
+                      ? "Online"
+                      : "No local",
+              });
+              await markEmailSent(appointmentId, eventKey);
+            }
+          } catch (e) {
+            logger.error("BOOKING", "Erro enviando e-mail de recusa", { error: e, appointmentId });
+          }
         }
+
 
         // WhatsApp: BOOKING_REJECTED
         if (result.updatedData.clientWhatsapp) {
-          const profileUrl = proData?.slug
-            ? `${PUBLIC_APP_URL}/p/${proData.slug}`
-            : PUBLIC_APP_URL;
+          try {
+            const profileUrl = proData?.slug
+              ? `${PUBLIC_APP_URL}/p/${proData.slug}`
+              : PUBLIC_APP_URL;
+              
+            const formattedDate = result.updatedData.date.split('-').reverse().join('/');
+            const msg = buildBookingRejectedMessageForClient({
+              clientName: result.updatedData.clientName,
+              serviceName: result.updatedData.serviceName,
+              date: formattedDate,
+              time: result.updatedData.time,
+              professionalPageUrl: profileUrl
+            });
             
-          const formattedDate = result.updatedData.date.split('-').reverse().join('/');
-          const msg = buildBookingRejectedMessageForClient({
-            clientName: result.updatedData.clientName,
-            serviceName: result.updatedData.serviceName,
-            date: formattedDate,
-            time: result.updatedData.time,
-            professionalPageUrl: profileUrl
-          });
-          
-          await sendWhatsApp(db, result.updatedData.clientWhatsapp, msg, {
-            appointmentId: result.appointmentId,
-            userId: result.updatedData.professionalId,
-            type: 'booking_rejected',
-            clientName: result.updatedData.clientName,
-            clientWhatsapp: result.updatedData.clientWhatsapp
-          });
+            await sendWhatsApp(db, result.updatedData.clientWhatsapp, msg, {
+              appointmentId: result.appointmentId,
+              userId: result.updatedData.professionalId,
+              type: 'booking_rejected',
+              clientName: result.updatedData.clientName,
+              clientWhatsapp: result.updatedData.clientWhatsapp
+            });
+          } catch (e) {
+            logger.error("BOOKING", "Erro enviando WhatsApp de recusa", { error: e, appointmentId });
+          }
         }
       }
 
