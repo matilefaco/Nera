@@ -38,7 +38,7 @@ export class AppErrorBoundary extends Component<Props, State> {
     if (this.isFirestoreError(event.error || event.message)) {
       runtimeLogger.dump();
       event.preventDefault(); // Prevent default browser console error
-      this.setState({ hasError: true, error: event.error || new Error(event.message) });
+      // Não crashar globalmente por erro assíncrono/recuperável do Firestore para permitir que o SDK se recupere sozinho
     }
   };
 
