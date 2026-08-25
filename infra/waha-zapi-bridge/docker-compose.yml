@@ -1,0 +1,74 @@
+services:
+  waha:
+    image: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.8.1}
+    container_name: waha
+    restart: unless-stopped
+    environment:
+      - WHATSAPP_DEFAULT_ENGINE=NOWEB
+      - WAHA_NOWEB_WA_VERSION=auto-web
+      - WHATSAPP_RESTART_ALL_SESSIONS=True
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WHATSAPP_HOOK_URL=http://bridge:8080/webhook/waha
+      - WHATSAPP_HOOK_EVENTS=message
+      - WHATSAPP_HOOK_HMAC_KEY=${WAHA_WEBHOOK_HMAC_KEY}
+      - WHATSAPP_HOOK_RETRIES_POLICY=exponential
+      - WHATSAPP_HOOK_RETRIES_DELAY_SECONDS=2
+      - WHATSAPP_HOOK_RETRIES_ATTEMPTS=5
+      - WAHA_SESSION_CONFIG_IGNORE_STATUS=true
+      - WAHA_SESSION_CONFIG_IGNORE_GROUPS=true
+      - WAHA_SESSION_CONFIG_IGNORE_CHANNELS=true
+      - WAHA_SESSION_CONFIG_IGNORE_BROADCAST=true
+    volumes:
+      - waha_sessions:/app/.sessions
+    ports:
+      # Expose dashboard strictly to localhost loopback for SSH tunnel access
+      - "127.0.0.1:3000:3000"
+    networks:
+      - waha_net
+
+  bridge:
+    build: .
+    container_name: bridge
+    restart: unless-stopped
+    environment:
+      - PORT=8080
+      - WAHA_BASE_URL=http://waha:3000
+      - WAHA_SESSION=${WAHA_SESSION:-default}
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WAHA_WEBHOOK_HMAC_KEY=${WAHA_WEBHOOK_HMAC_KEY}
+      - BRIDGE_INSTANCE_ID=${BRIDGE_INSTANCE_ID}
+      - BRIDGE_INSTANCE_TOKEN=${BRIDGE_INSTANCE_TOKEN}
+      - BRIDGE_CLIENT_TOKEN=${BRIDGE_CLIENT_TOKEN}
+      - NERA_ZAPI_WEBHOOK_URL=${NERA_ZAPI_WEBHOOK_URL:-https://usenera.com/api/zapi/webhook}
+      - NERA_ZAPI_WEBHOOK_TOKEN=${NERA_ZAPI_WEBHOOK_TOKEN}
+    depends_on:
+      - waha
+    networks:
+      - waha_net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - BRIDGE_PUBLIC_HOST=${BRIDGE_PUBLIC_HOST:-wa.usenera.com}
+    depends_on:
+      - bridge
+    networks:
+      - waha_net
+
+volumes:
+  waha_sessions:
+  caddy_data:
+  caddy_config:
+
+networks:
+  waha_net:
+    driver: bridge

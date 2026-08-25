@@ -72,7 +72,8 @@ export const api = onRequest(
       SENTRY_DSN,
       "ZAPI_INSTANCE_ID",
       "ZAPI_INSTANCE_TOKEN",
-      "ZAPI_CLIENT_TOKEN"
+      "ZAPI_CLIENT_TOKEN",
+      "ZAPI_WEBHOOK_TOKEN"
     ],
   },
   Sentry.wrapHttpFunction(async (req: any, res: any) => {
