@@ -70,24 +70,86 @@ function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
-function isDirectChatId(value) {
-  return typeof value === 'string' && value.endsWith('@c.us');
+function wahaHeaders(extra = {}) {
+  return {
+    accept: 'application/json',
+    'x-api-key': WAHA_API_KEY,
+    ...extra,
+  };
 }
 
-async function sendViaWaha(phone, message) {
+async function resolveOutboundChatId(phone) {
   const normalized = normalizePhone(phone);
   if (!normalized) throw new Error('invalid_phone');
 
+  // WAHA explicitly recommends check-exists for Brazilian numbers because the
+  // historical extra 9-digit convention can make a hand-built @c.us id wrong.
+  try {
+    const url = new URL(`${WAHA_BASE_URL}/api/contacts/check-exists`);
+    url.searchParams.set('phone', normalized);
+    url.searchParams.set('session', WAHA_SESSION);
+
+    const response = await fetch(url, {
+      headers: wahaHeaders(),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result?.numberExists === false) throw new Error('number_not_on_whatsapp');
+      if (typeof result?.chatId === 'string' && result.chatId) return result.chatId;
+      if (typeof result?.pn === 'string' && result.pn) return result.pn;
+    } else {
+      console.warn(`[CONTACT_CHECK] WAHA returned ${response.status}; falling back to @c.us`);
+    }
+  } catch (error) {
+    if (error?.message === 'number_not_on_whatsapp') throw error;
+    console.warn('[CONTACT_CHECK] failed; falling back to @c.us', error?.message || error);
+  }
+
+  return `${normalized}@c.us`;
+}
+
+async function resolveInboundPhone(chatId, sessionName) {
+  if (typeof chatId !== 'string' || !chatId) return null;
+
+  if (chatId.endsWith('@c.us') || chatId.endsWith('@s.whatsapp.net')) {
+    return normalizePhone(chatId.split('@')[0]);
+  }
+
+  if (!chatId.endsWith('@lid')) return null;
+
+  try {
+    const session = encodeURIComponent(sessionName || WAHA_SESSION);
+    const lid = encodeURIComponent(chatId);
+    const response = await fetch(`${WAHA_BASE_URL}/api/${session}/lids/${lid}`, {
+      headers: wahaHeaders(),
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok) {
+      console.warn(`[LID_RESOLVE] WAHA returned ${response.status} for inbound LID`);
+      return null;
+    }
+
+    const result = await response.json();
+    if (typeof result?.pn !== 'string' || !result.pn) return null;
+    return normalizePhone(result.pn.split('@')[0]);
+  } catch (error) {
+    console.warn('[LID_RESOLVE] failed', error?.message || error);
+    return null;
+  }
+}
+
+async function sendViaWaha(phone, message) {
+  const chatId = await resolveOutboundChatId(phone);
+
   const response = await fetch(`${WAHA_BASE_URL}/api/sendText`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      accept: 'application/json',
-      'x-api-key': WAHA_API_KEY,
-    },
+    headers: wahaHeaders({ 'content-type': 'application/json' }),
     body: JSON.stringify({
       session: WAHA_SESSION,
-      chatId: `${normalized}@c.us`,
+      chatId,
       text: String(message || ''),
     }),
     signal: AbortSignal.timeout(15_000),
@@ -102,9 +164,7 @@ async function sendViaWaha(phone, message) {
   }
 
   if (!response.ok) {
-    const error = new Error(`WAHA ${response.status}: ${text.slice(0, 500)}`);
-    error.status = response.status;
-    throw error;
+    throw new Error(`WAHA ${response.status}: ${text.slice(0, 500)}`);
   }
 
   return payload;
@@ -115,10 +175,11 @@ async function forwardInboundToNera(event) {
 
   if (event?.event !== 'message') return { skipped: 'not_message_event' };
   if (payload.fromMe) return { skipped: 'from_me' };
-  if (!isDirectChatId(payload.from)) return { skipped: 'not_direct_chat' };
   if (typeof payload.body !== 'string' || !payload.body.trim()) return { skipped: 'empty_body' };
 
-  const phone = payload.from.replace(/@c\.us$/, '');
+  const phone = await resolveInboundPhone(payload.from, event.session || WAHA_SESSION);
+  if (!phone) return { skipped: 'non_direct_or_unresolved_sender' };
+
   const zapiCompatiblePayload = {
     type: 'on-message-received',
     phone,
@@ -182,7 +243,9 @@ async function handle(req, res) {
       });
     } catch (error) {
       console.error('[OUTBOUND_ERROR]', error?.message || error);
-      return json(res, 502, { error: 'waha_send_failed' });
+      return json(res, 502, {
+        error: error?.message === 'number_not_on_whatsapp' ? 'number_not_on_whatsapp' : 'waha_send_failed',
+      });
     }
   }
 
