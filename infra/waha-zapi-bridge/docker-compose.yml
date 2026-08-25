@@ -10,7 +10,6 @@ services:
       WAHA_HTTP_LOG_LEVEL: warn
       WAHA_PRINT_QR: "False"
       WAHA_RESTART_ALL_SESSIONS: "True"
-      WHATSAPP_START_SESSION: ${WAHA_SESSION:-default}
       WHATSAPP_HOOK_URL: http://bridge:8080/webhook/waha
       WHATSAPP_HOOK_EVENTS: message
       WHATSAPP_HOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY}
