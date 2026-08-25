@@ -28,16 +28,26 @@ Inbound messages take the reverse path:
 WhatsApp -> WAHA webhook -> compatibility bridge -> existing /api/zapi/webhook -> Nera
 ```
 
-That means the existing booking confirmation / reschedule / cancel logic can keep working while Z-API is removed from the infrastructure.
+That preserves Nera's existing booking confirmation, reschedule, cancel, plan-policy, idempotency and Firestore logging logic while removing Z-API from the transport layer.
 
 ## Components
 
 - **WAHA Core** using the browserless `NOWEB` engine.
 - **Nera bridge**: tiny Node HTTP service with no npm dependencies.
 - **Caddy**: HTTPS termination. WAHA itself is never exposed publicly.
-- Persistent Docker volume for the WhatsApp session.
+- Persistent Docker volume for the WhatsApp session and NOWEB store.
 
 The WAHA image is pinned to `devlikeapro/waha:noweb-2026.8.1` so an upstream release cannot silently change production behavior.
+
+## Brazil + LID handling
+
+The bridge does not blindly build `{phone}@c.us`.
+
+Before outbound messages it calls WAHA `GET /api/contacts/check-exists` and uses the returned `chatId`. WAHA explicitly recommends this for Brazilian numbers because the historical extra 9-digit convention can make a hand-built chat id incorrect.
+
+For inbound messages, normal `@c.us` / `@s.whatsapp.net` ids are converted directly to a phone number. If WhatsApp sends the newer private `@lid` identifier, the bridge resolves it through WAHA's LID mapping API before forwarding it to Nera.
+
+That is why the NOWEB session **must be created with its store enabled**.
 
 ## Security model
 
@@ -47,7 +57,7 @@ Outbound requests must match all three credentials already used by Nera:
 - instance token
 - `Client-Token`
 
-WAHA webhooks are verified using `X-Webhook-Hmac` (`sha512`) before any message is forwarded to Nera.
+WAHA webhooks are verified using `X-Webhook-Hmac` (`sha512`) over the raw request body before any message is forwarded to Nera.
 
 The bridge ignores:
 
@@ -56,6 +66,7 @@ The bridge ignores:
 - channels
 - broadcasts/status
 - empty/non-text messages
+- senders whose phone number cannot be safely resolved
 
 The WAHA dashboard is bound to `127.0.0.1:3000` and should only be reached through an SSH tunnel.
 
@@ -116,7 +127,7 @@ ZAPI_WEBHOOK_TOKEN     -> NERA_ZAPI_WEBHOOK_TOKEN
 
 Do **not** commit `.env`.
 
-## 4. Start
+## 4. Start the stack
 
 ```bash
 docker compose pull
@@ -136,21 +147,42 @@ Expected:
 {"ok":true,"service":"nera-waha-zapi-bridge"}
 ```
 
-## 5. Pair the WhatsApp account
+## 5. Create and pair the NOWEB session
 
-WAHA's dashboard is not public. From your computer, open a tunnel:
+WAHA's dashboard/API is deliberately not public. From your computer, open an SSH tunnel:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 USER@VM_PUBLIC_IP
 ```
 
-Then open locally:
+With that tunnel open, create the session **before scanning the QR**, with the NOWEB store enabled:
+
+```bash
+curl -X POST http://localhost:3000/api/sessions \
+  -H "X-Api-Key: YOUR_WAHA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "default",
+    "config": {
+      "noweb": {
+        "store": {
+          "enabled": true,
+          "fullSync": false
+        }
+      }
+    }
+  }'
+```
+
+`fullSync: false` is intentional: Nera does not need historical chat synchronization; the store is enabled mainly so WAHA can maintain the `@lid` <-> phone-number mapping needed for reliable inbound replies.
+
+Then open:
 
 ```text
 http://localhost:3000/dashboard
 ```
 
-Use the WAHA API key from `.env`, start the `default` session and pair the WhatsApp account by QR/pairing flow.
+Use the WAHA API key from `.env`, select the `default` session and pair the Nera WhatsApp account by QR/pairing flow.
 
 Confirm the session reaches `WORKING` before routing Nera traffic to it.
 
@@ -166,7 +198,7 @@ curl -X POST \
   -d '{"phone":"55DDDNUMERO","message":"Teste Nera via WAHA"}'
 ```
 
-Then reply to the WhatsApp message and confirm the bridge logs show an inbound event forwarded to Nera.
+Then reply to the WhatsApp message and confirm the bridge logs show an inbound event forwarded to Nera:
 
 ```bash
 docker compose logs -f bridge
@@ -182,7 +214,7 @@ ZAPI_BASE_URL=https://wa.usenera.com
 
 Keep the current instance id/token/client token unchanged for the first migration. They now authenticate against our bridge instead of Z-API.
 
-Do not cancel Z-API yet.
+**Do not cancel Z-API yet.**
 
 Test these real flows end-to-end:
 
@@ -192,9 +224,10 @@ Test these real flows end-to-end:
 4. client replies `Sim` -> attendance is confirmed
 5. client replies `1` -> reschedule flow
 6. client replies `2` -> cancellation flow
-7. container restart -> WAHA session returns to `WORKING` without a new QR
+7. container/VM restart -> WAHA session returns to `WORKING` without a new QR
+8. test at least two Brazilian mobile numbers from different carriers/DDD if available
 
-Only after all seven pass should the Z-API subscription be cancelled.
+Only after all eight pass should the Z-API subscription be cancelled.
 
 ## Rollback
 
