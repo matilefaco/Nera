@@ -1,0 +1,70 @@
+services:
+  waha:
+    image: devlikeapro/waha:noweb-2026.8.1
+    restart: unless-stopped
+    environment:
+      WHATSAPP_DEFAULT_ENGINE: NOWEB
+      WAHA_NOWEB_WA_VERSION: auto-web
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WAHA_LOG_LEVEL: info
+      WAHA_HTTP_LOG_LEVEL: warn
+      WAHA_PRINT_QR: "False"
+      WAHA_RESTART_ALL_SESSIONS: "True"
+      WHATSAPP_START_SESSION: ${WAHA_SESSION:-default}
+      WHATSAPP_HOOK_URL: http://bridge:8080/webhook/waha
+      WHATSAPP_HOOK_EVENTS: message
+      WHATSAPP_HOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY}
+      WAHA_SESSION_CONFIG_IGNORE_STATUS: "true"
+      WAHA_SESSION_CONFIG_IGNORE_GROUPS: "true"
+      WAHA_SESSION_CONFIG_IGNORE_CHANNELS: "true"
+      WAHA_SESSION_CONFIG_IGNORE_BROADCAST: "true"
+    volumes:
+      - waha_sessions:/app/.sessions
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- -H 'X-Api-Key: ${WAHA_API_KEY}' http://127.0.0.1:3000/api/sessions >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  bridge:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      waha:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      WAHA_BASE_URL: http://waha:3000
+      WAHA_API_KEY: ${WAHA_API_KEY}
+      WAHA_SESSION: ${WAHA_SESSION:-default}
+      WAHA_WEBHOOK_HMAC_KEY: ${WAHA_WEBHOOK_HMAC_KEY}
+      BRIDGE_INSTANCE_ID: ${BRIDGE_INSTANCE_ID}
+      BRIDGE_INSTANCE_TOKEN: ${BRIDGE_INSTANCE_TOKEN}
+      BRIDGE_CLIENT_TOKEN: ${BRIDGE_CLIENT_TOKEN}
+      NERA_ZAPI_WEBHOOK_URL: ${NERA_ZAPI_WEBHOOK_URL}
+      NERA_ZAPI_WEBHOOK_TOKEN: ${NERA_ZAPI_WEBHOOK_TOKEN}
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      - bridge
+    environment:
+      BRIDGE_PUBLIC_HOST: ${BRIDGE_PUBLIC_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  waha_sessions:
+  caddy_data:
+  caddy_config:
