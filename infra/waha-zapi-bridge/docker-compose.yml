@@ -1,6 +1,7 @@
 services:
   waha:
-    image: devlikeapro/waha:noweb-2026.8.1
+    # x86 default. On Oracle Ampere A1 (ARM), set WAHA_IMAGE=devlikeapro/waha:noweb-arm-2026.8.1.
+    image: ${WAHA_IMAGE:-devlikeapro/waha:noweb-2026.8.1}
     restart: unless-stopped
     environment:
       WHATSAPP_DEFAULT_ENGINE: NOWEB
