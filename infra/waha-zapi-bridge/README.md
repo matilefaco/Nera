@@ -193,57 +193,72 @@ curl -X GET http://127.0.0.1:3000/api/default/auth/qr \
 
 ---
 
-## 8. Teste Direto do Bridge (Antes de alterar a Nera)
+## 8. Fases da Migração e Proteção contra Inbound Duplicado
 
-### 8.1. Teste de Envio (Outbound)
-```bash
-curl -X POST \
-  "https://wa.usenera.com/instances/$BRIDGE_INSTANCE_ID/token/$BRIDGE_INSTANCE_TOKEN/send-text" \
-  -H "Client-Token: $BRIDGE_CLIENT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "phone": "5511999999999",
-    "message": "✨ Teste Nera via WAHA Bridge!"
-  }'
-```
-*Resposta esperada (HTTP 200):*
-```json
-{"zaapId":"...","messageId":"...","id":"...","success":true}
-```
-
-### 8.2. Teste de Resposta (Inbound)
-Responda à mensagem no WhatsApp do cliente com `"Sim"`.
-Verifique nos logs do container:
-```bash
-docker compose logs -f bridge
-```
-*Log esperado:*
-`[INBOUND_FORWARDED] Forwarded message from *********9999 to Nera (200)`
+Durante a migração, a Z-API e o WAHA podem estar conectados simultaneamente ao mesmo número de WhatsApp. Para impedir que uma mesma mensagem de cliente seja processada duas vezes pela Nera (dual-inbound), o bridge possui a trava de segurança `BRIDGE_INBOUND_FORWARDING_ENABLED` (por padrão **`false`**).
 
 ---
 
-## 9. Procedimento de Cutover na Nera
+### FASE A — PREPARAÇÃO / SHADOW (Estado Inicial)
+- **Nera Outbound:** Z-API (`ZAPI_BASE_URL=https://api.z-api.io`)
+- **Nera Inbound:** Z-API (Webhook da Z-API ativo na URL da Nera)
+- **WAHA / Bridge:** Conectado e ativo, com **`BRIDGE_INBOUND_FORWARDING_ENABLED=false`**
 
-> ⚠️ **ATENÇÃO:** NÃO cancele a Z-API ainda. O cutover é feito mantendo a Z-API de prontidão para rollback imediato caso necessário.
+**Permitido nesta fase:**
+- Verificar saúde do bridge via `GET https://wa.usenera.com/healthz`.
+- Testar sessão do WAHA e reconexão automática (`docker compose restart waha` / reboot da VM).
+- Testar envio direto pelo bridge via `curl` para números de teste da equipe.
+- Testar verificação de número brasileiro (`check-exists`).
+- O WAHA receberá as mensagens dos clientes, mas o bridge responderá `200 { status: 'skipped', reason: 'inbound_forwarding_disabled' }` e **NÃO** repassará nada para a Nera.
 
-1. **Ação Prévia no Ambiente da Nera (GCP / Secret Manager / Firebase):**
-   - **CONFIRMAR/CRIAR `ZAPI_WEBHOOK_TOKEN` NO AMBIENTE DE PRODUÇÃO ANTES DO PRÓXIMO DEPLOY DA API.**
-   - Exemplo via gcloud / Firebase CLI:
-     ```bash
-     firebase functions:secrets:set ZAPI_WEBHOOK_TOKEN
-     ```
-2. No ambiente de produção da Nera (GCP / Firebase Secrets / Cloud Run):
-   - Atualize apenas a variável de ambiente:
+---
+
+### FASE B — CUTOVER CONTROLADO (Transição para WAHA)
+Execute estritamente na seguinte ordem:
+
+1. Confirmar que a sessão WAHA está em estado `WORKING`.
+2. Confirmar que o bridge está saudável (`https://wa.usenera.com/healthz`).
+3. **Desabilitar o webhook inbound da Z-API** no painel da Z-API (ou alterar a URL de webhook para uma URL nula), garantindo que a Z-API não seja mais dona do inbound.
+4. No arquivo `.env` do bridge na VM, alterar:
+   ```env
+   BRIDGE_INBOUND_FORWARDING_ENABLED=true
+   ```
+5. Reiniciar o container do bridge para carregar a nova variável:
+   ```bash
+   docker compose up -d bridge
+   ```
+6. No ambiente de produção da Nera (GCP / Firebase Secrets / Cloud Run):
+   - Confirmar/criar o segredo `ZAPI_WEBHOOK_TOKEN` (via `firebase functions:secrets:set ZAPI_WEBHOOK_TOKEN`).
+   - Alterar a variável de ambiente:
      ```env
      ZAPI_BASE_URL=https://wa.usenera.com
      ```
-   - Certifique-se de que `ZAPI_INSTANCE_ID`, `ZAPI_INSTANCE_TOKEN`, `ZAPI_CLIENT_TOKEN` e `ZAPI_WEBHOOK_TOKEN` correspondem aos valores configurados no `.env` do bridge.
-3. Reinicie / faça o deploy da API da Nera.
-4. Execute a bateria de testes reais.
+7. Reiniciar / fazer deploy da API da Nera.
+8. Enviar mensagem de teste para o WhatsApp da Nera e responder com `Sim`, `1`, `2`, `3`.
+9. Verificar nos logs da Nera (`whatsapp_inbound_logs`) que as mensagens estão sendo gravadas com `provider: "waha"`.
+
+> ⚠️ **IMPORTANTE:** Nunca mantenha o webhook da Z-API e o `BRIDGE_INBOUND_FORWARDING_ENABLED=true` ativos simultaneamente.
 
 ---
 
-## 10. Checklist Obrigatório Antes de Cancelar a Z-API
+### FASE C — ROLLBACK INSTANTÂNEO (Se houver qualquer instabilidade)
+Se precisar reverter a operação para a Z-API:
+
+1. No `.env` do bridge na VM, desative o forwarding:
+   ```env
+   BRIDGE_INBOUND_FORWARDING_ENABLED=false
+   ```
+   E aplique: `docker compose up -d bridge`.
+2. No ambiente da Nera (GCP / Firebase Secrets / Cloud Run), restaure:
+   ```env
+   ZAPI_BASE_URL=https://api.z-api.io
+   ```
+3. Reative o webhook inbound no painel da Z-API apontando para `https://usenera.com/api/zapi/webhook`.
+4. O tráfego retornará imediatamente para a Z-API sem mensagens duplicadas.
+
+---
+
+## 9. Checklist Obrigatório Antes de Cancelar a Z-API
 
 Execute e aprove todos os 23 itens:
 

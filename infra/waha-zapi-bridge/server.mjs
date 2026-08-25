@@ -26,6 +26,10 @@ const NERA_ZAPI_WEBHOOK_TOKEN = requireEnv('NERA_ZAPI_WEBHOOK_TOKEN', process.en
 
 const NERA_ZAPI_WEBHOOK_URL = process.env.NERA_ZAPI_WEBHOOK_URL || 'https://usenera.com/api/zapi/webhook';
 
+// Migration safety: Inbound forwarding is strictly disabled by default to avoid dual-inbound with Z-API
+const BRIDGE_INBOUND_FORWARDING_ENABLED =
+  String(process.env.BRIDGE_INBOUND_FORWARDING_ENABLED || 'false').toLowerCase() === 'true';
+
 const MAX_BODY_BYTES = 256 * 1024; // 256 KB limit
 const FETCH_TIMEOUT_MS = 15000; // 15 seconds
 
@@ -359,7 +363,19 @@ async function handleWahaWebhook(req, res) {
 
   const messageId = messageData.id || eventPayload.id || `waha-${Date.now()}`;
 
-  // 6. Build Z-API compatible payload for Nera's handleInboundMessage
+  // 6. Check if inbound forwarding is enabled (Migration safety against dual-inbound with Z-API)
+  const isForwardingEnabled =
+    String(process.env.BRIDGE_INBOUND_FORWARDING_ENABLED ?? BRIDGE_INBOUND_FORWARDING_ENABLED).toLowerCase() === 'true';
+
+  if (!isForwardingEnabled) {
+    console.log(`[INBOUND_SKIPPED] Inbound forwarding disabled. Skipped forwarding message from ${maskPhone(senderPhone)} to Nera.`);
+    return sendJson(res, 200, {
+      status: 'skipped',
+      reason: 'inbound_forwarding_disabled'
+    });
+  }
+
+  // 7. Build Z-API compatible payload for Nera's handleInboundMessage
   const zapiPayload = {
     type: 'on-message-received',
     phone: senderPhone,
@@ -371,7 +387,7 @@ async function handleWahaWebhook(req, res) {
     session: eventPayload.session || WAHA_SESSION
   };
 
-  // 7. Forward to Nera's webhook
+  // 8. Forward to Nera's webhook
   try {
     const forwardHeaders = {
       'Content-Type': 'application/json',
@@ -447,5 +463,6 @@ export {
   resolveLidToPhone,
   maskPhone,
   constantTimeCompare,
-  requireEnv
+  requireEnv,
+  BRIDGE_INBOUND_FORWARDING_ENABLED
 };

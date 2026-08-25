@@ -333,7 +333,43 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
     assert.equal(d.reason, 'non_direct_chat');
   });
 
-  await t.test('Inbound Webhook: successfully processes direct @c.us message and forwards to Nera', async () => {
+  await t.test('Inbound Webhook: skips forwarding to Nera when BRIDGE_INBOUND_FORWARDING_ENABLED is false', async () => {
+    process.env.BRIDGE_INBOUND_FORWARDING_ENABLED = 'false';
+    lastNeraRequest = null;
+    const sign = (body) => crypto.createHmac('sha512', 'test_hmac_secret').update(body).digest('hex');
+
+    const messagePayload = JSON.stringify({
+      event: 'message',
+      session: 'default',
+      payload: {
+        id: 'waha_inbound_disabled_test',
+        from: '5511999995555@c.us',
+        body: 'Sim'
+      }
+    });
+
+    const res = await fetch(`${bridgeUrl}/webhook/waha`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-hmac': sign(messagePayload),
+        'x-webhook-hmac-algorithm': 'sha512'
+      },
+      body: messagePayload
+    });
+
+    assert.equal(res.status, 200);
+    const d = await res.json();
+    assert.equal(d.status, 'skipped');
+    assert.equal(d.reason, 'inbound_forwarding_disabled');
+
+    // Confirm mock Nera received 0 requests
+    assert.equal(lastNeraRequest, null);
+  });
+
+  await t.test('Inbound Webhook: successfully processes direct @c.us message and forwards to Nera when forwarding enabled', async () => {
+    process.env.BRIDGE_INBOUND_FORWARDING_ENABLED = 'true';
+    lastNeraRequest = null;
     const sign = (body) => crypto.createHmac('sha512', 'test_hmac_secret').update(body).digest('hex');
 
     const messagePayload = JSON.stringify({
@@ -361,6 +397,7 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
     assert.equal(d.status, 'forwarded');
 
     // Verify Nera received formatted Z-API compatible webhook
+    assert.notEqual(lastNeraRequest, null);
     assert.equal(lastNeraRequest.path, '/api/zapi/webhook');
     assert.equal(lastNeraRequest.headers['client-token'], 'test_nera_webhook_token');
     assert.equal(lastNeraRequest.headers['x-zapi-token'], 'test_nera_webhook_token');

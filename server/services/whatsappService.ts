@@ -458,11 +458,14 @@ export async function handleInboundMessage(_db: admin.firestore.Firestore, phone
   // Attempt to extract metadata safely from rawPayload without credentials
   const eventType = rawPayload?.type || rawPayload?.event || "message";
   const messageType = rawPayload?.message?.type || "text";
+  const inboundProvider = (typeof rawPayload?.provider === 'string' && ['zapi', 'waha'].includes(rawPayload.provider.toLowerCase()))
+    ? rawPayload.provider.toLowerCase()
+    : 'zapi';
 
   const logRef = db.collection('whatsapp_inbound_logs').doc();
   const logData: any = {
     id: logRef.id,
-    provider: "zapi",
+    provider: inboundProvider,
     eventType,
     messageType,
     phoneMasked,

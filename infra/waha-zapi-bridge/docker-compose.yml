@@ -41,6 +41,7 @@ services:
       - BRIDGE_CLIENT_TOKEN=${BRIDGE_CLIENT_TOKEN:?BRIDGE_CLIENT_TOKEN is required}
       - NERA_ZAPI_WEBHOOK_URL=${NERA_ZAPI_WEBHOOK_URL:-https://usenera.com/api/zapi/webhook}
       - NERA_ZAPI_WEBHOOK_TOKEN=${NERA_ZAPI_WEBHOOK_TOKEN:?NERA_ZAPI_WEBHOOK_TOKEN is required}
+      - BRIDGE_INBOUND_FORWARDING_ENABLED=${BRIDGE_INBOUND_FORWARDING_ENABLED:-false}
     depends_on:
       - waha
     networks:
