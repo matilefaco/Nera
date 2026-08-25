@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import crypto from 'node:crypto';
 
-// Setup test env before importing server
+// Setup test env BEFORE importing server to pass fail-closed validation
 process.env.NODE_ENV = 'test';
 process.env.PORT = '0';
 process.env.BRIDGE_INSTANCE_ID = 'test_instance';
@@ -36,6 +36,7 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
   let lastWahaRequest = null;
   let lastNeraRequest = null;
   let wahaCheckExistsResponse = { numberExists: true, chatId: '5511999991234@c.us' };
+  let wahaLidResponse = { pn: '5511988887777@c.us', lid: '123456789@lid' };
 
   // 1. Mock WAHA
   mockWaha = await createMockServer((req, res) => {
@@ -59,8 +60,13 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
       }
 
       if (url.pathname.includes('/lids/')) {
+        if (!wahaLidResponse) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'not_found' }));
+          return;
+        }
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ pn: '5511988887777', id: 'resolved@c.us' }));
+        res.end(JSON.stringify(wahaLidResponse));
         return;
       }
 
@@ -95,7 +101,7 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
   process.env.WAHA_BASE_URL = mockWaha.url;
   process.env.NERA_ZAPI_WEBHOOK_URL = `${mockNera.url}/api/zapi/webhook`;
 
-  const { server, maskPhone, constantTimeCompare } = await import('./server.mjs');
+  const { server, maskPhone, constantTimeCompare, requireEnv } = await import('./server.mjs');
   bridgeServer = server;
 
   await new Promise((resolve) => {
@@ -109,6 +115,13 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
     await new Promise((res) => bridgeServer.close(res));
     await mockWaha.close();
     await mockNera.close();
+  });
+
+  await t.test('Fail-Closed: requireEnv throws on missing or empty values', () => {
+    assert.throws(() => requireEnv('TEST_VAR', ''), /Missing required environment variable: TEST_VAR/);
+    assert.throws(() => requireEnv('TEST_VAR', undefined), /Missing required environment variable: TEST_VAR/);
+    assert.throws(() => requireEnv('TEST_VAR', '   '), /Missing required environment variable: TEST_VAR/);
+    assert.equal(requireEnv('TEST_VAR', 'valid_val'), 'valid_val');
   });
 
   await t.test('Utility functions: maskPhone and constantTimeCompare', () => {
@@ -147,6 +160,28 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
       body: JSON.stringify({ phone: '5511999991234', message: 'Hello' })
     });
     assert.equal(res2.status, 401);
+
+    // Wrong instance token
+    const res3 = await fetch(`${bridgeUrl}/instances/test_instance/token/wrong_token/send-text`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Token': 'test_client_token'
+      },
+      body: JSON.stringify({ phone: '5511999991234', message: 'Hello' })
+    });
+    assert.equal(res3.status, 401);
+
+    // Wrong client token
+    const res4 = await fetch(`${bridgeUrl}/instances/test_instance/token/test_token/send-text`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Client-Token': 'wrong_client_token'
+      },
+      body: JSON.stringify({ phone: '5511999991234', message: 'Hello' })
+    });
+    assert.equal(res4.status, 401);
   });
 
   await t.test('Outbound: 400 on invalid body payload', async () => {
@@ -178,7 +213,7 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
     assert.equal(data.error, 'number_not_on_whatsapp');
   });
 
-  await t.test('Outbound: successfully checks existence and sends text via WAHA', async () => {
+  await t.test('Outbound: successfully extracts instanceId/token from URL and sends text via WAHA', async () => {
     wahaCheckExistsResponse = { numberExists: true, chatId: '5511999991234@c.us' };
     const res = await fetch(`${bridgeUrl}/instances/test_instance/token/test_token/send-text`, {
       method: 'POST',
@@ -194,7 +229,7 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
     assert.equal(data.success, true);
     assert.equal(data.zaapId, 'msg_waha_123');
 
-    // Verify WAHA received sendText call
+    // Verify WAHA received sendText call with X-Api-Key
     assert.equal(lastWahaRequest.path, '/api/sendText');
     assert.equal(lastWahaRequest.body.chatId, '5511999991234@c.us');
     assert.equal(lastWahaRequest.body.text, 'Olá do teste Nera');
@@ -203,7 +238,19 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
 
   await t.test('Inbound Webhook: 401 on missing or invalid HMAC', async () => {
     const rawPayload = JSON.stringify({ event: 'message', payload: { body: 'Sim' } });
-    const res = await fetch(`${bridgeUrl}/webhook/waha`, {
+
+    // Missing HMAC header
+    const resMissing = await fetch(`${bridgeUrl}/webhook/waha`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: rawPayload
+    });
+    assert.equal(resMissing.status, 401);
+
+    // Bad HMAC
+    const resBad = await fetch(`${bridgeUrl}/webhook/waha`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -212,7 +259,19 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
       },
       body: rawPayload
     });
-    assert.equal(res.status, 401);
+    assert.equal(resBad.status, 401);
+
+    // Unsupported algorithm
+    const resAlgo = await fetch(`${bridgeUrl}/webhook/waha`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-hmac': 'some_hmac',
+        'x-webhook-hmac-algorithm': 'sha256'
+      },
+      body: rawPayload
+    });
+    assert.equal(resAlgo.status, 401);
   });
 
   await t.test('Inbound Webhook: ignores non-message events and fromMe', async () => {
@@ -304,6 +363,7 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
     // Verify Nera received formatted Z-API compatible webhook
     assert.equal(lastNeraRequest.path, '/api/zapi/webhook');
     assert.equal(lastNeraRequest.headers['client-token'], 'test_nera_webhook_token');
+    assert.equal(lastNeraRequest.headers['x-zapi-token'], 'test_nera_webhook_token');
     assert.equal(lastNeraRequest.body.type, 'on-message-received');
     assert.equal(lastNeraRequest.body.phone, '5511999995555');
     assert.equal(lastNeraRequest.body.text.message, 'Sim');
@@ -314,6 +374,7 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
   await t.test('Inbound Webhook: resolves @lid and forwards to Nera', async () => {
     const sign = (body) => crypto.createHmac('sha512', 'test_hmac_secret').update(body).digest('hex');
 
+    wahaLidResponse = { pn: '5511988887777@c.us', lid: '123456789@lid' };
     const lidPayload = JSON.stringify({
       event: 'message',
       session: 'default',
@@ -340,5 +401,35 @@ test('Nera WAHA Bridge Test Suite', async (t) => {
 
     assert.equal(lastNeraRequest.body.phone, '5511988887777');
     assert.equal(lastNeraRequest.body.text.message, '1');
+  });
+
+  await t.test('Inbound Webhook: unresolvable @lid is skipped without forwarding', async () => {
+    const sign = (body) => crypto.createHmac('sha512', 'test_hmac_secret').update(body).digest('hex');
+
+    wahaLidResponse = null; // simulate unresolvable lid
+    const lidPayload = JSON.stringify({
+      event: 'message',
+      session: 'default',
+      payload: {
+        id: 'waha_lid_unresolved',
+        from: '999999999@lid',
+        body: '2'
+      }
+    });
+
+    const res = await fetch(`${bridgeUrl}/webhook/waha`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-hmac': sign(lidPayload),
+        'x-webhook-hmac-algorithm': 'sha512'
+      },
+      body: lidPayload
+    });
+
+    assert.equal(res.status, 200);
+    const d = await res.json();
+    assert.equal(d.status, 'skipped');
+    assert.equal(d.reason, 'unresolved_lid');
   });
 });

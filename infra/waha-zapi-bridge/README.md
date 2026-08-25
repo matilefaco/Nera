@@ -11,12 +11,15 @@ Camada de compatibilidade de baixo consumo e custo zero/mínimo para substituir 
 Nera (sendWhatsApp)
   │ (HTTP POST /instances/:id/token/:token/send-text)
   ▼
+Caddy (:443 HTTPS - Sem expor WAHA ou logs sensíveis)
+  │
+  ▼
 Nera WAHA Bridge (:8080)
-  │ (valida Client-Token & tokens)
+  │ (validação fail-closed de Client-Token & instance token)
   │ (verifica existência do número: GET /api/contacts/check-exists)
   ▼
-WAHA Core NOWEB (:3000)
-  │ (POST /api/sendText)
+WAHA Core NOWEB (:3000 interno)
+  │ (POST /api/sendText com X-Api-Key obrigatória)
   ▼
 WhatsApp Network
 ```
@@ -27,12 +30,12 @@ WhatsApp Network
   │ (Mensagem do cliente: "Sim", "1", "2", "3")
   ▼
 WAHA Core NOWEB
-  │ (Webhook com assinatura HMAC SHA-512)
+  │ (Webhook com assinatura obrigatória HMAC SHA-512)
   ▼
 Nera WAHA Bridge (:8080 /webhook/waha)
-  │ (valida HMAC SHA-512 do corpo raw)
+  │ (valida obrigatoriamente HMAC SHA-512 do corpo raw em timing-safe)
   │ (ignora fromMe, grupos, canais, status, broadcasts)
-  │ (resolve @lid para telefone se necessário)
+  │ (resolve @lid para telefone via endpoint oficial /api/{session}/lids/{lid})
   │ (molda para contrato Z-API on-message-received)
   ▼
 Nera Backend (POST /api/zapi/webhook)
@@ -46,6 +49,7 @@ handleInboundMessage() -> Firestore -> Confirmação / Reagendamento / Cancelame
 ## 2. Por que esta abordagem?
 
 - **Zero alteração de regras de negócio:** O backend da Nera continua chamando `sendWhatsApp()` e recebendo `handleInboundMessage()` exatamente como antes.
+- **Segurança Fail-Closed:** Todos os segredos e chaves de validação são estritamente obrigatórios no startup do bridge. Se qualquer credencial estiver ausente, o serviço não inicia e nunca desativa a autenticação.
 - **Rollback instantâneo:** Trocar entre WAHA e Z-API é feito alterando apenas a variável `ZAPI_BASE_URL` (sem migração de banco de dados).
 - **Sem peso:** O bridge é um servidor Node 22 nativo (`node:http`, `node:crypto`, `fetch`), sem frameworks pesados, sem Redis, sem PostgreSQL.
 - **Economia:** Elimina a mensalidade fixa da Z-API mantendo a mesma confiabilidade para o volume da Nera.
@@ -222,14 +226,20 @@ docker compose logs -f bridge
 
 > ⚠️ **ATENÇÃO:** NÃO cancele a Z-API ainda. O cutover é feito mantendo a Z-API de prontidão para rollback imediato caso necessário.
 
-1. No ambiente de produção da Nera (GCP / Firebase Secrets / Cloud Run):
+1. **Ação Prévia no Ambiente da Nera (GCP / Secret Manager / Firebase):**
+   - **CONFIRMAR/CRIAR `ZAPI_WEBHOOK_TOKEN` NO AMBIENTE DE PRODUÇÃO ANTES DO PRÓXIMO DEPLOY DA API.**
+   - Exemplo via gcloud / Firebase CLI:
+     ```bash
+     firebase functions:secrets:set ZAPI_WEBHOOK_TOKEN
+     ```
+2. No ambiente de produção da Nera (GCP / Firebase Secrets / Cloud Run):
    - Atualize apenas a variável de ambiente:
      ```env
      ZAPI_BASE_URL=https://wa.usenera.com
      ```
    - Certifique-se de que `ZAPI_INSTANCE_ID`, `ZAPI_INSTANCE_TOKEN`, `ZAPI_CLIENT_TOKEN` e `ZAPI_WEBHOOK_TOKEN` correspondem aos valores configurados no `.env` do bridge.
-2. Reinicie / faça o deploy da API da Nera.
-3. Execute a bateria de testes reais.
+3. Reinicie / faça o deploy da API da Nera.
+4. Execute a bateria de testes reais.
 
 ---
 

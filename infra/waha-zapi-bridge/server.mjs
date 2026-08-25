@@ -1,19 +1,30 @@
 import http from 'node:http';
 import crypto from 'node:crypto';
 
-// Configuration from environment
+/**
+ * Validate required environment variable (Fail-Closed)
+ */
+function requireEnv(name, value) {
+  if (!value || !String(value).trim()) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return String(value).trim();
+}
+
+// Configuration & Fail-Closed Validation
 const PORT = parseInt(process.env.PORT || '8080', 10);
 const WAHA_BASE_URL = (process.env.WAHA_BASE_URL || 'http://waha:3000').replace(/\/+$/, '');
 const WAHA_SESSION = process.env.WAHA_SESSION || 'default';
-const WAHA_API_KEY = process.env.WAHA_API_KEY || '';
-const WAHA_WEBHOOK_HMAC_KEY = process.env.WAHA_WEBHOOK_HMAC_KEY || '';
 
-const BRIDGE_INSTANCE_ID = process.env.BRIDGE_INSTANCE_ID || '';
-const BRIDGE_INSTANCE_TOKEN = process.env.BRIDGE_INSTANCE_TOKEN || '';
-const BRIDGE_CLIENT_TOKEN = process.env.BRIDGE_CLIENT_TOKEN || '';
+// Validate all mandatory secrets on startup
+const WAHA_API_KEY = requireEnv('WAHA_API_KEY', process.env.WAHA_API_KEY);
+const WAHA_WEBHOOK_HMAC_KEY = requireEnv('WAHA_WEBHOOK_HMAC_KEY', process.env.WAHA_WEBHOOK_HMAC_KEY);
+const BRIDGE_INSTANCE_ID = requireEnv('BRIDGE_INSTANCE_ID', process.env.BRIDGE_INSTANCE_ID);
+const BRIDGE_INSTANCE_TOKEN = requireEnv('BRIDGE_INSTANCE_TOKEN', process.env.BRIDGE_INSTANCE_TOKEN);
+const BRIDGE_CLIENT_TOKEN = requireEnv('BRIDGE_CLIENT_TOKEN', process.env.BRIDGE_CLIENT_TOKEN);
+const NERA_ZAPI_WEBHOOK_TOKEN = requireEnv('NERA_ZAPI_WEBHOOK_TOKEN', process.env.NERA_ZAPI_WEBHOOK_TOKEN);
 
 const NERA_ZAPI_WEBHOOK_URL = process.env.NERA_ZAPI_WEBHOOK_URL || 'https://usenera.com/api/zapi/webhook';
-const NERA_ZAPI_WEBHOOK_TOKEN = process.env.NERA_ZAPI_WEBHOOK_TOKEN || '';
 
 const MAX_BODY_BYTES = 256 * 1024; // 256 KB limit
 const FETCH_TIMEOUT_MS = 15000; // 15 seconds
@@ -107,7 +118,7 @@ async function checkContactExists(phone, session = WAHA_SESSION) {
     const response = await fetch(checkUrl, {
       method: 'GET',
       headers: {
-        ...(WAHA_API_KEY ? { 'X-Api-Key': WAHA_API_KEY } : {})
+        'X-Api-Key': WAHA_API_KEY
       },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
     });
@@ -120,7 +131,6 @@ async function checkContactExists(phone, session = WAHA_SESSION) {
       return { exists, chatId };
     }
 
-    // If endpoint returned 404/not found or error status
     if (response.status === 404) {
       return { exists: false, error: 'not_found' };
     }
@@ -135,35 +145,24 @@ async function checkContactExists(phone, session = WAHA_SESSION) {
 }
 
 /**
- * Resolve @lid to standard phone number via WAHA LID resolution endpoint
+ * Resolve @lid to standard phone number via WAHA official LID resolution endpoint
+ * GET /api/{session}/lids/{lid}
  */
 async function resolveLidToPhone(lid, session = WAHA_SESSION) {
   try {
-    // Attempt standard WAHA lid lookup endpoints
     const lidUrl = `${WAHA_BASE_URL}/api/${encodeURIComponent(session)}/lids/${encodeURIComponent(lid)}`;
-    let response = await fetch(lidUrl, {
+    const response = await fetch(lidUrl, {
       method: 'GET',
       headers: {
-        ...(WAHA_API_KEY ? { 'X-Api-Key': WAHA_API_KEY } : {})
+        'X-Api-Key': WAHA_API_KEY
       },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
     });
 
-    if (!response.ok) {
-      // Fallback endpoint in some WAHA builds: /api/contacts/{lid}
-      const altUrl = `${WAHA_BASE_URL}/api/contacts/${encodeURIComponent(lid)}?session=${encodeURIComponent(session)}`;
-      response = await fetch(altUrl, {
-        method: 'GET',
-        headers: {
-          ...(WAHA_API_KEY ? { 'X-Api-Key': WAHA_API_KEY } : {})
-        },
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-      });
-    }
-
     if (response.ok) {
       const data = await response.json();
-      const phoneCandidate = data.pn || data.phone || data.number || (data.id && typeof data.id === 'object' ? data.id.user : data.id);
+      // Documented response format: { lid: "123@lid", pn: "5511999999999@c.us" }
+      const phoneCandidate = data.pn || data.phone || data.number;
       const digits = normalizeDigits(String(phoneCandidate || ''));
       if (digits && digits.length >= 8) {
         return digits;
@@ -178,16 +177,13 @@ async function resolveLidToPhone(lid, session = WAHA_SESSION) {
 /**
  * Handle Outbound Message: POST /instances/:instanceId/token/:token/send-text
  */
-async function handleSendText(req, res, pathParts) {
-  const instanceId = pathParts[1];
-  const token = pathParts[3];
-
-  // 1. Authenticate instance & token
-  const isInstanceValid = BRIDGE_INSTANCE_ID ? constantTimeCompare(instanceId, BRIDGE_INSTANCE_ID) : true;
-  const isTokenValid = BRIDGE_INSTANCE_TOKEN ? constantTimeCompare(token, BRIDGE_INSTANCE_TOKEN) : true;
+async function handleSendText(req, res, instanceId, instanceToken) {
+  // 1. Authenticate instance & token (Fail-Closed)
+  const isInstanceValid = constantTimeCompare(instanceId, BRIDGE_INSTANCE_ID);
+  const isTokenValid = constantTimeCompare(instanceToken, BRIDGE_INSTANCE_TOKEN);
 
   const clientTokenHeader = req.headers['client-token'] || req.headers['x-client-token'] || '';
-  const isClientTokenValid = BRIDGE_CLIENT_TOKEN ? constantTimeCompare(String(clientTokenHeader), BRIDGE_CLIENT_TOKEN) : true;
+  const isClientTokenValid = constantTimeCompare(String(clientTokenHeader), BRIDGE_CLIENT_TOKEN);
 
   if (!isInstanceValid || !isTokenValid || !isClientTokenValid) {
     console.warn('[OUTBOUND_AUTH_FAILED] Invalid credentials received.');
@@ -238,7 +234,7 @@ async function handleSendText(req, res, pathParts) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(WAHA_API_KEY ? { 'X-Api-Key': WAHA_API_KEY } : {})
+        'X-Api-Key': WAHA_API_KEY
       },
       body: JSON.stringify({
         session: WAHA_SESSION,
@@ -260,24 +256,20 @@ async function handleSendText(req, res, pathParts) {
       });
     }
 
-    const errText = await wahaResponse.text().catch(() => 'Unknown WAHA error');
     console.error(`[OUTBOUND_ERROR] WAHA returned status ${wahaResponse.status}`);
     return sendJson(res, 502, {
-      error: 'Failed to send message via WAHA',
-      status: wahaResponse.status,
-      details: errText
+      error: 'waha_send_failed'
     });
   } catch (err) {
     console.error(`[OUTBOUND_ERROR] Error connecting to WAHA: ${err.message}`);
     return sendJson(res, 502, {
-      error: 'WAHA connection failed',
-      message: err.message
+      error: 'waha_send_failed'
     });
   }
 }
 
 /**
- * Handle Inbound Webhook: POST /webhook/waha
+ * Handle Inbound Webhook: POST /webhook/waha (Fail-Closed HMAC)
  */
 async function handleWahaWebhook(req, res) {
   // 1. Read raw body
@@ -288,25 +280,23 @@ async function handleWahaWebhook(req, res) {
     return sendJson(res, err.statusCode || 400, { error: err.message });
   }
 
-  // 2. Validate HMAC if secret is configured
-  if (WAHA_WEBHOOK_HMAC_KEY) {
-    const signature = req.headers['x-webhook-hmac'] || '';
-    const algorithm = (req.headers['x-webhook-hmac-algorithm'] || '').toLowerCase();
+  // 2. Validate HMAC (Always Mandatory)
+  const signature = req.headers['x-webhook-hmac'] || '';
+  const algorithm = (req.headers['x-webhook-hmac-algorithm'] || '').toLowerCase();
 
-    if (algorithm !== 'sha512' && algorithm !== 'sha-512') {
-      console.warn('[HMAC_INVALID] Unsupported or missing HMAC algorithm header');
-      return sendJson(res, 401, { error: 'Invalid or unsupported HMAC algorithm' });
-    }
+  if (!signature || (algorithm !== 'sha512' && algorithm !== 'sha-512')) {
+    console.warn('[HMAC_INVALID] Missing or unsupported HMAC signature/algorithm header');
+    return sendJson(res, 401, { error: 'Invalid or missing HMAC signature' });
+  }
 
-    const expectedHmac = crypto
-      .createHmac('sha512', WAHA_WEBHOOK_HMAC_KEY)
-      .update(rawBody)
-      .digest('hex');
+  const expectedHmac = crypto
+    .createHmac('sha512', WAHA_WEBHOOK_HMAC_KEY)
+    .update(rawBody)
+    .digest('hex');
 
-    if (!constantTimeCompare(signature, expectedHmac)) {
-      console.warn('[HMAC_INVALID] Signature verification failed');
-      return sendJson(res, 401, { error: 'Invalid HMAC signature' });
-    }
+  if (!constantTimeCompare(signature, expectedHmac)) {
+    console.warn('[HMAC_INVALID] Signature verification failed');
+    return sendJson(res, 401, { error: 'Invalid HMAC signature' });
   }
 
   // 3. Parse JSON
@@ -384,13 +374,10 @@ async function handleWahaWebhook(req, res) {
   // 7. Forward to Nera's webhook
   try {
     const forwardHeaders = {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'client-token': NERA_ZAPI_WEBHOOK_TOKEN,
+      'x-zapi-token': NERA_ZAPI_WEBHOOK_TOKEN
     };
-
-    if (NERA_ZAPI_WEBHOOK_TOKEN) {
-      forwardHeaders['client-token'] = NERA_ZAPI_WEBHOOK_TOKEN;
-      forwardHeaders['x-zapi-token'] = NERA_ZAPI_WEBHOOK_TOKEN;
-    }
 
     const neraResponse = await fetch(NERA_ZAPI_WEBHOOK_URL, {
       method: 'POST',
@@ -431,7 +418,8 @@ const server = http.createServer(async (req, res) => {
   // Outbound sendText route: /instances/:instanceId/token/:token/send-text
   const sendTextMatch = pathname.match(/^\/instances\/([^/]+)\/token\/([^/]+)\/send-text$/);
   if (method === 'POST' && sendTextMatch) {
-    return handleSendText(req, res, pathname.split('/'));
+    const [, instanceId, instanceToken] = sendTextMatch;
+    return handleSendText(req, res, instanceId, instanceToken);
   }
 
   // Inbound webhook from WAHA: /webhook/waha
@@ -443,11 +431,21 @@ const server = http.createServer(async (req, res) => {
   return sendJson(res, 404, { error: 'Not Found' });
 });
 
-// Start listening
+// Start listening in production/runtime
 if (process.env.NODE_ENV !== 'test') {
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`[NERA_WAHA_BRIDGE] Listening on port ${PORT}`);
   });
 }
 
-export { server, handleSendText, handleWahaWebhook, readBody, checkContactExists, resolveLidToPhone, maskPhone, constantTimeCompare };
+export {
+  server,
+  handleSendText,
+  handleWahaWebhook,
+  readBody,
+  checkContactExists,
+  resolveLidToPhone,
+  maskPhone,
+  constantTimeCompare,
+  requireEnv
+};
