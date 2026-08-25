@@ -37,7 +37,55 @@ That preserves Nera's existing booking confirmation, reschedule, cancel, plan-po
 - **Caddy**: HTTPS termination. WAHA itself is never exposed publicly.
 - Persistent Docker volume for the WhatsApp session and NOWEB store.
 
-The WAHA image is pinned to `devlikeapro/waha:noweb-2026.8.1` so an upstream release cannot silently change production behavior.
+The WAHA image is pinned to version `2026.8.1` so an upstream release cannot silently change production behavior.
+
+## Cheapest hosting order
+
+### Option A — Oracle Cloud Always Free (target: R$0 fixed/month)
+
+This is the preferred zero-fixed-cost host if an Always Free Ampere A1 instance is available in the account's home region.
+
+Suggested starting shape for Nera's tiny traffic:
+
+```text
+VM.Standard.A1.Flex
+1 OCPU
+1 GB RAM
+Ubuntu ARM64
+Always Free eligible
+```
+
+WAHA has a native ARM NOWEB image. In `.env` use:
+
+```text
+WAHA_IMAGE=devlikeapro/waha:noweb-arm-2026.8.1
+```
+
+Oracle can reclaim Always Free compute that it classifies as idle, and Always Free capacity is sometimes unavailable. Treat that as an infrastructure risk, not as a guarantee of permanent uptime. The persistent session design and one-variable Nera rollback make recovery straightforward.
+
+### Option B — Google Compute Engine e2-micro
+
+The VM itself is in Google's Free Tier in eligible US regions, but a public IPv4 address on a normal VM is billed separately. Therefore this is **not literally R$0** with a standard public IPv4 setup.
+
+For x86 use:
+
+```text
+WAHA_IMAGE=devlikeapro/waha:noweb-2026.8.1
+```
+
+An `e2-micro` has 1 GB RAM. Add 2 GB swap before starting Docker:
+
+```bash
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```
+
+### Option C — cheap VPS
+
+If free hosts prove unreliable, move this exact Compose stack to a small 2-4 GB VPS. Nera itself does not need another code change; only DNS / `ZAPI_BASE_URL` changes.
 
 ## Brazil + LID handling
 
@@ -70,21 +118,21 @@ The bridge ignores:
 
 The WAHA dashboard is bound to `127.0.0.1:3000` and should only be reached through an SSH tunnel.
 
-## 1. Server
+## 1. Provision the VM
 
-For the cheapest setup, use one small always-on Linux VM. The intended first test is a Google Cloud `e2-micro` Free Tier VM in an eligible US region.
+For the R$0 target, create an Oracle Always Free Ampere A1 VM in the tenancy's home region with an Always Free-eligible Ubuntu ARM64 image.
 
-Because `e2-micro` only has 1 GB RAM, add swap before starting Docker:
+Create it in a public subnet and assign a public IPv4 address. Allow inbound TCP:
 
-```bash
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
-echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+```text
+22   SSH (preferably restricted to your IP)
+80   HTTP, used for Caddy certificate bootstrap/redirect
+443  HTTPS bridge
 ```
 
-If this proves too tight in practice, move the exact same Compose stack to a cheap 2-4 GB VPS. No Nera application-code change is required.
+Do **not** expose port 3000 publicly.
+
+If using Google instead, use an eligible US region and `e2-micro` with standard persistent disk.
 
 ## 2. DNS
 
@@ -94,17 +142,27 @@ Create an `A` record such as:
 wa.usenera.com -> VM_PUBLIC_IP
 ```
 
-Open inbound TCP ports **80** and **443** on the VM firewall. Do not expose port 3000 publicly.
-
 Caddy will obtain and renew TLS automatically after DNS resolves.
 
-## 3. Install Docker
+## 3. Install Docker and configure the stack
 
-Install Docker Engine and the Docker Compose plugin on the VM, then copy this directory to the server.
+Install Docker Engine and the Docker Compose plugin on the VM, copy this directory to the server, then:
 
 ```bash
 cd infra/waha-zapi-bridge
 cp .env.example .env
+```
+
+On Oracle Ampere A1, set:
+
+```text
+WAHA_IMAGE=devlikeapro/waha:noweb-arm-2026.8.1
+```
+
+On an x86 host, keep:
+
+```text
+WAHA_IMAGE=devlikeapro/waha:noweb-2026.8.1
 ```
 
 Generate new WAHA-only secrets:
