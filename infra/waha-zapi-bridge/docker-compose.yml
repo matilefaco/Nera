@@ -20,21 +20,15 @@ services:
       WAHA_SESSION_CONFIG_IGNORE_BROADCAST: "true"
     volumes:
       - waha_sessions:/app/.sessions
-    expose:
-      - "3000"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- -H 'X-Api-Key: ${WAHA_API_KEY}' http://127.0.0.1:3000/api/sessions >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    # Dashboard/Swagger is available only through an SSH tunnel, never publicly.
+    ports:
+      - "127.0.0.1:3000:3000"
 
   bridge:
     build: .
     restart: unless-stopped
     depends_on:
-      waha:
-        condition: service_healthy
+      - waha
     environment:
       PORT: 8080
       WAHA_BASE_URL: http://waha:3000
