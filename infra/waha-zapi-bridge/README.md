@@ -213,46 +213,33 @@ Durante a migração, a Z-API e o WAHA podem estar conectados simultaneamente ao
 
 ---
 
-### FASE B — CUTOVER CONTROLADO (Transição para WAHA)
-Execute estritamente na seguinte ordem:
+### FASE B — CUTOVER CONTROLADO (Transição para WAHA — Concluído)
+O backend da Nera foi atualizado no código com o padrão durável `ZAPI_BASE_URL=https://wa.usenera.com`.
+Qualquer deploy padrão (manual ou CI/CD via GitHub Actions) utilizará automaticamente o bridge WAHA self-hosted sem depender de arquivos `.env` locais no ambiente de build.
 
-1. Confirmar que a sessão WAHA está em estado `WORKING`.
-2. Confirmar que o bridge está saudável (`https://wa.usenera.com/healthz`).
-3. **Desabilitar o webhook inbound da Z-API** no painel da Z-API (ou alterar a URL de webhook para uma URL nula), garantindo que a Z-API não seja mais dona do inbound.
-4. No arquivo `.env` do bridge na VM, alterar:
-   ```env
-   BRIDGE_INBOUND_FORWARDING_ENABLED=true
-   ```
-5. Reiniciar o container do bridge para carregar a nova variável:
-   ```bash
-   docker compose up -d bridge
-   ```
-6. No ambiente de produção da Nera (GCP / Firebase Secrets / Cloud Run):
-   - Confirmar/criar o segredo `ZAPI_WEBHOOK_TOKEN` (via `firebase functions:secrets:set ZAPI_WEBHOOK_TOKEN`).
-   - Alterar a variável de ambiente:
-     ```env
-     ZAPI_BASE_URL=https://wa.usenera.com
-     ```
-7. Reiniciar / fazer deploy da API da Nera.
-8. Enviar mensagem de teste para o WhatsApp da Nera e responder com `Sim`, `1`, `2`, `3`.
-9. Verificar nos logs da Nera (`whatsapp_inbound_logs`) que as mensagens estão sendo gravadas com `provider: "waha"`.
-
-> ⚠️ **IMPORTANTE:** Nunca mantenha o webhook da Z-API e o `BRIDGE_INBOUND_FORWARDING_ENABLED=true` ativos simultaneamente.
+1. A sessão WAHA está conectada em estado `WORKING`.
+2. O bridge está saudável (`https://wa.usenera.com/healthz`).
+3. O webhook inbound da Z-API está desabilitado no painel da Z-API.
+4. No arquivo `.env` do bridge na VM: `BRIDGE_INBOUND_FORWARDING_ENABLED=true`.
+5. Segredos da Function configurados: `ZAPI_INSTANCE_ID`, `ZAPI_INSTANCE_TOKEN`, `ZAPI_CLIENT_TOKEN` e `ZAPI_WEBHOOK_TOKEN`.
+6. Mensagens inbound de clientes chegam no formato WAHA e são registradas no Firestore com `provider: "waha"`.
 
 ---
 
 ### FASE C — ROLLBACK INSTANTÂNEO (Se houver qualquer instabilidade)
-Se precisar reverter a operação para a Z-API:
+Se for necessário reverter temporariamente para a Z-API:
 
 1. No `.env` do bridge na VM, desative o forwarding:
    ```env
    BRIDGE_INBOUND_FORWARDING_ENABLED=false
    ```
    E aplique: `docker compose up -d bridge`.
-2. No ambiente da Nera (GCP / Firebase Secrets / Cloud Run), restaure:
+2. No ambiente da Nera (GCP / Firebase Secrets / Cloud Run / .env):
+   Defina a variável de ambiente:
    ```env
    ZAPI_BASE_URL=https://api.z-api.io
    ```
+   *(Como o código agora tem como padrão `https://wa.usenera.com`, a definição explícita de `ZAPI_BASE_URL=https://api.z-api.io` sobrescreve o padrão para direcionar as requisições de volta à Z-API).*
 3. Reative o webhook inbound no painel da Z-API apontando para `https://usenera.com/api/zapi/webhook`.
 4. O tráfego retornará imediatamente para a Z-API sem mensagens duplicadas.
 

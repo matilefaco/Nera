@@ -271,7 +271,10 @@ export async function sendWhatsApp(
   const instanceId = process.env.ZAPI_INSTANCE_ID;
   const token = process.env.ZAPI_INSTANCE_TOKEN || process.env.ZAPI_TOKEN;
   const clientToken = process.env.ZAPI_CLIENT_TOKEN;
-  const baseUrl = process.env.ZAPI_BASE_URL || 'https://api.z-api.io';
+  // Default to self-hosted WAHA bridge (https://wa.usenera.com). Overridable via ZAPI_BASE_URL (e.g., https://api.z-api.io for rollback).
+  const baseUrl = (process.env.ZAPI_BASE_URL && process.env.ZAPI_BASE_URL.trim())
+    ? process.env.ZAPI_BASE_URL.trim()
+    : 'https://wa.usenera.com';
 
   if (!instanceId || !token) {
     logger.error("WHATSAPP", '[WHATSAPP_NOTIFY_FAILED] Missing Z-API credentials', {
